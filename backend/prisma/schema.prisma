@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Rol {
+  admin
+}
+
+enum PrioridadOficina {
+  baja
+  media
+  alta
+}
+
+enum PrioridadSemaforo {
+  alta
+}
+
+enum EstadoReporte {
+  abierto
+  en_proceso
+  resuelto
+}
+
+enum TipoReporte {
+  oficina
+  semaforo
+}
+
+model Usuario {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique @db.VarChar(50)
+  email        String    @unique @db.VarChar(100)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  nombre       String    @db.VarChar(100)
+  rol          Rol       @default(admin)
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  reportesOficinaAtendidos  ReporteOficina[]  @relation("AtendidoOficina")
+  reportesSemaforoAtendidos ReporteSemaforo[] @relation("AtendidoSemaforo")
+  historial                 HistorialReporte[]
+  comentarios               Comentario[]
+
+  @@map("usuario")
+}
+
+model Area {
+  id     Int     @id @default(autoincrement())
+  nombre String  @db.VarChar(100)
+  activo Boolean @default(true)
+
+  reportes ReporteOficina[]
+
+  @@map("area")
+}
+
+model Sede {
+  id     Int     @id @default(autoincrement())
+  nombre String  @db.VarChar(100)
+  activo Boolean @default(true)
+
+  reportes ReporteOficina[]
+
+  @@map("sede")
+}
+
+model Categoria {
+  id     Int     @id @default(autoincrement())
+  nombre String  @db.VarChar(100)
+  activo Boolean @default(true)
+
+  reportes ReporteOficina[]
+
+  @@map("categoria")
+}
+
+model Cargo {
+  id     Int     @id @default(autoincrement())
+  nombre String  @db.VarChar(100)
+  activo Boolean @default(true)
+
+  reportes ReporteOficina[]
+
+  @@map("cargo")
+}
+
+model Estacion {
+  id     Int     @id @default(autoincrement())
+  nombre String  @db.VarChar(100)
+  activo Boolean @default(true)
+
+  reportes ReporteSemaforo[]
+
+  @@map("estacion")
+}
+
+model Crucero {
+  id     Int     @id @default(autoincrement())
+  nombre String  @db.VarChar(150)
+  activo Boolean @default(true)
+
+  reportes ReporteSemaforo[]
+
+  @@map("crucero")
+}
+
+model TipoFalla {
+  id     Int     @id @default(autoincrement())
+  nombre String  @db.VarChar(150)
+  activo Boolean @default(true)
+
+  reportes ReporteSemaforo[]
+
+  @@map("tipo_falla")
+}
+
+model CorreoNotificacion {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @db.VarChar(100)
+  correo    String   @db.VarChar(150)
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("correo_notificacion")
+}
+
+model ReporteOficina {
+  id              Int              @id @default(autoincrement())
+  folio           String?          @unique @db.VarChar(30)
+  solicitante     String           @db.VarChar(100)
+  areaId          Int              @map("area_id")
+  cargoId         Int?             @map("cargo_id")
+  email           String           @db.VarChar(100)
+  telefono        String?          @db.VarChar(20)
+  sedeId          Int              @map("sede_id")
+  equipo          String?          @db.VarChar(100)
+  categoriaId     Int              @map("categoria_id")
+  prioridad       PrioridadOficina
+  descripcion     String?          @db.Text
+  estado          EstadoReporte    @default(abierto)
+  atendidoPorId   Int?             @map("atendido_por")
+  fechaResolucion DateTime?        @map("fecha_resolucion")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  area        Area        @relation(fields: [areaId], references: [id])
+  cargo       Cargo?      @relation(fields: [cargoId], references: [id])
+  sede        Sede        @relation(fields: [sedeId], references: [id])
+  categoria   Categoria   @relation(fields: [categoriaId], references: [id])
+  atendidoPor Usuario?    @relation("AtendidoOficina", fields: [atendidoPorId], references: [id])
+  evidencias  Evidencia[]
+
+  @@index([estado])
+  @@index([sedeId])
+  @@index([createdAt])
+  @@map("reporte_oficina")
+}
+
+model ReporteSemaforo {
+  id              Int               @id @default(autoincrement())
+  folio           String?           @unique @db.VarChar(30)
+  jefeTurno       String            @map("jefe_turno") @db.VarChar(100)
+  estacionId      Int               @map("estacion_id")
+  cruceroId       Int               @map("crucero_id")
+  tipoFallaId     Int               @map("tipo_falla_id")
+  descripcion     String?           @db.Text
+  horaDano        DateTime          @map("hora_dano")
+  prioridad       PrioridadSemaforo @default(alta)
+  estado          EstadoReporte     @default(abierto)
+  atendidoPorId   Int?              @map("atendido_por")
+  fechaResolucion DateTime?         @map("fecha_resolucion")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  estacion    Estacion    @relation(fields: [estacionId], references: [id])
+  crucero     Crucero     @relation(fields: [cruceroId], references: [id])
+  tipoFalla   TipoFalla   @relation(fields: [tipoFallaId], references: [id])
+  atendidoPor Usuario?    @relation("AtendidoSemaforo", fields: [atendidoPorId], references: [id])
+  evidencias  Evidencia[]
+
+  @@index([estado])
+  @@index([cruceroId])
+  @@index([createdAt])
+  @@map("reporte_semaforo")
+}
+
+model Evidencia {
+  id                Int      @id @default(autoincrement())
+  reporteOficinaId  Int?     @map("reporte_oficina_id")
+  reporteSemaforoId Int?     @map("reporte_semaforo_id")
+  filename          String   @db.VarChar(255)
+  filepath          String   @db.VarChar(500)
+  mimetype          String?  @db.VarChar(100)
+  sizeBytes         Int?     @map("size_bytes")
+  uploadedAt        DateTime @default(now()) @map("uploaded_at")
+
+  reporteOficina  ReporteOficina?  @relation(fields: [reporteOficinaId], references: [id], onDelete: Cascade)
+  reporteSemaforo ReporteSemaforo? @relation(fields: [reporteSemaforoId], references: [id], onDelete: Cascade)
+
+  @@map("evidencia")
+}
+
+model HistorialReporte {
+  id             Int         @id @default(autoincrement())
+  usuarioId      Int         @map("usuario_id")
+  tipoReporte    TipoReporte @map("tipo_reporte")
+  reporteId      Int         @map("reporte_id")
+  estadoAnterior String?     @map("estado_anterior") @db.VarChar(30)
+  estadoNuevo    String?     @map("estado_nuevo") @db.VarChar(30)
+  comentario     String?     @db.Text
+  fecha          DateTime    @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([reporteId, tipoReporte])
+  @@map("historial_reporte")
+}
+
+model Comentario {
+  id          Int         @id @default(autoincrement())
+  usuarioId   Int         @map("usuario_id")
+  tipoReporte TipoReporte @map("tipo_reporte")
+  reporteId   Int         @map("reporte_id")
+  comentario  String      @db.Text
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@map("comentario")
+}

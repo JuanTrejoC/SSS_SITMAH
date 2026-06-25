@@ -1,0 +1,225 @@
+/* TAMAÑOS CORRECTOS, NO EXAGERADOS */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+body {
+  background-color: #f8fafc;
+  color: #000000;
+}
+
+.titulo-principal {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 1.5rem 0;
+  color: #000000;
+}
+
+.botones-navegacion button {
+  padding: 0.6rem 1.5rem;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  font-weight: 500;
+  margin-right: 0.3rem;
+}
+
+.botones-navegacion button:first-child {
+  background-color: #691B31;
+  color: white;
+}
+
+.botones-navegacion button:last-child {
+  background-color: #6F7271;
+  color: #475569;
+}
+
+.tarjetas-resumen {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.tarjeta {
+  background: white;
+  padding: 1.2rem;
+  border-radius: 10px;
+  border-left: 4px solid;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.tarjeta:nth-child(1) {
+  border-color: #691B31;
+}
+
+.tarjeta:nth-child(2) {
+  border-color: #dc2626;
+}
+
+.tarjeta:nth-child(3) {
+  border-color: #b45309;
+}
+
+.tarjeta:nth-child(4) {
+  border-color: #166534;
+}
+
+.etiqueta {
+  font-size: 0.85rem;
+  color: #6F7271;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ✅ NÚMEROS PEQUEÑOS Y LIMPIOS, NO GIGANTES */
+.valor-numero {
+  display: block;
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin-top: 0.3rem;
+}
+
+.filtros-seccion {
+  background: white;
+  padding: 1rem;
+  border-radius: 10px;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin: 1rem 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.filtros-seccion input,
+.filtros-seccion select {
+  padding: 0.5rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}
+
+.btn-reporte {
+  margin-left: auto;
+  background-color: #166534;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.tabla-contenedor {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  background-color: #f1f5f9;
+  padding: 0.8rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+td {
+  padding: 0.8rem;
+  border-top: 1px solid #6F7271;
+  font-size: 0.9rem;
+}
+
+.sin-datos {
+  text-align: center;
+  color: #94a3b8;
+  padding: 2rem !important;
+}
+
+/* ESTADÍSTICAS */
+.resumen-estadistico {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.dato {
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dato span {
+  display: block;
+  font-size: 0.85rem;
+  color: #6F7271;
+}
+
+.dato strong {
+  font-size: 1.5rem;
+  /* ✅ TAMAÑO CORRECTO */
+  color: #000000;
+}
+
+/* TEMA ESCALA DE GRISES */
+body.grayscale-theme {
+  filter: grayscale(100%);
+}
+
+/* ESTADÍSTICAS - IMPRESIÓN PDF */
+@media print {
+  aside,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only-block {
+    display: block !important;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  .contenedor-estadisticas {
+    padding: 0 !important;
+  }
+
+  .graficas-flex-container {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 2rem !important;
+    page-break-inside: avoid;
+  }
+
+  .grafico-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #6F7271;
+  }
+
+  .resumen {
+    grid-template-columns: repeat(5, 1fr) !important;
+    page-break-inside: avoid;
+  }
+
+  .theme-toggle-btn {
+    display: none !important;
+  }
+}
