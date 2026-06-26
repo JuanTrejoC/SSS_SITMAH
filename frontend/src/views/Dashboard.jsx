@@ -44,7 +44,7 @@ export default function Dashboard() {
   return (
     <div className="main-content-padding" style={{ backgroundColor: '#f8fafc', minHeight: '100vh' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <h1 style={{ color: '#BC955B', fontSize: 'clamp(1.15rem, 3vw, 1.8rem)', fontWeight: 'bold', marginBottom: 'clamp(1rem, 3vw, 2rem)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+        <h1 style={{ color: '#BC955B', fontSize: 'clamp(1.15rem, 3vw, 1.8rem)', fontWeight: 'bold', marginBottom: 'clamp(1.25rem, 3vw, 2.5rem)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <i className="fa-solid fa-chart-pie"></i> Panel de Administración General
         </h1>
         <p style={{ color: '#6F7271', marginBottom: 'clamp(1.25rem, 3vw, 2.5rem)', fontSize: 'clamp(0.85rem, 2vw, 1rem)' }}>Bienvenido, resumen general del sistema.</p>
