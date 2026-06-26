@@ -30,8 +30,7 @@ export default function FormOficinas({ usuarioActual }) {
     { id: 2, nombre: "Dirección General" },
     { id: 3, nombre: "Dirección Jurídica" },
     { id: 4, nombre: "Dirección de Administración y Finanzas" },
-    { id: 5, nombre: "Dirección de Planeación Desarrollo" },
-    { id: 6, nombre: "Dirección de Planeación y Desarrollo" }
+    { id: 5, nombre: "Dirección de Planeación y Desarrollo" }
   ])
   const listaCargos = [
     "Técnico Especializado", "Asesor Técnico Gestor", "Jefatura de Área",
@@ -245,7 +244,7 @@ export default function FormOficinas({ usuarioActual }) {
       confirmButtonText: 'Sí, enviar reporte',
       cancelButtonText: 'Cancelar'
     })
-    
+
     if (!confirmar.isConfirmed) return
 
     Object.keys(formData).forEach(campo => {
