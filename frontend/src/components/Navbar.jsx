@@ -203,103 +203,74 @@ export default function Navbar({ toggleSidebar }) {
         )}
 
         {/* Menú de Perfil */}
-        <div style={{ position: 'relative' }}>
-          <div
-            onClick={() => setMenuPerfilAbierto(!menuPerfilAbierto)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer' }}
-          >
-            {/* Nombre y rol — ocultos en mobile */}
-            <div className="navbar-user-info" style={{ textAlign: 'right' }}>
-              <p style={{ margin: 0, fontSize: 'clamp(0.78rem, 1.8vw, 0.88rem)', fontWeight: '600', color: '#1a1a1a' }}>
-                {user ? user.nombre : 'Usuario General'}
-              </p>
-              <p style={{ margin: 0, fontSize: 'clamp(0.68rem, 1.5vw, 0.75rem)', color: '#6F7271', textTransform: 'capitalize' }}>
-                {user ? user.rol : 'Solicitante'}
-              </p>
-            </div>
-
-            {/* Avatar circular */}
-            <div style={{
-              width: 'clamp(32px, 5vw, 38px)',
-              height: 'clamp(32px, 5vw, 38px)',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #691B31 0%, #BC955B 100%)',
-              color: 'white',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: '700',
-              fontSize: 'clamp(0.85rem, 2vw, 1rem)',
-              boxShadow: '0 2px 8px rgba(105,27,49,0.3)',
-              transition: 'transform 0.2s, box-shadow 0.2s',
-              flexShrink: 0,
-            }}
-              onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(105,27,49,0.4)' }}
-              onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(105,27,49,0.3)' }}
+        {user && (
+          <div style={{ position: 'relative' }}>
+            <div
+              onClick={() => setMenuPerfilAbierto(!menuPerfilAbierto)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer' }}
             >
-              {user ? user.nombre.charAt(0).toUpperCase() : 'S'}
-            </div>
-          </div>
+              {/* Nombre y rol — ocultos en mobile */}
+              <div className="navbar-user-info" style={{ textAlign: 'right' }}>
+                <p style={{ margin: 0, fontSize: 'clamp(0.78rem, 1.8vw, 0.88rem)', fontWeight: '600', color: '#1a1a1a' }}>
+                  {user.nombre}
+                </p>
+                <p style={{ margin: 0, fontSize: 'clamp(0.68rem, 1.5vw, 0.75rem)', color: '#6F7271', textTransform: 'capitalize' }}>
+                  {user.rol}
+                </p>
+              </div>
 
-          {/* Menú desplegable */}
-          {menuPerfilAbierto && (
-            <>
-              <div onClick={() => setMenuPerfilAbierto(false)} style={{ position: 'fixed', inset: 0, zIndex: 997 }} />
+              {/* Avatar circular */}
               <div style={{
-                position: 'absolute',
-                top: 'calc(100% + 10px)',
-                right: 0,
-                backgroundColor: 'white',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                borderRadius: '12px',
-                minWidth: '180px',
-                padding: '0.4rem 0',
-                zIndex: 998,
-                border: '1px solid #e8ecef',
-                overflow: 'hidden',
-              }}>
-                {/* Info de usuario visible en mobile */}
-                <div className="only-mobile" style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9' }}>
-                  <p style={{ margin: 0, fontSize: '0.88rem', fontWeight: '600', color: '#1a1a1a' }}>
-                    {user ? user.nombre : 'Usuario General'}
-                  </p>
-                  <p style={{ margin: 0, fontSize: '0.75rem', color: '#6F7271', textTransform: 'capitalize' }}>
-                    {user ? user.rol : 'Solicitante'}
-                  </p>
-                </div>
+                width: 'clamp(32px, 5vw, 38px)',
+                height: 'clamp(32px, 5vw, 38px)',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #691B31 0%, #BC955B 100%)',
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: '700',
+                fontSize: 'clamp(0.85rem, 2vw, 1rem)',
+                boxShadow: '0 2px 8px rgba(105,27,49,0.3)',
+                transition: 'transform 0.2s, box-shadow 0.2s',
+                flexShrink: 0,
+              }}
+                onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(105,27,49,0.4)' }}
+                onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(105,27,49,0.3)' }}
+              >
+                {user.nombre.charAt(0).toUpperCase()}
+              </div>
+            </div>
 
-                {/* Opciones del solicitante */}
-                {(!user || user.rol === 'solicitante') && (
-                  <button
-                    onClick={salir}
-                    style={{
-                      width: '100%', padding: '0.7rem 1rem', border: 'none', backgroundColor: 'transparent',
-                      textAlign: 'left', cursor: 'pointer', fontSize: '0.88rem', color: '#dc2626',
-                      display: 'flex', alignItems: 'center', gap: '0.6rem', transition: 'background 0.15s',
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fef2f2'}
-                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                  >
-                    <FaSignOutAlt size={13} /> Cerrar Sesión
-                  </button>
-                )}
+            {/* Menú desplegable */}
+            {menuPerfilAbierto && (
+              <>
+                <div onClick={() => setMenuPerfilAbierto(false)} style={{ position: 'fixed', inset: 0, zIndex: 997 }} />
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 10px)',
+                  right: 0,
+                  backgroundColor: 'white',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  borderRadius: '12px',
+                  minWidth: '180px',
+                  padding: '0.4rem 0',
+                  zIndex: 998,
+                  border: '1px solid #e8ecef',
+                  overflow: 'hidden',
+                }}>
+                  {/* Info de usuario visible en mobile */}
+                  <div className="only-mobile" style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f1f5f9' }}>
+                    <p style={{ margin: 0, fontSize: '0.88rem', fontWeight: '600', color: '#1a1a1a' }}>
+                      {user.nombre}
+                    </p>
+                    <p style={{ margin: 0, fontSize: '0.75rem', color: '#6F7271', textTransform: 'capitalize' }}>
+                      {user.rol}
+                    </p>
+                  </div>
 
-                {/* Opciones del administrador */}
-                {user?.rol === 'administrador' && (
-                  <>
-                    <button
-                      onClick={() => { navegar('/configuracion'); setMenuPerfilAbierto(false) }}
-                      style={{
-                        width: '100%', padding: '0.7rem 1rem', border: 'none', backgroundColor: 'transparent',
-                        textAlign: 'left', cursor: 'pointer', fontSize: '0.88rem', color: '#374151',
-                        display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: '500', transition: 'background 0.15s',
-                      }}
-                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                    >
-                      <FaCog size={13} /> Configuración
-                    </button>
-                    <div style={{ height: '1px', backgroundColor: '#f1f5f9', margin: '0.2rem 0' }} />
+                  {/* Opciones del solicitante */}
+                  {user.rol === 'solicitante' && (
                     <button
                       onClick={salir}
                       style={{
@@ -312,12 +283,43 @@ export default function Navbar({ toggleSidebar }) {
                     >
                       <FaSignOutAlt size={13} /> Cerrar Sesión
                     </button>
-                  </>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+                  )}
+
+                  {/* Opciones del administrador */}
+                  {user.rol === 'administrador' && (
+                    <>
+                      <button
+                        onClick={() => { navegar('/configuracion'); setMenuPerfilAbierto(false) }}
+                        style={{
+                          width: '100%', padding: '0.7rem 1rem', border: 'none', backgroundColor: 'transparent',
+                          textAlign: 'left', cursor: 'pointer', fontSize: '0.88rem', color: '#374151',
+                          display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: '500', transition: 'background 0.15s',
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <FaCog size={13} /> Configuración
+                      </button>
+                      <div style={{ height: '1px', backgroundColor: '#f1f5f9', margin: '0.2rem 0' }} />
+                      <button
+                        onClick={salir}
+                        style={{
+                          width: '100%', padding: '0.7rem 1rem', border: 'none', backgroundColor: 'transparent',
+                          textAlign: 'left', cursor: 'pointer', fontSize: '0.88rem', color: '#dc2626',
+                          display: 'flex', alignItems: 'center', gap: '0.6rem', transition: 'background 0.15s',
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fef2f2'}
+                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <FaSignOutAlt size={13} /> Cerrar Sesión
+                      </button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </nav>
   )

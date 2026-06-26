@@ -28,10 +28,6 @@ export default function ThemeToggle() {
       aria-label="Alternar escala de grises"
       className="theme-toggle-btn"
       style={{
-        position: 'fixed',
-        bottom: '1.25rem',
-        right: '1rem',
-        zIndex: 9999,
         width: '42px',
         height: '42px',
         borderRadius: '50%',

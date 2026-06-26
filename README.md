@@ -266,3 +266,25 @@ backend/
 | `npm run db:migrate` | Aplicar migraciones |
 | `npm run db:seed` | Insertar datos de prueba |
 | `npm run db:studio` | Ver BD en navegador |
+
+## Sincronización Automática con Git (Opcional)
+
+Para mantener el proyecto actualizado con los cambios que suban tus compañeros a la rama remota de manera automática, puedes usar el script de PowerShell `git-auto-sync.ps1` en la raíz del proyecto.
+
+### Cómo iniciarlo:
+
+1. Abre una terminal de PowerShell (en VS Code o de forma independiente).
+2. Ejecuta el script omitiendo la política de ejecución local de Windows:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\git-auto-sync.ps1
+   ```
+
+### ¿Qué hace el script?
+- Realiza `git fetch` cada 60 segundos en segundo plano.
+- Si detecta cambios remotos nuevos:
+  - Guarda de forma segura tus cambios locales sin confirmar en un stash temporal (`git stash`).
+  - Descarga los nuevos cambios remotos (`git pull`).
+  - Vuelve a aplicar tus cambios locales sobre los nuevos cambios (`git stash pop`).
+  - Si se actualizaron dependencias en `frontend/package.json` o `backend/package.json`, corre `npm install` automáticamente en la carpeta correspondiente.
+  - Si se agregaron migraciones de base de datos de Prisma, las aplica automáticamente (`npx prisma migrate deploy`).
+  - Muestra globos de notificación nativos en la esquina inferior derecha de Windows informando de cada paso (cambios encontrados, instalaciones en progreso y actualización finalizada).
