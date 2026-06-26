@@ -24,6 +24,7 @@ export default function FormOficinas({ usuarioActual }) {
   const [valido, setValido] = useState({})
   const [mostrarOtro, setMostrarOtro] = useState(false)
   const [cargando, setCargando] = useState(false)
+  const [vistaPrevia, setVistaPrevia] = useState(null)
 
   const [listaAreas, setListaAreas] = useState([
     { id: 1, nombre: "Dirección de Operación" },
@@ -212,6 +213,7 @@ export default function FormOficinas({ usuarioActual }) {
       alert('❌ Solo se permiten archivos de imagen (.jpg, .jpeg, .png, .gif, .webp)')
       e.target.value = ''
       setFormData(prev => ({ ...prev, evidencia: null }))
+      setVistaPrevia(null)
       return
     }
 
@@ -219,15 +221,29 @@ export default function FormOficinas({ usuarioActual }) {
       alert('❌ La imagen no debe superar los 10 MB')
       e.target.value = ''
       setFormData(prev => ({ ...prev, evidencia: null }))
+      setVistaPrevia(null)
       return
     }
 
     try {
       const archivoComprimido = await comprimirImagen(archivo)
       setFormData(prev => ({ ...prev, evidencia: archivoComprimido }))
+      setVistaPrevia(URL.createObjectURL(archivoComprimido))
     } catch (err) {
       console.error('Error al comprimir la imagen:', err)
       setFormData(prev => ({ ...prev, evidencia: archivo }))
+      setVistaPrevia(URL.createObjectURL(archivo))
+    }
+  }
+
+  const eliminarEvidencia = () => {
+    setFormData(prev => ({ ...prev, evidencia: null }))
+    if (vistaPrevia) {
+      URL.revokeObjectURL(vistaPrevia)
+      setVistaPrevia(null)
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
     }
   }
 
@@ -301,6 +317,7 @@ export default function FormOficinas({ usuarioActual }) {
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
         }
+        setVistaPrevia(null)
         setMostrarOtro(false)
         setErrores({})
         setValido({})
@@ -514,8 +531,45 @@ export default function FormOficinas({ usuarioActual }) {
         {/* EVIDENCIA */}
         <div style={{ marginBottom: '2rem' }}>
           <label style={{ fontSize: '0.85rem', fontWeight: '500', color: '#000000', display: 'block', marginBottom: '0.4rem' }}>Evidencia Fotográfica (Solo imágenes)</label>
-          <div style={{ border: '1px solid #9B9B9A', borderRadius: '8px', padding: '0.65rem', backgroundColor: 'white', display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={manejarArchivo} style={{ fontSize: '0.9rem' }} />
+          <div style={{ border: '1px solid #9B9B9A', borderRadius: '8px', padding: '0.65rem', backgroundColor: 'white', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={manejarArchivo} style={{ fontSize: '0.9rem', width: '100%' }} />
+            {vistaPrevia && (
+              <div style={{ position: 'relative', display: 'inline-block', width: 'fit-content', marginTop: '0.5rem' }}>
+                <img 
+                  src={vistaPrevia} 
+                  alt="Vista previa" 
+                  style={{ maxWidth: '180px', maxHeight: '180px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #cbd5e1' }} 
+                />
+                <button
+                  type="button"
+                  onClick={eliminarEvidencia}
+                  title="Eliminar imagen"
+                  style={{
+                    position: 'absolute',
+                    top: '-8px',
+                    right: '-8px',
+                    backgroundColor: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '24px',
+                    height: '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    transition: 'transform 0.1s ease',
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                  onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
