@@ -47,12 +47,25 @@ async function crear(req, res) {
   const data = parsed.data;
   const folio = await generarFolio('oficina');
 
+  let cargoId = null;
+  if (data.cargo) {
+    let cargoObj = await prisma.cargo.findFirst({
+      where: { nombre: data.cargo }
+    });
+    if (!cargoObj) {
+      cargoObj = await prisma.cargo.create({
+        data: { nombre: data.cargo }
+      });
+    }
+    cargoId = cargoObj.id;
+  }
+
   const reporte = await prisma.reporteOficina.create({
     data: {
       folio,
       solicitante: data.solicitante,
       areaId: data.area_id,
-      cargo: data.cargo,
+      cargoId: cargoId,
       email: data.email,
       telefono: data.telefono,
       sedeId: data.sede_id,
