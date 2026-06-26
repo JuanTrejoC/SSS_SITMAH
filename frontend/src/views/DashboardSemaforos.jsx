@@ -160,11 +160,11 @@ export default function DashboardSemaforos() {
   }
 
   return (
-    <div style={{ padding: '2rem', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
+    <div className="main-content-padding" style={{ backgroundColor: '#f8fafc', minHeight: '100vh' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
 
         {/* ✅ ENCABEZADO CON TABS DE NAVEGACIÓN */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div className="responsive-flex" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
           <h1 style={{ color: '#BC955B', fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>
             <i className="fa-solid fa-traffic-light" style={{ marginRight: '0.5rem' }}></i> Panel de Reportes - Semáforos
           </h1>
@@ -213,7 +213,7 @@ export default function DashboardSemaforos() {
         {/* ✅ BARRA DE FILTROS */}
         <div style={{ backgroundColor: 'white', padding: '1.2rem', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', marginBottom: '2rem' }}>
           {/* Fila 1: Búsqueda por mes, año y estado */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr', gap: '1rem', marginBottom: '0.8rem' }}>
+          <div className="form-responsive-grid grid-2" style={{ marginBottom: '1rem' }}>
             <div>
               <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'block', marginBottom: '0.3rem' }}>
                 <i className="fa-solid fa-calendar-days" style={{ marginRight: '0.3rem' }}></i>Mes y Año
@@ -248,7 +248,7 @@ export default function DashboardSemaforos() {
           </div>
 
           {/* Fila 2: Busqueda por Termino y Botón Excel */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem', alignItems: 'end' }}>
+          <div className="form-responsive-grid grid-2" style={{ alignItems: 'end' }}>
             <div>
               <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'block', marginBottom: '0.3rem' }}>Buscar Término</label>
               <input
@@ -269,8 +269,8 @@ export default function DashboardSemaforos() {
         </div>
 
         {/* ✅ TABLA */}
-        <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="overflow-x-auto" style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
             <thead>
               <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #9B9B9A' }}>
                 <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Folio</th>
@@ -384,11 +384,11 @@ export default function DashboardSemaforos() {
         {/* ✅ MODAL DETALLES */}
         {verDetalle && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
-            <div style={{ backgroundColor: 'white', padding: '2.5rem', borderRadius: '12px', width: '600px', maxWidth: '95%', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '12px', width: '90%', maxWidth: '600px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', maxHeight: '90vh', overflowY: 'auto' }}>
               <h3 style={{ color: '#BC955B', marginBottom: '1.5rem', fontSize: '1.4rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' }}>
                 Detalles del Reporte {formatFolio(verDetalle.folio, verDetalle.id)}
               </h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', fontSize: '0.95rem', lineHeight: '1.5', color: '#334155' }}>
+              <div className="form-responsive-grid grid-2" style={{ fontSize: '0.95rem', lineHeight: '1.5', color: '#334155' }}>
                 <div><strong>Jefe Turno:</strong> {verDetalle.jefeTurno}</div>
                 <div><strong>Estación:</strong> {verDetalle.estacion?.nombre || '—'}</div>
                 <div><strong>Crucero:</strong> {verDetalle.crucero?.nombre || '—'}</div>
@@ -404,7 +404,7 @@ export default function DashboardSemaforos() {
                   <div style={{ gridColumn: '1 / -1' }}><strong>Atendido por:</strong> {verDetalle.atendidoPor.nombre} ({verDetalle.atendidoPor.username})</div>
                 )}
                 <div style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
-                  <strong>Notas de Campo:</strong>
+                  <strong>Descripción:</strong>
                   <div style={{ backgroundColor: '#f8fafc', padding: '0.8rem', borderRadius: '8px', marginTop: '0.4rem', maxHeight: '120px', overflowY: 'auto', border: '1px solid #6F7271', fontSize: '0.9rem', fontStyle: 'italic' }}>
                     {verDetalle.descripcion || 'Sin observaciones adicionales.'}
                   </div>

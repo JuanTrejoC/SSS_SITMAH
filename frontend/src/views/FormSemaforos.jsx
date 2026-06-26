@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import Swal from 'sweetalert2'
 
 export default function FormSemaforos({ usuarioActual }) {
   const fileInputRef = useRef(null)
@@ -260,6 +261,20 @@ export default function FormSemaforos({ usuarioActual }) {
   // ✅ ENVÍO DE FORMULARIO
   const enviar = async (e) => {
     e.preventDefault()
+
+    const confirmar = await Swal.fire({
+      title: '¿Enviar reporte?',
+      text: 'Puede cancelar si desea revisar o editar algo antes de enviarlo.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#BC955B',
+      cancelButtonColor: '#9B9B9A',
+      confirmButtonText: 'Sí, enviar reporte',
+      cancelButtonText: 'Cancelar'
+    })
+
+    if (!confirmar.isConfirmed) return
+
     setCargando(true)
 
     // 🔍 VALIDACIÓN COMPLETA ANTES DE ENVIAR
@@ -349,11 +364,11 @@ export default function FormSemaforos({ usuarioActual }) {
     <div style={{ padding: '2rem', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
       <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 12px rgb(0,0,0)', padding: '2.5rem' }}>
         <h2 style={{ color: '#BC955B', fontSize: '1.2rem', fontWeight: '600', marginBottom: '1.8rem' }}>
-          Reporte de Infraestructura Vial (Tuzobús)
+          Reporte de Infraestructura Vial
         </h2>
 
         {/* FILA 1: Datos principales */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.2rem', marginBottom: '1.2rem' }}>
+        <div className="form-responsive-grid grid-4" style={{ marginBottom: '1.2rem' }}>
           <div>
             <label style={{ fontSize: '0.85rem', fontWeight: '500', color: '#1f2937', display: 'block', marginBottom: '0.4rem' }}>
               Jefe de Turno Operativo
@@ -379,7 +394,7 @@ export default function FormSemaforos({ usuarioActual }) {
 
           <div>
             <label style={{ fontSize: '0.85rem', fontWeight: '500', color: '#1f2937', display: 'block', marginBottom: '0.4rem' }}>
-              Estación Tuzobús Cercana
+              Estación Cercana
             </label>
             <select
               value={formData.estacion_id}
@@ -480,7 +495,7 @@ export default function FormSemaforos({ usuarioActual }) {
         </div>
 
         {/* FILA 2: Hora y Prioridad */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.2rem', marginBottom: '1.5rem' }}>
+        <div className="form-responsive-grid grid-2" style={{ marginBottom: '1.5rem' }}>
           <div>
             <label style={{ fontSize: '0.85rem', fontWeight: '500', color: '#000000', display: 'block', marginBottom: '0.4rem' }}>
               Hora Exacta del Siniestro
@@ -552,7 +567,7 @@ export default function FormSemaforos({ usuarioActual }) {
         </div>
 
         {/* BOTONES DE ACCIÓN */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+        <div className="form-responsive-buttons" style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
           <button
             type="button"
             onClick={() => window.location.reload()}

@@ -1,6 +1,24 @@
 const prisma = require('../config/db');
 
-async function obtenerEstadisticas() {
+async function obtenerEstadisticas(filtroTiempo = 'dia') {
+  let fechaFiltro = null;
+  const ahora = new Date();
+
+  if (filtroTiempo === 'dia') {
+    fechaFiltro = new Date(ahora.setHours(0, 0, 0, 0));
+  } else if (filtroTiempo === 'semana') {
+    const day = ahora.getDay() || 7;
+    if (day !== 1) ahora.setHours(-24 * (day - 1));
+    fechaFiltro = new Date(ahora.setHours(0, 0, 0, 0));
+  } else if (filtroTiempo === 'mes') {
+    fechaFiltro = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+  } else if (filtroTiempo === 'año') {
+    fechaFiltro = new Date(ahora.getFullYear(), 0, 1);
+  }
+
+  const whereOficina = fechaFiltro ? { createdAt: { gte: fechaFiltro } } : {};
+  const whereSemaforo = fechaFiltro ? { createdAt: { gte: fechaFiltro } } : {};
+
   const [
     totalOficina,
     totalSemaforo,
@@ -10,31 +28,31 @@ async function obtenerEstadisticas() {
     resueltosSemaforo,
     resueltosOficinaData,
     resueltosSemaforoData,
-    oficinaPorMes,
-    semaforoPorMes,
+    reportesOficinaList,
+    reportesSemaforoList,
   ] = await Promise.all([
-    prisma.reporteOficina.count(),
-    prisma.reporteSemaforo.count(),
-    prisma.reporteOficina.count({ where: { estado: 'en_proceso' } }),
-    prisma.reporteSemaforo.count({ where: { estado: 'en_proceso' } }),
-    prisma.reporteOficina.count({ where: { estado: 'resuelto' } }),
-    prisma.reporteSemaforo.count({ where: { estado: 'resuelto' } }),
+    prisma.reporteOficina.count({ where: whereOficina }),
+    prisma.reporteSemaforo.count({ where: whereSemaforo }),
+    prisma.reporteOficina.count({ where: { ...whereOficina, estado: 'en_proceso' } }),
+    prisma.reporteSemaforo.count({ where: { ...whereSemaforo, estado: 'en_proceso' } }),
+    prisma.reporteOficina.count({ where: { ...whereOficina, estado: 'resuelto' } }),
+    prisma.reporteSemaforo.count({ where: { ...whereSemaforo, estado: 'resuelto' } }),
     prisma.reporteOficina.findMany({
-      where: { estado: 'resuelto', fechaResolucion: { not: null } },
+      where: { ...whereOficina, estado: 'resuelto', fechaResolucion: { not: null } },
       select: { createdAt: true, fechaResolucion: true },
     }),
     prisma.reporteSemaforo.findMany({
-      where: { estado: 'resuelto', fechaResolucion: { not: null } },
+      where: { ...whereSemaforo, estado: 'resuelto', fechaResolucion: { not: null } },
       select: { createdAt: true, fechaResolucion: true },
     }),
     prisma.reporteOficina.findMany({
-      where: { createdAt: { gte: hace12Meses() } },
-      select: { createdAt: true },
+      where: whereOficina,
+      include: { categoria: true, cargo: true, area: true, sede: true }
     }),
     prisma.reporteSemaforo.findMany({
-      where: { createdAt: { gte: hace12Meses() } },
-      select: { createdAt: true },
-    }),
+      where: whereSemaforo,
+      include: { tipoFalla: true, crucero: true, estacion: true }
+    })
   ]);
 
   const todosResueltos = [...resueltosOficinaData, ...resueltosSemaforoData];
@@ -47,19 +65,39 @@ async function obtenerEstadisticas() {
     tiempoPromedioHoras = Math.round((totalMs / todosResueltos.length / 3600000) * 10) / 10;
   }
 
-  const porMesMap = {};
+  const abiertosOficina = await prisma.reporteOficina.count({ where: { ...whereOficina, estado: 'abierto' } });
+  const abiertosSemaforo = await prisma.reporteSemaforo.count({ where: { ...whereSemaforo, estado: 'abierto' } });
 
-  [...oficinaPorMes, ...semaforoPorMes].forEach((r) => {
-    const mes = `${r.createdAt.getFullYear()}-${String(r.createdAt.getMonth() + 1).padStart(2, '0')}`;
-    porMesMap[mes] = (porMesMap[mes] || 0) + 1;
-  });
-
-  const porMes = Object.entries(porMesMap)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([mes, cantidad]) => ({ mes, cantidad }));
-
-  const abiertosOficina = await prisma.reporteOficina.count({ where: { estado: 'abierto' } });
-  const abiertosSemaforo = await prisma.reporteSemaforo.count({ where: { estado: 'abierto' } });
+  const reportes = [
+    ...reportesOficinaList.map(r => ({
+      id: r.id,
+      tipo: 'Oficina',
+      folio: r.folio || `OFI-${r.id}`,
+      solicitante: r.solicitante,
+      categoria: r.categoria?.nombre || 'N/A',
+      cargo: r.cargo?.nombre || 'No especificado',
+      sede: r.sede?.nombre || 'N/A',
+      area: r.area?.nombre || 'N/A',
+      equipo: r.equipo || 'N/A',
+      prioridad: r.prioridad,
+      estado: r.estado,
+      fecha: r.createdAt
+    })),
+    ...reportesSemaforoList.map(r => ({
+      id: r.id,
+      tipo: 'Semáforo',
+      folio: r.folio || `SEM-${r.id}`,
+      solicitante: r.jefeTurno,
+      notas: r.descripcion,
+      crucero: r.crucero?.nombre || 'N/A',
+      estacion: r.estacion?.nombre || 'N/A',
+      tipoFalla: r.tipoFalla?.nombre || 'N/A',
+      prioridad: r.prioridad,
+      estado: r.estado,
+      fecha: r.createdAt,
+      horaDano: r.horaDano
+    }))
+  ].sort((a, b) => b.fecha - a.fecha);
 
   return {
     totales: {
@@ -68,7 +106,7 @@ async function obtenerEstadisticas() {
       resueltos: resueltosOficina + resueltosSemaforo,
     },
     tiempo_promedio_horas: tiempoPromedioHoras,
-    por_mes: porMes,
+    por_mes: [],
     distribucion: {
       por_tipo: { oficina: totalOficina, semaforo: totalSemaforo },
       por_estado: {
@@ -88,14 +126,9 @@ async function obtenerEstadisticas() {
       abierto: abiertosSemaforo,
       en_proceso: enProcesoSemaforo,
       resuelto: resueltosSemaforo
-    }
+    },
+    reportes: reportes
   };
-}
-
-function hace12Meses() {
-  const d = new Date();
-  d.setMonth(d.getMonth() - 12);
-  return d;
 }
 
 module.exports = { obtenerEstadisticas };

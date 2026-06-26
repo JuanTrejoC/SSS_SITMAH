@@ -38,12 +38,12 @@ export default function MisReportes({ usuarioActual }) {
   )
 
   return (
-    <div style={{ padding: '2rem', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
-      <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', padding: '2.5rem' }}>
+    <div className="main-content-padding" style={{ backgroundColor: '#f8fafc', minHeight: '100vh' }}>
+      <div className="card-padding" style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
         <h2 style={{ color: '#BC955B', fontSize: '1.2rem', fontWeight: '600', marginBottom: '1.8rem' }}>Mis Reportes Enviados</h2>
 
         {/* ✅ BUSCADOR + BOTÓN SOLO ADMIN */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+        <div className="responsive-flex" style={{ alignItems: 'center', marginBottom: '2rem' }}>
           <input
             type="text"
             placeholder="Buscar palabra clave..."
@@ -129,8 +129,8 @@ export default function MisReportes({ usuarioActual }) {
 
         {/* ✅ MODAL DETALLES */}
         {verDetalle && (
-          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
-            <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: '600px', maxHeight: '80vh', overflowY: 'auto' }}>
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
+            <div className="card-padding" style={{ backgroundColor: 'white', borderRadius: '12px', width: '90%', maxWidth: '600px', maxHeight: '80vh', overflowY: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h3 style={{ color: '#BC955B' }}>Detalle del Reporte #{verDetalle.id}</h3>
                 <button onClick={() => setVerDetalle(null)} style={{ border: 'none', backgroundColor: 'transparent', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>

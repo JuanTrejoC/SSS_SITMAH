@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { FaAdjust } from 'react-icons/fa'
 
 export default function ThemeToggle() {
@@ -7,15 +8,20 @@ export default function ThemeToggle() {
   })
 
   useEffect(() => {
-    if (esEscalaGrises) {
-      document.body.classList.add('grayscale-theme')
-    } else {
-      document.body.classList.remove('grayscale-theme')
+    const root = document.getElementById('root')
+    if (root) {
+      if (esEscalaGrises) {
+        root.classList.add('grayscale-theme')
+      } else {
+        root.classList.remove('grayscale-theme')
+      }
     }
     localStorage.setItem('sitmah_grayscale', String(esEscalaGrises))
   }, [esEscalaGrises])
 
-  return (
+  // Se renderiza con portal directamente en document.body para quedar FUERA del
+  // stacking context del filtro grayscale, así position:fixed funciona correctamente
+  return createPortal(
     <button
       onClick={() => setEsEscalaGrises(!esEscalaGrises)}
       title={esEscalaGrises ? 'Restaurar colores' : 'Activar escala de grises'}
@@ -24,8 +30,8 @@ export default function ThemeToggle() {
       style={{
         position: 'fixed',
         bottom: '1.25rem',
-        right: '0.4rem',
-        zIndex: 900,
+        right: '1 rem',
+        zIndex: 9999,
         width: '42px',
         height: '42px',
         borderRadius: '50%',
@@ -36,13 +42,15 @@ export default function ThemeToggle() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
-        transition: 'background 0.2s, transform 0.2s, color 0.2s'
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
+        transition: 'background 0.2s, transform 0.2s, color 0.2s',
       }}
       onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.08)' }}
       onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)' }}
     >
       <FaAdjust size={18} />
-    </button>
+    </button>,
+    document.body
   )
 }
+

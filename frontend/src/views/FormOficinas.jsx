@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import Swal from 'sweetalert2'
 
 export default function FormOficinas({ usuarioActual }) {
   const fileInputRef = useRef(null)
@@ -234,6 +235,19 @@ export default function FormOficinas({ usuarioActual }) {
   const enviar = async (e) => {
     e.preventDefault()
 
+    const confirmar = await Swal.fire({
+      title: '¿Enviar reporte?',
+      text: 'Puede cancelar si desea revisar o editar algo antes de enviarlo.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#BC955B',
+      cancelButtonColor: '#9B9B9A',
+      confirmButtonText: 'Sí, enviar reporte',
+      cancelButtonText: 'Cancelar'
+    })
+    
+    if (!confirmar.isConfirmed) return
+
     Object.keys(formData).forEach(campo => {
       if (campo !== 'evidencia' && campo !== 'descripcion') {
         validarCampo(campo, formData[campo])
@@ -312,7 +326,7 @@ export default function FormOficinas({ usuarioActual }) {
         </h2>
 
         {/* FILA 1 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.2rem', marginBottom: '1.2rem' }}>
+        <div className="form-responsive-grid grid-4" style={{ marginBottom: '1.2rem' }}>
           <div>
             <label style={{ fontSize: '0.85rem', fontWeight: '500', color: '#000000', display: 'block', marginBottom: '0.4rem' }}>Nombre Completo</label>
             <input
@@ -369,7 +383,7 @@ export default function FormOficinas({ usuarioActual }) {
         </div>
 
         {/* FILA 2 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.2rem', marginBottom: '2rem' }}>
+        <div className="form-responsive-grid grid-3" style={{ marginBottom: '2rem' }}>
           <div>
             <label style={{ fontSize: '0.85rem', fontWeight: '500', color: '#000000', display: 'block', marginBottom: '0.4rem' }}>Teléfono</label>
             <input
@@ -414,7 +428,7 @@ export default function FormOficinas({ usuarioActual }) {
         </h2>
 
         {/* FILA 3: Categoría + Prioridad */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1.2rem', marginBottom: '1.5rem' }}>
+        <div className="form-responsive-grid grid-2" style={{ marginBottom: '1.5rem' }}>
           <div>
             <label style={{ fontSize: '0.85rem', fontWeight: '500', color: '#000000', display: 'block', marginBottom: '0.4rem' }}>Categoría de Falla</label>
             <select
@@ -507,7 +521,7 @@ export default function FormOficinas({ usuarioActual }) {
         </div>
 
         {/* BOTONES */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+        <div className="form-responsive-buttons" style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
           <button
             type="button"
             onClick={() => window.location.reload()}

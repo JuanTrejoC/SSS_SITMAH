@@ -276,8 +276,7 @@ export default function ConfigAdmin() {
   }
 
   return (
-    <div style={{
-      padding: '2.5rem',
+    <div className="main-content-padding" style={{
       backgroundColor: '#F8FAFC',
       minHeight: '100vh'
     }}>
@@ -380,11 +379,11 @@ export default function ConfigAdmin() {
         <div style={{
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
           backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', zIndex: 999
+          justifyContent: 'center', zIndex: 999, padding: '1rem'
         }}>
-          <div style={{
-            backgroundColor: 'white', padding: '2.5rem', borderRadius: '12px',
-            width: '800px', maxWidth: '95%', maxHeight: '90vh', display: 'flex',
+          <div className="card-padding" style={{
+            backgroundColor: 'white', borderRadius: '12px',
+            width: '90%', maxWidth: '900px', maxHeight: '90vh', display: 'flex',
             flexDirection: 'column', boxShadow: '0 5px 25px rgba(0,0,0,0.2)'
           }}>
 
@@ -405,13 +404,12 @@ export default function ConfigAdmin() {
             </div>
 
             {/* Contenido en dos columnas: Izquierda Formulario, Derecha Tabla */}
-            <div style={{
-              flex: 1, display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '2rem',
-              overflowY: 'auto', paddingRight: '0.5rem'
+            <div className="form-responsive-grid grid-2" style={{
+              flex: 1, overflowY: 'auto'
             }}>
 
               {/* COLUMNA IZQUIERDA: FORMULARIO */}
-              <div style={{ borderRight: '1px solid #f1f5f9', paddingRight: '1.5rem' }}>
+              <div>
                 <h3 style={{ fontSize: '1rem', color: '#000000', marginBottom: '1rem', fontWeight: '600' }}>
                   {editandoId ? 'Modificar Registro' : 'Agregar Nuevo'}
                 </h3>
@@ -485,7 +483,7 @@ export default function ConfigAdmin() {
                 ) : items.length === 0 ? (
                   <p style={{ color: '#6F7271', fontSize: '0.9rem', textAlign: 'center', paddingTop: '2rem' }}>No hay registros activos en la base de datos.</p>
                 ) : (
-                  <div style={{ overflowY: 'auto', maxHeight: '360px', border: '1px solid #6F7271', borderRadius: '8px' }}>
+                  <div className="overflow-x-auto" style={{ overflowY: 'auto', maxHeight: '360px', border: '1px solid #6F7271', borderRadius: '8px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                       <thead>
                         <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #6F7271', position: 'sticky', top: 0 }}>
