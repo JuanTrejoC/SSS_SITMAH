@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
+import { API_BASE_URL } from '../config'
 
 export default function FormSemaforos({ usuarioActual }) {
   const fileInputRef = useRef(null)
@@ -119,17 +120,17 @@ export default function FormSemaforos({ usuarioActual }) {
   useEffect(() => {
     const cargarCatalogos = async () => {
       try {
-        const resEstaciones = await fetch('http://localhost:3000/api/catalogos/estaciones')
+        const resEstaciones = await fetch(`${API_BASE_URL}/api/catalogos/estaciones`)
         if (resEstaciones.ok) {
           const json = await resEstaciones.json()
           if (json.ok && json.data && json.data.length > 0) setListaEstaciones(json.data)
         }
-        const resCruceros = await fetch('http://localhost:3000/api/catalogos/cruceros')
+        const resCruceros = await fetch(`${API_BASE_URL}/api/catalogos/cruceros`)
         if (resCruceros.ok) {
           const json = await resCruceros.json()
           if (json.ok && json.data && json.data.length > 0) setListaCruceros(json.data)
         }
-        const resFallas = await fetch('http://localhost:3000/api/catalogos/tipos-falla')
+        const resFallas = await fetch(`${API_BASE_URL}/api/catalogos/tipos-falla`)
         if (resFallas.ok) {
           const json = await resFallas.json()
           if (json.ok && json.data && json.data.length > 0) setListaTiposFalla(json.data)
@@ -337,7 +338,7 @@ export default function FormSemaforos({ usuarioActual }) {
       }
 
       // 📡 PETICIÓN AL SERVIDOR
-      const respuesta = await fetch('http://localhost:3000/api/reportes/semaforo', {
+      const respuesta = await fetch(`${API_BASE_URL}/api/reportes/semaforo`, {
         method: 'POST',
         body: datosAEnviar
       })

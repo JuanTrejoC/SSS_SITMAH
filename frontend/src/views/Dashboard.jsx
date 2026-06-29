@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { API_BASE_URL } from '../config'
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -16,7 +17,7 @@ export default function Dashboard() {
       try {
         const headers = { 'Authorization': `Bearer ${user.token}` }
 
-        const resOficina = await fetch('http://localhost:3000/api/admin/reportes/oficina/resumen', { headers })
+        const resOficina = await fetch(`${API_BASE_URL}/api/admin/reportes/oficina/resumen`, { headers })
         if (resOficina.ok) {
           const json = await resOficina.json()
           if (json.ok && json.data) {
@@ -25,7 +26,7 @@ export default function Dashboard() {
           }
         }
 
-        const resSemaforo = await fetch('http://localhost:3000/api/admin/reportes/semaforo/resumen', { headers })
+        const resSemaforo = await fetch(`${API_BASE_URL}/api/admin/reportes/semaforo/resumen`, { headers })
         if (resSemaforo.ok) {
           const json = await resSemaforo.json()
           if (json.ok && json.data) {

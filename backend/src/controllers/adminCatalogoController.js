@@ -33,7 +33,7 @@ async function listar(req, res) {
   const config = getModel(req.params.tipo);
   if (!config) return fail(res, 'Catálogo no encontrado', 404);
 
-  const items = await config.model().findMany({ orderBy: { nombre: 'asc' } });
+  const items = await config.model().findMany({ orderBy: { id: 'asc' } });
   ok(res, items);
 }
 

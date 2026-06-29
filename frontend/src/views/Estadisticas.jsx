@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { Doughnut } from 'react-chartjs-2'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
 import { FaFilePdf } from 'react-icons/fa'
+import { API_BASE_URL } from '../config'
 
 ChartJS.register(ArcElement, Tooltip, Legend)
 
@@ -37,7 +38,7 @@ export default function Estadisticas() {
       if (!user?.token) return
       setCargando(true)
       try {
-        const response = await fetch(`http://localhost:3000/api/admin/estadisticas?filtroTiempo=${filtroTiempo}`, {
+        const response = await fetch(`${API_BASE_URL}/api/admin/estadisticas?filtroTiempo=${filtroTiempo}`, {
           headers: {
             'Authorization': `Bearer ${user.token}`
           }

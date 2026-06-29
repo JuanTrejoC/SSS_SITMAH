@@ -5,6 +5,7 @@ import {
   FaIdBadge, FaBus, FaTrafficLight, FaExclamationTriangle
 } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
+import { API_BASE_URL } from '../config'
 
 export default function ConfigAdmin() {
   const { user } = useAuth()
@@ -90,9 +91,9 @@ export default function ConfigAdmin() {
     setCargando(true)
     try {
       let url = ''
-      if (tipo === 'usuarios') url = 'http://localhost:3000/api/admin/usuarios'
-      else if (tipo === 'correos') url = 'http://localhost:3000/api/admin/correos'
-      else url = `http://localhost:3000/api/admin/catalogos/${tipo}`
+      if (tipo === 'usuarios') url = `${API_BASE_URL}/api/admin/usuarios`
+      else if (tipo === 'correos') url = `${API_BASE_URL}/api/admin/correos`
+      else url = `${API_BASE_URL}/api/admin/catalogos/${tipo}`
 
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${user.token}` }
@@ -151,8 +152,8 @@ export default function ConfigAdmin() {
       if (password) payload.password = password
 
       url = editandoId
-        ? `http://localhost:3000/api/admin/usuarios/${editandoId}`
-        : 'http://localhost:3000/api/admin/usuarios'
+        ? `${API_BASE_URL}/api/admin/usuarios/${editandoId}`
+        : `${API_BASE_URL}/api/admin/usuarios`
     } else if (catalogoSeleccionado === 'correos') {
       if (!nombre || !correoDestino) {
         alert('Complete todos los campos')
@@ -160,8 +161,8 @@ export default function ConfigAdmin() {
       }
       payload = { nombre, correo: correoDestino }
       url = editandoId
-        ? `http://localhost:3000/api/admin/correos/${editandoId}`
-        : 'http://localhost:3000/api/admin/correos'
+        ? `${API_BASE_URL}/api/admin/correos/${editandoId}`
+        : `${API_BASE_URL}/api/admin/correos`
     } else {
       if (!nombre) {
         alert('El nombre es requerido')
@@ -169,8 +170,8 @@ export default function ConfigAdmin() {
       }
       payload = { nombre }
       url = editandoId
-        ? `http://localhost:3000/api/admin/catalogos/${catalogoSeleccionado}/${editandoId}`
-        : `http://localhost:3000/api/admin/catalogos/${catalogoSeleccionado}`
+        ? `${API_BASE_URL}/api/admin/catalogos/${catalogoSeleccionado}/${editandoId}`
+        : `${API_BASE_URL}/api/admin/catalogos/${catalogoSeleccionado}`
     }
 
     try {
@@ -224,9 +225,9 @@ export default function ConfigAdmin() {
         let url = ''
         let metodo = 'DELETE'
 
-        if (catalogoSeleccionado === 'usuarios') url = `http://localhost:3000/api/admin/usuarios/${id}`
-        else if (catalogoSeleccionado === 'correos') url = `http://localhost:3000/api/admin/correos/${id}`
-        else url = `http://localhost:3000/api/admin/catalogos/${catalogoSeleccionado}/${id}`
+        if (catalogoSeleccionado === 'usuarios') url = `${API_BASE_URL}/api/admin/usuarios/${id}`
+        else if (catalogoSeleccionado === 'correos') url = `${API_BASE_URL}/api/admin/correos/${id}`
+        else url = `${API_BASE_URL}/api/admin/catalogos/${catalogoSeleccionado}/${id}`
 
         const response = await fetch(url, {
           method: metodo,
@@ -251,8 +252,8 @@ export default function ConfigAdmin() {
     if (!user?.token) return
     try {
       let url = catalogoSeleccionado === 'correos'
-        ? `http://localhost:3000/api/admin/correos/${id}`
-        : `http://localhost:3000/api/admin/catalogos/${catalogoSeleccionado}/${id}`
+        ? `${API_BASE_URL}/api/admin/correos/${id}`
+        : `${API_BASE_URL}/api/admin/catalogos/${catalogoSeleccionado}/${id}`
 
       const response = await fetch(url, {
         method: 'PUT',
@@ -280,24 +281,25 @@ export default function ConfigAdmin() {
       backgroundColor: '#F8FAFC',
       minHeight: '100vh'
     }}>
-      {/* TÍTULO */}
-      <h1 style={{
-        fontSize: '1.8rem',
-        fontWeight: '700',
-        color: '#000000',
-        marginBottom: '0.5rem'
-      }}>
-        Configuraciones del Sistema
-      </h1>
-      <p style={{ color: '#6F7271', marginBottom: '3rem' }}>Gestiona los catálogos primarios de la base de datos, usuarios administradores y notificaciones automáticas.</p>
+      <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+        {/* TÍTULO */}
+        <h1 style={{
+          fontSize: '1.8rem',
+          fontWeight: '700',
+          color: '#000000',
+          marginBottom: '0.5rem'
+        }}>
+          Configuraciones del Sistema
+        </h1>
+        <p style={{ color: '#6F7271', marginBottom: '3rem' }}>Gestiona los catálogos primarios de la base de datos, usuarios administradores y notificaciones automáticas.</p>
 
-      {/* ✅ CUADRADITOS BONITOS EN GRID */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        gap: '1.8rem',
-        maxWidth: '900px'
-      }}>
+        {/* ✅ CUADRADITOS BONITOS EN GRID */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gap: '1.8rem',
+          maxWidth: '100%'
+        }}>
         {opciones.map((item, i) => (
           <div
             key={i}
@@ -582,6 +584,7 @@ export default function ConfigAdmin() {
         </div>
       )}
 
+      </div>
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { FaEye, FaTrashAlt } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { formatFolio } from '../utils/formatFolio'
 import { useNavigate } from 'react-router-dom'
+import { API_BASE_URL } from '../config'
 
 
 
@@ -23,7 +24,7 @@ export default function DashboardOficinas() {
     if (!user?.token) return
     setCargando(true)
     try {
-      let url = 'http://localhost:3000/api/admin/reportes/oficina?limit=100'
+      let url = `${API_BASE_URL}/api/admin/reportes/oficina?limit=100`
       if (mesFiltro) url += `&mes=${mesFiltro}`
       if (anioFiltro) url += `&anio=${anioFiltro}`
       const response = await fetch(url, {
@@ -52,7 +53,7 @@ export default function DashboardOficinas() {
   const cambiarEstado = async (id, nuevoEstado) => {
     if (!user?.token) return
     try {
-      const response = await fetch(`http://localhost:3000/api/admin/reportes/oficina/${id}/estado`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/reportes/oficina/${id}/estado`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -80,7 +81,7 @@ export default function DashboardOficinas() {
     if (!user?.token) return
     if (confirm('¿Eliminar este reporte de forma permanente?')) {
       try {
-        const response = await fetch(`http://localhost:3000/api/admin/reportes/oficina/${id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/admin/reportes/oficina/${id}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${user.token}`
@@ -104,7 +105,7 @@ export default function DashboardOficinas() {
   const descargarExcel = async () => {
     if (!user?.token) return
     try {
-      let url = 'http://localhost:3000/api/admin/reportes/oficina/export?'
+      let url = `${API_BASE_URL}/api/admin/reportes/oficina/export?`
       if (mesFiltro) url += `mes=${mesFiltro}&`
       if (anioFiltro) url += `anio=${anioFiltro}&`
       if (estadoFiltro !== 'Todos') {
@@ -449,12 +450,12 @@ export default function DashboardOficinas() {
                         <div key={ev.id} style={{ border: '1px solid #6F7271', borderRadius: '8px', overflow: 'hidden', maxWidth: '260px' }}>
                           {ev.mimetype?.startsWith('image/') ? (
                             <a
-                              href={`http://localhost:3000/api/evidencias/${ev.id}?token=${user.token}`}
+                              href={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
                               target="_blank"
                               rel="noreferrer"
                             >
                               <img
-                                src={`http://localhost:3000/api/evidencias/${ev.id}?token=${user.token}`}
+                                src={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
                                 alt={ev.filename}
                                 style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
                                 onError={(e) => { e.target.style.display = 'none' }}
@@ -462,7 +463,7 @@ export default function DashboardOficinas() {
                             </a>
                           ) : (
                             <a
-                              href={`http://localhost:3000/api/evidencias/${ev.id}?token=${user.token}`}
+                              href={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
                               target="_blank"
                               rel="noreferrer"
                               style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem', color: '#BC955B', textDecoration: 'none', fontSize: '0.85rem' }}

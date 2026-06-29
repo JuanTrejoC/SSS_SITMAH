@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import { API_BASE_URL } from '../config'
 
 export const AuthContext = createContext()
 export const useAuth = () => useContext(AuthContext)
@@ -14,7 +15,7 @@ export const AuthProvider = ({ children }) => {
   // ✅ CONEXIÓN CON EL BACKEND PARA INICIO DE SESIÓN
   const loginAdmin = async (datos) => {
     try {
-      const respuesta = await fetch('http://localhost:3000/api/auth/login', {
+      const respuesta = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

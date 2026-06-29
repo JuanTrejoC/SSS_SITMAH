@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
+import { API_BASE_URL } from '../config'
 
 export default function FormOficinas({ usuarioActual }) {
   const fileInputRef = useRef(null)
@@ -69,17 +70,17 @@ export default function FormOficinas({ usuarioActual }) {
   useEffect(() => {
     const cargarCatalogos = async () => {
       try {
-        const resAreas = await fetch('http://localhost:3000/api/catalogos/areas')
+        const resAreas = await fetch(`${API_BASE_URL}/api/catalogos/areas`)
         if (resAreas.ok) {
           const json = await resAreas.json()
           if (json.ok && json.data && json.data.length > 0) setListaAreas(json.data)
         }
-        const resSedes = await fetch('http://localhost:3000/api/catalogos/sedes')
+        const resSedes = await fetch(`${API_BASE_URL}/api/catalogos/sedes`)
         if (resSedes.ok) {
           const json = await resSedes.json()
           if (json.ok && json.data && json.data.length > 0) setListaSedes(json.data)
         }
-        const resCategorias = await fetch('http://localhost:3000/api/catalogos/categorias')
+        const resCategorias = await fetch(`${API_BASE_URL}/api/catalogos/categorias`)
         if (resCategorias.ok) {
           const json = await resCategorias.json()
           if (json.ok && json.data && json.data.length > 0) setListaCategorias(json.data)
@@ -302,7 +303,7 @@ export default function FormOficinas({ usuarioActual }) {
         datosAEnviar.append('evidencia', formData.evidencia)
       }
 
-      const respuesta = await fetch('http://localhost:3000/api/reportes/oficina', {
+      const respuesta = await fetch(`${API_BASE_URL}/api/reportes/oficina`, {
         method: 'POST',
         body: datosAEnviar
       })
