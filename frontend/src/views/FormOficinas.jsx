@@ -27,44 +27,10 @@ export default function FormOficinas({ usuarioActual }) {
   const [cargando, setCargando] = useState(false)
   const [vistaPrevia, setVistaPrevia] = useState(null)
 
-  const [listaAreas, setListaAreas] = useState([
-    { id: 1, nombre: "Dirección de Operación" },
-    { id: 2, nombre: "Dirección General" },
-    { id: 3, nombre: "Dirección Jurídica" },
-    { id: 4, nombre: "Dirección de Administración y Finanzas" },
-    { id: 5, nombre: "Dirección de Planeación y Desarrollo" }
-  ])
-  const listaCargos = [
-    "Técnico Especializado", "Asesor Técnico Gestor", "Jefatura de Área",
-    "Subdirección de Área", "Subdirección Adjunta", "Dirección de Área",
-    "Jefatura de Departamento", "Subdirector De Área", "Asistente General", "Dirección General"
-  ]
-  const [listaSedes, setListaSedes] = useState([
-    { id: 1, nombre: "Centro de Control" },
-    { id: 2, nombre: "CETRAM Téllez" }
-  ])
-  const [listaCategorias, setListaCategorias] = useState([
-    { id: 1, nombre: 'Equipo no enciende' },
-    { id: 2, nombre: 'Equipo lento o se traba' },
-    { id: 3, nombre: 'Pantalla sin imagen o con fallas' },
-    { id: 4, nombre: 'Teclado o mouse no funcionan' },
-    { id: 5, nombre: 'Batería de portátil no carga' },
-    { id: 6, nombre: 'Impresora no imprime o atasca papel' },
-    { id: 7, nombre: 'Impresora no se comunica con el equipo' },
-    { id: 8, nombre: 'Escáner no funciona' },
-    { id: 9, nombre: 'Sin conexión a internet' },
-    { id: 10, nombre: 'Conexión lenta o intermitente' },
-    { id: 11, nombre: 'Sin acceso a red local' },
-    { id: 12, nombre: 'Puerto o cable de red dañado' },
-    { id: 13, nombre: 'Regulador / No-Break no funciona' },
-    { id: 14, nombre: 'No-Break descarga rápido' },
-    { id: 15, nombre: 'Toma de corriente dañada' },
-    { id: 16, nombre: 'Programa no abre o se cierra solo' },
-    { id: 17, nombre: 'Archivos no se pueden abrir' },
-    { id: 18, nombre: 'Problemas de acceso o contraseña' },
-    { id: 19, nombre: 'Sistema operativo con errores' },
-    { id: 20, nombre: 'Otro ' }
-  ])
+  const [listaAreas, setListaAreas] = useState([])
+  const [listaCargos, setListaCargos] = useState([])
+  const [listaSedes, setListaSedes] = useState([])
+  const [listaCategorias, setListaCategorias] = useState([])
 
   // Cargar catálogos desde el backend al montar el componente
   useEffect(() => {
@@ -84,6 +50,11 @@ export default function FormOficinas({ usuarioActual }) {
         if (resCategorias.ok) {
           const json = await resCategorias.json()
           if (json.ok && json.data && json.data.length > 0) setListaCategorias(json.data)
+        }
+        const resCargos = await fetch(`${API_BASE_URL}/api/catalogos/cargos`)
+        if (resCargos.ok) {
+          const json = await resCargos.json()
+          if (json.ok && json.data && json.data.length > 0) setListaCargos(json.data)
         }
       } catch (err) {
         console.error('Error al cargar catálogos:', err)
@@ -381,8 +352,9 @@ export default function FormOficinas({ usuarioActual }) {
               style={{ width: '100%', padding: '0.65rem 0.8rem', border: `1px solid ${valido.cargo === true ? '#22c55e' : valido.cargo === false ? '#ef4444' : '#9B9B9A'}`, borderRadius: '8px', fontSize: '0.9rem', backgroundColor: 'white' }}
             >
               <option value="">Seleccione cargo</option>
-              {listaCargos.map((c, i) => <option key={i} value={c}>{c}</option>)}
-            </select>
+              {listaCargos.map((cargo) => (
+                <option key={cargo.id} value={cargo.nombre}>{cargo.nombre}</option>
+              ))}</select>
             {errores.cargo && <small style={{ color: '#ef4444' }}>{errores.cargo}</small>}
           </div>
 

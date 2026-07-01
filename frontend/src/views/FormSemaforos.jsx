@@ -21,100 +21,12 @@ export default function FormSemaforos({ usuarioActual }) {
   const [cargando, setCargando] = useState(false)
   const [vistaPrevia, setVistaPrevia] = useState(null)
 
-  const [listaEstaciones, setListaEstaciones] = useState([
-    { id: 1, nombre: "Terminal Téllez" },
-    { id: 2, nombre: "Gabriel Mancera" },
-    { id: 3, nombre: "Matilde" },
-    { id: 4, nombre: "Efrén Rebolledo" },
-    { id: 5, nombre: "Tercera Edad" },
-    { id: 6, nombre: "San Antonio" },
-    { id: 7, nombre: "Ejército Mexicano" },
-    { id: 8, nombre: "Felipe Ángeles" },
-    { id: 9, nombre: "Centro de Justicia oriente" },
-    { id: 10, nombre: "Centro de Justicia poniente" },
-    { id: 11, nombre: "Vicente Segura" },
-    { id: 12, nombre: "Juan C. Doria" },
-    { id: 13, nombre: "Hospitales" },
-    { id: 14, nombre: "SEPH" },
-    { id: 15, nombre: "Tecnológico" },
-    { id: 16, nombre: "Bicentenario oriente" },
-    { id: 17, nombre: "Bicentenario poniente" },
-    { id: 18, nombre: "Centro Minero" },
-    { id: 19, nombre: "Zona Plateada" },
-    { id: 20, nombre: "Tecnológico de Monterrey" },
-    { id: 21, nombre: "Estadio Hidalgo" },
-    { id: 22, nombre: "Central de Autobuses" },
-    { id: 23, nombre: "Cuna de Fútbol" },
-    { id: 24, nombre: "Santa Julia" },
-    { id: 25, nombre: "Prepa 1" },
-    { id: 26, nombre: "Revolución" },
-    { id: 27, nombre: "Manuel Dublán" },
-    { id: 28, nombre: "Presidente Alemán" },
-    { id: 29, nombre: "Niños Heroes oriente" },
-    { id: 30, nombre: "Niños Heroes poniente" },
-    { id: 31, nombre: "Centro Histórico" },
-    { id: 32, nombre: "Plaza Juárez" },
-    { id: 33, nombre: "Parque del Maestro" },
-    { id: 34, nombre: "Bioparque" }
-  ])
+  const [listaEstaciones, setListaEstaciones] = useState([])
+  const [listaCruceros, setListaCruceros] = useState([])
+  const [listaTiposFalla, setListaTiposFalla] = useState([])
 
-  const [listaCruceros, setListaCruceros] = useState([
-    { id: 1, nombre: "BLVD. TÉLLEZ - SAN ALFONSO" },
-    { id: 2, nombre: "FELIPE ÁNGELES - VENTA PRIETA" },
-    { id: 3, nombre: "FELIPE ÁNGELES - GALERÍAS" },
-    { id: 4, nombre: "FELIPE ÁNGELES - PREPA SIGLO XXI" },
-    { id: 5, nombre: "CENTRAL AUTOBUSES" },
-    { id: 6, nombre: "F. ÁNGELES - ROJO GÓMEZ" },
-    { id: 7, nombre: "F. ÁNGELES - POLIFORUM" },
-    { id: 8, nombre: "F. ÁNGELES - RETORNO NISSAN" },
-    { id: 9, nombre: "F. ÁNGELES - 5 DE MAYO" },
-    { id: 10, nombre: "F. ÁNGELES - ARTICULO 3RO" },
-    { id: 11, nombre: "F. ÁNGELES - PREPA 1" },
-    { id: 12, nombre: "FELIPE ÁNGELES - GYM PREPA" },
-    { id: 13, nombre: "B. JUÁREZ - INSURGENTES" },
-    { id: 14, nombre: "REVOLUCIÓN - 16 DE ENERO" },
-    { id: 15, nombre: "REVOLUCIÓN - JAIME NUNO" },
-    { id: 16, nombre: "REVOLUCIÓN - SAMUEL CARRO" },
-    { id: 17, nombre: "REVOLUCIÓN - MANUEL DÚBLAN" },
-    { id: 18, nombre: "REVOLUCIÓN - GABRIEL HERNÁNDEZ" },
-    { id: 19, nombre: "REVOLUCIÓN - 15 DE SEPTIEMBRE" },
-    { id: 20, nombre: "REVOLUCIÓN - 5 DE FEBRERO" },
-    { id: 21, nombre: "REVOLUCIÓN - MADERO" },
-    { id: 22, nombre: "REVOLUCIÓN - BELISARIO" },
-    { id: 23, nombre: "ARISPE - ALLENDE-MATAMOROS" },
-    { id: 24, nombre: "MATAMOROS - OCAMPO" },
-    { id: 25, nombre: "VILLAGRAN -ALLENDE-ZARAGOZA" },
-    { id: 26, nombre: "B. JUÁREZ - BELISARIO DOMINGUEZ" },
-    { id: 27, nombre: "B. JUÁREZ - GUERRERO" },
-    { id: 28, nombre: "B. JUÁREZ - DANIEL CERECEDO" },
-    { id: 29, nombre: "B. JUÁREZ - J M. IGLESIAS" },
-    { id: 30, nombre: "B. JUÁREZ - GRAL MEJIA" },
-    { id: 31, nombre: "B. JUÁREZ - MANUEL DÚBLAN" },
-    { id: 32, nombre: "B. JUÁREZ - SAMUEL CARRO" },
-    { id: 33, nombre: "B. JUÁREZ - 12 DE OCTUBRE" },
-    { id: 34, nombre: "B. JUÁREZ - BOCANEGRA" },
-    { id: 35, nombre: "B. JUÁREZ - 16 DE ENERO" }
-  ])
-
-  const [listaTiposFalla, setListaTiposFalla] = useState([
-    { id: 1, nombre: 'Luz roja no funciona' },
-    { id: 2, nombre: 'Luz amarilla no funciona' },
-    { id: 3, nombre: 'Luz verde no funciona' },
-    { id: 4, nombre: 'Semaforo peatonal dañado' },
-    { id: 5, nombre: 'Poste dañado' },
-    { id: 6, nombre: 'Cabezal semaforico dañado' },
-    { id: 7, nombre: 'Cabezal semaforico caido' },
-    { id: 8, nombre: 'Cableado dañado' },
-    { id: 9, nombre: 'Daño por choque vehicular' },
-    { id: 10, nombre: 'Daño por vandalismo' },
-    { id: 11, nombre: 'Desincronizacion semaforica' },
-    { id: 12, nombre: 'Programacion incorrecta de tiempos' },
-    { id: 13, nombre: 'Modulo LED dañado' },
-    { id: 14, nombre: 'Lente roto' },
-    { id: 15, nombre: 'Gabinete de control dañado' },
-    { id: 16, nombre: 'Falla CFE' },
-    { id: 17, nombre: 'Otro' }
-  ])
+  // Lista de cruceros filtrados por estación seleccionada
+  const [crucerosFiltrados, setCrucerosFiltrados] = useState([])
 
   // Cargar catálogos desde el backend al montar
   useEffect(() => {
@@ -418,8 +330,24 @@ export default function FormSemaforos({ usuarioActual }) {
               value={formData.estacion_id}
               onChange={(e) => {
                 const valor = e.target.value
-                setFormData(prev => ({ ...prev, estacion_id: valor }))
+                setFormData(prev => ({ ...prev, estacion_id: valor, crucero_id: '' }))
                 validarCampo('estacion_id', valor)
+
+                // Filtrar cruceros por estación seleccionada
+                if (valor) {
+                  const estacion = listaEstaciones.find(est => String(est.id) === String(valor))
+                  if (estacion && estacion.cruceros && estacion.cruceros.length > 0) {
+                    const crucerosDeEstacion = estacion.cruceros
+                      .map(ec => ec.crucero)
+                      .filter(c => c && c.activo !== false)
+                    setCrucerosFiltrados(crucerosDeEstacion)
+                  } else {
+                    // Sin asignaciones: mostrar todos los cruceros
+                    setCrucerosFiltrados(listaCruceros)
+                  }
+                } else {
+                  setCrucerosFiltrados([])
+                }
               }}
               style={{
                 width: '100%', padding: '0.65rem',
@@ -454,8 +382,8 @@ export default function FormSemaforos({ usuarioActual }) {
                 borderRadius: '8px', backgroundColor: 'white'
               }}
             >
-              <option value="">Seleccione intersección</option>
-              {listaCruceros.map((crucero) => (
+              <option value="">{formData.estacion_id ? 'Seleccione crucero' : 'Primero seleccione una estación'}</option>
+              {(formData.estacion_id ? crucerosFiltrados : []).map((crucero) => (
                 <option key={crucero.id} value={crucero.id}>{crucero.nombre}</option>
               ))}
             </select>

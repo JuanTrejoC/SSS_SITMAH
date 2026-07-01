@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   FaUsersCog, FaBuilding, FaMapMarkerAlt, FaTags,
   FaEnvelope, FaPlus, FaEdit, FaTrashAlt, FaToggleOn, FaToggleOff,
-  FaIdBadge, FaBus, FaTrafficLight, FaExclamationTriangle
+  FaIdBadge, FaBus, FaTrafficLight, FaExclamationTriangle, FaLink
 } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { API_BASE_URL } from '../config'
@@ -26,6 +26,13 @@ export default function ConfigAdmin() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [correoDestino, setCorreoDestino] = useState('')
+
+  // Estado para modal de asignaciones estación-crucero
+  const [modalAsignaciones, setModalAsignaciones] = useState(false)
+  const [estacionesConCruceros, setEstacionesConCruceros] = useState([])
+  const [todosLosCruceros, setTodosLosCruceros] = useState([])
+  const [estacionSeleccionada, setEstacionSeleccionada] = useState(null)
+  const [cargandoAsignaciones, setCargandoAsignaciones] = useState(false)
 
   const opciones = [
     {
@@ -82,6 +89,12 @@ export default function ConfigAdmin() {
       icono: <FaExclamationTriangle size={28} />,
       titulo: 'Tipos de Falla',
       descripcion: 'Administrar los tipos de falla de semáforos.'
+    },
+    {
+      tipo: 'asignar-cruceros',
+      icono: <FaLink size={28} />,
+      titulo: 'Asignar Cruceros',
+      descripcion: 'Vincular cruceros semafóricos a estaciones de Tuzobus.'
     }
   ]
 
@@ -116,12 +129,82 @@ export default function ConfigAdmin() {
       alert('Esta función estará disponible en la próxima actualización.')
       return
     }
+    if (opcion.tipo === 'asignar-cruceros') {
+      abrirModalAsignaciones()
+      return
+    }
     setCatalogoSeleccionado(opcion.tipo)
     setTituloModal(opcion.titulo)
     setModalAbierto(true)
     setEditandoId(null)
     limpiarFormulario()
     cargarItems(opcion.tipo)
+  }
+
+  // ── Funciones para modal de asignaciones ──
+  const abrirModalAsignaciones = async () => {
+    setModalAsignaciones(true)
+    setCargandoAsignaciones(true)
+    try {
+      const [resEstaciones, resCruceros] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/admin/estaciones-cruceros`, {
+          headers: { 'Authorization': `Bearer ${user.token}` }
+        }),
+        fetch(`${API_BASE_URL}/api/admin/catalogos/cruceros`, {
+          headers: { 'Authorization': `Bearer ${user.token}` }
+        })
+      ])
+      const jsonEstaciones = await resEstaciones.json()
+      const jsonCruceros = await resCruceros.json()
+      if (jsonEstaciones.ok) setEstacionesConCruceros(jsonEstaciones.data || [])
+      if (jsonCruceros.ok) setTodosLosCruceros(jsonCruceros.data || [])
+    } catch (err) {
+      console.error('Error al cargar asignaciones:', err)
+    } finally {
+      setCargandoAsignaciones(false)
+    }
+  }
+
+  const cruceroEstaAsignado = (cruceroId) => {
+    if (!estacionSeleccionada) return false
+    const estacion = estacionesConCruceros.find(e => e.id === estacionSeleccionada)
+    if (!estacion || !estacion.cruceros) return false
+    return estacion.cruceros.some(ec => ec.cruceroId === cruceroId)
+  }
+
+  const toggleAsignacion = async (cruceroId) => {
+    if (!estacionSeleccionada || !user?.token) return
+    try {
+      if (cruceroEstaAsignado(cruceroId)) {
+        await fetch(`${API_BASE_URL}/api/admin/estaciones/${estacionSeleccionada}/cruceros/${cruceroId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${user.token}` }
+        })
+      } else {
+        await fetch(`${API_BASE_URL}/api/admin/estaciones/${estacionSeleccionada}/cruceros`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${user.token}`
+          },
+          body: JSON.stringify({ cruceroId })
+        })
+      }
+      // Recargar datos
+      const res = await fetch(`${API_BASE_URL}/api/admin/estaciones-cruceros`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      })
+      const json = await res.json()
+      if (json.ok) setEstacionesConCruceros(json.data || [])
+    } catch (err) {
+      console.error('Error al cambiar asignación:', err)
+      alert('❌ Error al cambiar asignación')
+    }
+  }
+
+  const contarCrucerosAsignados = (estacionId) => {
+    const estacion = estacionesConCruceros.find(e => e.id === estacionId)
+    return estacion?.cruceros?.length || 0
   }
 
   const limpiarFormulario = () => {
@@ -579,6 +662,136 @@ export default function ConfigAdmin() {
               </div>
 
             </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ✅ MODAL DE ASIGNACIONES ESTACIÓN ↔ CRUCERO */}
+      {modalAsignaciones && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', zIndex: 999, padding: '1rem'
+        }}>
+          <div className="card-padding" style={{
+            backgroundColor: 'white', borderRadius: '12px',
+            width: '90%', maxWidth: '900px', maxHeight: '90vh', display: 'flex',
+            flexDirection: 'column', boxShadow: '0 5px 25px rgba(0,0,0,0.2)'
+          }}>
+
+            {/* Encabezado */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              borderBottom: '1px solid #6F7271', paddingBottom: '1rem', marginBottom: '1.5rem'
+            }}>
+              <h2 style={{ color: '#691B31', fontSize: '1.4rem', fontWeight: '700', margin: 0 }}>
+                Asignar Cruceros a Estaciones
+              </h2>
+              <button
+                onClick={() => { setModalAsignaciones(false); setEstacionSeleccionada(null) }}
+                style={{ border: 'none', backgroundColor: 'transparent', fontSize: '1.3rem', cursor: 'pointer', color: '#6F7271' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {cargandoAsignaciones ? (
+              <p style={{ color: '#6F7271', fontSize: '0.9rem', textAlign: 'center', paddingTop: '2rem' }}>Cargando datos...</p>
+            ) : (
+              <div className="form-responsive-grid grid-2" style={{ flex: 1, overflowY: 'auto' }}>
+
+                {/* COLUMNA IZQUIERDA: Lista de estaciones */}
+                <div>
+                  <h3 style={{ fontSize: '1rem', color: '#000000', marginBottom: '1rem', fontWeight: '600' }}>
+                    Seleccione una Estación
+                  </h3>
+                  <div style={{ overflowY: 'auto', maxHeight: '400px', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                    {estacionesConCruceros.map((est) => (
+                      <div
+                        key={est.id}
+                        onClick={() => setEstacionSeleccionada(est.id)}
+                        style={{
+                          padding: '0.7rem 1rem',
+                          cursor: 'pointer',
+                          backgroundColor: estacionSeleccionada === est.id ? '#f0e6d6' : 'white',
+                          borderBottom: '1px solid #f1f5f9',
+                          borderLeft: estacionSeleccionada === est.id ? '3px solid #BC955B' : '3px solid transparent',
+                          transition: 'all 0.15s ease',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <span style={{ fontSize: '0.85rem', fontWeight: estacionSeleccionada === est.id ? '600' : '400' }}>
+                          {est.nombre}
+                        </span>
+                        <span style={{
+                          fontSize: '0.7rem',
+                          backgroundColor: contarCrucerosAsignados(est.id) > 0 ? '#dcfce7' : '#f1f5f9',
+                          color: contarCrucerosAsignados(est.id) > 0 ? '#15803d' : '#6F7271',
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '10px',
+                          fontWeight: '600'
+                        }}>
+                          {contarCrucerosAsignados(est.id)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* COLUMNA DERECHA: Cruceros con checkboxes */}
+                <div>
+                  <h3 style={{ fontSize: '1rem', color: '#000000', marginBottom: '1rem', fontWeight: '600' }}>
+                    {estacionSeleccionada
+                      ? `Cruceros de: ${estacionesConCruceros.find(e => e.id === estacionSeleccionada)?.nombre || ''}`
+                      : 'Seleccione una estación'}
+                  </h3>
+                  {estacionSeleccionada ? (
+                    <div style={{ overflowY: 'auto', maxHeight: '400px', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                      {todosLosCruceros.filter(c => c.activo !== false).map((crucero) => {
+                        const asignado = cruceroEstaAsignado(crucero.id)
+                        return (
+                          <label
+                            key={crucero.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.6rem',
+                              padding: '0.6rem 1rem',
+                              borderBottom: '1px solid #f1f5f9',
+                              cursor: 'pointer',
+                              backgroundColor: asignado ? '#f0fdf4' : 'white',
+                              transition: 'background 0.15s ease'
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={asignado}
+                              onChange={() => toggleAsignacion(crucero.id)}
+                              style={{ accentColor: '#BC955B', width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            <span style={{
+                              fontSize: '0.85rem',
+                              fontWeight: asignado ? '500' : '400',
+                              color: asignado ? '#15803d' : '#374151'
+                            }}>
+                              {crucero.nombre}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p style={{ color: '#6F7271', fontSize: '0.85rem', textAlign: 'center', paddingTop: '3rem' }}>
+                      ← Seleccione una estación de la lista para ver y asignar sus cruceros.
+                    </p>
+                  )}
+                </div>
+
+              </div>
+            )}
 
           </div>
         </div>

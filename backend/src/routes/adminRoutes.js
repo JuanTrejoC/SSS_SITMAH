@@ -21,6 +21,11 @@ router.post('/correos', asyncHandler(adminCatalogo.crearCorreo));
 router.put('/correos/:id', asyncHandler(adminCatalogo.actualizarCorreo));
 router.delete('/correos/:id', asyncHandler(adminCatalogo.eliminarCorreo));
 
+// Asignaciones Estación ↔ Crucero
+router.get('/estaciones-cruceros', asyncHandler(adminCatalogo.listarEstacionesConCruceros));
+router.post('/estaciones/:id/cruceros', asyncHandler(adminCatalogo.asignarCrucero));
+router.delete('/estaciones/:estacionId/cruceros/:cruceroId', asyncHandler(adminCatalogo.desasignarCrucero));
+
 router.get('/usuarios', asyncHandler(usuario.listar));
 router.post('/usuarios', asyncHandler(usuario.crear));
 router.put('/usuarios/:id', asyncHandler(usuario.actualizar));

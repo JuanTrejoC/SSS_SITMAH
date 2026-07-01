@@ -33,10 +33,15 @@ const catalogosPublicos = {
     where: { activo: true }, 
     orderBy: { nombre: 'asc' }
   }),
-  // ✅ Estaciones: por ID tal cual tu lista
+  // ✅ Estaciones: por ID, con cruceros asignados
   estaciones: () => prisma.estacion.findMany({ 
     where: { activo: true }, 
-    orderBy: { id: 'asc' }
+    orderBy: { id: 'asc' },
+    include: {
+      cruceros: {
+        include: { crucero: true }
+      }
+    }
   }),
   // ✅ Cruceros: por ID tal cual tu lista
   cruceros: () => prisma.crucero.findMany({ 

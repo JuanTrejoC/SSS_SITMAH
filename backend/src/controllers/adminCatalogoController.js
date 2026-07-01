@@ -97,6 +97,48 @@ async function eliminarCorreo(req, res) {
   ok(res, item);
 }
 
+// ── Asignaciones Estación ↔ Crucero ──
+
+async function listarEstacionesConCruceros(req, res) {
+  const estaciones = await prisma.estacion.findMany({
+    orderBy: { id: 'asc' },
+    include: {
+      cruceros: {
+        include: { crucero: true }
+      }
+    }
+  });
+  ok(res, estaciones);
+}
+
+async function asignarCrucero(req, res) {
+  const estacionId = Number(req.params.id);
+  const { cruceroId } = req.body;
+  if (!cruceroId) return fail(res, 'cruceroId es requerido');
+
+  // Verificar que no exista ya
+  const existente = await prisma.estacionCrucero.findUnique({
+    where: { estacionId_cruceroId: { estacionId, cruceroId: Number(cruceroId) } }
+  });
+  if (existente) return fail(res, 'Este crucero ya está asignado a esta estación');
+
+  const asignacion = await prisma.estacionCrucero.create({
+    data: { estacionId, cruceroId: Number(cruceroId) },
+    include: { crucero: true, estacion: true }
+  });
+  ok(res, asignacion, 201);
+}
+
+async function desasignarCrucero(req, res) {
+  const estacionId = Number(req.params.estacionId);
+  const cruceroId = Number(req.params.cruceroId);
+
+  await prisma.estacionCrucero.delete({
+    where: { estacionId_cruceroId: { estacionId, cruceroId } }
+  });
+  ok(res, { message: 'Asignación eliminada' });
+}
+
 module.exports = {
   listar,
   crear,
@@ -106,4 +148,7 @@ module.exports = {
   crearCorreo,
   actualizarCorreo,
   eliminarCorreo,
+  listarEstacionesConCruceros,
+  asignarCrucero,
+  desasignarCrucero,
 };

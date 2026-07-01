@@ -72,17 +72,24 @@ export default function Login() {
             padding: 'clamp(1.5rem, 5vw, 2.25rem)',
             textAlign: 'center',
           }}>
-            <img
-              src={logoSitmah}
-              alt="SITMAH Logo"
-              style={{
-                maxWidth: 'clamp(140px, 60%, 200px)',
-                maxHeight: '70px',
-                objectFit: 'contain',
-                filter: 'brightness(0) invert(1)',
-                marginBottom: '0.85rem',
-              }}
-            />
+            <a
+              href="https://s-transportemetropolitano.hidalgo.gob.mx/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ cursor: 'pointer', display: 'inline-block', textDecoration: 'none' }}
+            >
+              <img
+                src={logoSitmah}
+                alt="SITMAH Logo"
+                style={{
+                  maxWidth: 'clamp(140px, 60%, 200px)',
+                  maxHeight: '70px',
+                  objectFit: 'contain',
+                  filter: 'brightness(0) invert(1)',
+                  marginBottom: '0.85rem',
+                }}
+              />
+            </a>
             <h1 style={{
               color: 'white',
               fontSize: 'clamp(1.1rem, 3vw, 1.35rem)',
@@ -208,6 +215,33 @@ export default function Login() {
                 {cargando ? 'Verificando...' : 'Ingresar al Sistema'}
               </button>
             </form>
+          </div>
+
+          {/* Enlaces a formularios públicos */}
+          <div style={{
+            padding: '1.2rem',
+            borderTop: '1px solid #e2e8f0',
+            background: '#f8fafc',
+            textAlign: 'center'
+          }}>
+            <p style={{ fontSize: '0.8rem', color: '#6b7280', margin: '0 0 0.8rem 0', fontWeight: '500' }}>
+              ¿Deseas registrar una incidencia?
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <a
+                href="/sitmah/crear-oficinas"
+                style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.3rem 0.5rem' }}
+              >
+                Reporte de Oficinas
+              </a>
+              <span style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center' }}>|</span>
+              <a
+                href="/sitmah/crear-semaforos"
+                style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.3rem 0.5rem' }}
+              >
+                Reporte de Semáforos
+              </a>
+            </div>
           </div>
         </div>
 

@@ -95,6 +95,7 @@ model Estacion {
   activo Boolean @default(true)
 
   reportes ReporteSemaforo[]
+  cruceros EstacionCrucero[]
 
   @@map("estacion")
 }
@@ -104,9 +105,21 @@ model Crucero {
   nombre String  @db.VarChar(150)
   activo Boolean @default(true)
 
-  reportes ReporteSemaforo[]
+  reportes   ReporteSemaforo[]
+  estaciones EstacionCrucero[]
 
   @@map("crucero")
+}
+
+model EstacionCrucero {
+  estacionId Int @map("estacion_id")
+  cruceroId  Int @map("crucero_id")
+
+  estacion Estacion @relation(fields: [estacionId], references: [id])
+  crucero  Crucero  @relation(fields: [cruceroId], references: [id])
+
+  @@id([estacionId, cruceroId])
+  @@map("estacion_crucero")
 }
 
 model TipoFalla {
