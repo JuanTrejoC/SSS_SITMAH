@@ -93,13 +93,23 @@ async function crear(req, res) {
     select: { correo: true },
   });
 
+  const categoria = await prisma.categoria.findUnique({
+    where: { id: data.categoria_id },
+    select: { nombre: true }
+  });
+  const categoriaNombre = categoria ? categoria.nombre : 'General';
+
   // Enviar correos en segundo plano para no demorar la respuesta del servidor
   Promise.all([
     enviarConfirmacionReporte({ email: data.email, folio, tipo: 'oficina' }),
     enviarNotificacionAdmins({
       folio,
+      fecha: new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' }),
       tipo: 'oficina',
-      resumen: `${data.solicitante} reportó: ${data.descripcion || 'Sin descripción'}`,
+      prioridad: data.prioridad,
+      falla: categoriaNombre,
+      descripcion: data.descripcion,
+      solicitante: data.solicitante,
       correos: correosAdmin.map((c) => c.correo),
     })
   ]).catch((err) => {

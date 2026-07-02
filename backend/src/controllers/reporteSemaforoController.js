@@ -70,11 +70,21 @@ async function crear(req, res) {
     select: { correo: true },
   });
 
+  const tipoFalla = await prisma.tipoFalla.findUnique({
+    where: { id: data.tipo_falla_id },
+    select: { nombre: true }
+  });
+  const fallaNombre = tipoFalla ? tipoFalla.nombre : 'Falla en semáforo';
+
   // Enviar correos en segundo plano para no demorar la respuesta del servidor
   enviarNotificacionAdmins({
     folio,
+    fecha: new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' }),
     tipo: 'semaforo',
-    resumen: `Jefe de turno ${data.jefe_turno}: ${data.descripcion || 'Falla en semáforo'}`,
+    prioridad: 'alta',
+    falla: fallaNombre,
+    descripcion: data.descripcion,
+    solicitante: data.jefe_turno,
     correos: correosAdmin.map((c) => c.correo),
   }).catch((err) => {
     console.error('Error al enviar correos en segundo plano:', err.message);
