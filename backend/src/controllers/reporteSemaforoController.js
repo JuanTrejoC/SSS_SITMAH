@@ -109,6 +109,8 @@ async function listar(req, res) {
   const whereFinal = applyKeywordSemaforo(where, keyword);
   const { page, limit, skip } = parsePagination(req.query);
 
+  const ordenParam = req.query.orden === 'asc' ? 'asc' : 'desc';
+
   const [items, total] = await Promise.all([
     prisma.reporteSemaforo.findMany({
       where: whereFinal,
@@ -118,7 +120,7 @@ async function listar(req, res) {
         tipoFalla: true,
         evidencias: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { id: ordenParam },
       skip,
       take: limit,
     }),
@@ -184,14 +186,16 @@ async function eliminar(req, res) {
 async function exportar(req, res) {
   const { keyword, where } = buildReporteFilters(req.query);
   const whereFinal = applyKeywordSemaforo(where, keyword);
+  const incluirImagenes = req.query.incluirImagenes === 'true';
+  const ordenParam = req.query.orden === 'asc' ? 'asc' : 'desc';
 
   const reportes = await prisma.reporteSemaforo.findMany({
     where: whereFinal,
     include: { estacion: true, crucero: true, tipoFalla: true, evidencias: true },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { id: ordenParam },
   });
 
-  const buffer = await exportarReportesSemaforo(reportes);
+  const buffer = await exportarReportesSemaforo(reportes, incluirImagenes);
 
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', 'attachment; filename=reportes-semaforo.xlsx');

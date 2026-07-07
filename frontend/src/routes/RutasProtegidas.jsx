@@ -1,7 +1,7 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-// ⚡ SOLO ADMIN: Si no inició sesión, lo manda al login
+// SOLO ADMIN: Si no inició sesión, lo manda al login
 export function RutaSoloAdmin() {
   const { user } = useAuth()
 
@@ -12,7 +12,7 @@ export function RutaSoloAdmin() {
   return <Outlet />
 }
 
-// 👤 SOLO SOLICITANTE: redirige al admin al dashboard si intenta crear reportes
+// SOLO SOLICITANTE: redirige al admin al dashboard si intenta crear reportes
 export function RutaSoloSolicitante() {
   const { user } = useAuth()
 

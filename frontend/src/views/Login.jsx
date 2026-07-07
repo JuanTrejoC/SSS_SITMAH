@@ -12,7 +12,7 @@ export default function Login() {
   const [cargando, setCargando] = useState(false)
   const [errores, setErrores] = useState({ usuario: false, contrasena: false })
 
-  if (user) return <Navigate to="/dashboard" replace />
+  if (user) return <Navigate to="/sitmah/dashboard" replace />
 
   const manejarCambio = (e) => {
     const { name, value } = e.target
@@ -27,7 +27,7 @@ export default function Login() {
     setCargando(true)
     const res = await loginAdmin(datos)
     setCargando(false)
-    if (res.ok) window.location.href = '/dashboard'
+    if (res.ok) window.location.href = '/sitmah/dashboard'
     else setError(res.error || 'Credenciales incorrectas')
   }
 

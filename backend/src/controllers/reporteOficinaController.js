@@ -135,6 +135,8 @@ async function listar(req, res) {
   const whereFinal = applyKeywordOficina(where, keyword);
   const { page, limit, skip } = parsePagination(req.query);
 
+  const ordenParam = req.query.orden === 'asc' ? 'asc' : 'desc';
+
   const [items, total] = await Promise.all([
     prisma.reporteOficina.findMany({
       where: whereFinal,
@@ -144,7 +146,7 @@ async function listar(req, res) {
         categoria: true,
         evidencias: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { id: ordenParam },
       skip,
       take: limit,
     }),
@@ -210,14 +212,16 @@ async function eliminar(req, res) {
 async function exportar(req, res) {
   const { keyword, where } = buildReporteFilters(req.query);
   const whereFinal = applyKeywordOficina(where, keyword);
+  const incluirImagenes = req.query.incluirImagenes === 'true';
+  const ordenParam = req.query.orden === 'asc' ? 'asc' : 'desc';
 
   const reportes = await prisma.reporteOficina.findMany({
     where: whereFinal,
     include: { area: true, sede: true, categoria: true, evidencias: true },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { id: ordenParam },
   });
 
-  const buffer = await exportarReportesOficina(reportes);
+  const buffer = await exportarReportesOficina(reportes, incluirImagenes);
 
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', 'attachment; filename=reportes-oficina.xlsx');

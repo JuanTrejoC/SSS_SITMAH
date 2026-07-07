@@ -18,6 +18,8 @@ export default function DashboardOficinas() {
   const [anioFiltro, setAnioFiltro] = useState('')
   const [verDetalle, setVerDetalle] = useState(null)
   const [cargando, setCargando] = useState(false)
+  const [incluirImagenes, setIncluirImagenes] = useState(false)
+  const [ordenAscendente, setOrdenAscendente] = useState(false)
 
   // ✅ CARGAR DATOS DESDE EL BACKEND
   const cargarReportes = async () => {
@@ -114,6 +116,8 @@ export default function DashboardOficinas() {
       }
       if (prioridadFiltro !== 'Todas') url += `prioridad=${prioridadFiltro.toLowerCase()}&`
       if (busqueda) url += `keyword=${encodeURIComponent(busqueda)}&`
+      if (incluirImagenes) url += `incluirImagenes=true&`
+      if (ordenAscendente) url += `orden=asc&`
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${user.token}`
@@ -285,7 +289,24 @@ export default function DashboardOficinas() {
               />
             </div>
             <div>
-              <label style={{ fontSize: '0.8rem', color: '#9B9B9A', display: 'block', marginBottom: '0.3rem' }}>&nbsp;</label>
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.3rem' }}>
+                <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={incluirImagenes} 
+                    onChange={(e) => setIncluirImagenes(e.target.checked)} 
+                  />
+                  Incluir imágenes
+                </label>
+                <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={ordenAscendente} 
+                    onChange={(e) => setOrdenAscendente(e.target.checked)} 
+                  />
+                  Ascendente (ID)
+                </label>
+              </div>
               <button onClick={descargarExcel} style={{ width: '100%', padding: '0.5rem', backgroundColor: '#166534', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '500', cursor: 'pointer' }}>
                 <i className="fa-solid fa-file-excel" style={{ marginRight: '0.4rem' }}></i>Generar Reporte Excel
               </button>

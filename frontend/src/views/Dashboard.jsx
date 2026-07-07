@@ -50,7 +50,7 @@ export default function Dashboard() {
         </h1>
         <p style={{ color: '#6F7271', marginBottom: 'clamp(1.25rem, 3vw, 2.5rem)', fontSize: 'clamp(0.85rem, 2vw, 1rem)' }}>Bienvenido, resumen general del sistema.</p>
 
-        {/* 📈 TARJETAS DE RESUMEN */}
+        {/* TARJETAS DE RESUMEN */}
         <div className="form-responsive-grid grid-4" style={{ marginBottom: 'clamp(1.5rem, 4vw, 3rem)' }}>
           <div className="card-padding" style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', textAlign: 'center' }}>
             <h3 style={{ fontSize: 'clamp(1.4rem, 4vw, 2rem)', color: '#BC955B', margin: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}>

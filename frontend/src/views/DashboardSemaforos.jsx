@@ -17,8 +17,10 @@ export default function DashboardSemaforos() {
   const [anioFiltro, setAnioFiltro] = useState('')
   const [verDetalle, setVerDetalle] = useState(null)
   const [cargando, setCargando] = useState(false)
+  const [incluirImagenes, setIncluirImagenes] = useState(false)
+  const [ordenAscendente, setOrdenAscendente] = useState(false)
 
-  // ✅ CARGAR DATOS DESDE EL BACKEND
+  // CARGAR DATOS DESDE EL BACKEND
   const cargarReportes = async () => {
     if (!user?.token) return
     setCargando(true)
@@ -48,7 +50,7 @@ export default function DashboardSemaforos() {
     cargarReportes()
   }, [user, mesFiltro, anioFiltro])
 
-  // ✅ CAMBIAR ESTADO EN BACKEND
+  // CAMBIAR ESTADO EN BACKEND
   const cambiarEstado = async (id, nuevoEstado) => {
     if (!user?.token) return
     try {
@@ -75,7 +77,7 @@ export default function DashboardSemaforos() {
     }
   }
 
-  // ✅ ELIMINAR REPORTE EN BACKEND
+  // ELIMINAR REPORTE EN BACKEND
   const eliminarReporte = async (id) => {
     if (!user?.token) return
     if (confirm('¿Eliminar este reporte de forma permanente?')) {
@@ -100,7 +102,7 @@ export default function DashboardSemaforos() {
     }
   }
 
-  // ✅ DESCARGAR / GENERAR REPORTE EXCEL CON FILTROS DE MES/AÑO
+  // DESCARGAR / GENERAR REPORTE EXCEL CON FILTROS DE MES/AÑO
   const descargarExcel = async () => {
     if (!user?.token) return
     try {
@@ -112,6 +114,8 @@ export default function DashboardSemaforos() {
         url += `estado=${mapEstado[estadoFiltro]}&`
       }
       if (busqueda) url += `keyword=${encodeURIComponent(busqueda)}&`
+      if (incluirImagenes) url += `incluirImagenes=true&`
+      if (ordenAscendente) url += `orden=asc&`
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${user.token}`
@@ -130,7 +134,7 @@ export default function DashboardSemaforos() {
     }
   }
 
-  // ✅ FILTRAR DATOS
+  // FILTRAR DATOS
   const reportesFiltrados = reportes.filter(r => {
     const coincideBusqueda =
       r.jefeTurno?.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -146,7 +150,7 @@ export default function DashboardSemaforos() {
     return coincideBusqueda && coincideEstado
   })
 
-  // ✅ ESTILO DE PRIORIDAD (Todos los semáforos son alta prioridad)
+  // ESTILO DE PRIORIDAD (Todos los semáforos son alta prioridad)
   const obtenerEstiloPrioridad = () => {
     return { bg: '#fee2e2', color: '#dc2626', label: 'Alta' }
   }
@@ -164,7 +168,7 @@ export default function DashboardSemaforos() {
     <div className="main-content-padding" style={{ backgroundColor: '#f8fafc', minHeight: '100vh' }}>
       <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
 
-        {/* ✅ ENCABEZADO CON TABS DE NAVEGACIÓN */}
+        {/* ENCABEZADO CON TABS DE NAVEGACIÓN */}
         <div className="responsive-flex" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
           <h1 style={{ color: '#BC955B', fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>
             <i className="fa-solid fa-traffic-light" style={{ marginRight: '0.5rem' }}></i> Panel de Reportes - Semáforos
@@ -211,7 +215,7 @@ export default function DashboardSemaforos() {
           </div>
         </div>
 
-        {/* ✅ BARRA DE FILTROS */}
+        {/* BARRA DE FILTROS */}
         <div style={{ backgroundColor: 'white', padding: '1.2rem', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', marginBottom: '2rem' }}>
           {/* Fila 1: Búsqueda por mes, año y estado */}
           <div className="form-responsive-grid grid-2" style={{ marginBottom: '1rem' }}>
@@ -261,7 +265,24 @@ export default function DashboardSemaforos() {
               />
             </div>
             <div>
-              <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'block', marginBottom: '0.3rem' }}>&nbsp;</label>
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.3rem' }}>
+                <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={incluirImagenes} 
+                    onChange={(e) => setIncluirImagenes(e.target.checked)} 
+                  />
+                  Incluir imágenes
+                </label>
+                <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={ordenAscendente} 
+                    onChange={(e) => setOrdenAscendente(e.target.checked)} 
+                  />
+                  Ascendente (ID)
+                </label>
+              </div>
               <button onClick={descargarExcel} style={{ width: '100%', padding: '0.5rem', backgroundColor: '#166534', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '500', cursor: 'pointer' }}>
                 <i className="fa-solid fa-file-excel" style={{ marginRight: '0.4rem' }}></i>Generar Reporte Excel
               </button>

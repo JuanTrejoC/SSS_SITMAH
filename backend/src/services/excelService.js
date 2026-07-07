@@ -1,6 +1,7 @@
 const ExcelJS = require('exceljs');
 const path = require('path');
 const fs = require('fs');
+const sizeOf = require('image-size');
 
 function aplicarEstiloTabla(sheet) {
   // Activar líneas de cuadrícula para que siempre sean visibles
@@ -42,7 +43,10 @@ function aplicarEstiloTabla(sheet) {
   sheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return; // Omitir cabecera
 
-    row.height = 22;
+    // Respetar altura si ya fue modificada (ej. miniatura de evidencia)
+    if (row.height === undefined || row.height < 22) {
+      row.height = 22;
+    }
 
     const esPar = rowNumber % 2 === 0;
     const bgCol = esPar ? 'FFF8FAFC' : 'FFFFFFFF'; // Cebra: Slate-50 y Blanco
@@ -194,6 +198,25 @@ function aplicarEstiloTabla(sheet) {
       }
     });
   });
+
+  // Auto-ajustar ancho de columnas
+  sheet.columns.forEach(column => {
+    let maxLength = 0;
+    column.eachCell({ includeEmpty: true }, function (cell) {
+      // Ignorar celdas con imágenes (el valor es null o vacío) para el cálculo de ancho de texto,
+      // pero para la columna 'evidencia', daremos un ancho mínimo.
+      const valStr = cell.value ? cell.value.toString() : '';
+      if (valStr.length > maxLength) {
+        maxLength = valStr.length;
+      }
+    });
+    // Si la columna es evidencia y se agregaron imágenes, dar un ancho base
+    if (column.key === 'evidencia' && maxLength < 25) {
+      column.width = 25;
+    } else {
+      column.width = maxLength < 10 ? 10 : maxLength + 2;
+    }
+  });
 }
 
 /**
@@ -215,6 +238,35 @@ async function insertarImagenEvidencia(workbook, sheet, rowIndex, colIndex, evid
 
   try {
     const imageBuffer = fs.readFileSync(filePath);
+    
+    // Obtener dimensiones originales para mantener la proporción (aspect ratio)
+    let origW = 100;
+    let origH = 100;
+    try {
+      const dimensions = sizeOf(imageBuffer);
+      origW = dimensions.width;
+      origH = dimensions.height;
+    } catch (err) {
+      console.error('No se pudieron leer las dimensiones de la imagen:', err.message);
+    }
+
+    // La celda tiene approx 175px de ancho (25 col width) y 120px de alto (90 row height)
+    // Fijamos un área máxima para la imagen, dejando margen
+    const MAX_WIDTH = 150; 
+    const MAX_HEIGHT = 100;
+
+    let width = origW;
+    let height = origH;
+
+    if (width > MAX_WIDTH) {
+      height = Math.round((height * MAX_WIDTH) / width);
+      width = MAX_WIDTH;
+    }
+    if (height > MAX_HEIGHT) {
+      width = Math.round((width * MAX_HEIGHT) / height);
+      height = MAX_HEIGHT;
+    }
+
     const ext = imagenEv.mimetype.split('/')[1] || 'jpeg';
     const validExts = ['jpeg', 'jpg', 'png', 'gif', 'bmp'];
     const imgExt = validExts.includes(ext.toLowerCase()) ? (ext === 'jpg' ? 'jpeg' : ext.toLowerCase()) : 'jpeg';
@@ -224,10 +276,10 @@ async function insertarImagenEvidencia(workbook, sheet, rowIndex, colIndex, evid
       extension: imgExt,
     });
 
-    // Insertar la imagen en la celda correspondiente
+    // Insertar la imagen en la celda correspondiente, con su proporción original
     sheet.addImage(imageId, {
-      tl: { col: colIndex, row: rowIndex },
-      br: { col: colIndex + 1, row: rowIndex + 1 },
+      tl: { col: colIndex + 0.2, row: rowIndex + 0.1 },
+      ext: { width: width, height: height },
       editAs: 'oneCell',
     });
 
@@ -238,11 +290,11 @@ async function insertarImagenEvidencia(workbook, sheet, rowIndex, colIndex, evid
   }
 }
 
-async function exportarReportesOficina(reportes) {
+async function exportarReportesOficina(reportes, incluirImagenes = false) {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Reportes Oficina');
 
-  const tieneImagenes = reportes.some(r => r.evidencias && r.evidencias.some(ev => ev.mimetype?.startsWith('image/')));
+  const tieneImagenes = incluirImagenes && reportes.some(r => r.evidencias && r.evidencias.some(ev => ev.mimetype?.startsWith('image/')));
 
   sheet.columns = [
     { header: 'ID', key: 'id', width: 8 },
@@ -296,11 +348,11 @@ async function exportarReportesOficina(reportes) {
   return workbook.xlsx.writeBuffer();
 }
 
-async function exportarReportesSemaforo(reportes) {
+async function exportarReportesSemaforo(reportes, incluirImagenes = false) {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Reportes Semáforo');
 
-  const tieneImagenes = reportes.some(r => r.evidencias && r.evidencias.some(ev => ev.mimetype?.startsWith('image/')));
+  const tieneImagenes = incluirImagenes && reportes.some(r => r.evidencias && r.evidencias.some(ev => ev.mimetype?.startsWith('image/')));
 
   sheet.columns = [
     { header: 'ID', key: 'id', width: 8 },
