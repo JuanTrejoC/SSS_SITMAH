@@ -20,6 +20,7 @@ export default function DashboardOficinas() {
   const [cargando, setCargando] = useState(false)
   const [incluirImagenes, setIncluirImagenes] = useState(false)
   const [ordenAscendente, setOrdenAscendente] = useState(false)
+  const [confirmResuelto, setConfirmResuelto] = useState({ visible: false, id: null })
 
   // ✅ CARGAR DATOS DESDE EL BACKEND
   const cargarReportes = async () => {
@@ -379,8 +380,25 @@ export default function DashboardOficinas() {
                       <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
                         <select
                           value={r.estado}
-                          onChange={(e) => cambiarEstado(r.id, e.target.value)}
-                          style={{ padding: '0.25rem 0.5rem', border: '1px solid #9B9B9A', borderRadius: '6px', backgroundColor: 'white', fontSize: '0.85rem', outline: 'none', cursor: 'pointer' }}
+                          disabled={r.estado === 'resuelto'}
+                          onChange={(e) => {
+                            const nuevoEstado = e.target.value;
+                            if (nuevoEstado === 'resuelto') {
+                              setConfirmResuelto({ visible: true, id: r.id });
+                            } else {
+                              cambiarEstado(r.id, nuevoEstado);
+                            }
+                          }}
+                          style={{ 
+                            padding: '0.25rem 0.5rem', 
+                            border: '1px solid #9B9B9A', 
+                            borderRadius: '6px', 
+                            backgroundColor: r.estado === 'resuelto' ? '#f1f5f9' : 'white', 
+                            color: r.estado === 'resuelto' ? '#6F7271' : '#000',
+                            fontSize: '0.85rem', 
+                            outline: 'none', 
+                            cursor: r.estado === 'resuelto' ? 'not-allowed' : 'pointer' 
+                          }}
                         >
                           <option value="abierto">Pendiente</option>
                           <option value="en_proceso">En Proceso</option>
@@ -512,6 +530,42 @@ export default function DashboardOficinas() {
               <button onClick={() => setVerDetalle(null)} style={{ marginTop: '1.8rem', padding: '0.65rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '6px', width: '100%', fontSize: '0.95rem', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' }} onMouseOver={(e) => e.target.style.backgroundColor = '#a07238'} onMouseOut={(e) => e.target.style.backgroundColor = '#BC955B'}>
                 Cerrar Detalles
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ✅ MODAL DE CONFIRMACIÓN DE RESOLUCIÓN */}
+        {confirmResuelto.visible && (
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+            <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '16px', width: '90%', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', textAlign: 'center', animation: 'fadeIn 0.2s ease-out' }}>
+              <div style={{ backgroundColor: '#fef3c7', color: '#d97706', width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', margin: '0 auto 1.5rem', fontWeight: 'bold' }}>
+                ?
+              </div>
+              <h3 style={{ color: '#1e293b', marginBottom: '0.8rem', fontSize: '1.3rem', fontWeight: 'bold' }}>¿Confirmar Resolución?</h3>
+              <p style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: '2rem', lineHeight: '1.5' }}>
+                Una vez marcado como <strong>Resuelto</strong>, no podrás volver a cambiar el estado de este reporte.
+              </p>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+                <button 
+                  onClick={() => setConfirmResuelto({ visible: false, id: null })} 
+                  style={{ flex: 1, padding: '0.7rem', backgroundColor: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => {
+                    cambiarEstado(confirmResuelto.id, 'resuelto');
+                    setConfirmResuelto({ visible: false, id: null });
+                  }} 
+                  style={{ flex: 1, padding: '0.7rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#a07238'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#BC955B'}
+                >
+                  Aceptar
+                </button>
+              </div>
             </div>
           </div>
         )}
