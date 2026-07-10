@@ -137,7 +137,7 @@ async function enviarNotificacionAdmins({ folio, fecha, tipo, prioridad, falla, 
           </table>
 
           <div style="text-align: center; margin-top: 30px; margin-bottom: 10px;">
-            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/sitmah/dashboard" style="background-color: #b98a46; color: white; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 0.9rem; transition: background 0.2s;">
+            <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard" style="background-color: #b98a46; color: white; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 0.9rem; transition: background 0.2s;">
               Ingresar al Panel Administrador
             </a>
           </div>

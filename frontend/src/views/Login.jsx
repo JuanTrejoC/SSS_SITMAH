@@ -12,7 +12,7 @@ export default function Login() {
   const [cargando, setCargando] = useState(false)
   const [errores, setErrores] = useState({ usuario: false, contrasena: false })
 
-  if (user) return <Navigate to="/sitmah/dashboard" replace />
+  if (user) return <Navigate to="/dashboard" replace />
 
   const manejarCambio = (e) => {
     const { name, value } = e.target
@@ -27,7 +27,7 @@ export default function Login() {
     setCargando(true)
     const res = await loginAdmin(datos)
     setCargando(false)
-    if (res.ok) window.location.href = '/sitmah/dashboard'
+    if (res.ok) window.location.href = '/dashboard'
     else setError(res.error || 'Credenciales incorrectas')
   }
 
@@ -229,14 +229,14 @@ export default function Login() {
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
               <a
-                href="/sitmah/crear-oficinas"
+                href="/crear-oficinas"
                 style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.3rem 0.5rem' }}
               >
                 Reporte de Oficinas
               </a>
               <span style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center' }}>|</span>
               <a
-                href="/sitmah/crear-semaforos"
+                href="/crear-semaforos"
                 style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.3rem 0.5rem' }}
               >
                 Reporte de Semáforos

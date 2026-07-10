@@ -46,6 +46,6 @@ const router = createBrowserRouter([
   { path: '/', element: <InicioRedirect /> },
   { path: '*', element: <InicioRedirect /> }
 
-], { basename: '/sitmah' }) // QUITÉ LA BARRA FINAL, ASÍ FUNCIONA MEJOR
+])
 
 export default router
