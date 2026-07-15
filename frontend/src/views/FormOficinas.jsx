@@ -508,10 +508,10 @@ export default function FormOficinas({ usuarioActual }) {
             <input ref={fileInputRef} type="file" accept="image/*" onChange={manejarArchivo} style={{ fontSize: '0.9rem', width: '100%' }} />
             {vistaPrevia && (
               <div style={{ position: 'relative', display: 'inline-block', width: 'fit-content', marginTop: '0.5rem' }}>
-                <img 
-                  src={vistaPrevia} 
-                  alt="Vista previa" 
-                  style={{ maxWidth: '180px', maxHeight: '180px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #cbd5e1' }} 
+                <img
+                  src={vistaPrevia}
+                  alt="Vista previa"
+                  style={{ maxWidth: '180px', maxHeight: '180px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #cbd5e1' }}
                 />
                 <button
                   type="button"
