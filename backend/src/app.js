@@ -11,6 +11,7 @@ const catalogoRoutes = require('./routes/catalogoRoutes');
 const reporteRoutes = require('./routes/reporteRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const evidenciaRoutes = require('./routes/evidenciaRoutes');
+const inventarioRoutes = require('./routes/inventarioRoutes');
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.use('/api/catalogos', catalogoRoutes);
 app.use('/api/reportes', reporteRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/evidencias', evidenciaRoutes);
+app.use('/api/inventario', inventarioRoutes);
 
 app.use(errorHandler);
 

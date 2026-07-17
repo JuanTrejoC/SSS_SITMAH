@@ -44,6 +44,8 @@ router.get('/reportes/semaforo', asyncHandler(reporteSemaforo.listar));
 router.get('/reportes/semaforo/:id', asyncHandler(reporteSemaforo.obtener));
 router.patch('/reportes/semaforo/:id/estado', asyncHandler(reporteSemaforo.cambiarEstado));
 router.delete('/reportes/semaforo/:id', asyncHandler(reporteSemaforo.eliminar));
+router.post('/reportes/semaforo/:id/piezas', asyncHandler(reporteSemaforo.asignarPieza));
+router.delete('/reportes/semaforo/:id/piezas/:piezaId', asyncHandler(reporteSemaforo.desasignarPieza));
 
 router.get('/estadisticas', asyncHandler(estadisticas.listar));
 

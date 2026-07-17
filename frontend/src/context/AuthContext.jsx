@@ -6,10 +6,12 @@ export const useAuth = () => useContext(AuthContext)
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
+  const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
     const sesion = localStorage.getItem('sesion_sitmah')
     if (sesion) setUser(JSON.parse(sesion))
+    setCargando(false)
   }, [])
 
   // ✅ CONEXIÓN CON EL BACKEND PARA INICIO DE SESIÓN
@@ -60,7 +62,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loginAdmin, logout }}>
+    <AuthContext.Provider value={{ user, cargando, loginAdmin, logout }}>
       {children}
     </AuthContext.Provider>
   )

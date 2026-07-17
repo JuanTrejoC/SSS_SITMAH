@@ -105,8 +105,9 @@ model Crucero {
   nombre String  @db.VarChar(150)
   activo Boolean @default(true)
 
-  reportes   ReporteSemaforo[]
-  estaciones EstacionCrucero[]
+  reportes      ReporteSemaforo[]
+  estaciones    EstacionCrucero[]
+  controladores ControladorSemaforo[]
 
   @@map("crucero")
 }
@@ -193,8 +194,9 @@ model ReporteSemaforo {
   estacion    Estacion    @relation(fields: [estacionId], references: [id])
   crucero     Crucero     @relation(fields: [cruceroId], references: [id])
   tipoFalla   TipoFalla   @relation(fields: [tipoFallaId], references: [id])
-  atendidoPor Usuario?    @relation("AtendidoSemaforo", fields: [atendidoPorId], references: [id])
-  evidencias  Evidencia[]
+  atendidoPor     Usuario?               @relation("AtendidoSemaforo", fields: [atendidoPorId], references: [id])
+  evidencias      Evidencia[]
+  piezasAsignadas ReporteSemaforoPieza[]
 
   @@index([estado])
   @@index([cruceroId])
@@ -245,4 +247,72 @@ model Comentario {
   usuario Usuario @relation(fields: [usuarioId], references: [id])
 
   @@map("comentario")
+}
+
+model EquipoTecnologico {
+  id               Int      @id @default(autoincrement())
+  tipo             String   @db.VarChar(50) // e.g. laptop, router, lectora_tags, herramienta_tec
+  numeroInventario String?  @unique @map("numero_inventario") @db.VarChar(100)
+  numeroSerie      String?  @map("numero_serie") @db.VarChar(100)
+  marca            String?  @db.VarChar(100)
+  modelo           String?  @db.VarChar(100)
+  responsable      String?  @db.VarChar(100)
+  cargoResponsable String?  @map("cargo_responsable") @db.VarChar(100)
+  areaUbicacion    String?  @map("area_ubicacion") @db.VarChar(150)
+  detalles         Json?    // Stores type-specific dynamic attributes
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("equipo_tecnologico")
+}
+
+model ControladorSemaforo {
+  id                  Int      @id @default(autoincrement())
+  modelo              String   @db.VarChar(100)
+  cruceroId           Int      @map("crucero_id")
+  totalCabezales      Int      @default(0) @map("total_cabezales")
+  totalLedsVerdes     Int      @default(0) @map("total_leds_verdes")
+  totalLedsRojos      Int      @default(0) @map("total_leds_rojos")
+  totalLedsAmarillos  Int      @default(0) @map("total_leds_amarillos")
+  pasoPeatonal        Boolean  @default(false) @map("paso_peatonal")
+  audible             Boolean  @default(false)
+  pantallaLed         Boolean  @default(false) @map("pantalla_led")
+  tarjetaRelevadora   Boolean  @default(false) @map("tarjeta_relevadora")
+  fuentePoder         Boolean  @default(false) @map("fuente_poder")
+  cpu                 Boolean  @default(false)
+  switch              Boolean  @default(false)
+  fibraOptica         Boolean  @default(false) @map("fibra_optica")
+  gps                 Boolean  @default(false)
+  botonera            Boolean  @default(false)
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  crucero             Crucero  @relation(fields: [cruceroId], references: [id])
+
+  @@map("controlador_semaforo")
+}
+
+model ExistenciaComponente {
+  id        Int                    @id @default(autoincrement())
+  nombre    String                 @unique @db.VarChar(150)
+  categoria String                 @db.VarChar(50) // e.g. componente, accesorio, periferico, equipo, herramienta
+  cantidad  Int                    @default(0)
+  createdAt DateTime               @default(now()) @map("created_at")
+  updatedAt DateTime               @updatedAt @map("updated_at")
+  reportes  ReporteSemaforoPieza[]
+
+  @@map("existencia_componente")
+}
+
+model ReporteSemaforoPieza {
+  id                Int                  @id @default(autoincrement())
+  reporteSemaforoId Int                  @map("reporte_semaforo_id")
+  componenteId      Int                  @map("componente_id")
+  cantidad          Int
+  createdAt         DateTime             @default(now()) @map("created_at")
+
+  reporteSemaforo   ReporteSemaforo      @relation(fields: [reporteSemaforoId], references: [id], onDelete: Cascade)
+  componente        ExistenciaComponente @relation(fields: [componenteId], references: [id])
+
+  @@map("reporte_semaforo_pieza")
 }

@@ -148,6 +148,17 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             <FaCog size={15} />
             Configuración
           </Link>
+
+          <Link
+            to="/inventario-semaforos"
+            style={linkStyle('/inventario-semaforos')}
+            onMouseOver={linkHover('/inventario-semaforos').over}
+            onMouseOut={linkHover('/inventario-semaforos').out}
+            onClick={closeOnMobile}
+          >
+            <FaRoad size={15} />
+            Inventario Semáforos
+          </Link>
         </div>
       )}
 

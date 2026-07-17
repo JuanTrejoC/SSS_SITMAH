@@ -31,6 +31,11 @@ const includeDetalle = {
   tipoFalla: true,
   atendidoPor: { select: { id: true, nombre: true, username: true } },
   evidencias: true,
+  piezasAsignadas: {
+    include: {
+      componente: true,
+    },
+  },
 };
 
 async function crear(req, res) {
@@ -202,6 +207,83 @@ async function exportar(req, res) {
   res.send(buffer);
 }
 
+const asignarPiezaSchema = z.object({
+  componente_id: z.coerce.number().int().positive(),
+  cantidad: z.coerce.number().int().positive(),
+});
+
+async function asignarPieza(req, res) {
+  const reporteId = Number(req.params.id);
+  const parsed = asignarPiezaSchema.safeParse(req.body);
+  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+
+  const { componente_id, cantidad } = parsed.data;
+
+  // Verify report exists
+  const reporte = await prisma.reporteSemaforo.findUnique({ where: { id: reporteId } });
+  if (!reporte) return fail(res, 'Reporte no encontrado', 404);
+
+  // Verify component stock
+  const componente = await prisma.existenciaComponente.findUnique({ where: { id: componente_id } });
+  if (!componente) return fail(res, 'Componente no encontrado', 404);
+
+  if (componente.cantidad < cantidad) {
+    return fail(res, `Stock insuficiente. Disponible: ${componente.cantidad}, Solicitado: ${cantidad}`);
+  }
+
+  // Transaction to deduct stock and assign piece
+  const result = await prisma.$transaction(async (tx) => {
+    // Decrement stock
+    await tx.existenciaComponente.update({
+      where: { id: componente_id },
+      data: {
+        cantidad: { decrement: cantidad }
+      }
+    });
+
+    // Create assignment
+    return tx.reporteSemaforoPieza.create({
+      data: {
+        reporteSemaforoId: reporteId,
+        componenteId: componente_id,
+        cantidad,
+      },
+      include: {
+        componente: true
+      }
+    });
+  });
+
+  ok(res, result, 210); // Custom code or just 201
+}
+
+async function desasignarPieza(req, res) {
+  const piezaId = Number(req.params.piezaId);
+
+  const asignacion = await prisma.reporteSemaforoPieza.findUnique({
+    where: { id: piezaId }
+  });
+  if (!asignacion) return fail(res, 'Asignación no encontrada', 404);
+
+  // Transaction to restore stock and delete assignment
+  await prisma.$transaction(async (tx) => {
+    // Restore stock
+    await tx.existenciaComponente.update({
+      where: { id: asignacion.componenteId },
+      data: {
+        cantidad: { increment: asignacion.cantidad }
+      }
+    });
+
+    // Delete assignment
+    await tx.reporteSemaforoPieza.delete({
+      where: { id: piezaId }
+    });
+  });
+
+  ok(res, { message: 'Pieza desasignada y stock restaurado' });
+}
+
 module.exports = {
   crear,
   resumen,
@@ -210,4 +292,6 @@ module.exports = {
   cambiarEstado,
   eliminar,
   exportar,
+  asignarPieza,
+  desasignarPieza,
 };

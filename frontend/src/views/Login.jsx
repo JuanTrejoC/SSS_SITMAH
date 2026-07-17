@@ -52,7 +52,7 @@ export default function Login() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #fdf2f4 50%, #f8fafc 100%)',
+        background: 'white',
         padding: '1rem',
       }}>
 
@@ -199,7 +199,7 @@ export default function Login() {
                   padding: '0.8rem',
                   background: cargando
                     ? '#9ca3af'
-                    : 'linear-gradient(135deg, #691B31 0%, #BC955B 100%)',
+                    : '#691B31',
                   color: 'white',
                   border: 'none',
                   borderRadius: '10px',

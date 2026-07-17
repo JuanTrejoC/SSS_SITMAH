@@ -1,0 +1,342 @@
+const { z } = require('zod');
+const prisma = require('../config/db');
+const { ok, fail } = require('../utils/response');
+const { parsePagination } = require('../utils/filters');
+
+// Schema validation for technological equipment
+const equipoTecnologicoSchema = z.object({
+  tipo: z.string().min(1),
+  numeroInventario: z.string().nullable().optional(),
+  numeroSerie: z.string().nullable().optional(),
+  marca: z.string().nullable().optional(),
+  modelo: z.string().nullable().optional(),
+  responsable: z.string().nullable().optional(),
+  cargoResponsable: z.string().nullable().optional(),
+  areaUbicacion: z.string().nullable().optional(),
+  detalles: z.any().optional(),
+});
+
+// Schema validation for traffic light controller
+const controladorSemaforoSchema = z.object({
+  modelo: z.string().min(1),
+  cruceroId: z.coerce.number().int().positive(),
+  totalCabezales: z.coerce.number().int().nonnegative().default(0),
+  totalLedsVerdes: z.coerce.number().int().nonnegative().default(0),
+  totalLedsRojos: z.coerce.number().int().nonnegative().default(0),
+  totalLedsAmarillos: z.coerce.number().int().nonnegative().default(0),
+  pasoPeatonal: z.boolean().default(false),
+  audible: z.boolean().default(false),
+  pantallaLed: z.boolean().default(false),
+  tarjetaRelevadora: z.boolean().default(false),
+  fuentePoder: z.boolean().default(false),
+  cpu: z.boolean().default(false),
+  switch: z.boolean().default(false),
+  fibraOptica: z.boolean().default(false),
+  gps: z.boolean().default(false),
+  botonera: z.boolean().default(false),
+});
+
+// Schema for adding stock existencias
+const ingresoExistenciaSchema = z.object({
+  nombre: z.string().min(1),
+  categoria: z.string().min(1),
+  cantidad: z.coerce.number().int().positive(),
+});
+
+// Schema for updating stock directly
+const ajusteExistenciaSchema = z.object({
+  nombre: z.string().min(1).optional(),
+  categoria: z.string().min(1).optional(),
+  cantidad: z.coerce.number().int().nonnegative().optional(),
+});
+
+// ==========================================
+// 1. CONTROLADORES DE EQUIPO TECNOLÓGICO
+// ==========================================
+
+async function listarEquipoTecnologico(req, res) {
+  const { page, limit, skip } = parsePagination(req.query);
+  const { tipo, area, search } = req.query;
+
+  const where = {};
+  if (tipo) where.tipo = tipo;
+  if (area) where.areaUbicacion = { contains: area };
+
+  if (search) {
+    where.OR = [
+      { numeroInventario: { contains: search } },
+      { numeroSerie: { contains: search } },
+      { marca: { contains: search } },
+      { modelo: { contains: search } },
+      { responsable: { contains: search } },
+      { areaUbicacion: { contains: search } },
+    ];
+  }
+
+  const [items, total] = await Promise.all([
+    prisma.equipoTecnologico.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { id: 'desc' },
+    }),
+    prisma.equipoTecnologico.count({ where }),
+  ]);
+
+  ok(res, { items, total, page, limit });
+}
+
+async function crearEquipoTecnologico(req, res) {
+  const parsed = equipoTecnologicoSchema.safeParse(req.body);
+  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+
+  const data = parsed.data;
+
+  // Validate unique inventory number if provided
+  if (data.numeroInventario) {
+    const existe = await prisma.equipoTecnologico.findUnique({
+      where: { numeroInventario: data.numeroInventario },
+    });
+    if (existe) {
+      return fail(res, `El número de inventario '${data.numeroInventario}' ya existe`);
+    }
+  }
+
+  const equipo = await prisma.equipoTecnologico.create({
+    data: {
+      tipo: data.tipo,
+      numeroInventario: data.numeroInventario || null,
+      numeroSerie: data.numeroSerie || null,
+      marca: data.marca || null,
+      modelo: data.modelo || null,
+      responsable: data.responsable || null,
+      cargoResponsable: data.cargoResponsable || null,
+      areaUbicacion: data.areaUbicacion || null,
+      detalles: data.detalles || {},
+    },
+  });
+
+  ok(res, equipo, 201);
+}
+
+async function obtenerEquipoTecnologico(req, res) {
+  const id = Number(req.params.id);
+  const equipo = await prisma.equipoTecnologico.findUnique({ where: { id } });
+  if (!equipo) return fail(res, 'Equipo tecnológico no encontrado', 404);
+  ok(res, equipo);
+}
+
+async function actualizarEquipoTecnologico(req, res) {
+  const id = Number(req.params.id);
+  const parsed = equipoTecnologicoSchema.safeParse(req.body);
+  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+
+  const data = parsed.data;
+
+  const actual = await prisma.equipoTecnologico.findUnique({ where: { id } });
+  if (!actual) return fail(res, 'Equipo tecnológico no encontrado', 404);
+
+  // Validate unique inventory number if it changed
+  if (data.numeroInventario && data.numeroInventario !== actual.numeroInventario) {
+    const existe = await prisma.equipoTecnologico.findUnique({
+      where: { numeroInventario: data.numeroInventario },
+    });
+    if (existe) {
+      return fail(res, `El número de inventario '${data.numeroInventario}' ya está asignado a otro equipo`);
+    }
+  }
+
+  const equipo = await prisma.equipoTecnologico.update({
+    where: { id },
+    data: {
+      tipo: data.tipo,
+      numeroInventario: data.numeroInventario || null,
+      numeroSerie: data.numeroSerie || null,
+      marca: data.marca || null,
+      modelo: data.modelo || null,
+      responsable: data.responsable || null,
+      cargoResponsable: data.cargoResponsable || null,
+      areaUbicacion: data.areaUbicacion || null,
+      detalles: data.detalles || {},
+    },
+  });
+
+  ok(res, equipo);
+}
+
+async function eliminarEquipoTecnologico(req, res) {
+  const id = Number(req.params.id);
+  const existe = await prisma.equipoTecnologico.findUnique({ where: { id } });
+  if (!existe) return fail(res, 'Equipo tecnológico no encontrado', 404);
+
+  await prisma.equipoTecnologico.delete({ where: { id } });
+  ok(res, { message: 'Equipo tecnológico eliminado correctamente' });
+}
+
+// ==========================================
+// 2. CONTROLADORES SEMAFÓRICOS INSTALADOS
+// ==========================================
+
+async function listarControladoresSemaforo(req, res) {
+  const { page, limit, skip } = parsePagination(req.query);
+  const { search } = req.query;
+
+  const where = {};
+  if (search) {
+    where.OR = [
+      { modelo: { contains: search } },
+      { crucero: { nombre: { contains: search } } },
+    ];
+  }
+
+  const [items, total] = await Promise.all([
+    prisma.controladorSemaforo.findMany({
+      where,
+      include: {
+        crucero: true,
+      },
+      skip,
+      take: limit,
+      orderBy: { id: 'desc' },
+    }),
+    prisma.controladorSemaforo.count({ where }),
+  ]);
+
+  ok(res, { items, total, page, limit });
+}
+
+async function crearControladorSemaforo(req, res) {
+  const parsed = controladorSemaforoSchema.safeParse(req.body);
+  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+
+  const controlador = await prisma.controladorSemaforo.create({
+    data: parsed.data,
+  });
+
+  ok(res, controlador, 201);
+}
+
+async function obtenerControladorSemaforo(req, res) {
+  const id = Number(req.params.id);
+  const controlador = await prisma.controladorSemaforo.findUnique({
+    where: { id },
+    include: { crucero: true }
+  });
+  if (!controlador) return fail(res, 'Controlador semafórico no encontrado', 404);
+  ok(res, controlador);
+}
+
+async function actualizarControladorSemaforo(req, res) {
+  const id = Number(req.params.id);
+  const parsed = controladorSemaforoSchema.safeParse(req.body);
+  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+
+  const existe = await prisma.controladorSemaforo.findUnique({ where: { id } });
+  if (!existe) return fail(res, 'Controlador semafórico no encontrado', 404);
+
+  const controlador = await prisma.controladorSemaforo.update({
+    where: { id },
+    data: parsed.data,
+  });
+
+  ok(res, controlador);
+}
+
+async function eliminarControladorSemaforo(req, res) {
+  const id = Number(req.params.id);
+  const existe = await prisma.controladorSemaforo.findUnique({ where: { id } });
+  if (!existe) return fail(res, 'Controlador semafórico no encontrado', 404);
+
+  await prisma.controladorSemaforo.delete({ where: { id } });
+  ok(res, { message: 'Controlador semafórico eliminado correctamente' });
+}
+
+// ==========================================
+// 3. EXISTENCIAS / STOCK DE REFACCIONES
+// ==========================================
+
+async function listarExistencias(req, res) {
+  const { categoria } = req.query;
+  const where = {};
+  if (categoria) where.categoria = categoria;
+
+  const existencias = await prisma.existenciaComponente.findMany({
+    where,
+    orderBy: { nombre: 'asc' },
+  });
+
+  ok(res, existencias);
+}
+
+async function ingresarExistencia(req, res) {
+  const parsed = ingresoExistenciaSchema.safeParse(req.body);
+  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+
+  const { nombre, categoria, cantidad } = parsed.data;
+
+  const componente = await prisma.existenciaComponente.upsert({
+    where: { nombre },
+    update: {
+      cantidad: { increment: cantidad },
+    },
+    create: {
+      nombre,
+      categoria,
+      cantidad,
+    },
+  });
+
+  ok(res, componente);
+}
+
+async function actualizarExistencia(req, res) {
+  const id = Number(req.params.id);
+  const parsed = ajusteExistenciaSchema.safeParse(req.body);
+  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+
+  const existe = await prisma.existenciaComponente.findUnique({ where: { id } });
+  if (!existe) return fail(res, 'Componente no encontrado', 404);
+
+  const componente = await prisma.existenciaComponente.update({
+    where: { id },
+    data: parsed.data,
+  });
+
+  ok(res, componente);
+}
+
+async function eliminarExistencia(req, res) {
+  const id = Number(req.params.id);
+  const existe = await prisma.existenciaComponente.findUnique({ where: { id } });
+  if (!existe) return fail(res, 'Componente no encontrado', 404);
+
+  // Verify it is not linked to any report assignments
+  const asignado = await prisma.reporteSemaforoPieza.findFirst({
+    where: { componenteId: id }
+  });
+  if (asignado) {
+    return fail(res, 'No se puede eliminar porque este componente ya fue asignado a reportes de semáforos.');
+  }
+
+  await prisma.existenciaComponente.delete({ where: { id } });
+  ok(res, { message: 'Componente eliminado correctamente' });
+}
+
+module.exports = {
+  listarEquipoTecnologico,
+  crearEquipoTecnologico,
+  obtenerEquipoTecnologico,
+  actualizarEquipoTecnologico,
+  eliminarEquipoTecnologico,
+
+  listarControladoresSemaforo,
+  crearControladorSemaforo,
+  obtenerControladorSemaforo,
+  actualizarControladorSemaforo,
+  eliminarControladorSemaforo,
+
+  listarExistencias,
+  ingresarExistencia,
+  actualizarExistencia,
+  eliminarExistencia,
+};

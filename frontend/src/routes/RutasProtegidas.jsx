@@ -3,7 +3,11 @@ import { useAuth } from '../context/AuthContext'
 
 // SOLO ADMIN: Si no inició sesión, lo manda al login
 export function RutaSoloAdmin() {
-  const { user } = useAuth()
+  const { user, cargando } = useAuth()
+
+  if (cargando) {
+    return null // Retornamos null o un loader discreto mientras se restaura la sesión
+  }
 
   if (!user || user.rol !== 'administrador') {
     return <Navigate to="/login" replace />
@@ -14,7 +18,11 @@ export function RutaSoloAdmin() {
 
 // SOLO SOLICITANTE: redirige al admin al dashboard si intenta crear reportes
 export function RutaSoloSolicitante() {
-  const { user } = useAuth()
+  const { user, cargando } = useAuth()
+
+  if (cargando) {
+    return null
+  }
 
   if (user?.rol === 'administrador') {
     return <Navigate to="/dashboard" replace />
