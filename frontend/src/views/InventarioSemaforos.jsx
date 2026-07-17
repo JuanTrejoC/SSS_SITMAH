@@ -1015,9 +1015,45 @@ export default function InventarioSemaforos() {
               </div>
 
               {/* CHECKBOXES / SWITCHES DE CARACTERÍSTICAS */}
-              <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#691B31', marginBottom: '0.75rem' }}>
-                Accesorios y Equipamiento Interno
-              </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: '700', color: '#691B31', margin: 0 }}>
+                  Accesorios y Equipamiento Interno
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const keys = [
+                      'pasoPeatonal', 'audible', 'pantallaLed', 'tarjetaRelevadora',
+                      'fuentePoder', 'cpu', 'switch', 'fibraOptica', 'gps', 'botonera', 'poste'
+                    ];
+                    const todosSeleccionados = keys.every(key => controladorForm[key]);
+                    const nuevoEstado = !todosSeleccionados;
+                    const updates = {};
+                    keys.forEach(key => { updates[key] = nuevoEstado; });
+                    
+                    if (!nuevoEstado) {
+                      updates.cpuDetalle = '';
+                      updates.gpsDetalle = '';
+                      updates.tarjetaRelevadoraDetalle = '';
+                      updates.modeloPoste = '';
+                    }
+
+                    setControladorForm({ ...controladorForm, ...updates });
+                  }}
+                  style={{
+                    backgroundColor: '#f8fafc', border: '1px solid #CBD5E1', padding: '0.3rem 0.6rem',
+                    borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', color: '#64748b',
+                    cursor: 'pointer', transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#e2e8f0'; e.currentTarget.style.color = '#334155' }}
+                  onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#f8fafc'; e.currentTarget.style.color = '#64748b' }}
+                >
+                  {[
+                      'pasoPeatonal', 'audible', 'pantallaLed', 'tarjetaRelevadora',
+                      'fuentePoder', 'cpu', 'switch', 'fibraOptica', 'gps', 'botonera', 'poste'
+                  ].every(key => controladorForm[key]) ? 'Deseleccionar Todos' : 'Seleccionar Todos'}
+                </button>
+              </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
                 {[

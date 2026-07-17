@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { FaEye, FaTrashAlt } from 'react-icons/fa'
+import { useState, useEffect, useRef } from 'react'
+import { FaEye, FaTrashAlt, FaChevronRight, FaCogs } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { formatFolio } from '../utils/formatFolio'
 import { useNavigate } from 'react-router-dom'
@@ -20,6 +20,10 @@ export default function DashboardSemaforos() {
   const [incluirImagenes, setIncluirImagenes] = useState(false)
   const [ordenAscendente, setOrdenAscendente] = useState(false)
   const [confirmResuelto, setConfirmResuelto] = useState({ visible: false, id: null })
+  const [inventario, setInventario] = useState([])
+  const [mostrarInventario, setMostrarInventario] = useState(false)
+  const [componenteSeleccionado, setComponenteSeleccionado] = useState('')
+  const [cantidadAsignar, setCantidadAsignar] = useState(1)
 
   // CARGAR DATOS DESDE EL BACKEND
   const cargarReportes = async () => {
@@ -47,9 +51,72 @@ export default function DashboardSemaforos() {
     }
   }
 
+  const cargarInventario = async () => {
+    if (!user?.token) return
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/inventario/existencias`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      })
+      const json = await response.json()
+      if (response.ok && json.ok) {
+        setInventario(Array.isArray(json.data) ? json.data : [])
+      }
+    } catch (err) {
+      console.error('Error al cargar inventario', err)
+    }
+  }
+
   useEffect(() => {
     cargarReportes()
+    cargarInventario()
   }, [user, mesFiltro, anioFiltro])
+
+  // Bloquear scroll de la página cuando el modal está abierto
+  useEffect(() => {
+    if (verDetalle) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [verDetalle]);
+
+
+  const asignarPieza = async () => {
+    if (!componenteSeleccionado || cantidadAsignar < 1) return
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/reportes/semaforo/${verDetalle.id}/piezas`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
+        body: JSON.stringify({ componente_id: componenteSeleccionado, cantidad: cantidadAsignar })
+      })
+      const json = await response.json()
+      if (response.ok && json.ok) {
+        alert('Pieza asignada correctamente')
+        setComponenteSeleccionado('')
+        setCantidadAsignar(1)
+        cargarReportes()
+        cargarInventario()
+        setVerDetalle(prev => {
+          const comp = inventario.find(i => i.id === Number(componenteSeleccionado))
+          return {
+            ...prev,
+            piezasAsignadas: [...(prev.piezasAsignadas || []), { componente: comp, cantidad: cantidadAsignar }]
+          }
+        })
+      } else {
+        alert('Error al asignar pieza: ' + (json.error || 'Desconocido'))
+      }
+    } catch (err) {
+      console.error(err)
+      alert('Error de red al asignar pieza')
+    }
+  }
 
   // CAMBIAR ESTADO EN BACKEND
   const cambiarEstado = async (id, nuevoEstado) => {
@@ -499,8 +566,54 @@ export default function DashboardSemaforos() {
                     Sin evidencia fotográfica adjunta.
                   </div>
                 )}
+
+                {/* ✅ PIEZAS ASIGNADAS E INVENTARIO */}
+                <div style={{ gridColumn: '1 / -1', marginTop: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <strong><i className="fa-solid fa-tools" style={{ marginRight: '0.4rem', color: '#691B31' }}></i> Componentes Asignados:</strong>
+                    <button onClick={() => setMostrarInventario(!mostrarInventario)} style={{ padding: '0.4rem 0.8rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>
+                      {mostrarInventario ? 'Ocultar Inventario' : 'Asignar Componente'}
+                    </button>
+                  </div>
+                  
+                  {mostrarInventario && (
+                    <div style={{ backgroundColor: '#fdf8f6', padding: '1rem', borderRadius: '8px', border: '1px solid #fecdd3', marginBottom: '1rem' }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem', color: '#9f1239' }}>Inventario Disponible</h4>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <CustomInventorySelect 
+                          value={componenteSeleccionado}
+                          onChange={setComponenteSeleccionado}
+                          inventario={inventario}
+                        />
+                        <input 
+                          type="number" 
+                          min="1" 
+                          value={cantidadAsignar} 
+                          onChange={e => setCantidadAsignar(Number(e.target.value))}
+                          style={{ width: '70px', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
+                        />
+                        <button onClick={asignarPieza} style={{ padding: '0.75rem 1.25rem', backgroundColor: '#e11d48', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(225, 29, 72, 0.2)' }}>
+                          Asignar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {verDetalle.piezasAsignadas && verDetalle.piezasAsignadas.length > 0 ? (
+                    <ul style={{ listStyle: 'none', padding: 0, margin: '0', fontSize: '0.9rem' }}>
+                      {verDetalle.piezasAsignadas.map((pieza, idx) => (
+                        <li key={idx} style={{ padding: '0.4rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px', marginBottom: '0.3rem', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{pieza.componente?.nombre || 'Desconocido'} <strong style={{color: '#691B31'}}>(x{pieza.cantidad})</strong></span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', marginBottom: '1rem' }}>No hay componentes asignados.</div>
+                  )}
+                </div>
+
               </div>
-              <button onClick={() => setVerDetalle(null)} style={{ marginTop: '1.8rem', padding: '0.65rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '6px', width: '100%', fontSize: '0.95rem', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' }} onMouseOver={(e) => e.target.style.backgroundColor = '#a07238'} onMouseOut={(e) => e.target.style.backgroundColor = '#BC955B'}>
+              <button onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }} style={{ marginTop: '1.8rem', padding: '0.65rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '6px', width: '100%', fontSize: '0.95rem', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' }} onMouseOver={(e) => e.target.style.backgroundColor = '#a07238'} onMouseOut={(e) => e.target.style.backgroundColor = '#BC955B'}>
                 Cerrar Detalles
               </button>
             </div>
@@ -547,3 +660,161 @@ export default function DashboardSemaforos() {
     </div>
   )
 }
+
+// Componente Customizado para el Inventario
+const CustomInventorySelect = ({ value, onChange, inventario }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [hoveredCategory, setHoveredCategory] = useState(null);
+  const selectRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (selectRef.current && !selectRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  const selectedOption = inventario.find(o => o.id === Number(value));
+
+  const filteredOptions = inventario.filter(o =>
+    o.nombre.toLowerCase().includes(search.toLowerCase()) ||
+    (o.categoria && o.categoria.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const gruposOpciones = inventario.reduce((acc, curr) => {
+    const group = curr.categoria || 'Sin Categoría';
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(curr);
+    return acc;
+  }, {});
+
+  return (
+    <div ref={selectRef} style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          padding: '0.75rem 1.25rem', border: '1px solid #CBD5E1', borderRadius: '8px',
+          fontSize: '1rem', backgroundColor: 'white', boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+          cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem'
+        }}
+      >
+        <span>
+          {selectedOption ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b', fontWeight: '600' }}>
+              <FaCogs color="#691B31" size={16} /> {selectedOption.nombre}
+            </span>
+          ) : (
+            <span style={{ color: '#475569', fontWeight: '500' }}>-- Seleccionar componente --</span>
+          )}
+        </span>
+        <FaChevronRight size={12} style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.2s', color: '#64748b' }} />
+      </div>
+
+      {isOpen && (
+        <>
+          <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', zIndex: 50, border: '1px solid #e2e8f0', overflow: 'hidden', width: '100%', minWidth: '300px' }}>
+            <div style={{ padding: '0.75rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+              <input
+                type="text"
+                placeholder="Buscar componente..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+                style={{ width: '100%', padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.9rem' }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+
+            <div style={{ display: 'flex', height: '240px' }}>
+              {search ? (
+                <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto', overscrollBehavior: 'contain' }}>
+                  {filteredOptions.length > 0 ? filteredOptions.map(opcion => (
+                    <div
+                      key={opcion.id}
+                      onClick={() => { if(opcion.cantidad > 0) { onChange(opcion.id); setIsOpen(false); setSearch(''); } }}
+                      style={{ padding: '0.7rem 1rem', cursor: opcion.cantidad > 0 ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', transition: 'background-color 0.15s', backgroundColor: value === opcion.id ? '#fdf2f8' : 'transparent', opacity: opcion.cantidad > 0 ? 1 : 0.5 }}
+                      onMouseOver={e => { if(opcion.cantidad > 0) e.currentTarget.style.backgroundColor = '#f1f5f9' }}
+                      onMouseOut={e => { if(opcion.cantidad > 0) e.currentTarget.style.backgroundColor = value === opcion.id ? '#fdf2f8' : 'transparent' }}
+                    >
+                      <FaCogs color={opcion.cantidad > 0 ? "#691B31" : "#94a3b8"} size={16} />
+                      <span style={{ fontWeight: '500', color: '#334155' }}>{opcion.nombre} <small style={{color: '#64748b'}}>(x{opcion.cantidad})</small></span>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginLeft: 'auto', backgroundColor: '#e2e8f0', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>{opcion.categoria}</span>
+                    </div>
+                  )) : (
+                    <div style={{ padding: '2rem', color: '#64748b', textAlign: 'center' }}>
+                      No se encontraron componentes para "{search}"
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div style={{ width: '45%', borderRight: '1px solid #e2e8f0', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#ffffff', overscrollBehavior: 'contain' }}>
+                    {Object.keys(gruposOpciones).map((group) => (
+                      <div
+                        key={group}
+                        onMouseEnter={() => setHoveredCategory(group)}
+                        style={{
+                          padding: '0.75rem 0.85rem',
+                          cursor: 'pointer',
+                          borderRadius: '8px',
+                          fontWeight: '600',
+                          fontSize: '0.85rem',
+                          color: hoveredCategory === group ? '#691B31' : '#475569',
+                          backgroundColor: hoveredCategory === group ? '#fdf2f8' : 'transparent',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '0.2rem',
+                          transition: 'background-color 0.2s, color 0.2s'
+                        }}
+                      >
+                        {group} <FaChevronRight size={9} style={{ opacity: hoveredCategory === group ? 1 : 0.3 }} />
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ width: '55%', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#f8fafc', overscrollBehavior: 'contain' }}>
+                    {hoveredCategory ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        <div style={{ padding: '0.4rem 0.75rem', fontSize: '0.7rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          {hoveredCategory}
+                        </div>
+                        {gruposOpciones[hoveredCategory].map(opcion => (
+                          <div
+                            key={opcion.id}
+                            onClick={() => { if(opcion.cantidad > 0) { onChange(opcion.id); setIsOpen(false); setSearch(''); } }}
+                            style={{ padding: '0.65rem 0.85rem', cursor: opcion.cantidad > 0 ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '0.65rem', borderRadius: '8px', transition: 'background-color 0.15s', backgroundColor: value === opcion.id ? '#fdf2f8' : 'transparent', opacity: opcion.cantidad > 0 ? 1 : 0.5 }}
+                            onMouseOver={e => { if(opcion.cantidad > 0) e.currentTarget.style.backgroundColor = '#e2e8f0'; }}
+                            onMouseOut={e => { if(opcion.cantidad > 0) e.currentTarget.style.backgroundColor = value === opcion.id ? '#fdf2f8' : 'transparent'; }}
+                          >
+                            <FaCogs color={value === opcion.id ? '#691B31' : '#64748b'} size={15} />
+                            <span style={{ fontSize: '0.9rem', fontWeight: '500', color: value === opcion.id ? '#691B31' : '#475569' }}>
+                              {opcion.nombre} <small style={{color: '#64748b'}}>(x{opcion.cantidad})</small>
+                            </span>
+                            {value === opcion.id && <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#691B31', fontWeight: '700' }}>✓</span>}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                        <FaCogs size={28} color="#cbd5e1" />
+                        Pasa el cursor sobre una categoría
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};

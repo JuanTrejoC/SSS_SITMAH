@@ -124,6 +124,7 @@ async function listar(req, res) {
         crucero: true,
         tipoFalla: true,
         evidencias: true,
+        piezasAsignadas: { include: { componente: true } },
       },
       orderBy: { id: ordenParam },
       skip,
