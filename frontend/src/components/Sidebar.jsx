@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   FaTachometerAlt, FaFileAlt, FaRoad,
-  FaChartBar, FaCog, FaTimes
+  FaChartBar, FaCog, FaTimes, FaLaptop
 } from 'react-icons/fa'
 import { FaFacebook, FaXTwitter } from 'react-icons/fa6'
 import logoSitmah from '../assets/logo.png'
@@ -158,6 +158,17 @@ export default function Sidebar({ isOpen, setIsOpen }) {
           >
             <FaRoad size={15} />
             Inventario Semáforos
+          </Link>
+
+          <Link
+            to="/inventario-tecnologico"
+            style={linkStyle('/inventario-tecnologico')}
+            onMouseOver={linkHover('/inventario-tecnologico').over}
+            onMouseOut={linkHover('/inventario-tecnologico').out}
+            onClick={closeOnMobile}
+          >
+            <FaLaptop size={15} />
+            Inventario Tecnológico
           </Link>
         </div>
       )}

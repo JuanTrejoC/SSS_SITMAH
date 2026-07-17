@@ -7,6 +7,49 @@ import {
   FaChevronLeft, FaChevronRight, FaTimes
 } from 'react-icons/fa'
 
+// ==================================================
+// CONFIGURACIONES PREDEFINIDAS POR MODELO DE POSTE
+// Ajusta los valores segun los postes de tu municipio
+// ==================================================
+const MODELOS_POSTE = {
+  'PS-3C': {
+    label: 'PS-3C — Poste Simple 3 Caras',
+    totalCabezales: 3,
+    totalLedsVerdes: 48,
+    totalFlechasVerdes: 0,
+    totalLedsRojos: 48,
+    totalFlechasRojas: 0,
+    totalLedsAmarillos: 16
+  },
+  'PS-4C': {
+    label: 'PS-4C — Poste Simple 4 Caras',
+    totalCabezales: 4,
+    totalLedsVerdes: 64,
+    totalFlechasVerdes: 0,
+    totalLedsRojos: 64,
+    totalFlechasRojas: 0,
+    totalLedsAmarillos: 24
+  },
+  'PD-3C': {
+    label: 'PD-3C — Poste Doble 3 Caras',
+    totalCabezales: 3,
+    totalLedsVerdes: 96,
+    totalFlechasVerdes: 16,
+    totalLedsRojos: 96,
+    totalFlechasRojas: 16,
+    totalLedsAmarillos: 32
+  },
+  'PD-4C': {
+    label: 'PD-4C — Poste Doble 4 Caras',
+    totalCabezales: 4,
+    totalLedsVerdes: 128,
+    totalFlechasVerdes: 24,
+    totalLedsRojos: 128,
+    totalFlechasRojas: 24,
+    totalLedsAmarillos: 48
+  }
+}
+
 export default function InventarioSemaforos() {
   const { user } = useAuth()
   const [tabActiva, setTabActiva] = useState('existencias') // 'existencias' o 'controladores'
@@ -22,6 +65,7 @@ export default function InventarioSemaforos() {
   const [existencias, setExistencias] = useState([])
   const [cargandoExistencias, setCargandoExistencias] = useState(false)
   const [modalStockAbierto, setModalStockAbierto] = useState(false)
+  const [modoAjusteDirecto, setModoAjusteDirecto] = useState(false)
   const [editandoStockId, setEditandoStockId] = useState(null)
   const [busquedaExistencias, setBusquedaExistencias] = useState('')
   const [stockForm, setStockForm] = useState({
@@ -46,18 +90,25 @@ export default function InventarioSemaforos() {
     cruceroId: '',
     totalCabezales: 0,
     totalLedsVerdes: 0,
+    totalFlechasVerdes: 0,
     totalLedsRojos: 0,
+    totalFlechasRojas: 0,
     totalLedsAmarillos: 0,
     pasoPeatonal: false,
     audible: false,
     pantallaLed: false,
     tarjetaRelevadora: false,
+    tarjetaRelevadoraDetalle: '',
     fuentePoder: false,
     cpu: false,
+    cpuDetalle: '',
     switch: false,
     fibraOptica: false,
     gps: false,
-    botonera: false
+    gpsDetalle: '',
+    botonera: false,
+    poste: false,
+    modeloPoste: ''
   })
 
   const [controladorErrores, setControladorErrores] = useState({})
@@ -178,6 +229,7 @@ export default function InventarioSemaforos() {
 
   const handleEditarStock = (item) => {
     setEditandoStockId(item.id)
+    setModoAjusteDirecto(false)
     setStockForm({
       nombre: item.nombre,
       categoria: item.categoria,
@@ -218,56 +270,20 @@ export default function InventarioSemaforos() {
     }
   }
 
-  const handleAjustarStockDirecto = async (item) => {
-    const { value: nuevaCantidad } = await Swal.fire({
-      title: `Ajustar stock de ${item.nombre}`,
-      input: 'number',
-      inputLabel: 'Nueva cantidad disponible',
-      inputValue: item.cantidad,
-      showCancelButton: true,
-      confirmButtonColor: '#691B31',
-      cancelButtonColor: '#6F7271',
-      confirmButtonText: 'Guardar',
-      cancelButtonText: 'Cancelar',
-      inputValidator: (value) => {
-        if (!value || isNaN(value) || Number(value) < 0) {
-          return 'Debe ingresar un número entero positivo o cero.'
-        }
-      }
+  const handleAjustarStockDirecto = (item) => {
+    setEditandoStockId(item.id)
+    setModoAjusteDirecto(true)
+    setStockForm({
+      nombre: item.nombre,
+      categoria: item.categoria,
+      cantidad: item.cantidad
     })
-
-    if (nuevaCantidad !== undefined) {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/inventario/existencias/${item.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${user.token}`
-          },
-          body: JSON.stringify({ cantidad: Number(nuevaCantidad) })
-        })
-
-        if (res.ok) {
-          const json = await res.json()
-          if (json.ok) {
-            Swal.fire({
-              title: 'Actualizado',
-              text: 'Cantidad de stock modificada.',
-              icon: 'success',
-              timer: 1500,
-              showConfirmButton: false
-            })
-            cargarExistencias()
-          }
-        }
-      } catch (err) {
-        console.error('Error al actualizar existencia:', err)
-      }
-    }
+    setModalStockAbierto(true)
   }
 
   const resetStockForm = () => {
     setEditandoStockId(null)
+    setModoAjusteDirecto(false)
     setStockForm({ nombre: '', categoria: 'componente', cantidad: 1 })
   }
 
@@ -330,18 +346,25 @@ export default function InventarioSemaforos() {
       cruceroId: item.cruceroId,
       totalCabezales: item.totalCabezales,
       totalLedsVerdes: item.totalLedsVerdes,
+      totalFlechasVerdes: item.totalFlechasVerdes || 0,
       totalLedsRojos: item.totalLedsRojos,
+      totalFlechasRojas: item.totalFlechasRojas || 0,
       totalLedsAmarillos: item.totalLedsAmarillos,
       pasoPeatonal: item.pasoPeatonal,
       audible: item.audible,
       pantallaLed: item.pantallaLed,
       tarjetaRelevadora: item.tarjetaRelevadora,
+      tarjetaRelevadoraDetalle: item.tarjetaRelevadoraDetalle || '',
       fuentePoder: item.fuentePoder,
       cpu: item.cpu,
+      cpuDetalle: item.cpuDetalle || '',
       switch: item.switch,
       fibraOptica: item.fibraOptica,
       gps: item.gps,
-      botonera: item.botonera
+      gpsDetalle: item.gpsDetalle || '',
+      botonera: item.botonera,
+      poste: item.poste || false,
+      modeloPoste: item.modeloPoste || ''
     })
     setControladorErrores({})
     setModalControladorAbierto(true)
@@ -383,18 +406,25 @@ export default function InventarioSemaforos() {
       cruceroId: '',
       totalCabezales: 0,
       totalLedsVerdes: 0,
+      totalFlechasVerdes: 0,
       totalLedsRojos: 0,
+      totalFlechasRojas: 0,
       totalLedsAmarillos: 0,
       pasoPeatonal: false,
       audible: false,
       pantallaLed: false,
       tarjetaRelevadora: false,
+      tarjetaRelevadoraDetalle: '',
       fuentePoder: false,
       cpu: false,
+      cpuDetalle: '',
       switch: false,
       fibraOptica: false,
       gps: false,
-      botonera: false
+      gpsDetalle: '',
+      botonera: false,
+      poste: false,
+      modeloPoste: ''
     })
     setControladorErrores({})
   }
@@ -763,7 +793,8 @@ export default function InventarioSemaforos() {
                   placeholder="Ej. cabezales, led verdes..."
                   value={stockForm.nombre}
                   onChange={(e) => setStockForm({ ...stockForm, nombre: e.target.value })}
-                  style={{ width: '100%', padding: '0.65rem', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '0.9rem' }}
+                  disabled={modoAjusteDirecto}
+                  style={{ width: '100%', padding: '0.65rem', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '0.9rem', backgroundColor: modoAjusteDirecto ? '#f1f5f9' : 'white', color: modoAjusteDirecto ? '#94a3b8' : 'inherit' }}
                 />
               </div>
 
@@ -774,7 +805,8 @@ export default function InventarioSemaforos() {
                 <select
                   value={stockForm.categoria}
                   onChange={(e) => setStockForm({ ...stockForm, categoria: e.target.value })}
-                  style={{ width: '100%', padding: '0.65rem', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '0.9rem' }}
+                  disabled={modoAjusteDirecto}
+                  style={{ width: '100%', padding: '0.65rem', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '0.9rem', backgroundColor: modoAjusteDirecto ? '#f1f5f9' : 'white', color: modoAjusteDirecto ? '#94a3b8' : 'inherit' }}
                 >
                   <option value="componente">Componente</option>
                   <option value="accesorio">Accesorio</option>
@@ -853,16 +885,23 @@ export default function InventarioSemaforos() {
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#6F7271', marginBottom: '0.35rem' }}>
                     Modelo *
                   </label>
-                  <input
-                    type="text"
-                    placeholder="Ej. K-100, M-400..."
+                  <select
                     value={controladorForm.modelo}
                     onChange={(e) => setControladorForm({ ...controladorForm, modelo: e.target.value })}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = '#BC955B'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(188,149,91,0.15)' }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = controladorErrores.modelo ? '#A02142' : '#CBD5E1'; e.currentTarget.style.boxShadow = 'none' }}
                     style={{
-                      width: '100%', padding: '0.6,', border: `1px solid ${controladorErrores.modelo ? '#A02142' : '#CBD5E1'}`,
-                      borderRadius: '8px', fontSize: '0.9rem'
+                      width: '100%', padding: '0.6rem 0.75rem',
+                      border: `1px solid ${controladorErrores.modelo ? '#A02142' : '#CBD5E1'}`,
+                      borderRadius: '8px', fontSize: '0.9rem', fontWeight: '500', color: '#1E293B',
+                      backgroundColor: '#fff', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s',
+                      boxSizing: 'border-box', cursor: 'pointer'
                     }}
-                  />
+                  >
+                    <option value="">-- Seleccionar Modelo --</option>
+                    <option value="C-3000">C-3000</option>
+                    <option value="C-5000">C-5000</option>
+                  </select>
                   {controladorErrores.modelo && <span style={{ fontSize: '0.75rem', color: '#A02142' }}>{controladorErrores.modelo}</span>}
                 </div>
 
@@ -888,27 +927,37 @@ export default function InventarioSemaforos() {
               </div>
 
               {/* CONTADORES (LEDS Y CABEZALES) */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem', backgroundColor: '#fcfbf9', padding: '1rem', borderRadius: '8px', border: '1px solid #DDC9A3' }}>
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem 1rem',
+                marginBottom: '1.5rem', backgroundColor: '#fcfbf9', padding: '1rem',
+                borderRadius: '8px', border: '1px solid #DDC9A3'
+              }}>
+                {/* Fila 1: Cabezales | Leds Verdes | Leds Rojos */}
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#6F7271', marginBottom: '0.25rem' }}>
                     Cabezales
                   </label>
-                  <input
-                    type="number"
-                    min="0"
+                  <select
                     value={controladorForm.totalCabezales}
-                    onChange={(e) => setControladorForm({ ...controladorForm, totalCabezales: Math.max(0, Number(e.target.value)) })}
-                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem' }}
-                  />
+                    onChange={(e) => setControladorForm({ ...controladorForm, totalCabezales: Number(e.target.value) })}
+                    style={{
+                      width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1',
+                      borderRadius: '6px', fontSize: '0.9rem', backgroundColor: '#fff',
+                      cursor: 'pointer', outline: 'none'
+                    }}
+                  >
+                    <option value={0}>-- Seleccionar --</option>
+                    <option value={3}>3</option>
+                    <option value={4}>4</option>
+                  </select>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: 'green', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#16a34a', marginBottom: '0.25rem' }}>
                     Leds Verdes
                   </label>
                   <input
-                    type="number"
-                    min="0"
+                    type="number" min="0"
                     value={controladorForm.totalLedsVerdes}
                     onChange={(e) => setControladorForm({ ...controladorForm, totalLedsVerdes: Math.max(0, Number(e.target.value)) })}
                     style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem' }}
@@ -916,27 +965,50 @@ export default function InventarioSemaforos() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: 'red', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#dc2626', marginBottom: '0.25rem' }}>
                     Leds Rojos
                   </label>
                   <input
-                    type="number"
-                    min="0"
+                    type="number" min="0"
                     value={controladorForm.totalLedsRojos}
                     onChange={(e) => setControladorForm({ ...controladorForm, totalLedsRojos: Math.max(0, Number(e.target.value)) })}
                     style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem' }}
                   />
                 </div>
 
+                {/* Fila 2: Leds Amarillos | Flecha Verde | Flecha Roja */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: 'orange', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#d97706', marginBottom: '0.25rem' }}>
                     Leds Amarillos
                   </label>
                   <input
-                    type="number"
-                    min="0"
+                    type="number" min="0"
                     value={controladorForm.totalLedsAmarillos}
                     onChange={(e) => setControladorForm({ ...controladorForm, totalLedsAmarillos: Math.max(0, Number(e.target.value)) })}
+                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#16a34a', marginBottom: '0.25rem' }}>
+                    Flecha Verde
+                  </label>
+                  <input
+                    type="number" min="0"
+                    value={controladorForm.totalFlechasVerdes}
+                    onChange={(e) => setControladorForm({ ...controladorForm, totalFlechasVerdes: Math.max(0, Number(e.target.value)) })}
+                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#dc2626', marginBottom: '0.25rem' }}>
+                    Flecha Roja
+                  </label>
+                  <input
+                    type="number" min="0"
+                    value={controladorForm.totalFlechasRojas}
+                    onChange={(e) => setControladorForm({ ...controladorForm, totalFlechasRojas: Math.max(0, Number(e.target.value)) })}
                     style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem' }}
                   />
                 </div>
@@ -947,7 +1019,7 @@ export default function InventarioSemaforos() {
                 Accesorios y Equipamiento Interno
               </h3>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
                 {[
                   { key: 'pasoPeatonal', label: 'Paso Peatonal' },
                   { key: 'audible', label: 'Audible' },
@@ -958,26 +1030,164 @@ export default function InventarioSemaforos() {
                   { key: 'switch', label: 'Switch de Red' },
                   { key: 'fibraOptica', label: 'Fibra Óptica' },
                   { key: 'gps', label: 'Módulo GPS' },
-                  { key: 'botonera', label: 'Botonera Peatonal' }
+                  { key: 'botonera', label: 'Botonera Peatonal' },
+                  { key: 'poste', label: 'Poste' }
                 ].map((item) => (
                   <label
                     key={item.key}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem',
-                      color: '#6F7271', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px',
-                      backgroundColor: '#f8fafc', border: '1px solid #E2E8F0'
+                      color: controladorForm[item.key] ? '#691B31' : '#6F7271',
+                      cursor: 'pointer', padding: '0.4rem', borderRadius: '6px',
+                      backgroundColor: controladorForm[item.key] ? '#fdf6ec' : '#f8fafc',
+                      border: `1px solid ${controladorForm[item.key] ? '#BC955B' : '#E2E8F0'}`,
+                      fontWeight: controladorForm[item.key] ? '700' : '400',
+                      transition: 'all 0.2s'
                     }}
                   >
                     <input
                       type="checkbox"
                       checked={controladorForm[item.key]}
-                      onChange={(e) => setControladorForm({ ...controladorForm, [item.key]: e.target.checked })}
-                      style={{ cursor: 'pointer' }}
+                      onChange={(e) => {
+                        const updates = { [item.key]: e.target.checked }
+                        // Limpiar detalle si se desmarca
+                        if (!e.target.checked) {
+                          if (item.key === 'cpu') updates.cpuDetalle = ''
+                          if (item.key === 'gps') updates.gpsDetalle = ''
+                          if (item.key === 'tarjetaRelevadora') updates.tarjetaRelevadoraDetalle = ''
+                          if (item.key === 'poste') updates.modeloPoste = ''
+                        }
+                        setControladorForm({ ...controladorForm, ...updates })
+                      }}
+                      style={{ cursor: 'pointer', accentColor: '#691B31' }}
                     />
                     {item.label}
                   </label>
                 ))}
               </div>
+
+              {/* SUB-SELECCIÓN DE MODELO DE POSTE */}
+              {controladorForm.poste && (
+                <div style={{
+                  backgroundColor: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px',
+                  padding: '1rem', marginBottom: '1rem'
+                }}>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#0369a1', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                    Modelo de Poste Semafórico
+                  </label>
+                  <select
+                    value={controladorForm.modeloPoste}
+                    onChange={(e) => {
+                      const key = e.target.value
+                      if (key && MODELOS_POSTE[key]) {
+                        const preset = MODELOS_POSTE[key]
+                        setControladorForm(prev => ({
+                          ...prev,
+                          modeloPoste: key,
+                          totalCabezales: preset.totalCabezales,
+                          totalLedsVerdes: preset.totalLedsVerdes,
+                          totalFlechasVerdes: preset.totalFlechasVerdes,
+                          totalLedsRojos: preset.totalLedsRojos,
+                          totalFlechasRojas: preset.totalFlechasRojas,
+                          totalLedsAmarillos: preset.totalLedsAmarillos
+                        }))
+                      } else {
+                        setControladorForm(prev => ({ ...prev, modeloPoste: '' }))
+                      }
+                    }}
+                    style={{
+                      width: '100%', padding: '0.6rem 0.75rem', border: '1px solid #7dd3fc',
+                      borderRadius: '8px', fontSize: '0.9rem', fontWeight: '500', color: '#0c4a6e',
+                      backgroundColor: '#fff', outline: 'none', cursor: 'pointer'
+                    }}
+                  >
+                    <option value="">-- Seleccionar modelo de poste --</option>
+                    {Object.entries(MODELOS_POSTE).map(([key, val]) => (
+                      <option key={key} value={key}>{val.label}</option>
+                    ))}
+                  </select>
+
+                  {controladorForm.modeloPoste && (
+                    <div style={{
+                      marginTop: '0.75rem', backgroundColor: '#e0f2fe', borderRadius: '6px',
+                      padding: '0.6rem 0.9rem', fontSize: '0.8rem', color: '#075985',
+                      display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.5rem'
+                    }}>
+                      <span>✓ Se aplicaron valores del poste <strong>{controladorForm.modeloPoste}</strong> a los campos de LEDs y cabezales.</span>
+                      <span style={{ color: '#9B9B9A', fontSize: '0.75rem' }}>Puede ajustarlos manualmente si es necesario.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* CAMPOS DE DETALLE CONDICIONALES: CPU, GPS, Tarjeta Relevadora */}
+              {(controladorForm.cpu || controladorForm.gps || controladorForm.tarjetaRelevadora) && (
+                <div style={{
+                  backgroundColor: '#fdf6ec', border: '1px solid #DDC9A3', borderRadius: '8px',
+                  padding: '1rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem'
+                }}>
+                  <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: '700', color: '#BC955B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Detalles de módulos seleccionados
+                  </p>
+
+                  {controladorForm.cpu && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#6F7271', marginBottom: '0.25rem' }}>
+                        Módulo CPU — Marca / Modelo / No. Serie
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. Intel NUC, Serie A12345..."
+                        value={controladorForm.cpuDetalle}
+                        onChange={(e) => setControladorForm({ ...controladorForm, cpuDetalle: e.target.value })}
+                        style={{
+                          width: '100%', padding: '0.55rem 0.75rem', border: '1px solid #BC955B',
+                          borderRadius: '6px', fontSize: '0.9rem', outline: 'none',
+                          boxShadow: '0 0 0 2px rgba(188,149,91,0.15)'
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {controladorForm.gps && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#6F7271', marginBottom: '0.25rem' }}>
+                        Módulo GPS — Marca / Modelo / No. Serie
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. Ublox NEO-M8N, Serie G98765..."
+                        value={controladorForm.gpsDetalle}
+                        onChange={(e) => setControladorForm({ ...controladorForm, gpsDetalle: e.target.value })}
+                        style={{
+                          width: '100%', padding: '0.55rem 0.75rem', border: '1px solid #BC955B',
+                          borderRadius: '6px', fontSize: '0.9rem', outline: 'none',
+                          boxShadow: '0 0 0 2px rgba(188,149,91,0.15)'
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {controladorForm.tarjetaRelevadora && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#6F7271', marginBottom: '0.25rem' }}>
+                        Tarjeta Relevadora — Marca / Modelo / No. Serie
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. Siemens SIRIUS, Serie R00123..."
+                        value={controladorForm.tarjetaRelevadoraDetalle}
+                        onChange={(e) => setControladorForm({ ...controladorForm, tarjetaRelevadoraDetalle: e.target.value })}
+                        style={{
+                          width: '100%', padding: '0.55rem 0.75rem', border: '1px solid #BC955B',
+                          borderRadius: '6px', fontSize: '0.9rem', outline: 'none',
+                          boxShadow: '0 0 0 2px rgba(188,149,91,0.15)'
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', borderTop: '1px solid #E2E8F0', paddingTop: '1.25rem' }}>
                 <button

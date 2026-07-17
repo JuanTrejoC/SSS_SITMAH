@@ -13,6 +13,7 @@ import ConfigAdmin from '../views/ConfigAdmin'
 import DashboardOficinas from '../views/DashboardOficinas'
 import DashboardSemaforos from '../views/DashboardSemaforos'
 import InventarioSemaforos from '../views/InventarioSemaforos'
+import InventarioTecnologico from '../views/InventarioTecnologico'
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -38,7 +39,8 @@ const router = createBrowserRouter([
           { path: '/configuracion', element: <ConfigAdmin /> },
           { path: '/dashboard-oficinas', element: <DashboardOficinas /> },
           { path: '/dashboard-semaforos', element: <DashboardSemaforos /> },
-          { path: '/inventario-semaforos', element: <InventarioSemaforos /> }
+          { path: '/inventario-semaforos', element: <InventarioSemaforos /> },
+          { path: '/inventario-tecnologico', element: <InventarioTecnologico /> }
         ]
       }
     ]
