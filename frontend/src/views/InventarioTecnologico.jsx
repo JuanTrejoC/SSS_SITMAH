@@ -207,7 +207,7 @@ export default function InventarioTecnologico() {
   }, {});
 
   return (
-    <main style={{ padding: '2.5rem', flex: 1, backgroundColor: '#f8fafc', overflowY: 'auto' }}>
+    <main style={{ padding: '2.5rem', flex: 1, backgroundColor: '#f8fafc', overflowY: 'auto', minHeight: '800px', paddingBottom: '15rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#691B31', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -239,20 +239,12 @@ export default function InventarioTecnologico() {
           onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }}
           style={{ padding: '0.75rem 1.25rem', border: '1px solid #CBD5E1', borderRadius: '8px', flex: 1, minWidth: '300px', fontSize: '1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
         />
-        <select
+        <CustomFilterSelect
           value={filtroTipo}
-          onChange={(e) => { setFiltroTipo(e.target.value); setPagina(1); }}
-          style={{ padding: '0.75rem 1.25rem', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '1rem', backgroundColor: 'white', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-        >
-          <option value="">Todos los tipos</option>
-          {Object.entries(gruposOpciones).map(([groupName, opciones]) => (
-            <optgroup label={groupName} key={groupName}>
-              {opciones.map(opcion => (
-                <option value={opcion.value} key={opcion.value}>{opcion.label}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+          onChange={(val) => { setFiltroTipo(val); setPagina(1); }}
+          opciones={TIPOS_EQUIPO}
+          gruposOpciones={gruposOpciones}
+        />
       </div>
 
       {cargando ? (
@@ -678,3 +670,150 @@ const CustomEquipmentSelect = ({ value, onChange, opciones, gruposOpciones }) =>
     </div>
   );
 };
+
+const CustomFilterSelect = ({ value, onChange, opciones, gruposOpciones }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [hoveredCategory, setHoveredCategory] = useState(null);
+
+  const selectedOption = opciones.find(o => o.value === value);
+
+  const filteredOptions = opciones.filter(o =>
+    o.label.toLowerCase().includes(search.toLowerCase()) ||
+    o.group.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div style={{ position: 'relative', minWidth: '220px' }}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          padding: '0.75rem 1.25rem', border: '1px solid #CBD5E1', borderRadius: '8px',
+          fontSize: '1rem', backgroundColor: 'white', boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+          cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem'
+        }}
+      >
+        <span>
+          {selectedOption ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b', fontWeight: '600' }}>
+              <selectedOption.icon color="#691B31" size={16} /> {selectedOption.label}
+            </span>
+          ) : (
+            <span style={{ color: '#475569', fontWeight: '500' }}>Todos los tipos</span>
+          )}
+        </span>
+        <FaChevronRight size={12} style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.2s', color: '#64748b' }} />
+      </div>
+
+      {isOpen && (
+        <>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} onClick={() => { setIsOpen(false); setSearch(''); }} />
+          <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', zIndex: 50, border: '1px solid #e2e8f0', overflow: 'hidden', width: '380px' }}>
+            <div style={{ padding: '0.75rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+              <input
+                type="text"
+                placeholder="Buscar tipo de equipo..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+                style={{ width: '100%', padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.9rem' }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+
+            {/* Opción "Todos los tipos" siempre visible */}
+            <div
+              onClick={() => { onChange(''); setIsOpen(false); setSearch(''); }}
+              style={{ padding: '0.75rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: '1px solid #f1f5f9', backgroundColor: !value ? '#f0f9ff' : 'transparent', transition: 'background-color 0.15s' }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#f0f9ff'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = !value ? '#f0f9ff' : 'transparent'}
+            >
+              <FaLaptop color="#64748b" size={16} />
+              <span style={{ fontWeight: '600', color: !value ? '#0369a1' : '#475569' }}>Todos los tipos</span>
+              {!value && <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#0ea5e9', fontWeight: '600' }}>✓</span>}
+            </div>
+
+            <div style={{ display: 'flex', height: '240px' }}>
+              {search ? (
+                <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto' }}>
+                  {filteredOptions.length > 0 ? filteredOptions.map(opcion => (
+                    <div
+                      key={opcion.value}
+                      onClick={() => { onChange(opcion.value); setIsOpen(false); setSearch(''); }}
+                      style={{ padding: '0.7rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', transition: 'background-color 0.15s', backgroundColor: value === opcion.value ? '#fdf2f8' : 'transparent' }}
+                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                      onMouseOut={e => e.currentTarget.style.backgroundColor = value === opcion.value ? '#fdf2f8' : 'transparent'}
+                    >
+                      <opcion.icon color="#691B31" size={16} />
+                      <span style={{ fontWeight: '500', color: '#334155' }}>{opcion.label}</span>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginLeft: 'auto', backgroundColor: '#e2e8f0', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>{opcion.group}</span>
+                    </div>
+                  )) : (
+                    <div style={{ padding: '2rem', color: '#64748b', textAlign: 'center' }}>
+                      No se encontraron equipos para "{search}"
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div style={{ width: '45%', borderRight: '1px solid #e2e8f0', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#ffffff' }}>
+                    {Object.keys(gruposOpciones).map((group) => (
+                      <div
+                        key={group}
+                        onMouseEnter={() => setHoveredCategory(group)}
+                        style={{
+                          padding: '0.75rem 0.85rem',
+                          cursor: 'pointer',
+                          borderRadius: '8px',
+                          fontWeight: '600',
+                          fontSize: '0.85rem',
+                          color: hoveredCategory === group ? '#691B31' : '#475569',
+                          backgroundColor: hoveredCategory === group ? '#fdf2f8' : 'transparent',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '0.2rem',
+                          transition: 'background-color 0.2s, color 0.2s'
+                        }}
+                      >
+                        {group} <FaChevronRight size={9} style={{ opacity: hoveredCategory === group ? 1 : 0.3 }} />
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ width: '55%', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#f8fafc' }}>
+                    {hoveredCategory ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        <div style={{ padding: '0.4rem 0.75rem', fontSize: '0.7rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          {hoveredCategory}
+                        </div>
+                        {gruposOpciones[hoveredCategory].map(opcion => (
+                          <div
+                            key={opcion.value}
+                            onClick={() => { onChange(opcion.value); setIsOpen(false); setSearch(''); }}
+                            style={{ padding: '0.65rem 0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.65rem', borderRadius: '8px', transition: 'background-color 0.15s', backgroundColor: value === opcion.value ? '#fdf2f8' : 'transparent' }}
+                            onMouseOver={e => { e.currentTarget.style.backgroundColor = '#e2e8f0'; }}
+                            onMouseOut={e => { e.currentTarget.style.backgroundColor = value === opcion.value ? '#fdf2f8' : 'transparent'; }}
+                          >
+                            <opcion.icon color={value === opcion.value ? '#691B31' : '#64748b'} size={15} />
+                            <span style={{ fontSize: '0.9rem', fontWeight: '500', color: value === opcion.value ? '#691B31' : '#475569' }}>{opcion.label}</span>
+                            {value === opcion.value && <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#691B31', fontWeight: '700' }}>✓</span>}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                        <FaLaptop size={28} color="#cbd5e1" />
+                        Pasa el cursor sobre una categoría
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
