@@ -14,6 +14,8 @@ import DashboardOficinas from '../views/DashboardOficinas'
 import DashboardSemaforos from '../views/DashboardSemaforos'
 import InventarioSemaforos from '../views/InventarioSemaforos'
 import InventarioTecnologico from '../views/InventarioTecnologico'
+import InventarioExistencias from '../views/InventarioExistencias'
+import InventarioHerramientas from '../views/InventarioHerramientas'
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -40,7 +42,9 @@ const router = createBrowserRouter([
           { path: '/dashboard-oficinas', element: <DashboardOficinas /> },
           { path: '/dashboard-semaforos', element: <DashboardSemaforos /> },
           { path: '/inventario-semaforos', element: <InventarioSemaforos /> },
-          { path: '/inventario-tecnologico', element: <InventarioTecnologico /> }
+          { path: '/inventario-tecnologico', element: <InventarioTecnologico /> },
+          { path: '/inventario-existencias', element: <InventarioExistencias /> },
+          { path: '/inventario-herramientas', element: <InventarioHerramientas /> }
         ]
       }
     ]

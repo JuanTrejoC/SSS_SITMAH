@@ -29,7 +29,10 @@ const TIPOS_EQUIPO = [
   { value: 'telefono', label: 'Teléfono', icon: FaPhone, group: 'Comunicación' },
   { value: 'radio', label: 'Radio', icon: FaMicrophone, group: 'Comunicación' },
   { value: 'aire', label: 'Aire Acondicionado', icon: FaFan, group: 'Infraestructura' },
+  { value: 'lectora_tags', label: 'Lectora de Tags', icon: FaBroadcastTower, group: 'Peaje y Control' },
+  { value: 'controladora', label: 'Controladora', icon: FaShieldAlt, group: 'Peaje y Control' },
 ];
+
 
 export default function InventarioTecnologico() {
   const { user } = useAuth();
@@ -88,6 +91,17 @@ export default function InventarioTecnologico() {
   useEffect(() => {
     cargarEquipos();
   }, [pagina, busqueda, filtroTipo]);
+
+  useEffect(() => {
+    if (modalAbierto) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [modalAbierto]);
 
   const handleDetalleChange = (campo, valor) => {
     setForm(prev => ({
@@ -476,41 +490,48 @@ export default function InventarioTecnologico() {
                     <div style={{ padding: '1.75rem', backgroundColor: '#f0fdfa', borderRadius: '12px', border: '1px solid #ccfbf1', marginBottom: '2rem' }}>
                       <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0f766e', marginBottom: '1.5rem', borderBottom: '1px solid #99f6e4', paddingBottom: '0.5rem' }}>Periféricos Asignados</h3>
 
-                      <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: '600', color: '#115e59', cursor: 'pointer' }}>
+                      <div style={{ marginBottom: '1.8rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: '600', color: '#115e59', cursor: 'pointer', marginBottom: '1rem' }}>
                           <input type="checkbox" checked={!!form.detalles.tieneTeclado} onChange={e => handleDetalleChange('tieneTeclado', e.target.checked)} style={{ transform: 'scale(1.2)' }} />
                           ¿Tiene Teclado Asignado?
                         </label>
                         {form.detalles.tieneTeclado && (
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginTop: '1rem', paddingLeft: '1.75rem' }}>
-                            <div><label style={labelStyle}>No. Inventario Teclado</label><input type="text" value={form.detalles.numeroInventarioTeclado || ''} onChange={e => handleDetalleChange('numeroInventarioTeclado', e.target.value)} style={inputStyle} /></div>
-                            <div><label style={labelStyle}>Datos (Marca, Modelo, Serie)</label><input type="text" placeholder="Ej: Logitech MX Keys, SN:123..." value={form.detalles.datosTeclado || ''} onChange={e => handleDetalleChange('datosTeclado', e.target.value)} style={inputStyle} /></div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr 1fr 1fr', gap: '1rem', paddingLeft: '1.75rem' }}>
+                            <div><label style={labelStyle}>No. Inventario</label><input type="text" placeholder="Inv. Teclado" value={form.detalles.numeroInventarioTeclado || ''} onChange={e => handleDetalleChange('numeroInventarioTeclado', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Logitech" value={form.detalles.marcaTeclado || ''} onChange={e => handleDetalleChange('marcaTeclado', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: MX Keys" value={form.detalles.modeloTeclado || ''} onChange={e => handleDetalleChange('modeloTeclado', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>No. Serie</label><input type="text" placeholder="Ej: SN1234" value={form.detalles.serieTeclado || ''} onChange={e => handleDetalleChange('serieTeclado', e.target.value)} style={inputStyle} /></div>
                           </div>
                         )}
                       </div>
 
-                      <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: '600', color: '#115e59', cursor: 'pointer' }}>
+                      <div style={{ marginBottom: '1.8rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: '600', color: '#115e59', cursor: 'pointer', marginBottom: '1rem' }}>
                           <input type="checkbox" checked={!!form.detalles.tieneMouse} onChange={e => handleDetalleChange('tieneMouse', e.target.checked)} style={{ transform: 'scale(1.2)' }} />
                           ¿Tiene Mouse Asignado?
                         </label>
                         {form.detalles.tieneMouse && (
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginTop: '1rem', paddingLeft: '1.75rem' }}>
-                            <div><label style={labelStyle}>No. Inventario Mouse</label><input type="text" value={form.detalles.numeroInventarioMouse || ''} onChange={e => handleDetalleChange('numeroInventarioMouse', e.target.value)} style={inputStyle} /></div>
-                            <div><label style={labelStyle}>Datos (Marca, Modelo, Serie)</label><input type="text" placeholder="Ej: Logitech MX Master, SN:456..." value={form.detalles.datosMouse || ''} onChange={e => handleDetalleChange('datosMouse', e.target.value)} style={inputStyle} /></div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr 1fr 1fr', gap: '1rem', paddingLeft: '1.75rem' }}>
+                            <div><label style={labelStyle}>No. Inventario</label><input type="text" placeholder="Inv. Mouse" value={form.detalles.numeroInventarioMouse || ''} onChange={e => handleDetalleChange('numeroInventarioMouse', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Logitech" value={form.detalles.marcaMouse || ''} onChange={e => handleDetalleChange('marcaMouse', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: MX Master" value={form.detalles.modeloMouse || ''} onChange={e => handleDetalleChange('modeloMouse', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>No. Serie</label><input type="text" placeholder="Ej: SN5678" value={form.detalles.serieMouse || ''} onChange={e => handleDetalleChange('serieMouse', e.target.value)} style={inputStyle} /></div>
                           </div>
                         )}
                       </div>
 
                       <div>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: '600', color: '#115e59', cursor: 'pointer' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: '600', color: '#115e59', cursor: 'pointer', marginBottom: '1rem' }}>
                           <input type="checkbox" checked={!!form.detalles.tieneMonitores} onChange={e => handleDetalleChange('tieneMonitores', e.target.checked)} style={{ transform: 'scale(1.2)' }} />
                           ¿Tiene Monitores Asignados?
                         </label>
                         {form.detalles.tieneMonitores && (
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginTop: '1rem', paddingLeft: '1.75rem' }}>
-                            <div><label style={labelStyle}>No. Inventario Monitor(es)</label><input type="text" value={form.detalles.numeroInventarioMonitores || ''} onChange={e => handleDetalleChange('numeroInventarioMonitores', e.target.value)} style={inputStyle} /></div>
-                            <div><label style={labelStyle}>Datos (Cant, Marca, Mod, Serie)</label><input type="text" placeholder="Ej: 2x Dell P2419H, SN:789..." value={form.detalles.datosMonitores || ''} onChange={e => handleDetalleChange('datosMonitores', e.target.value)} style={inputStyle} /></div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 0.75fr 1fr 1fr 1fr', gap: '1rem', paddingLeft: '1.75rem' }}>
+                            <div><label style={labelStyle}>No. Inventario</label><input type="text" placeholder="Inv. Monitor" value={form.detalles.numeroInventarioMonitores || ''} onChange={e => handleDetalleChange('numeroInventarioMonitores', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>Cantidad</label><input type="number" min="1" placeholder="Ej: 1" value={form.detalles.cantidadMonitores || ''} onChange={e => handleDetalleChange('cantidadMonitores', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Dell" value={form.detalles.marcaMonitores || ''} onChange={e => handleDetalleChange('marcaMonitores', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: P2419H" value={form.detalles.modeloMonitores || ''} onChange={e => handleDetalleChange('modeloMonitores', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>No. Serie</label><input type="text" placeholder="Ej: SN7890" value={form.detalles.serieMonitores || ''} onChange={e => handleDetalleChange('serieMonitores', e.target.value)} style={inputStyle} /></div>
                           </div>
                         )}
                       </div>

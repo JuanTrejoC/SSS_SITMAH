@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   FaTachometerAlt, FaFileAlt, FaRoad,
-  FaChartBar, FaCog, FaTimes, FaLaptop
+  FaChartBar, FaCog, FaTimes, FaLaptop, FaBoxes, FaWrench
 } from 'react-icons/fa'
 import { FaFacebook, FaXTwitter } from 'react-icons/fa6'
 import logoSitmah from '../assets/logo.png'
@@ -169,6 +169,28 @@ export default function Sidebar({ isOpen, setIsOpen }) {
           >
             <FaLaptop size={15} />
             Inventario Tecnológico
+          </Link>
+
+          <Link
+            to="/inventario-existencias"
+            style={linkStyle('/inventario-existencias')}
+            onMouseOver={linkHover('/inventario-existencias').over}
+            onMouseOut={linkHover('/inventario-existencias').out}
+            onClick={closeOnMobile}
+          >
+            <FaBoxes size={15} />
+            Inventario de Existencias
+          </Link>
+
+          <Link
+            to="/inventario-herramientas"
+            style={linkStyle('/inventario-herramientas')}
+            onMouseOver={linkHover('/inventario-herramientas').over}
+            onMouseOut={linkHover('/inventario-herramientas').out}
+            onClick={closeOnMobile}
+          >
+            <FaWrench size={15} />
+            Inventario de Herramientas
           </Link>
         </div>
       )}

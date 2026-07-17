@@ -59,7 +59,15 @@ async function listarEquipoTecnologico(req, res) {
   const { tipo, area, search } = req.query;
 
   const where = {};
-  if (tipo) where.tipo = tipo;
+  if (tipo === 'herramientas') {
+    where.tipo = { in: ['herramienta_tec', 'herramienta_infra'] };
+  } else if (tipo === 'tecnologico') {
+    where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra'] };
+  } else if (tipo) {
+    where.tipo = tipo;
+  } else {
+    where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra'] };
+  }
   if (area) where.areaUbicacion = { contains: area };
 
   if (search) {

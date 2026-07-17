@@ -23,9 +23,16 @@ const obtenerEquipos = async (req, res) => {
       ];
     }
     
-    if (tipo) {
+    if (tipo === 'herramientas') {
+      where.tipo = { in: ['herramienta_tec', 'herramienta_infra'] };
+    } else if (tipo === 'tecnologico') {
+      where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra'] };
+    } else if (tipo) {
       where.tipo = tipo;
+    } else {
+      where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra'] };
     }
+
 
     const [equipos, total] = await Promise.all([
       prisma.equipoTecnologico.findMany({
