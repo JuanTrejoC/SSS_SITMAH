@@ -47,8 +47,25 @@ export default function InventarioTecnologico() {
 
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
-
   const [form, setForm] = useState(getInitialForm());
+  const [sedesList, setSedesList] = useState(['Centro de Control', 'CETRAM']);
+
+  useEffect(() => {
+    const cargarSedes = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/catalogos/sedes`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.ok && json.data && json.data.length > 0) {
+            setSedesList(json.data.map(s => s.nombre));
+          }
+        }
+      } catch (err) {
+        console.error('Error al cargar sedes:', err);
+      }
+    };
+    cargarSedes();
+  }, []);
 
   function getInitialForm() {
     return {
@@ -386,7 +403,20 @@ export default function InventarioTecnologico() {
                     )}
                     <div><label style={labelStyle}>No. Serie</label><input type="text" value={form.numeroSerie} onChange={e => setForm({ ...form, numeroSerie: e.target.value })} style={inputStyle} /></div>
 
-                    <div><label style={labelStyle}>Área / Ubicación *</label><input type="text" value={form.areaUbicacion} onChange={e => setForm({ ...form, areaUbicacion: e.target.value })} style={inputStyle} required /></div>
+                    <div>
+                      <label style={labelStyle}>Área / Ubicación *</label>
+                      <select
+                        value={form.areaUbicacion}
+                        onChange={e => setForm({ ...form, areaUbicacion: e.target.value })}
+                        style={{ ...inputStyle, cursor: 'pointer' }}
+                        required
+                      >
+                        <option value="">-- Seleccionar Ubicación --</option>
+                        {sedesList.map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
 
                     {/* Campos Responsable */}
                     {requiereResponsable && (
@@ -424,27 +454,63 @@ export default function InventarioTecnologico() {
                         </>
                       )}
 
-                      {tieneAlmacenamiento && (
+                       {tieneAlmacenamiento && (
                         <>
-                          <div><label style={labelStyle}>Almacenamiento (Capacidad)</label><input type="text" value={form.detalles.almacenamiento || ''} onChange={e => handleDetalleChange('almacenamiento', e.target.value)} style={inputStyle} /></div>
-                          <div><label style={labelStyle}>Memoria RAM</label><input type="text" value={form.detalles.ram || ''} onChange={e => handleDetalleChange('ram', e.target.value)} style={inputStyle} /></div>
+                          <CustomSpecSelect
+                            label="Almacenamiento (Capacidad)"
+                            value={form.detalles.almacenamiento || ''}
+                            options={['120GB', '240GB', '480GB', '512GB', '1TB', '2TB']}
+                            onChange={val => handleDetalleChange('almacenamiento', val)}
+                            placeholder="Ej: 500GB SSD"
+                          />
+                          <CustomSpecSelect
+                            label="Memoria RAM"
+                            value={form.detalles.ram || ''}
+                            options={['4GB', '8GB', '16GB', '32GB', '64GB']}
+                            onChange={val => handleDetalleChange('ram', val)}
+                            placeholder="Ej: 12GB DDR4"
+                          />
                           {['escritorio', 'laptop'].includes(form.tipo) && (
-                            <div><label style={labelStyle}>Tipo de Almacenamiento</label><input type="text" value={form.detalles.tipoAlmacenamiento || ''} onChange={e => handleDetalleChange('tipoAlmacenamiento', e.target.value)} style={inputStyle} placeholder="SSD / HDD" /></div>
+                            <CustomSpecSelect
+                              label="Tipo de Almacenamiento"
+                              value={form.detalles.tipoAlmacenamiento || ''}
+                              options={['SSD', 'HDD', 'M.2 NVMe', 'M.2 SATA']}
+                              onChange={val => handleDetalleChange('tipoAlmacenamiento', val)}
+                              placeholder="Ej: SSD + HDD"
+                            />
                           )}
                         </>
                       )}
 
                       {tieneProcesador && (
-                        <div><label style={labelStyle}>Procesador</label><input type="text" value={form.detalles.procesador || ''} onChange={e => handleDetalleChange('procesador', e.target.value)} style={inputStyle} /></div>
+                        <CustomSpecSelect
+                          label="Procesador"
+                          value={form.detalles.procesador || ''}
+                          options={['Intel Core i3', 'Intel Core i5', 'Intel Core i7', 'Intel Core i9', 'Intel Xeon', 'AMD Ryzen 3', 'AMD Ryzen 5', 'AMD Ryzen 7', 'AMD Ryzen 9']}
+                          onChange={val => handleDetalleChange('procesador', val)}
+                          placeholder="Ej: Intel Core i5 11va Gen"
+                        />
                       )}
 
                       {['escritorio', 'laptop', 'celular'].includes(form.tipo) && (
-                        <div><label style={labelStyle}>Sistema Operativo</label><input type="text" value={form.detalles.sistemaOperativo || ''} onChange={e => handleDetalleChange('sistemaOperativo', e.target.value)} style={inputStyle} /></div>
+                        <CustomSpecSelect
+                          label="Sistema Operativo"
+                          value={form.detalles.sistemaOperativo || ''}
+                          options={['Windows 10 Pro', 'Windows 11 Pro', 'Linux Ubuntu', 'Linux Debian', 'macOS', 'Android', 'iOS']}
+                          onChange={val => handleDetalleChange('sistemaOperativo', val)}
+                          placeholder="Ej: Windows Server 2022"
+                        />
                       )}
 
                       {['escritorio', 'laptop'].includes(form.tipo) && (
                         <>
-                          <div><label style={labelStyle}>Tarjeta Gráfica</label><input type="text" value={form.detalles.tarjetaGrafica || ''} onChange={e => handleDetalleChange('tarjetaGrafica', e.target.value)} style={inputStyle} /></div>
+                          <CustomSpecSelect
+                            label="Tarjeta Gráfica"
+                            value={form.detalles.tarjetaGrafica || ''}
+                            options={['Integrada', 'NVIDIA GeForce GTX 1650', 'NVIDIA GeForce RTX 3060', 'NVIDIA GeForce RTX 4060', 'AMD Radeon RX 6600']}
+                            onChange={val => handleDetalleChange('tarjetaGrafica', val)}
+                            placeholder="Ej: Intel Iris Xe"
+                          />
                           <div><label style={labelStyle}>Conectividad de Red</label>
                             <select value={form.detalles.red || ''} onChange={e => handleDetalleChange('red', e.target.value)} style={inputStyle}>
                               <option value="">-- Seleccionar --</option>
@@ -457,22 +523,52 @@ export default function InventarioTecnologico() {
                       )}
 
                       {['camara', 'dvr'].includes(form.tipo) && (
-                        <div><label style={labelStyle}>Megapíxeles (MP)</label><input type="text" value={form.detalles.megapixeles || ''} onChange={e => handleDetalleChange('megapixeles', e.target.value)} style={inputStyle} /></div>
+                        <CustomSpecSelect
+                          label="Megapíxeles (MP)"
+                          value={form.detalles.megapixeles || ''}
+                          options={['2MP', '4MP', '5MP', '8MP (4K)']}
+                          onChange={val => handleDetalleChange('megapixeles', val)}
+                          placeholder="Ej: 3MP"
+                        />
                       )}
 
                       {form.tipo === 'dvr' && (
-                        <div><label style={labelStyle}>Tipo (Análogo, IP)</label><input type="text" value={form.detalles.tipoDvr || ''} onChange={e => handleDetalleChange('tipoDvr', e.target.value)} style={inputStyle} /></div>
+                        <CustomSpecSelect
+                          label="Tipo (Análogo, IP)"
+                          value={form.detalles.tipoDvr || ''}
+                          options={['Análogo', 'IP', 'Híbrido']}
+                          onChange={val => handleDetalleChange('tipoDvr', val)}
+                          placeholder="Ej: NVR IP"
+                        />
                       )}
 
                       {form.tipo === 'impresora' && (
                         <>
-                          <div><label style={labelStyle}>Tipo (Monocromática o Color)</label><input type="text" value={form.detalles.tipoColor || ''} onChange={e => handleDetalleChange('tipoColor', e.target.value)} style={inputStyle} /></div>
-                          <div><label style={labelStyle}>Propiedad (Rentada / SITMAH)</label><input type="text" value={form.detalles.propiedad || ''} onChange={e => handleDetalleChange('propiedad', e.target.value)} style={inputStyle} /></div>
+                          <CustomSpecSelect
+                            label="Tipo (Monocromática o Color)"
+                            value={form.detalles.tipoColor || ''}
+                            options={['Monocromática', 'Color']}
+                            onChange={val => handleDetalleChange('tipoColor', val)}
+                            placeholder="Ej: Monocromática Láser"
+                          />
+                          <CustomSpecSelect
+                            label="Propiedad (Rentada / SITMAH)"
+                            value={form.detalles.propiedad || ''}
+                            options={['Rentada', 'SITMAH']}
+                            onChange={val => handleDetalleChange('propiedad', val)}
+                            placeholder="Ej: En comodato"
+                          />
                         </>
                       )}
 
                       {form.tipo === 'pantalla' && (
-                        <div><label style={labelStyle}>Pulgadas</label><input type="text" value={form.detalles.pulgadas || ''} onChange={e => handleDetalleChange('pulgadas', e.target.value)} style={inputStyle} /></div>
+                        <CustomSpecSelect
+                          label="Pulgadas"
+                          value={form.detalles.pulgadas || ''}
+                          options={['24"', '27"', '32"', '43"', '55"', '65"', '75"']}
+                          onChange={val => handleDetalleChange('pulgadas', val)}
+                          placeholder='Ej: 21.5"'
+                        />
                       )}
 
                       {form.tipo === 'videowall' && (
@@ -481,7 +577,13 @@ export default function InventarioTecnologico() {
 
                       {['internet', 'telefono'].includes(form.tipo) && (
                         <>
-                          <div><label style={labelStyle}>Compañía Proveedora</label><input type="text" value={form.detalles.compania || ''} onChange={e => handleDetalleChange('compania', e.target.value)} style={inputStyle} /></div>
+                          <CustomSpecSelect
+                            label="Compañía Proveedora"
+                            value={form.detalles.compania || ''}
+                            options={['Telmex', 'Totalplay', 'Izzi', 'Megacable']}
+                            onChange={val => handleDetalleChange('compania', val)}
+                            placeholder="Ej: Telcel"
+                          />
                           <div><label style={labelStyle}>Número de Teléfono</label><input type="text" value={form.detalles.numeroTelefono || ''} onChange={e => handleDetalleChange('numeroTelefono', e.target.value)} style={inputStyle} /></div>
                         </>
                       )}
@@ -849,6 +951,140 @@ const CustomFilterSelect = ({ value, onChange, opciones, gruposOpciones }) => {
             </div>
           </div>
         </>
+      )}
+    </div>
+  );
+};
+
+const CustomSpecSelect = ({ label, value, options, onChange, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [esOtro, setEsOtro] = useState(false);
+  const [customVal, setCustomVal] = useState('');
+
+  useEffect(() => {
+    if (value) {
+      if (options.includes(value)) {
+        setEsOtro(false);
+        setCustomVal('');
+      } else {
+        setEsOtro(true);
+        setCustomVal(value);
+      }
+    } else {
+      if (!esOtro) {
+        setCustomVal('');
+      }
+    }
+  }, [value, options]);
+
+  const handleSelectOption = (opt) => {
+    setEsOtro(false);
+    setIsOpen(false);
+    onChange(opt);
+  };
+
+  const handleSelectOtro = () => {
+    setEsOtro(true);
+    setIsOpen(false);
+  };
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setCustomVal(val);
+    onChange(val);
+  };
+
+  const displayVal = esOtro ? `Otro: ${value || '(Escriba abajo)'}` : (value || '-- Seleccionar --');
+
+  return (
+    <div style={{ position: 'relative', width: '100%' }}>
+      <label style={labelStyle}>{label}</label>
+      
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          ...inputStyle,
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          backgroundColor: '#fff',
+          fontWeight: value ? '600' : 'normal',
+          color: value ? '#1e293b' : '#94a3b8',
+          marginBottom: esOtro ? '0.5rem' : '0'
+        }}
+      >
+        <span>{displayVal}</span>
+        <FaChevronRight size={12} style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.2s', color: '#64748b' }} />
+      </div>
+
+      {isOpen && (
+        <>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 90 }} onClick={() => setIsOpen(false)} />
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            marginTop: '0.25rem',
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)',
+            zIndex: 100,
+            border: '1px solid #e2e8f0',
+            maxHeight: '200px',
+            overflowY: 'auto'
+          }}>
+            {options.map(opt => (
+              <div
+                key={opt}
+                onClick={() => handleSelectOption(opt)}
+                style={{
+                  padding: '0.6rem 1rem',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  color: value === opt ? '#691B31' : '#475569',
+                  backgroundColor: value === opt ? '#fdf2f8' : 'transparent',
+                  fontWeight: value === opt ? '600' : 'normal',
+                  transition: 'background-color 0.15s'
+                }}
+                onMouseOver={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                onMouseOut={e => e.currentTarget.style.backgroundColor = value === opt ? '#fdf2f8' : 'transparent'}
+              >
+                {opt}
+              </div>
+            ))}
+            
+            <div
+              onClick={handleSelectOtro}
+              style={{
+                padding: '0.6rem 1rem',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                color: esOtro ? '#691B31' : '#475569',
+                backgroundColor: esOtro ? '#fdf2f8' : 'transparent',
+                fontWeight: esOtro ? '600' : 'normal',
+                borderTop: '1px dashed #cbd5e1',
+                transition: 'background-color 0.15s'
+              }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = esOtro ? '#fdf2f8' : 'transparent'}
+            >
+              Otro (Especificar)
+            </div>
+          </div>
+        </>
+      )}
+
+      {esOtro && (
+        <input
+          type="text"
+          value={customVal}
+          onChange={handleInputChange}
+          placeholder={placeholder || `Escriba ${label.toLowerCase()}`}
+          style={inputStyle}
+          required
+        />
       )}
     </div>
   );

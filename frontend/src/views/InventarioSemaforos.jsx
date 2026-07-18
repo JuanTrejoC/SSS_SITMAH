@@ -4,7 +4,8 @@ import { API_BASE_URL } from '../config'
 import { useAuth } from '../context/AuthContext'
 import {
   FaRoad, FaPlus, FaEdit, FaTrashAlt, FaBoxes,
-  FaChevronLeft, FaChevronRight, FaTimes
+  FaChevronLeft, FaChevronRight, FaTimes,
+  FaCogs, FaWrench, FaHdd, FaTools
 } from 'react-icons/fa'
 
 // ==================================================
@@ -49,6 +50,27 @@ const MODELOS_POSTE = {
     totalLedsAmarillos: 48
   }
 }
+
+const getCategoriaLabel = (cat) => {
+  const categories = {
+    componente: 'Componente',
+    accesorio: 'Accesorio',
+    periferico: 'Periférico',
+    equipo: 'Equipo',
+    herramienta: 'Herramienta'
+  };
+  return categories[cat] || cat;
+};
+
+const getCategoriaIcon = (cat) => {
+  switch (cat) {
+    case 'componente': return <FaCogs style={{ color: '#4f46e5' }} />;
+    case 'accesorio': return <FaWrench style={{ color: '#0d9488' }} />;
+    case 'periferico': return <FaHdd style={{ color: '#ea580c' }} />;
+    case 'equipo': return <FaTools style={{ color: '#eab308' }} />;
+    default: return <FaBoxes style={{ color: '#64748b' }} />;
+  }
+};
 
 export default function InventarioSemaforos() {
   const { user } = useAuth()
@@ -568,53 +590,91 @@ export default function InventarioSemaforos() {
                   <div
                     key={item.id}
                     style={{
-                      backgroundColor: 'white', border: '1px solid #DDC9A3', borderRadius: '12px', padding: '1.25rem',
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column',
-                      justifyContent: 'space-between', transition: 'all 0.25s', position: 'relative', overflow: 'hidden'
+                      backgroundColor: 'white',
+                      borderRadius: '16px',
+                      padding: '1.5rem',
+                      boxShadow: '0 4px 6px rgba(0,0,0,0.02), 0 10px 15px -3px rgba(0,0,0,0.03)',
+                      border: '1px solid #e2e8f0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      transition: 'all 0.2s',
+                      position: 'relative',
+                      overflow: 'hidden'
                     }}
-                    onMouseOver={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 15px rgba(0,0,0,0.06)' }}
-                    onMouseOut={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.02)' }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.boxShadow = '0 12px 20px rgba(0,0,0,0.06)';
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.02)';
+                    }}
                   >
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', backgroundColor: '#BC955B' }}></div>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', backgroundColor: '#691B31' }}></div>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                       <div>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#6F7271', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          {item.categoria}
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          fontSize: '0.75rem',
+                          fontWeight: '700',
+                          color: '#475569',
+                          textTransform: 'uppercase',
+                          backgroundColor: '#f1f5f9',
+                          padding: '0.25rem 0.6rem',
+                          borderRadius: '6px'
+                        }}>
+                          {getCategoriaIcon(item.categoria)}
+                          {getCategoriaLabel(item.categoria)}
                         </span>
-                        <h3 style={{ fontSize: '1.15rem', margin: '0.4rem 0 0.75rem', fontWeight: '700', textTransform: 'capitalize' }}>
-                          <span style={{ backgroundColor: '#BC955B', color: 'white', padding: '0.25rem 0.6rem', borderRadius: '6px', display: 'inline-block', boxShadow: '0 2px 4px rgba(188,149,91,0.2)' }}>
-                            {item.nombre}
-                          </span>
+                        <h3 style={{ fontSize: '1.25rem', margin: '0.75rem 0 0.25rem', fontWeight: '800', color: '#1e293b', textTransform: 'capitalize' }}>
+                          {item.nombre}
                         </h3>
+                        {(item.marca || item.modelo) && (
+                          <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.25rem' }}>
+                            {item.marca && <span style={{ fontWeight: '600' }}>{item.marca}</span>}
+                            {item.marca && item.modelo && ' - '}
+                            {item.modelo && <span>{item.modelo}</span>}
+                          </div>
+                        )}
+                        {(item.numeroSerie || item.numeroInventario) && (
+                          <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                            {item.numeroSerie && <span>S/N: {item.numeroSerie}</span>}
+                            {item.numeroInventario && <span>Inv: {item.numeroInventario}</span>}
+                          </div>
+                        )}
                       </div>
 
-                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <div style={{ display: 'flex', gap: '0.25rem' }}>
                         <button
                           onClick={() => handleEditarStock(item)}
-                          title="Editar refacción"
-                          style={{ backgroundColor: 'transparent', color: '#BC955B', border: 'none', cursor: 'pointer', padding: '0.25rem' }}
+                          title="Editar existencias"
+                          style={{
+                            backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
                         >
                           <FaEdit size={14} />
                         </button>
                         <button
                           onClick={() => handleEliminarStock(item.id)}
                           title="Eliminar refacción"
-                          style={{ backgroundColor: 'transparent', color: '#A02142', border: 'none', cursor: 'pointer', padding: '0.25rem' }}
+                          style={{
+                            backgroundColor: '#fee2e2', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#fecaca'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#fee2e2'}
                         >
                           <FaTrashAlt size={14} />
                         </button>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid #F1F5F9', paddingTop: '0.75rem' }}>
-                      <div>
-                        <span style={{ fontSize: '0.8rem', color: '#9B9B9A', display: 'block' }}>Cantidad en existencia</span>
-                        <strong style={{ fontSize: '1.5rem', color: item.cantidad > 0 ? '#691B31' : '#A02142' }}>
-                          {item.cantidad} uds
-                        </strong>
-                      </div>
-
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', marginTop: '0.5rem' }}>
                       <button
                         onClick={() => handleAjustarStockDirecto(item)}
                         style={{
@@ -627,6 +687,16 @@ export default function InventarioSemaforos() {
                       >
                         Ajustar Stock
                       </button>
+                      <span style={{
+                        fontSize: '1.5rem',
+                        fontWeight: '800',
+                        color: item.cantidad > 5 ? '#0f766e' : item.cantidad > 0 ? '#b45309' : '#be123c',
+                        backgroundColor: item.cantidad > 5 ? '#f0fdf4' : item.cantidad > 0 ? '#fffbeb' : '#fdf2f2',
+                        padding: '0.1rem 0.8rem',
+                        borderRadius: '8px'
+                      }}>
+                        {item.cantidad}
+                      </span>
                     </div>
                   </div>
                 ))}

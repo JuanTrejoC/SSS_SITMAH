@@ -44,8 +44,25 @@ export default function InventarioHerramientas() {
 
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
-
   const [form, setForm] = useState(getInitialForm());
+  const [sedesList, setSedesList] = useState(['Centro de Control', 'CETRAM']);
+
+  useEffect(() => {
+    const cargarSedes = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/catalogos/sedes`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.ok && json.data && json.data.length > 0) {
+            setSedesList(json.data.map(s => s.nombre));
+          }
+        }
+      } catch (err) {
+        console.error('Error al cargar sedes:', err);
+      }
+    };
+    cargarSedes();
+  }, []);
 
   function getInitialForm() {
     return {
@@ -402,14 +419,17 @@ export default function InventarioHerramientas() {
 
                 <div style={{ gridColumn: 'span 2' }}>
                   <label style={labelStyle}>Ubicación (Área) *</label>
-                  <input
-                    type="text"
+                  <select
                     value={form.areaUbicacion}
                     onChange={e => setForm({ ...form, areaUbicacion: e.target.value })}
-                    placeholder="Ej: Mantenimiento, Sistemas, Site"
-                    style={inputStyle}
+                    style={{ ...inputStyle, cursor: 'pointer' }}
                     required
-                  />
+                  >
+                    <option value="">-- Seleccionar Ubicación --</option>
+                    {sedesList.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
