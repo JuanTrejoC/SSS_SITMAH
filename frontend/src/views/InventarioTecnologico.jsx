@@ -119,6 +119,10 @@ export default function InventarioTecnologico() {
       Swal.fire('Error', 'Seleccione un tipo de equipo', 'warning');
       return;
     }
+    if (!form.areaUbicacion || !form.areaUbicacion.trim()) {
+      Swal.fire('Error', 'El campo de Área / Ubicación es obligatorio', 'warning');
+      return;
+    }
 
     try {
       const url = editandoId
@@ -269,6 +273,7 @@ export default function InventarioTecnologico() {
             <thead style={{ backgroundColor: '#f1f5f9', color: '#475569', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               <tr>
                 <th style={{ padding: '1.25rem' }}>Tipo</th>
+                <th style={{ padding: '1.25rem' }}>Responsable</th>
                 <th style={{ padding: '1.25rem' }}>Identificación</th>
                 <th style={{ padding: '1.25rem' }}>Marca / Modelo</th>
                 <th style={{ padding: '1.25rem' }}>Ubicación</th>
@@ -278,7 +283,7 @@ export default function InventarioTecnologico() {
             <tbody>
               {equipos.length === 0 ? (
                 <tr>
-                  <td colSpan="5" style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontSize: '1.1rem' }}>
+                  <td colSpan="6" style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontSize: '1.1rem' }}>
                     No se encontraron equipos registrados.
                   </td>
                 </tr>
@@ -291,6 +296,18 @@ export default function InventarioTecnologico() {
                       </span>
                     </td>
                     <td style={{ padding: '1.25rem' }}>
+                      {['escritorio', 'laptop', 'radio'].includes(item.tipo) ? (
+                        <div>
+                          <div style={{ fontWeight: '600', color: '#1e293b' }}>{item.responsable || 'N/A'}</div>
+                          {(item.tipo === 'escritorio' || item.tipo === 'laptop') && item.cargoResponsable && (
+                            <div style={{ fontSize: '0.9rem', color: '#64748b' }}>{item.cargoResponsable}</div>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>N/A</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '1.25rem' }}>
                       {!['internet', 'aire', 'telefono'].includes(item.tipo) && <div style={{ fontWeight: '600', color: '#1e293b' }}>Inv: {item.numeroInventario || 'N/A'}</div>}
                       <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Serie: {item.numeroSerie || 'N/A'}</div>
                     </td>
@@ -300,7 +317,6 @@ export default function InventarioTecnologico() {
                     </td>
                     <td style={{ padding: '1.25rem' }}>
                       <div style={{ fontWeight: '600', color: '#1e293b' }}>{item.areaUbicacion || 'N/A'}</div>
-                      {['escritorio', 'laptop', 'radio'].includes(item.tipo) && <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Resp: {item.responsable || 'N/A'}</div>}
                     </td>
                     <td style={{ padding: '1.25rem', textAlign: 'center' }}>
                       <button onClick={() => handleEditar(item)} style={{ backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', marginRight: '0.5rem', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}>
@@ -370,7 +386,7 @@ export default function InventarioTecnologico() {
                     )}
                     <div><label style={labelStyle}>No. Serie</label><input type="text" value={form.numeroSerie} onChange={e => setForm({ ...form, numeroSerie: e.target.value })} style={inputStyle} /></div>
 
-                    <div><label style={labelStyle}>Área / Ubicación</label><input type="text" value={form.areaUbicacion} onChange={e => setForm({ ...form, areaUbicacion: e.target.value })} style={inputStyle} /></div>
+                    <div><label style={labelStyle}>Área / Ubicación *</label><input type="text" value={form.areaUbicacion} onChange={e => setForm({ ...form, areaUbicacion: e.target.value })} style={inputStyle} required /></div>
 
                     {/* Campos Responsable */}
                     {requiereResponsable && (

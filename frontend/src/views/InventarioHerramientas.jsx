@@ -11,6 +11,26 @@ const TIPOS_HERRAMIENTA = [
   { value: 'herramienta_infra', label: 'Herramienta de Infraestructura', icon: FaHammer }
 ];
 
+const labelStyle = {
+  display: 'block',
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  color: '#475569',
+  marginBottom: '0.4rem'
+};
+
+const inputStyle = {
+  width: '100%',
+  padding: '0.75rem 1rem',
+  border: '1px solid #CBD5E1',
+  borderRadius: '8px',
+  fontSize: '0.95rem',
+  color: '#1E293B',
+  boxSizing: 'border-box',
+  outline: 'none',
+  transition: 'border-color 0.2s, box-shadow 0.2s'
+};
+
 export default function InventarioHerramientas() {
   const { user } = useAuth();
 
@@ -96,6 +116,10 @@ export default function InventarioHerramientas() {
       Swal.fire('Error', 'El modelo de la herramienta de tecnologías es obligatorio.', 'warning');
       return;
     }
+    if (!form.areaUbicacion || !form.areaUbicacion.trim()) {
+      Swal.fire('Error', 'La ubicación (área) es obligatoria.', 'warning');
+      return;
+    }
 
     try {
       const url = editandoId
@@ -179,26 +203,6 @@ export default function InventarioHerramientas() {
     const found = TIPOS_HERRAMIENTA.find(t => t.value === tipo);
     const Icon = found ? found.icon : FaWrench;
     return <Icon size={16} />;
-  };
-
-  const labelStyle = {
-    display: 'block',
-    fontSize: '0.85rem',
-    fontWeight: '600',
-    color: '#475569',
-    marginBottom: '0.4rem'
-  };
-
-  const inputStyle = {
-    width: '100%',
-    padding: '0.75rem 1rem',
-    border: '1px solid #CBD5E1',
-    borderRadius: '8px',
-    fontSize: '0.95rem',
-    color: '#1E293B',
-    boxSizing: 'border-box',
-    outline: 'none',
-    transition: 'border-color 0.2s, box-shadow 0.2s'
   };
 
   return (
@@ -340,14 +344,10 @@ export default function InventarioHerramientas() {
             <form onSubmit={handleGuardar}>
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={labelStyle}>Tipo de Herramienta *</label>
-                <select
+                <CustomToolTypeSelect
                   value={form.tipo}
-                  onChange={e => setForm({ ...form, tipo: e.target.value })}
-                  style={inputStyle}
-                >
-                  <option value="herramienta_tec">Herramienta de Tecnologías (Ponchadora, etc.)</option>
-                  <option value="herramienta_infra">Herramienta de Infraestructura (Martillo, etc.)</option>
-                </select>
+                  onChange={nuevoTipo => setForm(prev => ({ ...prev, tipo: nuevoTipo }))}
+                />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
@@ -401,13 +401,14 @@ export default function InventarioHerramientas() {
                 </div>
 
                 <div style={{ gridColumn: 'span 2' }}>
-                  <label style={labelStyle}>Ubicación (Área)</label>
+                  <label style={labelStyle}>Ubicación (Área) *</label>
                   <input
                     type="text"
                     value={form.areaUbicacion}
                     onChange={e => setForm({ ...form, areaUbicacion: e.target.value })}
                     placeholder="Ej: Mantenimiento, Sistemas, Site"
                     style={inputStyle}
+                    required
                   />
                 </div>
               </div>
@@ -441,3 +442,111 @@ export default function InventarioHerramientas() {
     </main>
   );
 }
+
+const CustomToolTypeSelect = ({ value, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [hoveredCategory, setHoveredCategory] = useState('herramienta_tec');
+
+  const opciones = [
+    { value: 'herramienta_tec', label: 'Herramienta de Tecnologías', group: 'Tecnologías', icon: FaWrench, description: 'Ponchadoras, crimpadoras, multímetros, etc.' },
+    { value: 'herramienta_infra', label: 'Herramienta de Infraestructura', group: 'Infraestructura', icon: FaHammer, description: 'Martillos, destornilladores, pinzas, etc.' }
+  ];
+
+  const selectedOption = opciones.find(o => o.value === value);
+
+  return (
+    <div style={{ position: 'relative', width: '100%' }}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ ...inputStyle, padding: '0.75rem 1rem', fontSize: '1rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+      >
+        <span>
+          {selectedOption ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b', fontWeight: '600' }}>
+              {(() => {
+                const Icon = selectedOption.icon;
+                return <Icon color="#691B31" size={18} />;
+              })()} {selectedOption.label}
+            </span>
+          ) : (
+            <span style={{ color: '#94a3b8' }}>-- Seleccionar tipo de herramienta --</span>
+          )}
+        </span>
+        <FaChevronRight size={14} style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.2s', color: '#64748b' }} />
+      </div>
+
+      {isOpen && (
+        <>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} onClick={() => setIsOpen(false)} />
+          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', zIndex: 50, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', height: '200px' }}>
+              <div style={{ width: '45%', borderRight: '1px solid #e2e8f0', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#ffffff' }}>
+                {opciones.map((opcion) => (
+                  <div
+                    key={opcion.value}
+                    onMouseEnter={() => setHoveredCategory(opcion.value)}
+                    onClick={() => {
+                      onChange(opcion.value);
+                      setIsOpen(false);
+                    }}
+                    style={{
+                      padding: '0.85rem 1rem',
+                      cursor: 'pointer',
+                      borderRadius: '8px',
+                      fontWeight: '600',
+                      fontSize: '0.9rem',
+                      color: hoveredCategory === opcion.value ? '#691B31' : '#475569',
+                      backgroundColor: hoveredCategory === opcion.value ? '#fdf2f8' : 'transparent',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '0.25rem',
+                      transition: 'background-color 0.2s, color 0.2s'
+                    }}
+                  >
+                    {opcion.group} <FaChevronRight size={10} style={{ opacity: hoveredCategory === opcion.value ? 1 : 0.3 }} />
+                  </div>
+                ))}
+              </div>
+              <div style={{ width: '55%', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#f8fafc' }}>
+                {hoveredCategory ? (
+                  (() => {
+                    const opcion = opciones.find(o => o.value === hoveredCategory);
+                    const Icon = opcion.icon;
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <div style={{ padding: '0.5rem 0.75rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Herramientas en {opcion.group}
+                        </div>
+                        <div
+                          onClick={() => {
+                            onChange(opcion.value);
+                            setIsOpen(false);
+                          }}
+                          style={{ padding: '0.75rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', transition: 'background-color 0.15s, color 0.15s' }}
+                          onMouseOver={e => { e.currentTarget.style.backgroundColor = '#e2e8f0'; e.currentTarget.style.color = '#0f172a'; }}
+                          onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#475569'; }}
+                        >
+                          <Icon color="#64748b" size={16} /> 
+                          <div>
+                            <span style={{ fontSize: '0.95rem', fontWeight: '500', display: 'block' }}>{opcion.label}</span>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{opcion.description}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()
+                ) : (
+                  <div style={{ padding: '3rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                    <FaWrench size={32} color="#cbd5e1" />
+                    Selecciona una categoría a la izquierda
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};

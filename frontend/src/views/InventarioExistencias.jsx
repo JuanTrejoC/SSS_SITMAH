@@ -3,8 +3,42 @@ import Swal from 'sweetalert2';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import {
-  FaBoxes, FaPlus, FaEdit, FaTrashAlt, FaTimes, FaSearch, FaCogs, FaWrench, FaTools, FaHdd
+  FaBoxes, FaPlus, FaEdit, FaTrashAlt, FaTimes, FaSearch, FaCogs, FaWrench, FaTools, FaHdd, FaChevronRight
 } from 'react-icons/fa';
+
+const ARTICULOS_AGRUPADOS = {
+  'Componentes': [
+    { value: 'Memoria RAM DDR4 8GB', label: 'Memoria RAM DDR4 8GB', icon: FaCogs },
+    { value: 'Memoria RAM DDR4 16GB', label: 'Memoria RAM DDR4 16GB', icon: FaCogs },
+    { value: 'Disco Duro HDD 1TB', label: 'Disco Duro HDD 1TB', icon: FaCogs },
+    { value: 'Disco Estado Sólido SSD 240GB', label: 'Disco Estado Sólido SSD 240GB', icon: FaCogs },
+    { value: 'Disco Estado Sólido SSD 480GB', label: 'Disco Estado Sólido SSD 480GB', icon: FaCogs },
+    { value: 'Disco Estado Sólido SSD 1TB', label: 'Disco Estado Sólido SSD 1TB', icon: FaCogs },
+    { value: 'Fuente de Poder', label: 'Fuente de Poder', icon: FaCogs },
+    { value: 'Pasta Térmica', label: 'Pasta Térmica', icon: FaCogs },
+    { value: 'Pila CR2032', label: 'Pila CR2032', icon: FaCogs }
+  ],
+  'Accesorios': [
+    { value: 'Cable HDMI', label: 'Cable HDMI', icon: FaWrench },
+    { value: 'Cable de Red RJ45 (Cat 6)', label: 'Cable de Red RJ45 (Cat 6)', icon: FaWrench },
+    { value: 'Conectores RJ45', label: 'Conectores RJ45', icon: FaWrench },
+    { value: 'Adaptador USB a Ethernet', label: 'Adaptador USB a Ethernet', icon: FaWrench },
+    { value: 'Adaptador HDMI a VGA', label: 'Adaptador HDMI a VGA', icon: FaWrench },
+    { value: 'Cinta de Aislar', label: 'Cinta de Aislar', icon: FaWrench },
+    { value: 'Cinchos plásticos', label: 'Cinchos plásticos', icon: FaWrench }
+  ],
+  'Periféricos': [
+    { value: 'Mouse USB', label: 'Mouse USB', icon: FaHdd },
+    { value: 'Teclado USB', label: 'Teclado USB', icon: FaHdd },
+    { value: 'Lector de Tarjetas USB', label: 'Lector de Tarjetas USB', icon: FaHdd }
+  ],
+  'Equipos': [
+    { value: 'Switch de 5 puertos', label: 'Switch de 5 puertos', icon: FaTools },
+    { value: 'Access Point', label: 'Access Point', icon: FaTools }
+  ]
+};
+
+const ARTICULOS_COMUNES = Object.values(ARTICULOS_AGRUPADOS).flat().map(item => item.value);
 
 export default function InventarioExistencias() {
   const { user } = useAuth();
@@ -16,6 +50,7 @@ export default function InventarioExistencias() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [modoAjusteDirecto, setModoAjusteDirecto] = useState(false);
+  const [esNombrePersonalizado, setEsNombrePersonalizado] = useState(false);
 
   const [form, setForm] = useState({
     nombre: '',
@@ -114,6 +149,8 @@ export default function InventarioExistencias() {
   const handleEditar = (item) => {
     setEditandoId(item.id);
     setModoAjusteDirecto(false);
+    const esComun = ARTICULOS_COMUNES.includes(item.nombre || '');
+    setEsNombrePersonalizado(!esComun && !!item.nombre);
     setForm({
       nombre: item.nombre || '',
       categoria: item.categoria || 'componente',
@@ -162,6 +199,7 @@ export default function InventarioExistencias() {
   const resetForm = () => {
     setEditandoId(null);
     setModoAjusteDirecto(false);
+    setEsNombrePersonalizado(false);
     setForm({
       nombre: '',
       categoria: 'componente',
@@ -416,14 +454,23 @@ export default function InventarioExistencias() {
             <form onSubmit={handleGuardar}>
               <div style={{ marginBottom: '1.25rem' }}>
                 <label style={labelStyle}>Nombre del artículo *</label>
-                <input
-                  type="text"
+                <CustomArticleSelect
                   value={form.nombre}
-                  onChange={e => setForm({ ...form, nombre: e.target.value })}
-                  style={inputStyle}
-                  placeholder="Ej: Lector USB, Cable HDMI, Memoria RAM"
-                  required
+                  onChange={nuevoNombre => setForm(prev => ({ ...prev, nombre: nuevoNombre }))}
+                  esPersonalizado={esNombrePersonalizado}
+                  setEsPersonalizado={setEsNombrePersonalizado}
                 />
+
+                {esNombrePersonalizado && (
+                  <input
+                    type="text"
+                    value={form.nombre}
+                    onChange={e => setForm({ ...form, nombre: e.target.value })}
+                    style={{ ...inputStyle, marginTop: '0.75rem' }}
+                    placeholder="Escriba el nombre del artículo personalizado"
+                    required
+                  />
+                )}
               </div>
 
               <div style={{ marginBottom: '1.25rem' }}>
@@ -524,3 +571,225 @@ export default function InventarioExistencias() {
     </main>
   );
 }
+
+const labelStyle = {
+  display: 'block',
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  color: '#475569',
+  marginBottom: '0.4rem'
+};
+
+const inputStyle = {
+  width: '100%',
+  padding: '0.75rem 1rem',
+  border: '1px solid #CBD5E1',
+  borderRadius: '8px',
+  fontSize: '0.95rem',
+  color: '#1E293B',
+  boxSizing: 'border-box',
+  outline: 'none',
+  transition: 'border-color 0.2s, box-shadow 0.2s'
+};
+
+const CustomArticleSelect = ({ value, onChange, esPersonalizado, setEsPersonalizado }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [hoveredCategory, setHoveredCategory] = useState('Componentes');
+
+  const todasLasOpciones = Object.entries(ARTICULOS_AGRUPADOS).flatMap(([group, items]) =>
+    items.map(item => ({ ...item, group }))
+  );
+
+  const selectedOption = todasLasOpciones.find(o => o.value === value);
+
+  const filteredOptions = todasLasOpciones.filter(o =>
+    o.label.toLowerCase().includes(search.toLowerCase()) ||
+    o.group.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div style={{ position: 'relative', width: '100%' }}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ ...inputStyle, padding: '0.75rem 1rem', fontSize: '1rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+      >
+        <span>
+          {esPersonalizado ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b', fontWeight: '600' }}>
+              <FaBoxes color="#691B31" size={18} /> Otro: {value || '(Escriba abajo)'}
+            </span>
+          ) : selectedOption ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b', fontWeight: '600' }}>
+              {(() => {
+                const Icon = selectedOption.icon;
+                return <Icon color="#691B31" size={18} />;
+              })()} {selectedOption.label}
+            </span>
+          ) : (
+            <span style={{ color: '#94a3b8' }}>-- Seleccionar artículo --</span>
+          )}
+        </span>
+        <FaChevronRight size={14} style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.2s', color: '#64748b' }} />
+      </div>
+
+      {isOpen && (
+        <>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} onClick={() => setIsOpen(false)} />
+          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', zIndex: 50, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            <div style={{ padding: '0.75rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+              <input
+                type="text"
+                placeholder="Buscar artículo..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+                style={{ width: '100%', padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.95rem' }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+
+            <div style={{ display: 'flex', height: '280px' }}>
+              {search ? (
+                <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto' }}>
+                  {filteredOptions.length > 0 ? filteredOptions.map(opcion => {
+                    const Icon = opcion.icon;
+                    return (
+                      <div
+                        key={opcion.value}
+                        onClick={() => {
+                          setEsPersonalizado(false);
+                          onChange(opcion.value);
+                          setIsOpen(false);
+                          setSearch('');
+                        }}
+                        style={{ padding: '0.75rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', transition: 'background-color 0.15s' }}
+                        onMouseOver={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                        onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <Icon color="#691B31" size={18} />
+                        <span style={{ fontWeight: '500', color: '#334155' }}>{opcion.label}</span>
+                        <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginLeft: 'auto', backgroundColor: '#e2e8f0', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: '600' }}>{opcion.group}</span>
+                      </div>
+                    );
+                  }) : (
+                    <div style={{ padding: '2rem', color: '#64748b', textAlign: 'center' }}>
+                      No se encontraron artículos para "{search}"
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div style={{ width: '45%', borderRight: '1px solid #e2e8f0', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#ffffff' }}>
+                    {Object.keys(ARTICULOS_AGRUPADOS).map((group) => (
+                      <div
+                        key={group}
+                        onMouseEnter={() => setHoveredCategory(group)}
+                        style={{
+                          padding: '0.85rem 1rem',
+                          cursor: 'pointer',
+                          borderRadius: '8px',
+                          fontWeight: '600',
+                          fontSize: '0.9rem',
+                          color: hoveredCategory === group ? '#691B31' : '#475569',
+                          backgroundColor: hoveredCategory === group ? '#fdf2f8' : 'transparent',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '0.25rem',
+                          transition: 'background-color 0.2s, color 0.2s'
+                        }}
+                      >
+                        {group} <FaChevronRight size={10} style={{ opacity: hoveredCategory === group ? 1 : 0.3 }} />
+                      </div>
+                    ))}
+                    
+                    <div
+                      onMouseEnter={() => setHoveredCategory('Otro')}
+                      onClick={() => {
+                        setEsPersonalizado(true);
+                        onChange('');
+                        setIsOpen(false);
+                      }}
+                      style={{
+                        padding: '0.85rem 1rem',
+                        cursor: 'pointer',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        fontSize: '0.9rem',
+                        color: hoveredCategory === 'Otro' ? '#691B31' : '#475569',
+                        backgroundColor: hoveredCategory === 'Otro' ? '#fdf2f8' : 'transparent',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginTop: '0.5rem',
+                        borderTop: '1px dashed #cbd5e1',
+                        transition: 'background-color 0.2s, color 0.2s'
+                      }}
+                    >
+                      Otro (Especificar) <FaChevronRight size={10} style={{ opacity: hoveredCategory === 'Otro' ? 1 : 0.3 }} />
+                    </div>
+                  </div>
+                  
+                  <div style={{ width: '55%', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#f8fafc' }}>
+                    {hoveredCategory === 'Otro' ? (
+                      <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: '#64748b' }}>
+                        <div style={{ fontWeight: 'bold', color: '#334155', marginBottom: '0.5rem' }}>Artículo Personalizado</div>
+                        <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>
+                          Haz clic aquí para poder escribir un nombre personalizado.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEsPersonalizado(true);
+                            onChange('');
+                            setIsOpen(false);
+                          }}
+                          style={{
+                            backgroundColor: '#691B31', color: 'white', border: 'none',
+                            padding: '0.5rem 1rem', borderRadius: '6px', fontWeight: '600', cursor: 'pointer'
+                          }}
+                        >
+                          Especificar Otro
+                        </button>
+                      </div>
+                    ) : hoveredCategory ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <div style={{ padding: '0.5rem 0.75rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Artículos en {hoveredCategory}
+                        </div>
+                        {ARTICULOS_AGRUPADOS[hoveredCategory].map(opcion => {
+                          const Icon = opcion.icon;
+                          return (
+                            <div
+                              key={opcion.value}
+                              onClick={() => {
+                                setEsPersonalizado(false);
+                                onChange(opcion.value);
+                                setIsOpen(false);
+                              }}
+                              style={{ padding: '0.75rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', transition: 'background-color 0.15s, color 0.15s' }}
+                              onMouseOver={e => { e.currentTarget.style.backgroundColor = '#e2e8f0'; e.currentTarget.style.color = '#0f172a'; }}
+                              onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#475569'; }}
+                            >
+                              <Icon color="#64748b" size={16} /> <span style={{ fontSize: '0.95rem', fontWeight: '500' }}>{opcion.label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{ padding: '3rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                        <FaBoxes size={32} color="#cbd5e1" />
+                        Selecciona una categoría a la izquierda
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
