@@ -20,16 +20,21 @@ export default function InventarioExistencias() {
   const [form, setForm] = useState({
     nombre: '',
     categoria: 'componente',
-    cantidad: 1
+    cantidad: 1,
+    marca: '',
+    modelo: '',
+    numeroSerie: '',
+    numeroInventario: '',
+    tipoInventario: 'tecnologico'
   });
 
   const cargarExistencias = async () => {
     if (!user?.token) return;
     setCargando(true);
     try {
-      let url = `${API_BASE_URL}/api/inventario/existencias`;
+      let url = `${API_BASE_URL}/api/inventario/existencias?tipoInventario=tecnologico`;
       if (filtroCategoria) {
-        url += `?categoria=${filtroCategoria}`;
+        url += `&categoria=${filtroCategoria}`;
       }
       const res = await fetch(url, {
         headers: { 'Authorization': `Bearer ${user.token}` }
@@ -110,9 +115,14 @@ export default function InventarioExistencias() {
     setEditandoId(item.id);
     setModoAjusteDirecto(false);
     setForm({
-      nombre: item.nombre,
-      categoria: item.categoria,
-      cantidad: item.cantidad
+      nombre: item.nombre || '',
+      categoria: item.categoria || 'componente',
+      cantidad: item.cantidad || 0,
+      marca: item.marca || '',
+      modelo: item.modelo || '',
+      numeroSerie: item.numeroSerie || '',
+      numeroInventario: item.numeroInventario || '',
+      tipoInventario: 'tecnologico'
     });
     setModalAbierto(true);
   };
@@ -155,7 +165,12 @@ export default function InventarioExistencias() {
     setForm({
       nombre: '',
       categoria: 'componente',
-      cantidad: 1
+      cantidad: 1,
+      marca: '',
+      modelo: '',
+      numeroSerie: '',
+      numeroInventario: '',
+      tipoInventario: 'tecnologico'
     });
   };
 
@@ -327,6 +342,19 @@ export default function InventarioExistencias() {
                     <h3 style={{ fontSize: '1.25rem', margin: '0.75rem 0 0.25rem', fontWeight: '800', color: '#1e293b', textTransform: 'capitalize' }}>
                       {item.nombre}
                     </h3>
+                    {(item.marca || item.modelo) && (
+                      <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.25rem' }}>
+                        {item.marca && <span style={{ fontWeight: '600' }}>{item.marca}</span>}
+                        {item.marca && item.modelo && ' - '}
+                        {item.modelo && <span>{item.modelo}</span>}
+                      </div>
+                    )}
+                    {(item.numeroSerie || item.numeroInventario) && (
+                      <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                        {item.numeroSerie && <span>S/N: {item.numeroSerie}</span>}
+                        {item.numeroInventario && <span>Inv: {item.numeroInventario}</span>}
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.25rem' }}>
@@ -411,6 +439,48 @@ export default function InventarioExistencias() {
                   <option value="equipo">Equipo</option>
                   <option value="herramienta">Herramienta</option>
                 </select>
+              </div>
+
+              <div style={{ marginBottom: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                <div>
+                  <label style={labelStyle}>Marca (opcional)</label>
+                  <input
+                    type="text"
+                    value={form.marca}
+                    onChange={e => setForm({ ...form, marca: e.target.value })}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Modelo (opcional)</label>
+                  <input
+                    type="text"
+                    value={form.modelo}
+                    onChange={e => setForm({ ...form, modelo: e.target.value })}
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                <div>
+                  <label style={labelStyle}>No. de Serie (opcional)</label>
+                  <input
+                    type="text"
+                    value={form.numeroSerie}
+                    onChange={e => setForm({ ...form, numeroSerie: e.target.value })}
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>No. Inventario (opcional)</label>
+                  <input
+                    type="text"
+                    value={form.numeroInventario}
+                    onChange={e => setForm({ ...form, numeroInventario: e.target.value })}
+                    style={inputStyle}
+                  />
+                </div>
               </div>
 
               <div style={{ marginBottom: '2rem' }}>

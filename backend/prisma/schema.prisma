@@ -293,13 +293,18 @@ model ControladorSemaforo {
 }
 
 model ExistenciaComponente {
-  id        Int                    @id @default(autoincrement())
-  nombre    String                 @unique @db.VarChar(150)
-  categoria String                 @db.VarChar(50) // e.g. componente, accesorio, periferico, equipo, herramienta
-  cantidad  Int                    @default(0)
-  createdAt DateTime               @default(now()) @map("created_at")
-  updatedAt DateTime               @updatedAt @map("updated_at")
-  reportes  ReporteSemaforoPieza[]
+  id               Int                    @id @default(autoincrement())
+  nombre           String                 @db.VarChar(150)
+  categoria        String                 @db.VarChar(50) // e.g. componente, accesorio, periferico, equipo, herramienta
+  cantidad         Int                    @default(0)
+  marca            String?                @db.VarChar(100)
+  modelo           String?                @db.VarChar(100)
+  numeroSerie      String?                @map("numero_serie") @db.VarChar(100)
+  numeroInventario String?                @map("numero_inventario") @db.VarChar(100)
+  tipoInventario   String                 @default("semaforos") @map("tipo_inventario") @db.VarChar(50)
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+  reportes         ReporteSemaforoPieza[]
 
   @@map("existencia_componente")
 }

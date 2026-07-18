@@ -41,6 +41,11 @@ const ingresoExistenciaSchema = z.object({
   nombre: z.string().min(1),
   categoria: z.string().min(1),
   cantidad: z.coerce.number().int().positive(),
+  marca: z.string().optional(),
+  modelo: z.string().optional(),
+  numeroSerie: z.string().optional(),
+  numeroInventario: z.string().optional(),
+  tipoInventario: z.string().optional(),
 });
 
 // Schema for updating stock directly
@@ -48,6 +53,11 @@ const ajusteExistenciaSchema = z.object({
   nombre: z.string().min(1).optional(),
   categoria: z.string().min(1).optional(),
   cantidad: z.coerce.number().int().nonnegative().optional(),
+  marca: z.string().optional(),
+  modelo: z.string().optional(),
+  numeroSerie: z.string().optional(),
+  numeroInventario: z.string().optional(),
+  tipoInventario: z.string().optional(),
 });
 
 // ==========================================
@@ -264,9 +274,10 @@ async function eliminarControladorSemaforo(req, res) {
 // ==========================================
 
 async function listarExistencias(req, res) {
-  const { categoria } = req.query;
+  const { categoria, tipoInventario } = req.query;
   const where = {};
   if (categoria) where.categoria = categoria;
+  if (tipoInventario) where.tipoInventario = tipoInventario;
 
   const existencias = await prisma.existenciaComponente.findMany({
     where,
@@ -280,17 +291,18 @@ async function ingresarExistencia(req, res) {
   const parsed = ingresoExistenciaSchema.safeParse(req.body);
   if (!parsed.success) return fail(res, parsed.error.errors[0].message);
 
-  const { nombre, categoria, cantidad } = parsed.data;
+  const { nombre, categoria, cantidad, marca, modelo, numeroSerie, numeroInventario, tipoInventario } = parsed.data;
 
-  const componente = await prisma.existenciaComponente.upsert({
-    where: { nombre },
-    update: {
-      cantidad: { increment: cantidad },
-    },
-    create: {
+  const componente = await prisma.existenciaComponente.create({
+    data: {
       nombre,
       categoria,
       cantidad,
+      marca: marca || null,
+      modelo: modelo || null,
+      numeroSerie: numeroSerie || null,
+      numeroInventario: numeroInventario || null,
+      tipoInventario: tipoInventario || 'semaforos',
     },
   });
 

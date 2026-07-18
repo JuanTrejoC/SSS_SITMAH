@@ -71,7 +71,8 @@ export default function InventarioSemaforos() {
   const [stockForm, setStockForm] = useState({
     nombre: '',
     categoria: 'componente',
-    cantidad: 1
+    cantidad: 1,
+    tipoInventario: 'semaforos'
   })
 
   // ==========================================
@@ -144,7 +145,7 @@ export default function InventarioSemaforos() {
     if (!user?.token) return
     setCargandoExistencias(true)
     try {
-      const res = await fetch(`${API_BASE_URL}/api/inventario/existencias`, {
+      const res = await fetch(`${API_BASE_URL}/api/inventario/existencias?tipoInventario=semaforos`, {
         headers: { 'Authorization': `Bearer ${user.token}` }
       })
       if (res.ok) {
@@ -233,7 +234,8 @@ export default function InventarioSemaforos() {
     setStockForm({
       nombre: item.nombre,
       categoria: item.categoria,
-      cantidad: item.cantidad
+      cantidad: item.cantidad,
+      tipoInventario: 'semaforos'
     })
     setModalStockAbierto(true)
   }
@@ -284,7 +286,12 @@ export default function InventarioSemaforos() {
   const resetStockForm = () => {
     setEditandoStockId(null)
     setModoAjusteDirecto(false)
-    setStockForm({ nombre: '', categoria: 'componente', cantidad: 1 })
+    setStockForm({
+      nombre: '',
+      categoria: 'componente',
+      cantidad: 1,
+      tipoInventario: 'semaforos'
+    })
   }
 
   // ==========================================
