@@ -242,7 +242,148 @@ export default function InventarioTecnologico() {
   }, {});
 
   return (
-    <main style={{ padding: '2.5rem', flex: 1, backgroundColor: '#f8fafc', overflowY: 'auto', minHeight: '800px', paddingBottom: '15rem' }}>
+    <main className="inventario-main">
+      <style>{`
+        .inventario-main {
+          padding: 2.5rem;
+          flex: 1;
+          background-color: #f8fafc;
+          overflow-y: auto;
+          min-height: 800px;
+          padding-bottom: 15rem;
+        }
+        .inventario-grid-2col {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1.25rem;
+          margin-bottom: 2rem;
+        }
+        .inventario-grid-spec {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1.25rem;
+        }
+        .inventario-grid-periferico-4 {
+          display: grid;
+          grid-template-columns: 1.25fr 1fr 1fr 1fr;
+          gap: 1rem;
+          padding-left: 1.75rem;
+        }
+        .inventario-grid-periferico-5 {
+          display: grid;
+          grid-template-columns: 1.25fr 0.75fr 1fr 1fr 1fr;
+          gap: 1rem;
+          padding-left: 1.75rem;
+        }
+        .modal-container-custom {
+          background-color: white;
+          border-radius: 16px;
+          padding: 2.5rem;
+          width: 100%;
+          max-width: 850px;
+          max-height: 90vh;
+          min-height: 620px;
+          overflow-y: auto;
+          position: relative;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+          display: flex;
+          flex-direction: column;
+        }
+        .dropdown-select-container {
+          display: flex;
+          height: 320px;
+        }
+        .dropdown-left-pane {
+          width: 45%;
+          border-right: 1px solid #e2e8f0;
+          overflow-y: auto;
+          padding: 0.5rem;
+          background-color: #ffffff;
+        }
+        .dropdown-right-pane {
+          width: 55%;
+          overflow-y: auto;
+          padding: 0.5rem;
+          background-color: #f8fafc;
+        }
+        .filter-dropdown-container {
+          display: flex;
+          height: 240px;
+        }
+        .filter-dropdown-left {
+          width: 45%;
+          border-right: 1px solid #e2e8f0;
+          overflow-y: auto;
+          padding: 0.5rem;
+          background-color: #ffffff;
+        }
+        .filter-dropdown-right {
+          width: 55%;
+          overflow-y: auto;
+          padding: 0.5rem;
+          background-color: #f8fafc;
+        }
+
+        @media (max-width: 768px) {
+          .inventario-main {
+            padding: 1rem 1rem 12rem 1rem;
+          }
+          .inventario-grid-2col {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+          }
+          .inventario-grid-spec {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+          }
+          .inventario-grid-periferico-4 {
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+            padding-left: 0.5rem;
+          }
+          .inventario-grid-periferico-5 {
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+            padding-left: 0.5rem;
+          }
+          .modal-container-custom {
+            padding: 1.25rem;
+            min-height: auto;
+          }
+        }
+
+        @media (max-width: 600px) {
+          .dropdown-select-container {
+            flex-direction: column;
+            height: 350px;
+          }
+          .dropdown-left-pane {
+            width: 100%;
+            height: 150px;
+            border-right: none;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          .dropdown-right-pane {
+            width: 100%;
+            height: 200px;
+          }
+          .filter-dropdown-container {
+            flex-direction: column;
+            height: 280px;
+          }
+          .filter-dropdown-left {
+            width: 100%;
+            height: 120px;
+            border-right: none;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          .filter-dropdown-right {
+            width: 100%;
+            height: 160px;
+          }
+        }
+      `}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#691B31', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -285,8 +426,8 @@ export default function InventarioTecnologico() {
       {cargando ? (
         <div style={{ textAlign: 'center', padding: '4rem', color: '#64748b', fontSize: '1.1rem' }}>Cargando inventario...</div>
       ) : (
-        <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)', overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
             <thead style={{ backgroundColor: '#f1f5f9', color: '#475569', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               <tr>
                 <th style={{ padding: '1.25rem' }}>Tipo</th>
@@ -371,7 +512,7 @@ export default function InventarioTecnologico() {
       {/* MODAL DE REGISTRO */}
       {modalAbierto && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '1rem' }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '2.5rem', width: '100%', maxWidth: '850px', maxHeight: '90vh', minHeight: '620px', overflowY: 'auto', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', display: 'flex', flexDirection: 'column' }}>
+          <div className="modal-container-custom">
             <button type="button" onClick={() => setModalAbierto(false)} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', color: '#64748b', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}>
               <FaTimes size={16} />
             </button>
@@ -393,7 +534,7 @@ export default function InventarioTecnologico() {
 
               {form.tipo ? (
                 <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
+                  <div className="inventario-grid-2col">
                     {/* Campos Base */}
                     <div><label style={labelStyle}>Marca</label><input type="text" value={form.marca} onChange={e => setForm({ ...form, marca: e.target.value })} style={inputStyle} /></div>
                     <div><label style={labelStyle}>Modelo</label><input type="text" value={form.modelo} onChange={e => setForm({ ...form, modelo: e.target.value })} style={inputStyle} /></div>
@@ -433,7 +574,7 @@ export default function InventarioTecnologico() {
                   <div style={{ padding: '1.75rem', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
                     <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#334155', marginBottom: '1.5rem', borderBottom: '1px solid #cbd5e1', paddingBottom: '0.5rem' }}>Especificaciones Técnicas</h3>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                    <div className="inventario-grid-spec">
                       {tieneMAC && (
                         <div><label style={labelStyle}>Dirección MAC</label><input type="text" value={form.detalles.mac || ''} onChange={e => handleDetalleChange('mac', e.target.value)} style={inputStyle} placeholder="00:00:00:00:00:00" /></div>
                       )}
@@ -614,7 +755,7 @@ export default function InventarioTecnologico() {
                           ¿Tiene Teclado Asignado?
                         </label>
                         {form.detalles.tieneTeclado && (
-                          <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr 1fr 1fr', gap: '1rem', paddingLeft: '1.75rem' }}>
+                          <div className="inventario-grid-periferico-4">
                             <div><label style={labelStyle}>No. Inventario</label><input type="text" placeholder="Inv. Teclado" value={form.detalles.numeroInventarioTeclado || ''} onChange={e => handleDetalleChange('numeroInventarioTeclado', e.target.value)} style={inputStyle} /></div>
                             <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Logitech" value={form.detalles.marcaTeclado || ''} onChange={e => handleDetalleChange('marcaTeclado', e.target.value)} style={inputStyle} /></div>
                             <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: MX Keys" value={form.detalles.modeloTeclado || ''} onChange={e => handleDetalleChange('modeloTeclado', e.target.value)} style={inputStyle} /></div>
@@ -629,7 +770,7 @@ export default function InventarioTecnologico() {
                           ¿Tiene Mouse Asignado?
                         </label>
                         {form.detalles.tieneMouse && (
-                          <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 1fr 1fr 1fr', gap: '1rem', paddingLeft: '1.75rem' }}>
+                          <div className="inventario-grid-periferico-4">
                             <div><label style={labelStyle}>No. Inventario</label><input type="text" placeholder="Inv. Mouse" value={form.detalles.numeroInventarioMouse || ''} onChange={e => handleDetalleChange('numeroInventarioMouse', e.target.value)} style={inputStyle} /></div>
                             <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Logitech" value={form.detalles.marcaMouse || ''} onChange={e => handleDetalleChange('marcaMouse', e.target.value)} style={inputStyle} /></div>
                             <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: MX Master" value={form.detalles.modeloMouse || ''} onChange={e => handleDetalleChange('modeloMouse', e.target.value)} style={inputStyle} /></div>
@@ -644,7 +785,7 @@ export default function InventarioTecnologico() {
                           ¿Tiene Monitores Asignados?
                         </label>
                         {form.detalles.tieneMonitores && (
-                          <div style={{ display: 'grid', gridTemplateColumns: '1.25fr 0.75fr 1fr 1fr 1fr', gap: '1rem', paddingLeft: '1.75rem' }}>
+                          <div className="inventario-grid-periferico-5">
                             <div><label style={labelStyle}>No. Inventario</label><input type="text" placeholder="Inv. Monitor" value={form.detalles.numeroInventarioMonitores || ''} onChange={e => handleDetalleChange('numeroInventarioMonitores', e.target.value)} style={inputStyle} /></div>
                             <div><label style={labelStyle}>Cantidad</label><input type="number" min="1" placeholder="Ej: 1" value={form.detalles.cantidadMonitores || ''} onChange={e => handleDetalleChange('cantidadMonitores', e.target.value)} style={inputStyle} /></div>
                             <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Dell" value={form.detalles.marcaMonitores || ''} onChange={e => handleDetalleChange('marcaMonitores', e.target.value)} style={inputStyle} /></div>
@@ -726,7 +867,7 @@ const CustomEquipmentSelect = ({ value, onChange, opciones, gruposOpciones }) =>
               />
             </div>
 
-            <div style={{ display: 'flex', height: '320px' }}>
+            <div className="dropdown-select-container">
               {search ? (
                 // Search Results
                 <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto' }}>
@@ -751,7 +892,7 @@ const CustomEquipmentSelect = ({ value, onChange, opciones, gruposOpciones }) =>
               ) : (
                 // Category Hover View
                 <>
-                  <div style={{ width: '45%', borderRight: '1px solid #e2e8f0', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#ffffff' }}>
+                  <div className="dropdown-left-pane">
                     {Object.keys(gruposOpciones).map((group) => (
                       <div
                         key={group}
@@ -775,7 +916,7 @@ const CustomEquipmentSelect = ({ value, onChange, opciones, gruposOpciones }) =>
                       </div>
                     ))}
                   </div>
-                  <div style={{ width: '55%', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#f8fafc' }}>
+                  <div className="dropdown-right-pane">
                     {hoveredCategory ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                         <div style={{ padding: '0.5rem 0.75rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -847,7 +988,7 @@ const CustomFilterSelect = ({ value, onChange, opciones, gruposOpciones }) => {
       {isOpen && (
         <>
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} onClick={() => { setIsOpen(false); setSearch(''); }} />
-          <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', zIndex: 50, border: '1px solid #e2e8f0', overflow: 'hidden', width: '380px' }}>
+          <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', zIndex: 50, border: '1px solid #e2e8f0', overflow: 'hidden', width: '380px', maxWidth: 'calc(100vw - 2rem)' }}>
             <div style={{ padding: '0.75rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
               <input
                 type="text"
@@ -872,7 +1013,7 @@ const CustomFilterSelect = ({ value, onChange, opciones, gruposOpciones }) => {
               {!value && <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#0ea5e9', fontWeight: '600' }}>✓</span>}
             </div>
 
-            <div style={{ display: 'flex', height: '240px' }}>
+            <div className="filter-dropdown-container">
               {search ? (
                 <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto' }}>
                   {filteredOptions.length > 0 ? filteredOptions.map(opcion => (
@@ -895,7 +1036,7 @@ const CustomFilterSelect = ({ value, onChange, opciones, gruposOpciones }) => {
                 </div>
               ) : (
                 <>
-                  <div style={{ width: '45%', borderRight: '1px solid #e2e8f0', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#ffffff' }}>
+                  <div className="filter-dropdown-left">
                     {Object.keys(gruposOpciones).map((group) => (
                       <div
                         key={group}
@@ -919,7 +1060,7 @@ const CustomFilterSelect = ({ value, onChange, opciones, gruposOpciones }) => {
                       </div>
                     ))}
                   </div>
-                  <div style={{ width: '55%', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#f8fafc' }}>
+                  <div className="filter-dropdown-right">
                     {hoveredCategory ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                         <div style={{ padding: '0.4rem 0.75rem', fontSize: '0.7rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>

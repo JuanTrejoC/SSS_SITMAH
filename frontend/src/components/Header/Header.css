@@ -130,15 +130,29 @@
 
 @media (max-width: 640px) {
   .app-header__inner {
-    padding: 0 1.25rem;
+    padding: 0 0.5rem;
+    max-width: 100%;
+  }
+
+  .app-header__center {
+    position: static;
+    transform: none;
+    flex: 1;
+    display: flex;
+    justify-content: center;
   }
 
   .app-header__brand-logo-1 {
-    height: 46px;
+    height: 40px;
   }
 
   .app-header__brand-logo-2 {
-    height: 23px;
+    height: 25px;
+  }
+
+  .app-header__back-btn {
+    margin-right: 0.25rem;
+    padding: 0.35rem;
   }
 }
 
