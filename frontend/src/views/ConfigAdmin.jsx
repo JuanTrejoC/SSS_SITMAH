@@ -15,6 +15,15 @@ export default function ConfigAdmin() {
   const [catalogoSeleccionado, setCatalogoSeleccionado] = useState(null) // 'usuarios', 'areas', 'sedes', 'categorias', 'correos'
   const [tituloModal, setTituloModal] = useState('')
 
+  useEffect(() => {
+    if (modalAbierto) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [modalAbierto])
+
   // Datos y formulario
   const [items, setItems] = useState([])
   const [cargando, setCargando] = useState(false)

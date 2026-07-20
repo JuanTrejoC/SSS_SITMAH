@@ -1,3 +1,16 @@
+:root {
+  --tw-color-white: #ffffff;
+  --tw-color-gray-50: #f9fafb;
+  --tw-color-gray-200: #e5e7eb;
+  --tw-color-gray-500: #6b7280;
+  --tw-color-gray-700: #374151;
+  --tw-color-gray-900: #111827;
+  --state-red-text: #dc2626;
+  --state-red-light: #fef2f2;
+  --color-maroon: #691B31;
+  --color-gold: #BC955B;
+}
+
 .app-header {
   background-color: #691B31;
   border-bottom: 2px solid #BC955B;

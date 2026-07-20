@@ -26,6 +26,15 @@ export default function DashboardOficinas() {
   const [mostrarInventario, setMostrarInventario] = useState(false)
   const [componenteSeleccionado, setComponenteSeleccionado] = useState('')
 
+  useEffect(() => {
+    if (verDetalle || confirmResuelto.visible) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [verDetalle, confirmResuelto.visible])
+
   // ✅ CARGAR DATOS DESDE EL BACKEND
   const cargarReportes = async () => {
     if (!user?.token) return

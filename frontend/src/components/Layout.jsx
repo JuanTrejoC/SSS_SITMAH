@@ -7,6 +7,15 @@ import { useState, useEffect } from 'react'
 export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
+  useEffect(() => {
+    if (isSidebarOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [isSidebarOpen])
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc', overflow: 'hidden' }}>
 

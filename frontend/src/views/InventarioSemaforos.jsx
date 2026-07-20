@@ -1070,7 +1070,6 @@ export default function InventarioSemaforos() {
                 marginBottom: '1.5rem', backgroundColor: '#fcfbf9', padding: '1rem',
                 borderRadius: '8px', border: '1px solid #DDC9A3'
               }}>
-                {/* Fila 1: Cabezales | Leds Verdes | Leds Rojos */}
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#6F7271', marginBottom: '0.25rem', textAlign: 'center' }}>
                     Cabezales
@@ -1124,15 +1123,8 @@ export default function InventarioSemaforos() {
                     style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
                   />
                 </div>
-              </div>
 
-              {/* CONTADORES FILA 2 (AMARILLO, FLECHAS) */}
-              <div style={{
-                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem 1rem', alignItems: 'end',
-                marginBottom: '1.5rem', backgroundColor: '#fcfbf9', padding: '0 1rem 1rem 1rem',
-                borderRadius: '0 0 8px 8px', border: '1px solid #DDC9A3', borderTop: 'none', marginTop: '-1.5rem'
-              }}>
-                <div>
+                <div style={{ marginTop: '0.5rem' }}>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#d97706', marginBottom: '0.25rem', textAlign: 'center' }}>
                     Leds Amarillos
                   </label>
@@ -1144,7 +1136,7 @@ export default function InventarioSemaforos() {
                   />
                 </div>
 
-                <div>
+                <div style={{ marginTop: '0.5rem' }}>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#16a34a', marginBottom: '0.25rem', textAlign: 'center' }}>
                     Flecha Verde
                   </label>
@@ -1156,7 +1148,7 @@ export default function InventarioSemaforos() {
                   />
                 </div>
 
-                <div>
+                <div style={{ marginTop: '0.5rem' }}>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#dc2626', marginBottom: '0.25rem', textAlign: 'center' }}>
                     Flecha Roja
                   </label>

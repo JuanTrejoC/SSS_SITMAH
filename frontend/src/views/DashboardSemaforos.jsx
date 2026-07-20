@@ -20,6 +20,15 @@ export default function DashboardSemaforos() {
   const [incluirImagenes, setIncluirImagenes] = useState(false)
   const [ordenAscendente, setOrdenAscendente] = useState(false)
   const [confirmResuelto, setConfirmResuelto] = useState({ visible: false, id: null })
+
+  useEffect(() => {
+    if (verDetalle || confirmResuelto.visible) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [verDetalle, confirmResuelto.visible])
   const [inventario, setInventario] = useState([])
   const [mostrarInventario, setMostrarInventario] = useState(false)
   const [componenteSeleccionado, setComponenteSeleccionado] = useState('')
