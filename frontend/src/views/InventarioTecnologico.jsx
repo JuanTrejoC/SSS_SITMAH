@@ -324,6 +324,24 @@ export default function InventarioTecnologico() {
           background-color: #f8fafc;
         }
 
+        .filter-select-wrapper {
+          position: relative;
+          min-width: 220px;
+        }
+        .filter-dropdown-menu {
+          position: absolute;
+          top: 100%;
+          right: 0;
+          margin-top: 0.5rem;
+          background-color: white;
+          border-radius: 12px;
+          box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+          z-index: 50;
+          border: 1px solid #e2e8f0;
+          overflow: hidden;
+          width: 380px;
+        }
+
         @media (max-width: 768px) {
           .inventario-main {
             padding: 1rem 1rem 12rem 1rem;
@@ -381,6 +399,16 @@ export default function InventarioTecnologico() {
           .filter-dropdown-right {
             width: 100%;
             height: 160px;
+          }
+          .filter-select-wrapper {
+            width: 100%;
+            flex: 1;
+          }
+          .filter-dropdown-menu {
+            width: 100%;
+            min-width: 280px;
+            left: 0;
+            right: auto;
           }
         }
       `}</style>
@@ -964,7 +992,7 @@ const CustomFilterSelect = ({ value, onChange, opciones, gruposOpciones }) => {
   );
 
   return (
-    <div style={{ position: 'relative', minWidth: '220px' }}>
+    <div className="filter-select-wrapper">
       <div
         onClick={() => setIsOpen(!isOpen)}
         style={{
@@ -988,7 +1016,7 @@ const CustomFilterSelect = ({ value, onChange, opciones, gruposOpciones }) => {
       {isOpen && (
         <>
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} onClick={() => { setIsOpen(false); setSearch(''); }} />
-          <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', zIndex: 50, border: '1px solid #e2e8f0', overflow: 'hidden', width: '380px', maxWidth: 'calc(100vw - 2rem)' }}>
+          <div className="filter-dropdown-menu">
             <div style={{ padding: '0.75rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
               <input
                 type="text"

@@ -223,7 +223,105 @@ export default function InventarioHerramientas() {
   };
 
   return (
-    <main style={{ padding: '2.5rem', flex: 1, backgroundColor: '#f8fafc', overflowY: 'auto', minHeight: '800px', paddingBottom: '15rem' }}>
+    <main className="inventario-main">
+      <style>{`
+        .inventario-main {
+          padding: 2.5rem;
+          flex: 1;
+          background-color: #f8fafc;
+          overflow-y: auto;
+          min-height: 800px;
+          padding-bottom: 15rem;
+        }
+        .inventario-grid-2col {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1.25rem;
+          margin-bottom: 2rem;
+        }
+        .modal-container-custom {
+          background-color: white;
+          border-radius: 16px;
+          padding: 2.5rem;
+          width: 100%;
+          max-height: 90vh;
+          overflow-y: auto;
+          position: relative;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+          display: flex;
+          flex-direction: column;
+        }
+        .filter-select-wrapper {
+          position: relative;
+          min-width: 220px;
+        }
+        .filter-dropdown-menu {
+          position: absolute;
+          top: 100%;
+          right: 0;
+          margin-top: 0.5rem;
+          background-color: white;
+          border-radius: 12px;
+          box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+          z-index: 50;
+          border: 1px solid #e2e8f0;
+          overflow: hidden;
+          width: 100%;
+          min-width: 260px;
+        }
+        .dropdown-select-container {
+          display: flex;
+          height: 200px;
+        }
+        .dropdown-left-pane {
+          width: 45%;
+          border-right: 1px solid #e2e8f0;
+          overflow-y: auto;
+          padding: 0.5rem;
+          background-color: #ffffff;
+        }
+        .dropdown-right-pane {
+          width: 55%;
+          overflow-y: auto;
+          padding: 0.5rem;
+          background-color: #f8fafc;
+        }
+
+        @media (max-width: 768px) {
+          .inventario-main {
+            padding: 1rem 1rem 12rem 1rem;
+          }
+          .inventario-grid-2col {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+          }
+          .modal-container-custom {
+            padding: 1.25rem;
+          }
+        }
+
+        @media (max-width: 600px) {
+          .filter-select-wrapper {
+            width: 100%;
+            flex: 1;
+          }
+          .dropdown-select-container {
+            flex-direction: column;
+            height: 300px;
+          }
+          .dropdown-left-pane {
+            width: 100%;
+            height: 120px;
+            border-right: none;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          .dropdown-right-pane {
+            width: 100%;
+            height: 180px;
+          }
+        }
+      `}</style>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#691B31', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -258,25 +356,18 @@ export default function InventarioHerramientas() {
           />
           <FaSearch style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
         </div>
-        <select
+        <CustomFilterSelect
           value={filtroTipo}
-          onChange={(e) => { setFiltroTipo(e.target.value); setPagina(1); }}
-          style={{
-            padding: '0.75rem 1.25rem', border: '1px solid #CBD5E1', borderRadius: '8px',
-            fontSize: '0.95rem', color: '#475569', backgroundColor: '#ffffff', cursor: 'pointer', outline: 'none', minWidth: '220px'
-          }}
-        >
-          <option value="">Todos los tipos</option>
-          <option value="herramienta_tec">Herramientas de Tecnología</option>
-          <option value="herramienta_infra">Herramientas de Infraestructura</option>
-        </select>
+          onChange={(val) => { setFiltroTipo(val); setPagina(1); }}
+          opciones={TIPOS_HERRAMIENTA}
+        />
       </div>
 
       {cargando ? (
         <div style={{ textAlign: 'center', padding: '4rem', color: '#64748b', fontSize: '1.1rem' }}>Cargando herramientas...</div>
       ) : (
-        <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)', overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
             <thead style={{ backgroundColor: '#f1f5f9', color: '#475569', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               <tr>
                 <th style={{ padding: '1.25rem' }}>Tipo</th>
@@ -351,7 +442,7 @@ export default function InventarioHerramientas() {
       {/* MODAL DE REGISTRO */}
       {modalAbierto && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '1rem' }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '2.5rem', width: '100%', maxWidth: '650px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', position: 'relative' }}>
+          <div className="modal-container-custom" style={{ maxWidth: '650px' }}>
             <button type="button" onClick={() => setModalAbierto(false)} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', color: '#64748b', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}>
               <FaTimes size={16} />
             </button>
@@ -367,7 +458,7 @@ export default function InventarioHerramientas() {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '2rem' }}>
+              <div className="inventario-grid-2col">
                 {/* Dynamic fields */}
                 <div>
                   <label style={labelStyle}>
@@ -499,8 +590,8 @@ const CustomToolTypeSelect = ({ value, onChange }) => {
         <>
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} onClick={() => setIsOpen(false)} />
           <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', zIndex: 50, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', height: '200px' }}>
-              <div style={{ width: '45%', borderRight: '1px solid #e2e8f0', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#ffffff' }}>
+            <div className="dropdown-select-container">
+              <div className="dropdown-left-pane">
                 {opciones.map((opcion) => (
                   <div
                     key={opcion.value}
@@ -528,7 +619,7 @@ const CustomToolTypeSelect = ({ value, onChange }) => {
                   </div>
                 ))}
               </div>
-              <div style={{ width: '55%', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#f8fafc' }}>
+              <div className="dropdown-right-pane">
                 {hoveredCategory ? (
                   (() => {
                     const opcion = opciones.find(o => o.value === hoveredCategory);
@@ -564,6 +655,75 @@ const CustomToolTypeSelect = ({ value, onChange }) => {
                 )}
               </div>
             </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+const CustomFilterSelect = ({ value, onChange, opciones }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedOption = opciones.find(o => o.value === value);
+
+  return (
+    <div className="filter-select-wrapper">
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          padding: '0.75rem 1.25rem', border: '1px solid #CBD5E1', borderRadius: '8px',
+          fontSize: '1rem', backgroundColor: 'white', boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+          cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem'
+        }}
+      >
+        <span>
+          {selectedOption ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b', fontWeight: '600' }}>
+              {(() => {
+                const Icon = selectedOption.icon;
+                return <Icon color="#691B31" size={16} />;
+              })()} {selectedOption.label}
+            </span>
+          ) : (
+            <span style={{ color: '#475569', fontWeight: '500' }}>Todos los tipos</span>
+          )}
+        </span>
+        <FaChevronRight size={12} style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.2s', color: '#64748b' }} />
+      </div>
+
+      {isOpen && (
+        <>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} onClick={() => setIsOpen(false)} />
+          <div className="filter-dropdown-menu">
+            {/* Opción "Todos los tipos" */}
+            <div
+              onClick={() => { onChange(''); setIsOpen(false); }}
+              style={{ padding: '0.75rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderBottom: '1px solid #f1f5f9', backgroundColor: !value ? '#fdf2f8' : 'transparent', transition: 'background-color 0.15s' }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#fdf2f8'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = !value ? '#fdf2f8' : 'transparent'}
+            >
+              <FaWrench color="#64748b" size={16} />
+              <span style={{ fontWeight: '600', color: !value ? '#691B31' : '#475569' }}>Todos los tipos</span>
+              {!value && <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#691B31', fontWeight: '700' }}>✓</span>}
+            </div>
+
+            {opciones.map(opcion => {
+              const Icon = opcion.icon;
+              const isSelected = value === opcion.value;
+              return (
+                <div
+                  key={opcion.value}
+                  onClick={() => { onChange(opcion.value); setIsOpen(false); }}
+                  style={{ padding: '0.75rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', backgroundColor: isSelected ? '#fdf2f8' : 'transparent', transition: 'background-color 0.15s' }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = isSelected ? '#fdf2f8' : 'transparent'}
+                >
+                  <Icon color={isSelected ? '#691B31' : '#64748b'} size={16} />
+                  <span style={{ fontSize: '0.95rem', fontWeight: '500', color: isSelected ? '#691B31' : '#475569' }}>{opcion.label}</span>
+                  {isSelected && <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#691B31', fontWeight: '700' }}>✓</span>}
+                </div>
+              );
+            })}
           </div>
         </>
       )}
