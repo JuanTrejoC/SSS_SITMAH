@@ -1,0 +1,326 @@
+.app-header {
+  background-color: #691B31;
+  border-bottom: 2px solid #BC955B;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-header--hidden {
+  transform: translateY(-100%);
+}
+
+.app-header__inner {
+  max-width: 90%;
+  margin: 0 auto;
+  padding: 0 1rem;
+  height: 80px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+}
+
+.app-header__left {
+  display: flex;
+  align-items: center;
+}
+
+.app-header__back-btn {
+  background: transparent;
+  border: none;
+  color: #BC955B;
+  padding: 0.5rem;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 1rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-header__back-btn svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.app-header__back-btn:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.app-header__back-btn:active {
+  transform: scale(0.85);
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+.app-header__brand {
+  display: flex;
+  align-items: center;
+  cursor: default;
+  text-decoration: none;
+  background-color: #691B31;
+  border: none;
+}
+
+.app-header__text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.app-header__eyebrow {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #d1d5db;
+  margin: 0 0 0.125rem 0;
+  font-weight: 600;
+}
+
+.app-header__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--tw-color-white);
+}
+
+.app-header__center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+}
+
+/* Clases específicas para cada logo */
+.app-header__brand-logo-1,
+.app-header__brand-logo-2 {
+  display: block;
+  object-fit: contain;
+  transition: opacity 0.2s ease;
+}
+
+/* El logo 1 */
+.app-header__brand-logo-1 {
+  height: 58px;
+  width: auto;
+}
+
+/* El logo 2 (Logo central) */
+.app-header__brand-logo-2 {
+  height: 37px;
+  width: auto;
+}
+
+@media (max-width: 640px) {
+  .app-header__inner {
+    padding: 0 1.25rem;
+  }
+
+  .app-header__brand-logo-1 {
+    height: 46px;
+  }
+
+  .app-header__brand-logo-2 {
+    height: 23px;
+  }
+}
+
+/* Profile Dropdown Styles */
+.app-header__profile {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.app-header__profile-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.profile-icon {
+  width: 40px;
+  height: 40px;
+  background-color: #BC955B;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: bold;
+  border: 2px solid #fff;
+  transition: transform 0.2s ease;
+}
+
+.profile-icon:hover {
+  transform: scale(1.05);
+}
+
+.app-header__profile-menu {
+  position: absolute;
+  top: 60px;
+  right: 0;
+  background-color: var(--tw-color-white);
+  border: 1px solid var(--tw-color-gray-200);
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: 250px;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.profile-info {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-name {
+  font-weight: bold;
+  color: var(--tw-color-gray-900);
+}
+
+.profile-username {
+  font-size: 0.875rem;
+  color: var(--tw-color-gray-500);
+}
+
+.profile-role {
+  font-size: 0.75rem;
+  background-color: var(--tw-color-gray-50);
+  color: var(--tw-color-gray-700);
+  padding: 2px 6px;
+  border-radius: 4px;
+  align-self: flex-start;
+  margin-top: 0.5rem;
+}
+
+.app-header__profile-menu hr {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid #ddd;
+}
+
+.profile-menu-btn {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--tw-color-gray-900);
+  transition: background-color 0.2s ease;
+}
+
+.profile-menu-btn:hover {
+  background-color: var(--tw-color-gray-50);
+}
+
+.logout-btn {
+  color: var(--state-red-text);
+}
+
+.logout-btn:hover {
+  background-color: var(--state-red-light);
+}
+
+/* ========================================================= */
+/* NUEVOS ESTILOS PARA ESTE PROYECTO                         */
+/* ========================================================= */
+
+.header-hamburger {
+  color: #BC955B;
+  margin-right: 0.5rem;
+  background: none;
+  border: none;
+}
+
+.header-hamburger:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+.header-admin-login-btn {
+  padding: clamp(0.35rem, 1.5vw, 0.45rem) clamp(0.6rem, 2vw, 1rem);
+  background-color: #BC955B;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: clamp(0.72rem, 1.8vw, 0.82rem);
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.header-admin-login-btn:hover {
+  background-color: #DDC9A3;
+  transform: scale(1.02);
+}
+
+.header-login-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  background-color: white;
+  padding: 1.25rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  border-radius: 12px;
+  width: clamp(220px, 90vw, 260px);
+  z-index: 999;
+  border: 1px solid #e8ecef;
+}
+
+.header-login-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-maroon);
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.header-login-label {
+  font-size: 0.78rem;
+  color: #555;
+  display: block;
+  margin-bottom: 0.3rem;
+  font-weight: 500;
+}
+
+.header-login-input {
+  width: 100%;
+  padding: 0.5rem 0.5rem 0.5rem 2rem;
+  border: 1.5px solid #d1d5db;
+  border-radius: 7px;
+  font-size: 0.82rem;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.header-login-submit {
+  width: 100%;
+  padding: 0.6rem;
+  background: linear-gradient(135deg, var(--color-gold) 0%, #a07238 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.header-login-submit:hover {
+  opacity: 0.88;
+}

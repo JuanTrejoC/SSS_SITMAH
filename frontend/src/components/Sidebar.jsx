@@ -12,8 +12,8 @@ export default function Sidebar({ isOpen, setIsOpen }) {
   const ubicacion = useLocation()
   const esActivo = (ruta) => ubicacion.pathname === ruta
 
-  const closeOnMobile = () => {
-    if (window.innerWidth < 768 && setIsOpen) {
+  const closeSidebar = () => {
+    if (setIsOpen) {
       setIsOpen(false)
     }
   }
@@ -86,7 +86,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             style={linkStyle('/dashboard')}
             onMouseOver={linkHover('/dashboard').over}
             onMouseOut={linkHover('/dashboard').out}
-            onClick={closeOnMobile}
+            onClick={closeSidebar}
           >
             <FaTachometerAlt size={15} />
             Dashboard
@@ -100,7 +100,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             style={linkStyle('/crear-oficinas')}
             onMouseOver={linkHover('/crear-oficinas').over}
             onMouseOut={linkHover('/crear-oficinas').out}
-            onClick={closeOnMobile}
+            onClick={closeSidebar}
           >
             <FaFileAlt size={15} />
             Crear Reporte Oficinas
@@ -114,7 +114,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             style={linkStyle('/crear-semaforos')}
             onMouseOver={linkHover('/crear-semaforos').over}
             onMouseOut={linkHover('/crear-semaforos').out}
-            onClick={closeOnMobile}
+            onClick={closeSidebar}
           >
             <FaRoad size={15} />
             Crear Reporte Semáforos
@@ -132,7 +132,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             style={linkStyle('/estadisticas')}
             onMouseOver={linkHover('/estadisticas').over}
             onMouseOut={linkHover('/estadisticas').out}
-            onClick={closeOnMobile}
+            onClick={closeSidebar}
           >
             <FaChartBar size={15} />
             Estadísticas
@@ -143,7 +143,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             style={linkStyle('/configuracion')}
             onMouseOver={linkHover('/configuracion').over}
             onMouseOut={linkHover('/configuracion').out}
-            onClick={closeOnMobile}
+            onClick={closeSidebar}
           >
             <FaCog size={15} />
             Configuración
@@ -154,7 +154,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             style={linkStyle('/inventario-semaforos')}
             onMouseOver={linkHover('/inventario-semaforos').over}
             onMouseOut={linkHover('/inventario-semaforos').out}
-            onClick={closeOnMobile}
+            onClick={closeSidebar}
           >
             <FaRoad size={15} />
             Inventario Semáforos
@@ -165,7 +165,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             style={linkStyle('/inventario-tecnologico')}
             onMouseOver={linkHover('/inventario-tecnologico').over}
             onMouseOut={linkHover('/inventario-tecnologico').out}
-            onClick={closeOnMobile}
+            onClick={closeSidebar}
           >
             <FaLaptop size={15} />
             Inventario Tecnológico
@@ -176,7 +176,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             style={linkStyle('/inventario-existencias')}
             onMouseOver={linkHover('/inventario-existencias').over}
             onMouseOut={linkHover('/inventario-existencias').out}
-            onClick={closeOnMobile}
+            onClick={closeSidebar}
           >
             <FaBoxes size={15} />
             Inventario de Existencias
@@ -187,7 +187,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             style={linkStyle('/inventario-herramientas')}
             onMouseOver={linkHover('/inventario-herramientas').over}
             onMouseOut={linkHover('/inventario-herramientas').out}
-            onClick={closeOnMobile}
+            onClick={closeSidebar}
           >
             <FaWrench size={15} />
             Inventario de Herramientas

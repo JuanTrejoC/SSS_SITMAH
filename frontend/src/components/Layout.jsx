@@ -1,31 +1,16 @@
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
-import Navbar from './Navbar'
+import Header from './Header/Header'
 import ThemeToggle from './ThemeToggle'
 import { useState, useEffect } from 'react'
 
 export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
-  useEffect(() => {
-    const checkSize = () => {
-      // En desktop (≥768px): sidebar siempre visible (ocupa espacio en flex)
-      // En mobile (<768px): sidebar como drawer (position:fixed, no ocupa espacio)
-      if (window.innerWidth >= 768) {
-        setIsSidebarOpen(true)
-      } else {
-        setIsSidebarOpen(false)
-      }
-    }
-    checkSize()
-    window.addEventListener('resize', checkSize)
-    return () => window.removeEventListener('resize', checkSize)
-  }, [])
-
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc', overflow: 'hidden' }}>
 
-      {/* Overlay oscuro — solo mobile, al abrir el sidebar */}
+      {/* Overlay oscuro */}
       <div
         className={`sidebar-overlay ${isSidebarOpen ? 'open' : ''}`}
         onClick={() => setIsSidebarOpen(false)}
@@ -43,7 +28,7 @@ export default function Layout() {
         minWidth: 0,
         overflow: 'hidden',
       }}>
-        <Navbar toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+        <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
         <main className="main-content-padding" style={{ flex: 1, overflowX: 'hidden' }}>
           <Outlet />
