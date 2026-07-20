@@ -519,14 +519,16 @@ export default function DashboardSemaforos() {
 
                 {/* ✅ IMAGEN DE EVIDENCIA */}
                 {verDetalle.evidencias && verDetalle.evidencias.length > 0 && (
-                  <div style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>
-                    <strong style={{ display: 'block', marginBottom: '0.6rem' }}>
-                      <i className="fa-solid fa-image" style={{ marginRight: '0.4rem', color: '#BC955B' }}></i>
+                  <div style={{ gridColumn: '1 / -1', marginTop: '1.5rem' }}>
+                    <strong style={{ display: 'block', marginBottom: '0.8rem', fontSize: '1.05rem', color: '#1e293b' }}>
                       Evidencia Fotográfica:
                     </strong>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8rem' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
                       {verDetalle.evidencias.map((ev) => (
-                        <div key={ev.id} style={{ border: '1px solid #6F7271', borderRadius: '8px', overflow: 'hidden', maxWidth: '260px' }}>
+                        <div key={ev.id} style={{ 
+                          border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', 
+                          maxWidth: '220px', backgroundColor: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' 
+                        }}>
                           {ev.mimetype?.startsWith('image/') ? (
                             <a
                               href={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
@@ -536,7 +538,7 @@ export default function DashboardSemaforos() {
                               <img
                                 src={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
                                 alt={ev.filename}
-                                style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
+                                style={{ width: '100%', height: '180px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
                                 onError={(e) => { e.target.style.display = 'none' }}
                               />
                             </a>
@@ -545,13 +547,12 @@ export default function DashboardSemaforos() {
                               href={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
                               target="_blank"
                               rel="noreferrer"
-                              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem', color: '#BC955B', textDecoration: 'none', fontSize: '0.85rem' }}
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '180px', gap: '0.5rem', color: '#BC955B', textDecoration: 'none', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
                             >
-                              <i className="fa-solid fa-file"></i>
-                              {ev.filename}
+                              <i className="fa-solid fa-file-pdf" style={{ fontSize: '2rem' }}></i>
                             </a>
                           )}
-                          <div style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem', color: '#6F7271', backgroundColor: '#f8fafc', borderTop: '1px solid #6F7271' }}>
+                          <div style={{ padding: '0.6rem 0.8rem', fontSize: '0.8rem', color: '#64748b', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {ev.filename}
                           </div>
                         </div>
@@ -561,38 +562,49 @@ export default function DashboardSemaforos() {
                 )}
 
                 {verDetalle.evidencias && verDetalle.evidencias.length === 0 && (
-                  <div style={{ gridColumn: '1 / -1', marginTop: '0.8rem', color: '#9ca3af', fontSize: '0.88rem', fontStyle: 'italic' }}>
-                    <i className="fa-solid fa-image" style={{ marginRight: '0.4rem' }}></i>
+                  <div style={{ gridColumn: '1 / -1', marginTop: '1.5rem', color: '#9ca3af', fontSize: '0.9rem', fontStyle: 'italic' }}>
                     Sin evidencia fotográfica adjunta.
                   </div>
                 )}
 
                 {/* ✅ PIEZAS ASIGNADAS E INVENTARIO */}
-                <div style={{ gridColumn: '1 / -1', marginTop: '1rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <strong><i className="fa-solid fa-tools" style={{ marginRight: '0.4rem', color: '#691B31' }}></i> Componentes Asignados:</strong>
-                    <button onClick={() => setMostrarInventario(!mostrarInventario)} style={{ padding: '0.4rem 0.8rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer', fontWeight: '600' }}>
-                      {mostrarInventario ? 'Ocultar Inventario' : 'Asignar Componente'}
-                    </button>
+                <div style={{ gridColumn: '1 / -1', marginTop: '2rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <strong style={{ fontSize: '1.05rem', color: '#1e293b' }}>Componentes Asignados:</strong>
+                    <div 
+                      onClick={() => setMostrarInventario(!mostrarInventario)}
+                      style={{ 
+                        width: '46px', height: '24px', backgroundColor: mostrarInventario ? '#BC955B' : '#cbd5e1', 
+                        borderRadius: '12px', position: 'relative', cursor: 'pointer', transition: 'background-color 0.3s' 
+                      }}
+                    >
+                      <div style={{ 
+                        width: '20px', height: '20px', backgroundColor: 'white', borderRadius: '50%', 
+                        position: 'absolute', top: '2px', left: mostrarInventario ? '24px' : '2px', 
+                        transition: 'left 0.3s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' 
+                      }} />
+                    </div>
                   </div>
                   
                   {mostrarInventario && (
-                    <div style={{ backgroundColor: '#fdf8f6', padding: '1rem', borderRadius: '8px', border: '1px solid #fecdd3', marginBottom: '1rem' }}>
-                      <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem', color: '#9f1239' }}>Inventario Disponible</h4>
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <CustomInventorySelect 
-                          value={componenteSeleccionado}
-                          onChange={setComponenteSeleccionado}
-                          inventario={inventario}
-                        />
+                    <div style={{ backgroundColor: '#f1f5f9', padding: '1.2rem', borderRadius: '12px', marginBottom: '1.2rem' }}>
+                      <h4 style={{ margin: '0 0 0.8rem 0', fontSize: '0.9rem', color: '#475569', fontWeight: '600' }}>Inventario Disponible</h4>
+                      <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ flex: '1', minWidth: '200px' }}>
+                          <CustomInventorySelect 
+                            value={componenteSeleccionado}
+                            onChange={setComponenteSeleccionado}
+                            inventario={inventario}
+                          />
+                        </div>
                         <input 
                           type="number" 
                           min="1" 
                           value={cantidadAsignar} 
                           onChange={e => setCantidadAsignar(Number(e.target.value))}
-                          style={{ width: '70px', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
+                          style={{ width: '70px', padding: '0.7rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
                         />
-                        <button onClick={asignarPieza} style={{ padding: '0.75rem 1.25rem', backgroundColor: '#e11d48', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', boxShadow: '0 4px 6px rgba(225, 29, 72, 0.2)' }}>
+                        <button onClick={asignarPieza} style={{ padding: '0.7rem 1.5rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', transition: 'background 0.2s', fontSize: '0.95rem' }} onMouseOver={(e) => e.target.style.backgroundColor = '#0369a1'} onMouseOut={(e) => e.target.style.backgroundColor = '#0284c7'}>
                           Asignar
                         </button>
                       </div>
@@ -600,20 +612,21 @@ export default function DashboardSemaforos() {
                   )}
 
                   {verDetalle.piezasAsignadas && verDetalle.piezasAsignadas.length > 0 ? (
-                    <ul style={{ listStyle: 'none', padding: 0, margin: '0', fontSize: '0.9rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.8rem' }}>
                       {verDetalle.piezasAsignadas.map((pieza, idx) => (
-                        <li key={idx} style={{ padding: '0.4rem', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '4px', marginBottom: '0.3rem', display: 'flex', justifyContent: 'space-between' }}>
-                          <span>{pieza.componente?.nombre || 'Desconocido'} <strong style={{color: '#691B31'}}>(x{pieza.cantidad})</strong></span>
-                        </li>
+                        <div key={idx} style={{ padding: '0.6rem 1rem', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem', color: '#334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                          <span>{pieza.componente?.nombre || 'Desconocido'}</span>
+                          <strong style={{ color: '#64748b' }}>(x{pieza.cantidad})</strong>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   ) : (
-                    <div style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', marginBottom: '1rem' }}>No hay componentes asignados.</div>
+                    <div style={{ fontSize: '0.9rem', color: '#94a3b8', fontStyle: 'italic', padding: '0.5rem 0' }}>No hay componentes asignados.</div>
                   )}
                 </div>
 
               </div>
-              <button onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }} style={{ marginTop: '1.8rem', padding: '0.65rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '6px', width: '100%', fontSize: '0.95rem', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' }} onMouseOver={(e) => e.target.style.backgroundColor = '#a07238'} onMouseOut={(e) => e.target.style.backgroundColor = '#BC955B'}>
+              <button onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }} style={{ marginTop: '2rem', padding: '0.8rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '8px', width: '100%', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s', boxShadow: '0 2px 4px rgba(188, 149, 91, 0.3)' }} onMouseOver={(e) => e.target.style.backgroundColor = '#a07238'} onMouseOut={(e) => e.target.style.backgroundColor = '#BC955B'}>
                 Cerrar Detalles
               </button>
             </div>
@@ -701,27 +714,28 @@ const CustomInventorySelect = ({ value, onChange, inventario }) => {
       <div
         onClick={() => setIsOpen(!isOpen)}
         style={{
-          padding: '0.75rem 1.25rem', border: '1px solid #CBD5E1', borderRadius: '8px',
-          fontSize: '1rem', backgroundColor: 'white', boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-          cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem'
+          padding: '0.7rem 1.2rem', border: isOpen ? '1.5px solid #0284c7' : '1px solid #cbd5e1', 
+          borderRadius: '8px', fontSize: '0.95rem', backgroundColor: 'white', 
+          cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem',
+          transition: 'all 0.2s', boxShadow: isOpen ? '0 0 0 3px rgba(2, 132, 199, 0.1)' : 'none'
         }}
       >
         <span>
           {selectedOption ? (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b', fontWeight: '600' }}>
-              <FaCogs color="#691B31" size={16} /> {selectedOption.nombre}
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b', fontWeight: '500' }}>
+               {selectedOption.nombre}
             </span>
           ) : (
-            <span style={{ color: '#475569', fontWeight: '500' }}>-- Seleccionar componente --</span>
+            <span style={{ color: '#64748b', fontWeight: '400' }}>-- Seleccionar componente --</span>
           )}
         </span>
-        <FaChevronRight size={12} style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.2s', color: '#64748b' }} />
+        <FaChevronRight size={12} style={{ transform: isOpen ? 'rotate(-90deg)' : 'rotate(90deg)', transition: '0.2s', color: '#64748b' }} />
       </div>
 
       {isOpen && (
         <>
-          <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', zIndex: 50, border: '1px solid #e2e8f0', overflow: 'hidden', width: '100%', minWidth: '300px' }}>
-            <div style={{ padding: '0.75rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+          <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 -4px 20px rgba(0,0,0,0.12)', zIndex: 50, border: '1px solid #e2e8f0', overflow: 'hidden', width: '100%', minWidth: '320px' }}>
+            <div style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
               <input
                 type="text"
                 placeholder="Buscar componente..."

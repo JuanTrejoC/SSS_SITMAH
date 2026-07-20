@@ -25,6 +25,7 @@ router.delete('/controladores/:id', asyncHandler(inventario.eliminarControladorS
 // Existencias / Stock Routes
 router.get('/existencias', asyncHandler(inventario.listarExistencias));
 router.post('/existencias', asyncHandler(inventario.ingresarExistencia));
+router.get('/existencias/:id/historial', asyncHandler(inventario.obtenerHistorialExistencia));
 router.put('/existencias/:id', asyncHandler(inventario.actualizarExistencia));
 router.delete('/existencias/:id', asyncHandler(inventario.eliminarExistencia));
 

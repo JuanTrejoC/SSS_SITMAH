@@ -38,6 +38,7 @@ const includeDetalle = {
   categoria: true,
   atendidoPor: { select: { id: true, nombre: true, username: true } },
   evidencias: true,
+  equiposAsignados: { include: { equipo: true } },
 };
 
 async function crear(req, res) {
@@ -228,6 +229,63 @@ async function exportar(req, res) {
   res.send(buffer);
 }
 
+const asignarEquipoSchema = z.object({
+  equipo_id: z.coerce.number().int().positive(),
+});
+
+async function asignarEquipo(req, res) {
+  const reporteId = Number(req.params.id);
+  const parsed = asignarEquipoSchema.safeParse(req.body);
+  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+
+  const { equipo_id } = parsed.data;
+
+  // Verificar que el reporte existe
+  const reporte = await prisma.reporteOficina.findUnique({ where: { id: reporteId } });
+  if (!reporte) return fail(res, 'Reporte no encontrado', 404);
+
+  // Verificar que el equipo existe
+  const equipo = await prisma.equipoTecnologico.findUnique({ where: { id: equipo_id } });
+  if (!equipo) return fail(res, 'Equipo no encontrado', 404);
+
+  // Verificar si ya está asignado a este reporte
+  const yaAsignado = await prisma.reporteOficinaEquipo.findFirst({
+    where: { reporteOficinaId: reporteId, equipoId: equipo_id }
+  });
+  if (yaAsignado) return fail(res, 'El equipo ya está asignado a este reporte', 400);
+
+  // Crear asignación (no hay cantidad porque el equipo es único)
+  const result = await prisma.reporteOficinaEquipo.create({
+    data: {
+      reporteOficinaId: reporteId,
+      equipoId: equipo_id,
+    },
+    include: { equipo: true }
+  });
+
+  ok(res, result, 201);
+}
+
+async function desasignarEquipo(req, res) {
+  const reporteId = Number(req.params.id);
+  const asignacionId = Number(req.params.piezaId); // Se mantiene el parametro por compatibilidad si no lo cambiamos en ruta
+
+  const asignacion = await prisma.reporteOficinaEquipo.findUnique({
+    where: { id: asignacionId }
+  });
+
+  if (!asignacion || asignacion.reporteOficinaId !== reporteId) {
+    return fail(res, 'Asignación no encontrada', 404);
+  }
+
+  // Eliminar asignación
+  await prisma.reporteOficinaEquipo.delete({
+    where: { id: asignacionId }
+  });
+
+  ok(res, { message: 'Equipo desasignado correctamente' });
+}
+
 module.exports = {
   crear,
   resumen,
@@ -236,4 +294,6 @@ module.exports = {
   cambiarEstado,
   eliminar,
   exportar,
+  asignarEquipo,
+  desasignarEquipo,
 };

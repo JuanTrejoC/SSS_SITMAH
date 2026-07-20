@@ -49,42 +49,13 @@ async function main() {
 
   // Seed initial technological equipment and tools
   const equiposSemilla = [
-    {
-      tipo: 'lectora_tags',
-      numeroInventario: 'INV-TAG-001',
-      marca: 'ZKTeco',
-      modelo: 'U1000',
-      numeroSerie: 'ZK987654321',
-      areaUbicacion: 'Peaje Acceso Norte',
-      detalles: {}
-    },
-    {
-      tipo: 'controladora',
-      numeroInventario: 'INV-CTR-001',
-      marca: 'Hikvision',
-      modelo: 'DS-K2604',
-      numeroSerie: 'HK11223344',
-      areaUbicacion: 'Peaje Acceso Sur',
-      detalles: {}
-    },
-    {
-      tipo: 'herramienta_tec',
-      numeroInventario: 'INV-HER-TEC-001',
-      marca: 'Steren',
-      modelo: 'Ponchadora RJ45',
-      numeroSerie: 'ST998877',
-      areaUbicacion: 'Sistemas',
-      detalles: {}
-    },
-    {
-      tipo: 'herramienta_infra',
-      numeroInventario: 'INV-HER-INF-001',
-      marca: 'Truper',
-      modelo: 'Martillo de uña',
-      numeroSerie: 'TR665544',
-      areaUbicacion: 'Mantenimiento',
-      detalles: {}
-    }
+    { tipo: 'lectora_tags', numeroInventario: 'INV-TAG-001', marca: 'ZKTeco', modelo: 'U1000', numeroSerie: 'ZK987654321', areaUbicacion: 'Peaje Acceso Norte', detalles: {} },
+    { tipo: 'controladora', numeroInventario: 'INV-CTR-001', marca: 'Hikvision', modelo: 'DS-K2604', numeroSerie: 'HK11223344', areaUbicacion: 'Peaje Acceso Sur', detalles: {} },
+    { tipo: 'herramienta_tec', numeroInventario: 'INV-HER-TEC-001', marca: 'Steren', modelo: 'Ponchadora RJ45', numeroSerie: 'ST998877', areaUbicacion: 'Sistemas', detalles: {} },
+    { tipo: 'herramienta_infra', numeroInventario: 'INV-HER-INF-001', marca: 'Truper', modelo: 'Martillo de uña', numeroSerie: 'TR665544', areaUbicacion: 'Mantenimiento', detalles: {} },
+    { tipo: 'herramienta_tec', modelo: 'Crimpadora RJ45', marca: 'Steren', numeroInventario: 'INV-HT-001', areaUbicacion: 'Sistemas', detalles: {} },
+    { tipo: 'herramienta_tec', modelo: 'Multímetro Digital', marca: 'Fluke', numeroInventario: 'INV-HT-002', areaUbicacion: 'Mantenimiento', detalles: {} },
+    { tipo: 'herramienta_infra', modelo: 'Taladro percutor', marca: 'DeWalt', numeroInventario: 'INV-HI-002', areaUbicacion: 'Mantenimiento', detalles: {} }
   ];
 
   for (const eq of equiposSemilla) {

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { FaEye, FaTrashAlt } from 'react-icons/fa'
+import { useState, useEffect, useRef } from 'react'
+import { FaEye, FaTrashAlt, FaChevronRight, FaCogs } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { formatFolio } from '../utils/formatFolio'
 import { useNavigate } from 'react-router-dom'
@@ -21,6 +21,10 @@ export default function DashboardOficinas() {
   const [incluirImagenes, setIncluirImagenes] = useState(false)
   const [ordenAscendente, setOrdenAscendente] = useState(false)
   const [confirmResuelto, setConfirmResuelto] = useState({ visible: false, id: null })
+  
+  const [inventario, setInventario] = useState([])
+  const [mostrarInventario, setMostrarInventario] = useState(false)
+  const [componenteSeleccionado, setComponenteSeleccionado] = useState('')
 
   // ✅ CARGAR DATOS DESDE EL BACKEND
   const cargarReportes = async () => {
@@ -51,6 +55,56 @@ export default function DashboardOficinas() {
   useEffect(() => {
     cargarReportes()
   }, [user, mesFiltro, anioFiltro])
+
+  const cargarInventario = async () => {
+    if (!user?.token) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?limit=1000`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      });
+      const json = await response.json();
+      if (response.ok && json.ok) {
+        setInventario(json.data || []);
+      }
+    } catch (err) {
+      console.error('Error al cargar inventario', err);
+    }
+  };
+
+  useEffect(() => {
+    cargarInventario();
+  }, [user]);
+
+  const asignarEquipo = async () => {
+    if (!componenteSeleccionado) return alert('Seleccione un equipo');
+    if (!confirm(`¿Confirmas asignar este equipo?`)) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/reportes/oficina/${verDetalle.id}/equipos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
+        body: JSON.stringify({
+          equipo_id: componenteSeleccionado
+        })
+      });
+      const json = await response.json();
+      if (response.ok && json.ok) {
+        setVerDetalle({
+          ...verDetalle,
+          equiposAsignados: [...(verDetalle.equiposAsignados || []), json.data]
+        });
+        setComponenteSeleccionado('');
+        cargarInventario();
+      } else {
+        alert('❌ Error: ' + (json.error || 'Desconocido'));
+      }
+    } catch (err) {
+      alert('❌ Error de red');
+    }
+  };
 
   // ✅ CAMBIAR ESTADO EN BACKEND
   const cambiarEstado = async (id, nuevoEstado) => {
@@ -479,14 +533,16 @@ export default function DashboardOficinas() {
 
                 {/* ✅ IMAGEN DE EVIDENCIA */}
                 {verDetalle.evidencias && verDetalle.evidencias.length > 0 && (
-                  <div style={{ gridColumn: '1 / -1', marginTop: '1rem' }}>
-                    <strong style={{ display: 'block', marginBottom: '0.6rem' }}>
-                      <i className="fa-solid fa-image" style={{ marginRight: '0.4rem', color: '#BC955B' }}></i>
+                  <div style={{ gridColumn: '1 / -1', marginTop: '1.5rem' }}>
+                    <strong style={{ display: 'block', marginBottom: '0.8rem', fontSize: '1.05rem', color: '#1e293b' }}>
                       Evidencia Fotográfica:
                     </strong>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8rem' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
                       {verDetalle.evidencias.map((ev) => (
-                        <div key={ev.id} style={{ border: '1px solid #6F7271', borderRadius: '8px', overflow: 'hidden', maxWidth: '260px' }}>
+                        <div key={ev.id} style={{ 
+                          border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', 
+                          maxWidth: '220px', backgroundColor: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' 
+                        }}>
                           {ev.mimetype?.startsWith('image/') ? (
                             <a
                               href={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
@@ -496,7 +552,7 @@ export default function DashboardOficinas() {
                               <img
                                 src={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
                                 alt={ev.filename}
-                                style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
+                                style={{ width: '100%', height: '180px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
                                 onError={(e) => { e.target.style.display = 'none' }}
                               />
                             </a>
@@ -505,13 +561,12 @@ export default function DashboardOficinas() {
                               href={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
                               target="_blank"
                               rel="noreferrer"
-                              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem', color: '#BC955B', textDecoration: 'none', fontSize: '0.85rem' }}
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '180px', gap: '0.5rem', color: '#BC955B', textDecoration: 'none', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
                             >
-                              <i className="fa-solid fa-file"></i>
-                              {ev.filename}
+                              <i className="fa-solid fa-file-pdf" style={{ fontSize: '2rem' }}></i>
                             </a>
                           )}
-                          <div style={{ padding: '0.3rem 0.5rem', fontSize: '0.75rem', color: '#6F7271', backgroundColor: '#f8fafc', borderTop: '1px solid #6F7271' }}>
+                          <div style={{ padding: '0.6rem 0.8rem', fontSize: '0.8rem', color: '#64748b', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {ev.filename}
                           </div>
                         </div>
@@ -521,13 +576,69 @@ export default function DashboardOficinas() {
                 )}
 
                 {verDetalle.evidencias && verDetalle.evidencias.length === 0 && (
-                  <div style={{ gridColumn: '1 / -1', marginTop: '0.8rem', color: '#9ca3af', fontSize: '0.88rem', fontStyle: 'italic' }}>
-                    <i className="fa-solid fa-image" style={{ marginRight: '0.4rem' }}></i>
+                  <div style={{ gridColumn: '1 / -1', marginTop: '1.5rem', color: '#9ca3af', fontSize: '0.9rem', fontStyle: 'italic' }}>
                     Sin evidencia fotográfica adjunta.
                   </div>
                 )}
+
+                {/* ✅ EQUIPOS ASIGNADOS E INVENTARIO */}
+                <div style={{ gridColumn: '1 / -1', marginTop: '2rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <strong style={{ fontSize: '1.05rem', color: '#1e293b' }}>Equipos Asignados:</strong>
+                    <div 
+                      onClick={() => setMostrarInventario(!mostrarInventario)}
+                      style={{ 
+                        width: '46px', height: '24px', backgroundColor: mostrarInventario ? '#BC955B' : '#cbd5e1', 
+                        borderRadius: '12px', position: 'relative', cursor: 'pointer', transition: 'background-color 0.3s' 
+                      }}
+                    >
+                      <div style={{ 
+                        width: '20px', height: '20px', backgroundColor: 'white', borderRadius: '50%', 
+                        position: 'absolute', top: '2px', left: mostrarInventario ? '24px' : '2px', 
+                        transition: 'left 0.3s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' 
+                      }} />
+                    </div>
+                  </div>
+                  
+                  {mostrarInventario && (
+                    <div style={{ backgroundColor: '#f1f5f9', padding: '1.2rem', borderRadius: '12px', marginBottom: '1.2rem' }}>
+                      <h4 style={{ margin: '0 0 0.8rem 0', fontSize: '0.9rem', color: '#475569', fontWeight: '600' }}>Inventario Tecnológico</h4>
+                      <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ flex: '1', minWidth: '200px' }}>
+                          <CustomInventorySelect 
+                            value={componenteSeleccionado}
+                            onChange={setComponenteSeleccionado}
+                            inventario={inventario}
+                          />
+                        </div>
+                        <button onClick={asignarEquipo} style={{ padding: '0.7rem 1.5rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', transition: 'background 0.2s', fontSize: '0.95rem' }} onMouseOver={(e) => e.target.style.backgroundColor = '#0369a1'} onMouseOut={(e) => e.target.style.backgroundColor = '#0284c7'}>
+                          Asignar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {verDetalle.equiposAsignados && verDetalle.equiposAsignados.length > 0 ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.8rem' }}>
+                      {verDetalle.equiposAsignados.map((asignacion, idx) => (
+                        <div key={idx} style={{ padding: '0.6rem 1rem', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '0.2rem', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                          <span style={{ fontWeight: '600' }}>{asignacion.equipo?.tipo || 'Equipo'}</span>
+                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                            {asignacion.equipo?.marca} {asignacion.equipo?.modelo}
+                          </span>
+                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                            Inv: {asignacion.equipo?.numeroInventario || 'S/N'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.9rem', color: '#94a3b8', fontStyle: 'italic', padding: '0.5rem 0' }}>No hay equipos asignados.</div>
+                  )}
+                </div>
+
               </div>
-              <button onClick={() => setVerDetalle(null)} style={{ marginTop: '1.8rem', padding: '0.65rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '6px', width: '100%', fontSize: '0.95rem', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' }} onMouseOver={(e) => e.target.style.backgroundColor = '#a07238'} onMouseOut={(e) => e.target.style.backgroundColor = '#BC955B'}>
+              <button onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }} style={{ marginTop: '2rem', padding: '0.8rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '8px', width: '100%', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s', boxShadow: '0 2px 4px rgba(188, 149, 91, 0.3)' }} onMouseOver={(e) => e.target.style.backgroundColor = '#a07238'} onMouseOut={(e) => e.target.style.backgroundColor = '#BC955B'}>
                 Cerrar Detalles
               </button>
             </div>
@@ -574,3 +685,175 @@ export default function DashboardOficinas() {
     </div>
   )
 }
+
+// Componente Customizado para el Inventario
+const CustomInventorySelect = ({ value, onChange, inventario }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [hoveredCategory, setHoveredCategory] = useState(null);
+  const selectRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (selectRef.current && !selectRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  const selectedOption = inventario.find(o => o.id === Number(value));
+
+  const filteredOptions = inventario.filter(o => {
+    const searchTerm = search.toLowerCase();
+    return (
+      (o.tipo && o.tipo.toLowerCase().includes(searchTerm)) ||
+      (o.numeroInventario && o.numeroInventario.toLowerCase().includes(searchTerm)) ||
+      (o.marca && o.marca.toLowerCase().includes(searchTerm)) ||
+      (o.modelo && o.modelo.toLowerCase().includes(searchTerm))
+    );
+  });
+
+  const gruposOpciones = inventario.reduce((acc, curr) => {
+    const group = curr.tipo || 'Sin Tipo';
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(curr);
+    return acc;
+  }, {});
+
+  return (
+    <div ref={selectRef} style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          padding: '0.7rem 1.2rem', border: isOpen ? '1.5px solid #0284c7' : '1px solid #cbd5e1', 
+          borderRadius: '8px', fontSize: '0.95rem', backgroundColor: 'white', 
+          cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem',
+          transition: 'all 0.2s', boxShadow: isOpen ? '0 0 0 3px rgba(2, 132, 199, 0.1)' : 'none'
+        }}
+      >
+        <span>
+          {selectedOption ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b', fontWeight: '500' }}>
+               {selectedOption.tipo} - {selectedOption.numeroInventario || selectedOption.numeroSerie || 'S/N'}
+            </span>
+          ) : (
+            <span style={{ color: '#64748b', fontWeight: '400' }}>-- Seleccionar equipo --</span>
+          )}
+        </span>
+        <FaChevronRight size={12} style={{ transform: isOpen ? 'rotate(-90deg)' : 'rotate(90deg)', transition: '0.2s', color: '#64748b' }} />
+      </div>
+
+      {isOpen && (
+        <>
+          <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 -4px 20px rgba(0,0,0,0.12)', zIndex: 50, border: '1px solid #e2e8f0', overflow: 'hidden', width: '100%', minWidth: '320px' }}>
+            <div style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
+              <input
+                type="text"
+                placeholder="Buscar componente..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+                style={{ width: '100%', padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.9rem' }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+
+            <div style={{ display: 'flex', height: '240px' }}>
+              {search ? (
+                <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto', overscrollBehavior: 'contain' }}>
+                  {filteredOptions.length > 0 ? filteredOptions.map(opcion => (
+                    <div
+                      key={opcion.id}
+                      onClick={() => { onChange(opcion.id); setIsOpen(false); setSearch(''); }}
+                      style={{ padding: '0.7rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', transition: 'background-color 0.15s', backgroundColor: value === opcion.id ? '#fdf2f8' : 'transparent' }}
+                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                      onMouseOut={e => e.currentTarget.style.backgroundColor = value === opcion.id ? '#fdf2f8' : 'transparent'}
+                    >
+                      <FaCogs color="#691B31" size={16} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                        <span style={{ fontWeight: '500', color: '#334155' }}>{opcion.tipo}</span>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Inv: {opcion.numeroInventario || 'S/N'} | {opcion.marca} {opcion.modelo}</span>
+                      </div>
+                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginLeft: 'auto', backgroundColor: '#e2e8f0', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>{opcion.areaUbicacion || 'Sin área'}</span>
+                    </div>
+                  )) : (
+                    <div style={{ padding: '2rem', color: '#64748b', textAlign: 'center' }}>
+                      No se encontraron equipos para "{search}"
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div style={{ width: '45%', borderRight: '1px solid #e2e8f0', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#ffffff', overscrollBehavior: 'contain' }}>
+                    {Object.keys(gruposOpciones).map((group) => (
+                      <div
+                        key={group}
+                        onMouseEnter={() => setHoveredCategory(group)}
+                        style={{
+                          padding: '0.75rem 0.85rem',
+                          cursor: 'pointer',
+                          borderRadius: '8px',
+                          fontWeight: '600',
+                          fontSize: '0.85rem',
+                          color: hoveredCategory === group ? '#691B31' : '#475569',
+                          backgroundColor: hoveredCategory === group ? '#fdf2f8' : 'transparent',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '0.2rem',
+                          transition: 'background-color 0.2s, color 0.2s'
+                        }}
+                      >
+                        {group} <FaChevronRight size={9} style={{ opacity: hoveredCategory === group ? 1 : 0.3 }} />
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ width: '55%', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#f8fafc', overscrollBehavior: 'contain' }}>
+                    {hoveredCategory ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        <div style={{ padding: '0.4rem 0.75rem', fontSize: '0.7rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          {hoveredCategory}
+                        </div>
+                        {gruposOpciones[hoveredCategory].map(opcion => (
+                          <div
+                            key={opcion.id}
+                            onClick={() => { onChange(opcion.id); setIsOpen(false); setSearch(''); }}
+                            style={{ padding: '0.65rem 0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.65rem', borderRadius: '8px', transition: 'background-color 0.15s', backgroundColor: value === opcion.id ? '#fdf2f8' : 'transparent' }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = value === opcion.id ? '#fdf2f8' : 'transparent'}
+                          >
+                            <FaCogs color={value === opcion.id ? '#691B31' : '#64748b'} size={15} />
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '0.9rem', fontWeight: '500', color: value === opcion.id ? '#691B31' : '#475569' }}>
+                                {opcion.tipo}
+                              </span>
+                              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                Inv: {opcion.numeroInventario || 'S/N'} | {opcion.marca} {opcion.modelo}
+                              </span>
+                            </div>
+                            {value === opcion.id && <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#691B31', fontWeight: '700' }}>✓</span>}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                        <FaCogs size={28} color="#cbd5e1" />
+                        Pasa el cursor sobre una categoría
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};

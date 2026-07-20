@@ -5,7 +5,11 @@ import { useAuth } from '../context/AuthContext'
 import {
   FaRoad, FaPlus, FaEdit, FaTrashAlt, FaBoxes,
   FaChevronLeft, FaChevronRight, FaTimes,
-  FaCogs, FaWrench, FaHdd, FaTools
+  FaCogs, FaWrench, FaHdd, FaTools,
+  FaWalking, FaVolumeUp, FaDesktop, FaCreditCard,
+  FaPowerOff, FaMicrochip, FaNetworkWired, FaProjectDiagram,
+  FaMapMarkerAlt, FaHandPointer, FaSign, FaCheckSquare,
+  FaCalendarAlt, FaUpload, FaHistory
 } from 'react-icons/fa'
 
 // ==================================================
@@ -15,7 +19,8 @@ import {
 const MODELOS_POSTE = {
   'PS-3C': {
     label: 'PS-3C — Poste Simple 3 Caras',
-    totalCabezales: 3,
+    semaforos3Luces: 3,
+    semaforos4Luces: 0,
     totalLedsVerdes: 48,
     totalFlechasVerdes: 0,
     totalLedsRojos: 48,
@@ -24,7 +29,8 @@ const MODELOS_POSTE = {
   },
   'PS-4C': {
     label: 'PS-4C — Poste Simple 4 Caras',
-    totalCabezales: 4,
+    semaforos3Luces: 0,
+    semaforos4Luces: 4,
     totalLedsVerdes: 64,
     totalFlechasVerdes: 0,
     totalLedsRojos: 64,
@@ -33,7 +39,8 @@ const MODELOS_POSTE = {
   },
   'PD-3C': {
     label: 'PD-3C — Poste Doble 3 Caras',
-    totalCabezales: 3,
+    semaforos3Luces: 6,
+    semaforos4Luces: 0,
     totalLedsVerdes: 96,
     totalFlechasVerdes: 16,
     totalLedsRojos: 96,
@@ -42,7 +49,8 @@ const MODELOS_POSTE = {
   },
   'PD-4C': {
     label: 'PD-4C — Poste Doble 4 Caras',
-    totalCabezales: 4,
+    semaforos3Luces: 0,
+    semaforos4Luces: 8,
     totalLedsVerdes: 128,
     totalFlechasVerdes: 24,
     totalLedsRojos: 128,
@@ -97,6 +105,12 @@ export default function InventarioSemaforos() {
     tipoInventario: 'semaforos'
   })
 
+  const [modalHistorialAbierto, setModalHistorialAbierto] = useState(false)
+  const [historialData, setHistorialData] = useState([])
+  const [cargandoHistorial, setCargandoHistorial] = useState(false)
+  const [componenteHistorialActual, setComponenteHistorialActual] = useState(null)
+  const [filtroMesHistorial, setFiltroMesHistorial] = useState('')
+
   // ==========================================
   // ESTADOS - CONTROLADORES INSTALADOS
   // ==========================================
@@ -107,11 +121,14 @@ export default function InventarioSemaforos() {
   const [limiteControladores] = useState(10)
   const [modalControladorAbierto, setModalControladorAbierto] = useState(false)
   const [editandoControladorId, setEditandoControladorId] = useState(null)
+  const [mostrarProgramacion, setMostrarProgramacion] = useState(false)
+  const [archivoProgramacion, setArchivoProgramacion] = useState(null)
 
   const [controladorForm, setControladorForm] = useState({
     modelo: '',
     cruceroId: '',
-    totalCabezales: 0,
+    semaforos3Luces: 0,
+    semaforos4Luces: 0,
     totalLedsVerdes: 0,
     totalFlechasVerdes: 0,
     totalLedsRojos: 0,
@@ -316,6 +333,32 @@ export default function InventarioSemaforos() {
     })
   }
 
+  const abrirHistorial = async (item) => {
+    setComponenteHistorialActual(item)
+    setFiltroMesHistorial('')
+    setModalHistorialAbierto(true)
+    setCargandoHistorial(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/inventario/existencias/${item.id}/historial`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      })
+      if (res.ok) {
+        const json = await res.json()
+        if (json.ok) setHistorialData(json.data)
+      }
+    } catch (err) {
+      console.error('Error al cargar historial:', err)
+    } finally {
+      setCargandoHistorial(false)
+    }
+  }
+
+  const cerrarHistorial = () => {
+    setModalHistorialAbierto(false)
+    setHistorialData([])
+    setComponenteHistorialActual(null)
+  }
+
   // ==========================================
   // ACCIONES - CONTROLADORES INSTALADOS
   // ==========================================
@@ -373,7 +416,8 @@ export default function InventarioSemaforos() {
     setControladorForm({
       modelo: item.modelo,
       cruceroId: item.cruceroId,
-      totalCabezales: item.totalCabezales,
+      semaforos3Luces: item.semaforos3Luces || 0,
+      semaforos4Luces: item.semaforos4Luces || 0,
       totalLedsVerdes: item.totalLedsVerdes,
       totalFlechasVerdes: item.totalFlechasVerdes || 0,
       totalLedsRojos: item.totalLedsRojos,
@@ -433,7 +477,8 @@ export default function InventarioSemaforos() {
     setControladorForm({
       modelo: '',
       cruceroId: '',
-      totalCabezales: 0,
+      semaforos3Luces: 0,
+      semaforos4Luces: 0,
       totalLedsVerdes: 0,
       totalFlechasVerdes: 0,
       totalLedsRojos: 0,
@@ -650,6 +695,17 @@ export default function InventarioSemaforos() {
 
                       <div style={{ display: 'flex', gap: '0.25rem' }}>
                         <button
+                          onClick={() => abrirHistorial(item)}
+                          title="Ver historial de asignación"
+                          style={{
+                            backgroundColor: '#e0f2fe', border: 'none', color: '#0284c7', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
+                        >
+                          <FaHistory size={14} />
+                        </button>
+                        <button
                           onClick={() => handleEditarStock(item)}
                           title="Editar existencias"
                           style={{
@@ -741,7 +797,12 @@ export default function InventarioSemaforos() {
                     >
                       <td style={{ padding: '1rem', fontWeight: '700', color: '#691B31' }}>{item.modelo}</td>
                       <td style={{ padding: '1rem', color: '#6F7271', fontWeight: '500' }}>{item.crucero?.nombre || 'Sin Crucero'}</td>
-                      <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '600' }}>{item.totalCabezales}</td>
+                      <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.85rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <span style={{ color: '#16a34a' }}>3 leds: {item.semaforos3Luces || 0}</span>
+                          <span style={{ color: '#0284c7' }}>4 leds: {item.semaforos4Luces || 0}</span>
+                        </div>
+                      </td>
                       <td style={{ padding: '1rem' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} title="Verdes">
@@ -1005,88 +1066,105 @@ export default function InventarioSemaforos() {
 
               {/* CONTADORES (LEDS Y CABEZALES) */}
               <div style={{
-                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem 1rem',
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem 1rem', alignItems: 'end',
                 marginBottom: '1.5rem', backgroundColor: '#fcfbf9', padding: '1rem',
                 borderRadius: '8px', border: '1px solid #DDC9A3'
               }}>
                 {/* Fila 1: Cabezales | Leds Verdes | Leds Rojos */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#6F7271', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#6F7271', marginBottom: '0.25rem', textAlign: 'center' }}>
                     Cabezales
                   </label>
-                  <select
-                    value={controladorForm.totalCabezales}
-                    onChange={(e) => setControladorForm({ ...controladorForm, totalCabezales: Number(e.target.value) })}
-                    style={{
-                      width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1',
-                      borderRadius: '6px', fontSize: '0.9rem', backgroundColor: '#fff',
-                      cursor: 'pointer', outline: 'none'
-                    }}
-                  >
-                    <option value={0}>-- Seleccionar --</option>
-                    <option value={3}>3</option>
-                    <option value={4}>4</option>
-                  </select>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#0284c7', marginBottom: '0.15rem', textAlign: 'center' }}>
+                        3 leds
+                      </label>
+                      <input
+                        type="number" min="0"
+                        value={controladorForm.semaforos3Luces}
+                        onChange={(e) => setControladorForm({ ...controladorForm, semaforos3Luces: Math.max(0, Number(e.target.value)) })}
+                        style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#0284c7', marginBottom: '0.15rem', textAlign: 'center' }}>
+                        4 leds
+                      </label>
+                      <input
+                        type="number" min="0"
+                        value={controladorForm.semaforos4Luces}
+                        onChange={(e) => setControladorForm({ ...controladorForm, semaforos4Luces: Math.max(0, Number(e.target.value)) })}
+                        style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#16a34a', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#16a34a', marginBottom: '0.25rem', textAlign: 'center' }}>
                     Leds Verdes
                   </label>
                   <input
                     type="number" min="0"
                     value={controladorForm.totalLedsVerdes}
                     onChange={(e) => setControladorForm({ ...controladorForm, totalLedsVerdes: Math.max(0, Number(e.target.value)) })}
-                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem' }}
+                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#dc2626', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#dc2626', marginBottom: '0.25rem', textAlign: 'center' }}>
                     Leds Rojos
                   </label>
                   <input
                     type="number" min="0"
                     value={controladorForm.totalLedsRojos}
                     onChange={(e) => setControladorForm({ ...controladorForm, totalLedsRojos: Math.max(0, Number(e.target.value)) })}
-                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem' }}
+                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
                   />
                 </div>
+              </div>
 
-                {/* Fila 2: Leds Amarillos | Flecha Verde | Flecha Roja */}
+              {/* CONTADORES FILA 2 (AMARILLO, FLECHAS) */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem 1rem', alignItems: 'end',
+                marginBottom: '1.5rem', backgroundColor: '#fcfbf9', padding: '0 1rem 1rem 1rem',
+                borderRadius: '0 0 8px 8px', border: '1px solid #DDC9A3', borderTop: 'none', marginTop: '-1.5rem'
+              }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#d97706', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#d97706', marginBottom: '0.25rem', textAlign: 'center' }}>
                     Leds Amarillos
                   </label>
                   <input
                     type="number" min="0"
                     value={controladorForm.totalLedsAmarillos}
                     onChange={(e) => setControladorForm({ ...controladorForm, totalLedsAmarillos: Math.max(0, Number(e.target.value)) })}
-                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem' }}
+                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#16a34a', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#16a34a', marginBottom: '0.25rem', textAlign: 'center' }}>
                     Flecha Verde
                   </label>
                   <input
                     type="number" min="0"
                     value={controladorForm.totalFlechasVerdes}
                     onChange={(e) => setControladorForm({ ...controladorForm, totalFlechasVerdes: Math.max(0, Number(e.target.value)) })}
-                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem' }}
+                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#dc2626', marginBottom: '0.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: '600', color: '#dc2626', marginBottom: '0.25rem', textAlign: 'center' }}>
                     Flecha Roja
                   </label>
                   <input
                     type="number" min="0"
                     value={controladorForm.totalFlechasRojas}
                     onChange={(e) => setControladorForm({ ...controladorForm, totalFlechasRojas: Math.max(0, Number(e.target.value)) })}
-                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem' }}
+                    style={{ width: '100%', padding: '0.5rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }}
                   />
                 </div>
               </div>
@@ -1118,13 +1196,15 @@ export default function InventarioSemaforos() {
                     setControladorForm({ ...controladorForm, ...updates });
                   }}
                   style={{
-                    backgroundColor: '#f8fafc', border: '1px solid #CBD5E1', padding: '0.3rem 0.6rem',
-                    borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', color: '#64748b',
-                    cursor: 'pointer', transition: 'all 0.2s'
+                    display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    backgroundColor: 'transparent', border: '1px solid #e2e8f0', padding: '0.4rem 0.8rem',
+                    borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', color: '#64748b',
+                    cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                   }}
-                  onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#e2e8f0'; e.currentTarget.style.color = '#334155' }}
-                  onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#f8fafc'; e.currentTarget.style.color = '#64748b' }}
+                  onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#f8fafc'; e.currentTarget.style.color = '#334155'; e.currentTarget.style.borderColor = '#cbd5e1' }}
+                  onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#64748b'; e.currentTarget.style.borderColor = '#e2e8f0' }}
                 >
+                  <FaCheckSquare size={16} />
                   {[
                       'pasoPeatonal', 'audible', 'pantallaLed', 'tarjetaRelevadora',
                       'fuentePoder', 'cpu', 'switch', 'fibraOptica', 'gps', 'botonera', 'poste'
@@ -1134,33 +1214,27 @@ export default function InventarioSemaforos() {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
                 {[
-                  { key: 'pasoPeatonal', label: 'Paso Peatonal' },
-                  { key: 'audible', label: 'Audible' },
-                  { key: 'pantallaLed', label: 'Pantalla LED' },
-                  { key: 'tarjetaRelevadora', label: 'Tarjeta Relevadora' },
-                  { key: 'fuentePoder', label: 'Fuente de Poder' },
-                  { key: 'cpu', label: 'Módulo CPU' },
-                  { key: 'switch', label: 'Switch de Red' },
-                  { key: 'fibraOptica', label: 'Fibra Óptica' },
-                  { key: 'gps', label: 'Módulo GPS' },
-                  { key: 'botonera', label: 'Botonera Peatonal' },
-                  { key: 'poste', label: 'Poste' }
+                  { key: 'pasoPeatonal', label: 'Paso Peatonal', icon: <FaWalking /> },
+                  { key: 'audible', label: 'Audible', icon: <FaVolumeUp /> },
+                  { key: 'pantallaLed', label: 'Pantalla LED', icon: <FaDesktop /> },
+                  { key: 'tarjetaRelevadora', label: 'Tarjeta Relevadora', icon: <FaCreditCard /> },
+                  { key: 'fuentePoder', label: 'Fuente de Poder', icon: <FaPowerOff /> },
+                  { key: 'cpu', label: 'Módulo CPU', icon: <FaMicrochip /> },
+                  { key: 'switch', label: 'Switch de Red', icon: <FaNetworkWired /> },
+                  { key: 'fibraOptica', label: 'Fibra Óptica', icon: <FaProjectDiagram /> },
+                  { key: 'gps', label: 'Módulo GPS', icon: <FaMapMarkerAlt /> },
+                  { key: 'botonera', label: 'Botonera Peatonal', icon: <FaHandPointer /> },
+                  { key: 'poste', label: 'Poste', icon: <FaSign /> }
                 ].map((item) => (
-                  <label
-                    key={item.key}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem',
-                      color: controladorForm[item.key] ? '#691B31' : '#6F7271',
-                      cursor: 'pointer', padding: '0.4rem', borderRadius: '6px',
-                      backgroundColor: controladorForm[item.key] ? '#fdf6ec' : '#f8fafc',
-                      border: `1px solid ${controladorForm[item.key] ? '#BC955B' : '#E2E8F0'}`,
-                      fontWeight: controladorForm[item.key] ? '700' : '400',
-                      transition: 'all 0.2s'
-                    }}
-                  >
+                  <label key={item.key} style={{
+                    display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem',
+                    border: '1px solid #E2E8F0', borderRadius: '8px', cursor: 'pointer',
+                    backgroundColor: controladorForm[item.key] ? '#f8fafc' : 'white',
+                    transition: 'background-color 0.2s', fontSize: '0.85rem', color: '#475569'
+                  }}>
                     <input
                       type="checkbox"
-                      checked={controladorForm[item.key]}
+                      checked={!!controladorForm[item.key]}
                       onChange={(e) => {
                         const updates = { [item.key]: e.target.checked }
                         // Limpiar detalle si se desmarca
@@ -1172,11 +1246,30 @@ export default function InventarioSemaforos() {
                         }
                         setControladorForm({ ...controladorForm, ...updates })
                       }}
-                      style={{ cursor: 'pointer', accentColor: '#691B31' }}
+                      style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: '#691B31' }}
                     />
-                    {item.label}
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#691B31', fontSize: '1.1rem' }}>
+                      {item.icon}
+                    </span>
+                    <span>{item.label}</span>
                   </label>
                 ))}
+                {/* BOTON DE PROGRAMACION EN EL ESPACIO VACIO */}
+                <button
+                  type="button"
+                  onClick={() => setMostrarProgramacion(!mostrarProgramacion)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                    padding: '0.75rem', border: '1px dashed #BC955B', borderRadius: '8px',
+                    backgroundColor: mostrarProgramacion ? '#fdf8f6' : 'transparent',
+                    color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#fdf8f6' }}
+                  onMouseOut={(e) => { e.currentTarget.style.backgroundColor = mostrarProgramacion ? '#fdf8f6' : 'transparent' }}
+                >
+                  <FaCalendarAlt size={16} /> Programación
+                </button>
               </div>
 
               {/* SUB-SELECCIÓN DE MODELO DE POSTE */}
@@ -1197,7 +1290,8 @@ export default function InventarioSemaforos() {
                         setControladorForm(prev => ({
                           ...prev,
                           modeloPoste: key,
-                          totalCabezales: preset.totalCabezales,
+                          semaforos3Luces: preset.semaforos3Luces,
+                          semaforos4Luces: preset.semaforos4Luces,
                           totalLedsVerdes: preset.totalLedsVerdes,
                           totalFlechasVerdes: preset.totalFlechasVerdes,
                           totalLedsRojos: preset.totalLedsRojos,
@@ -1302,6 +1396,54 @@ export default function InventarioSemaforos() {
                 </div>
               )}
 
+              {mostrarProgramacion && (
+                <div style={{
+                  backgroundColor: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: '8px',
+                  padding: '1.25rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem', animation: 'fadeIn 0.2s ease-out'
+                }}>
+                  <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: '700', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <FaCalendarAlt size={16} color="#BC955B" /> Horario Programado
+                  </p>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#64748b' }}>
+                    Sube el archivo con los horarios y configuración de tiempos del semáforo.
+                  </p>
+                  <label
+                    style={{
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      padding: '1.5rem', border: '2px dashed #94a3b8', borderRadius: '8px',
+                      backgroundColor: 'white', cursor: 'pointer', transition: 'all 0.2s', marginTop: '0.5rem'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.borderColor = '#BC955B'}
+                    onMouseOut={(e) => e.currentTarget.style.borderColor = '#94a3b8'}
+                  >
+                    <FaUpload size={24} color="#94a3b8" style={{ marginBottom: '0.5rem' }} />
+                    <span style={{ fontSize: '0.85rem', color: '#475569', fontWeight: '500', textAlign: 'center' }}>
+                      {archivoProgramacion ? archivoProgramacion.name : 'Haz clic para seleccionar un archivo o arrástralo aquí'}
+                    </span>
+                    <input
+                      type="file"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setArchivoProgramacion(e.target.files[0])
+                        }
+                      }}
+                    />
+                  </label>
+                  {archivoProgramacion && (
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        onClick={() => setArchivoProgramacion(null)}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.75rem', cursor: 'pointer', fontWeight: '600' }}
+                      >
+                        Remover archivo
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', borderTop: '1px solid #E2E8F0', paddingTop: '1.25rem' }}>
                 <button
                   type="button"
@@ -1324,6 +1466,103 @@ export default function InventarioSemaforos() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {modalHistorialAbierto && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '16px', width: '90%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', borderBottom: '2px solid #E2E8F0', paddingBottom: '1rem' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <FaHistory /> Historial de Asignación
+                </h2>
+                {componenteHistorialActual && (
+                  <p style={{ margin: '0.25rem 0 0', color: '#6F7271', fontSize: '0.95rem' }}>
+                    Componente: <strong style={{ color: '#1e293b', textTransform: 'capitalize' }}>{componenteHistorialActual.nombre}</strong>
+                  </p>
+                )}
+              </div>
+              <button onClick={cerrarHistorial} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '0.5rem' }}>
+                <FaTimes size={20} />
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#475569' }}>Filtrar por Mes:</label>
+                <input
+                  type="month"
+                  value={filtroMesHistorial}
+                  onChange={(e) => setFiltroMesHistorial(e.target.value)}
+                  style={{
+                    padding: '0.5rem 0.75rem', border: '1px solid #cbd5e1', borderRadius: '8px',
+                    fontSize: '0.9rem', color: '#334155', outline: 'none'
+                  }}
+                />
+                {filtroMesHistorial && (
+                  <button
+                    onClick={() => setFiltroMesHistorial('')}
+                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600' }}
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {cargandoHistorial ? (
+              <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>Cargando historial...</div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: '#334155', fontWeight: '700' }}>Fecha</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: '#334155', fontWeight: '700' }}>Reporte</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: '#334155', fontWeight: '700' }}>Estación / Crucero</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#334155', fontWeight: '700' }}>Cantidad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historialData
+                      .filter(h => {
+                        if (!filtroMesHistorial) return true;
+                        const fecha = new Date(h.fecha);
+                        const mesAnio = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+                        return mesAnio === filtroMesHistorial;
+                      })
+                      .map((h, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: i % 2 === 0 ? 'white' : '#f8fafc' }}>
+                        <td style={{ padding: '0.75rem 1rem', color: '#475569', whiteSpace: 'nowrap' }}>
+                          {new Date(h.fecha).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' })}
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', color: '#0284c7', fontWeight: '600' }}>{h.reporte?.folio || 'N/A'}</td>
+                        <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>
+                          <div><strong style={{ color: '#334155' }}>Estación:</strong> {h.reporte?.estacion || 'N/A'}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Crucero: {h.reporte?.crucero || 'N/A'}</div>
+                        </td>
+                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: '700', color: '#ef4444' }}>
+                          -{h.cantidad}
+                        </td>
+                      </tr>
+                    ))}
+                    {historialData.filter(h => {
+                        if (!filtroMesHistorial) return true;
+                        const fecha = new Date(h.fecha);
+                        const mesAnio = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+                        return mesAnio === filtroMesHistorial;
+                    }).length === 0 && (
+                      <tr>
+                        <td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                          No hay registros de historial {filtroMesHistorial ? 'para el mes seleccionado' : ''}.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

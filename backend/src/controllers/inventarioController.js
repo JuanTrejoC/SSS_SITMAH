@@ -20,7 +20,8 @@ const equipoTecnologicoSchema = z.object({
 const controladorSemaforoSchema = z.object({
   modelo: z.string().min(1),
   cruceroId: z.coerce.number().int().positive(),
-  totalCabezales: z.coerce.number().int().nonnegative().default(0),
+  semaforos3Luces: z.coerce.number().int().nonnegative().default(0),
+  semaforos4Luces: z.coerce.number().int().nonnegative().default(0),
   totalLedsVerdes: z.coerce.number().int().nonnegative().default(0),
   totalLedsRojos: z.coerce.number().int().nonnegative().default(0),
   totalLedsAmarillos: z.coerce.number().int().nonnegative().default(0),
@@ -342,6 +343,40 @@ async function eliminarExistencia(req, res) {
   ok(res, { message: 'Componente eliminado correctamente' });
 }
 
+async function obtenerHistorialExistencia(req, res) {
+  const id = Number(req.params.id);
+
+  const componente = await prisma.existenciaComponente.findUnique({ where: { id } });
+  if (!componente) return fail(res, 'Componente no encontrado', 404);
+
+  const historial = await prisma.reporteSemaforoPieza.findMany({
+    where: { componenteId: id },
+    include: {
+      reporteSemaforo: {
+        include: {
+          estacion: true,
+          crucero: true
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+
+  const historialMapeado = historial.map(h => ({
+    id: h.id,
+    cantidad: h.cantidad,
+    fecha: h.createdAt,
+    reporte: {
+      id: h.reporteSemaforo.id,
+      folio: h.reporteSemaforo.folio,
+      estacion: h.reporteSemaforo.estacion?.nombre,
+      crucero: h.reporteSemaforo.crucero?.nombre
+    }
+  }));
+
+  ok(res, historialMapeado);
+}
+
 module.exports = {
   listarEquipoTecnologico,
   crearEquipoTecnologico,
@@ -359,4 +394,5 @@ module.exports = {
   ingresarExistencia,
   actualizarExistencia,
   eliminarExistencia,
+  obtenerHistorialExistencia,
 };

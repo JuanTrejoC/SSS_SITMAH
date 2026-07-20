@@ -167,7 +167,8 @@ model ReporteOficina {
   sede        Sede        @relation(fields: [sedeId], references: [id])
   categoria   Categoria   @relation(fields: [categoriaId], references: [id])
   atendidoPor Usuario?    @relation("AtendidoOficina", fields: [atendidoPorId], references: [id])
-  evidencias  Evidencia[]
+  evidencias      Evidencia[]
+  equiposAsignados ReporteOficinaEquipo[]
 
   @@index([estado])
   @@index([sedeId])
@@ -262,6 +263,7 @@ model EquipoTecnologico {
   detalles         Json?    // Stores type-specific dynamic attributes
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
+  reportesOficina  ReporteOficinaEquipo[]
 
   @@map("equipo_tecnologico")
 }
@@ -270,7 +272,8 @@ model ControladorSemaforo {
   id                  Int      @id @default(autoincrement())
   modelo              String   @db.VarChar(100)
   cruceroId           Int      @map("crucero_id")
-  totalCabezales      Int      @default(0) @map("total_cabezales")
+  semaforos3Luces     Int      @default(0) @map("semaforos_3_luces")
+  semaforos4Luces     Int      @default(0) @map("semaforos_4_luces")
   totalLedsVerdes     Int      @default(0) @map("total_leds_verdes")
   totalLedsRojos      Int      @default(0) @map("total_leds_rojos")
   totalLedsAmarillos  Int      @default(0) @map("total_leds_amarillos")
@@ -320,4 +323,16 @@ model ReporteSemaforoPieza {
   componente        ExistenciaComponente @relation(fields: [componenteId], references: [id])
 
   @@map("reporte_semaforo_pieza")
+}
+
+model ReporteOficinaEquipo {
+  id                Int                  @id @default(autoincrement())
+  reporteOficinaId  Int                  @map("reporte_oficina_id")
+  equipoId          Int                  @map("equipo_id")
+  createdAt         DateTime             @default(now()) @map("created_at")
+
+  reporteOficina    ReporteOficina       @relation(fields: [reporteOficinaId], references: [id], onDelete: Cascade)
+  equipo            EquipoTecnologico    @relation(fields: [equipoId], references: [id])
+
+  @@map("reporte_oficina_equipo")
 }
