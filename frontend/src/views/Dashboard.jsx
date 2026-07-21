@@ -110,27 +110,7 @@ export default function Dashboard() {
             </div>
 
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <Link
-                to="/mis-reportes"
-                className="btn-responsive-general"
-                style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  color: 'white',
-                  border: '1px solid rgba(255, 255, 255, 0.25)',
-                  padding: '0.65rem 1.15rem',
-                  borderRadius: '10px',
-                  textDecoration: 'none',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  transition: 'all 0.2s ease',
-                  backdropFilter: 'blur(4px)'
-                }}
-              >
-                <i className="fa-solid fa-plus-circle"></i> Crear Reporte
-              </Link>
+
               <Link
                 to="/estadisticas"
                 className="btn-responsive-general"

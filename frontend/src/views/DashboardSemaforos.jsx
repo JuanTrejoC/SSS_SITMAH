@@ -614,18 +614,11 @@ export default function DashboardSemaforos() {
                       <h4 style={{ margin: '0 0 0.65rem 0', fontSize: '0.85rem', color: '#4B5563', fontWeight: '700' }}>Seleccionar del Inventario de Existencias</h4>
                       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                         <div style={{ flex: '1', minWidth: '180px' }}>
-                          <select
+                          <CustomInventorySelect
                             value={componenteSeleccionado}
-                            onChange={(e) => setComponenteSeleccionado(e.target.value)}
-                            style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '0.85rem' }}
-                          >
-                            <option value="">-- Seleccionar pieza --</option>
-                            {inventario.map(p => (
-                              <option key={p.id} value={p.id}>
-                                {p.nombre || p.descripcion} (Disp: {p.cantidad ?? 'N/A'})
-                              </option>
-                            ))}
-                          </select>
+                            onChange={setComponenteSeleccionado}
+                            inventario={inventario}
+                          />
                         </div>
                         <input
                           type="number"
@@ -717,3 +710,165 @@ export default function DashboardSemaforos() {
     </div>
   )
 }
+
+// Componente Customizado para el Inventario
+const CustomInventorySelect = ({ value, onChange, inventario }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [hoveredCategory, setHoveredCategory] = useState(null);
+  const selectRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (selectRef.current && !selectRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  const selectedOption = inventario.find(o => o.id === Number(value));
+
+  const filteredOptions = inventario.filter(o => {
+    const searchTerm = search.toLowerCase();
+    return (
+      (o.nombre && o.nombre.toLowerCase().includes(searchTerm)) ||
+      (o.categoria && o.categoria.toLowerCase().includes(searchTerm)) ||
+      (o.marca && o.marca.toLowerCase().includes(searchTerm)) ||
+      (o.modelo && o.modelo.toLowerCase().includes(searchTerm))
+    );
+  });
+
+  const gruposOpciones = inventario.reduce((acc, curr) => {
+    const group = curr.categoria || 'Sin Categoría';
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(curr);
+    return acc;
+  }, {});
+
+  return (
+    <div ref={selectRef} style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          padding: '0.65rem 1rem', border: isOpen ? '1.5px solid #2563EB' : '1px solid #D1D5DB', 
+          borderRadius: '8px', fontSize: '0.9rem', backgroundColor: 'white', 
+          cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem',
+          transition: 'all 0.2s'
+        }}
+      >
+        <span>
+          {selectedOption ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#111827', fontWeight: '600' }}>
+               {selectedOption.nombre || selectedOption.descripcion} (Disp: {selectedOption.cantidad ?? 'N/A'})
+            </span>
+          ) : (
+            <span style={{ color: '#9CA3AF', fontWeight: '400' }}>-- Seleccionar pieza --</span>
+          )}
+        </span>
+        <FaChevronRight size={12} style={{ transform: isOpen ? 'rotate(-90deg)' : 'rotate(90deg)', transition: '0.2s', color: '#6B7280' }} />
+      </div>
+
+      {isOpen && (
+        <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 -4px 20px rgba(0,0,0,0.12)', zIndex: 50, border: '1px solid #E5E7EB', overflow: 'hidden', width: '100%', minWidth: '320px' }}>
+          <div style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid #E5E7EB', backgroundColor: '#ffffff' }}>
+            <input
+              type="text"
+              placeholder="Buscar componente..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoFocus
+              style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #D1D5DB', outline: 'none', fontSize: '0.85rem' }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+
+          <div style={{ display: 'flex', height: '240px' }}>
+            {search ? (
+              <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto' }}>
+                {filteredOptions.length > 0 ? filteredOptions.map(opcion => (
+                  <div
+                    key={opcion.id}
+                    onClick={() => { onChange(opcion.id); setIsOpen(false); setSearch(''); }}
+                    style={{ padding: '0.65rem 0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', backgroundColor: value === opcion.id ? '#FEF3C7' : 'transparent' }}
+                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#FFFBEB'}
+                    onMouseOut={e => e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF3C7' : 'transparent'}
+                  >
+                    <FaCogs color="#BC955B" size={16} />
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontWeight: '600', color: '#111827' }}>{opcion.nombre || opcion.descripcion}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>Disp: {opcion.cantidad ?? 'N/A'} | {opcion.marca || ''} {opcion.modelo || ''}</span>
+                    </div>
+                  </div>
+                )) : (
+                  <div style={{ padding: '2rem', color: '#6B7280', textAlign: 'center', fontSize: '0.85rem' }}>
+                    No se encontraron piezas para "{search}"
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <div style={{ width: '45%', borderRight: '1px solid #E5E7EB', overflowY: 'auto', padding: '0.4rem', backgroundColor: '#ffffff' }}>
+                  {Object.keys(gruposOpciones).map((group) => (
+                    <div
+                      key={group}
+                      onMouseEnter={() => setHoveredCategory(group)}
+                      style={{
+                        padding: '0.65rem 0.75rem',
+                        cursor: 'pointer',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        fontSize: '0.825rem',
+                        color: hoveredCategory === group ? '#BC955B' : '#4B5563',
+                        backgroundColor: hoveredCategory === group ? '#FEF3C7' : 'transparent',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {group} <FaChevronRight size={9} style={{ opacity: hoveredCategory === group ? 1 : 0.3 }} />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ width: '55%', overflowY: 'auto', padding: '0.4rem', backgroundColor: '#F8FAFC' }}>
+                  {hoveredCategory ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      {gruposOpciones[hoveredCategory].map(opcion => (
+                        <div
+                          key={opcion.id}
+                          onClick={() => { onChange(opcion.id); setIsOpen(false); setSearch(''); }}
+                          style={{ padding: '0.6rem 0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.65rem', borderRadius: '8px', backgroundColor: value === opcion.id ? '#FEF3C7' : 'transparent' }}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#FEF9C3'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF3C7' : 'transparent'}
+                        >
+                          <FaCogs color={value === opcion.id ? '#BC955B' : '#6B7280'} size={14} />
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: value === opcion.id ? '#BC955B' : '#374151' }}>
+                              {opcion.nombre || opcion.descripcion}
+                            </span>
+                            <span style={{ fontSize: '0.725rem', color: '#6B7280' }}>
+                              Disp: {opcion.cantidad ?? 'N/A'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#9CA3AF', fontSize: '0.8rem' }}>
+                      Pasa el cursor sobre una categoría
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

@@ -168,6 +168,16 @@ export default function InventarioSemaforos() {
     }
   }, [tabActiva, paginaControladores])
 
+  // Prevent background scrolling when modals are open
+  useEffect(() => {
+    if (modalStockAbierto || modalHistorialAbierto || modalControladorAbierto) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [modalStockAbierto, modalHistorialAbierto, modalControladorAbierto])
+
   const cargarCatalogos = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/catalogos/cruceros`)
