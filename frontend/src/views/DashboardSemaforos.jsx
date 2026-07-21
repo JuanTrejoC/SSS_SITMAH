@@ -1,11 +1,10 @@
+// src/views/DashboardSemaforos.jsx
 import { useState, useEffect, useRef } from 'react'
 import { FaEye, FaTrashAlt, FaChevronRight, FaCogs } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { formatFolio } from '../utils/formatFolio'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config'
-
-
 
 export default function DashboardSemaforos() {
   const { user } = useAuth()
@@ -21,6 +20,11 @@ export default function DashboardSemaforos() {
   const [ordenAscendente, setOrdenAscendente] = useState(false)
   const [confirmResuelto, setConfirmResuelto] = useState({ visible: false, id: null })
 
+  const [inventario, setInventario] = useState([])
+  const [mostrarInventario, setMostrarInventario] = useState(false)
+  const [componenteSeleccionado, setComponenteSeleccionado] = useState('')
+  const [cantidadAsignar, setCantidadAsignar] = useState(1)
+
   useEffect(() => {
     if (verDetalle || confirmResuelto.visible) {
       document.body.style.overflow = 'hidden'
@@ -29,10 +33,6 @@ export default function DashboardSemaforos() {
     }
     return () => { document.body.style.overflow = '' }
   }, [verDetalle, confirmResuelto.visible])
-  const [inventario, setInventario] = useState([])
-  const [mostrarInventario, setMostrarInventario] = useState(false)
-  const [componenteSeleccionado, setComponenteSeleccionado] = useState('')
-  const [cantidadAsignar, setCantidadAsignar] = useState(1)
 
   // CARGAR DATOS DESDE EL BACKEND
   const cargarReportes = async () => {
@@ -80,21 +80,8 @@ export default function DashboardSemaforos() {
     cargarInventario()
   }, [user, mesFiltro, anioFiltro])
 
-  // Bloquear scroll de la página cuando el modal está abierto
-  useEffect(() => {
-    if (verDetalle) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [verDetalle]);
-
-
   const asignarPieza = async () => {
-    if (!componenteSeleccionado || cantidadAsignar < 1) return
+    if (!componenteSeleccionado || cantidadAsignar < 1) return alert('Seleccione un componente e ingrese cantidad válida')
     try {
       const response = await fetch(`${API_BASE_URL}/api/admin/reportes/semaforo/${verDetalle.id}/piezas`, {
         method: 'POST',
@@ -102,32 +89,28 @@ export default function DashboardSemaforos() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${user.token}`
         },
-        body: JSON.stringify({ componente_id: componenteSeleccionado, cantidad: cantidadAsignar })
+        body: JSON.stringify({
+          existencia_id: componenteSeleccionado,
+          cantidad: cantidadAsignar
+        })
       })
       const json = await response.json()
       if (response.ok && json.ok) {
-        alert('Pieza asignada correctamente')
+        setVerDetalle({
+          ...verDetalle,
+          piezasUtilizadas: [...(verDetalle.piezasUtilizadas || []), json.data]
+        })
         setComponenteSeleccionado('')
         setCantidadAsignar(1)
-        cargarReportes()
         cargarInventario()
-        setVerDetalle(prev => {
-          const comp = inventario.find(i => i.id === Number(componenteSeleccionado))
-          return {
-            ...prev,
-            piezasAsignadas: [...(prev.piezasAsignadas || []), { componente: comp, cantidad: cantidadAsignar }]
-          }
-        })
       } else {
-        alert('Error al asignar pieza: ' + (json.error || 'Desconocido'))
+        alert('❌ Error: ' + (json.error || 'Desconocido'))
       }
     } catch (err) {
-      console.error(err)
-      alert('Error de red al asignar pieza')
+      alert('❌ Error de red')
     }
   }
 
-  // CAMBIAR ESTADO EN BACKEND
   const cambiarEstado = async (id, nuevoEstado) => {
     if (!user?.token) return
     try {
@@ -139,7 +122,7 @@ export default function DashboardSemaforos() {
         },
         body: JSON.stringify({
           estado: nuevoEstado,
-          comentario: 'Actualizado desde el panel de administración'
+          comentario: 'Actualizado desde el panel de semáforos'
         })
       })
       const json = await response.json()
@@ -154,10 +137,9 @@ export default function DashboardSemaforos() {
     }
   }
 
-  // ELIMINAR REPORTE EN BACKEND
   const eliminarReporte = async (id) => {
     if (!user?.token) return
-    if (confirm('¿Eliminar este reporte de forma permanente?')) {
+    if (confirm('¿Eliminar este reporte de semáforos de forma permanente?')) {
       try {
         const response = await fetch(`${API_BASE_URL}/api/admin/reportes/semaforo/${id}`, {
           method: 'DELETE',
@@ -179,7 +161,6 @@ export default function DashboardSemaforos() {
     }
   }
 
-  // DESCARGAR / GENERAR REPORTE EXCEL CON FILTROS DE MES/AÑO
   const descargarExcel = async () => {
     if (!user?.token) return
     try {
@@ -207,17 +188,17 @@ export default function DashboardSemaforos() {
       a.click()
       URL.revokeObjectURL(urlObj)
     } catch (error) {
-      alert('❌ Error al generar y descargar el reporte Excel: ' + error.message)
+      alert('❌ Error al generar el reporte Excel: ' + error.message)
     }
   }
 
-  // FILTRAR DATOS
   const reportesFiltrados = reportes.filter(r => {
     const coincideBusqueda =
-      r.jefeTurno?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      r.jefe_turno?.toLowerCase().includes(busqueda.toLowerCase()) ||
       r.folio?.toLowerCase().includes(busqueda.toLowerCase()) ||
       r.estacion?.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      r.crucero?.nombre?.toLowerCase().includes(busqueda.toLowerCase())
+      r.crucero?.ubicacion?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      r.tipoFalla?.nombre?.toLowerCase().includes(busqueda.toLowerCase())
 
     const coincideEstado = estadoFiltro === 'Todos' ||
       (estadoFiltro === 'Pendiente' && r.estado === 'abierto') ||
@@ -226,11 +207,6 @@ export default function DashboardSemaforos() {
 
     return coincideBusqueda && coincideEstado
   })
-
-  // ESTILO DE PRIORIDAD (Todos los semáforos son alta prioridad)
-  const obtenerEstiloPrioridad = () => {
-    return { bg: '#fee2e2', color: '#dc2626', label: 'Alta' }
-  }
 
   const obtenerNombreEstado = (estado) => {
     switch (estado) {
@@ -242,49 +218,58 @@ export default function DashboardSemaforos() {
   }
 
   return (
-    <div className="main-content-padding" style={{ backgroundColor: '#f8fafc', minHeight: '100vh' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="main-content-padding" style={{ backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '3rem' }}>
+      <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-        {/* ENCABEZADO CON TABS DE NAVEGACIÓN */}
-        <div className="responsive-flex" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <h1 style={{ color: '#BC955B', fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>
-            <i className="fa-solid fa-traffic-light" style={{ marginRight: '0.5rem' }}></i> Panel de Reportes - Semáforos
-          </h1>
-          <div style={{ display: 'flex', gap: '0.5rem', backgroundColor: 'white', padding: '0.4rem', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+        {/* ENCABEZADO CON SWITCHER DE MODULOS */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h1 style={{ color: '#BC955B', fontSize: 'clamp(1.3rem, 3vw, 1.85rem)', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <i className="fa-solid fa-traffic-light"></i> Panel de Reportes · Semáforos
+            </h1>
+            <p style={{ color: '#6B7280', margin: '0.25rem 0 0 0', fontSize: '0.9rem' }}>
+              Control de averías en intersecciones viales, mantenimiento de controladores y asignación de piezas.
+            </p>
+          </div>
+
+          {/* Switcher Tabs */}
+          <div style={{ display: 'flex', gap: '0.35rem', backgroundColor: '#E2E8F0', padding: '0.35rem', borderRadius: '12px' }}>
             <button
               onClick={() => navigate('/dashboard-oficinas')}
               style={{
-                padding: '0.5rem 1.2rem',
-                borderRadius: '8px',
+                padding: '0.55rem 1.25rem',
+                borderRadius: '9px',
                 border: 'none',
                 backgroundColor: 'transparent',
-                color: '#6F7271',
-                fontWeight: '500',
-                fontSize: '0.9rem',
+                color: '#4B5563',
+                fontWeight: '600',
+                fontSize: '0.875rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.4rem',
-                transition: 'background 0.2s, color 0.2s'
+                gap: '0.45rem',
+                transition: 'all 0.2s ease'
               }}
-              onMouseOver={e => { e.currentTarget.style.backgroundColor = '#f1f5f9'; e.currentTarget.style.color = '#691B31' }}
-              onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6F7271' }}
+              onMouseOver={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#691B31' }}
+              onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#4B5563' }}
             >
               <i className="fa-solid fa-building"></i> Oficinas
             </button>
+
             <button
               style={{
-                padding: '0.5rem 1.2rem',
-                borderRadius: '8px',
+                padding: '0.55rem 1.25rem',
+                borderRadius: '9px',
                 border: 'none',
-                backgroundColor: '#691B31',
+                backgroundColor: '#BC955B',
                 color: 'white',
-                fontWeight: '600',
-                fontSize: '0.9rem',
+                fontWeight: '700',
+                fontSize: '0.875rem',
                 cursor: 'default',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.4rem'
+                gap: '0.45rem',
+                boxShadow: '0 2px 6px rgba(188, 149, 91, 0.3)'
               }}
             >
               <i className="fa-solid fa-traffic-light"></i> Semáforos
@@ -292,13 +277,13 @@ export default function DashboardSemaforos() {
           </div>
         </div>
 
-        {/* BARRA DE FILTROS */}
-        <div style={{ backgroundColor: 'white', padding: '1.2rem', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', marginBottom: '2rem' }}>
-          {/* Fila 1: Búsqueda por mes, año y estado */}
-          <div className="form-responsive-grid grid-2" style={{ marginBottom: '1rem' }}>
+        {/* BARRA DE FILTROS Y BÚSQUEDA */}
+        <div style={{ backgroundColor: 'white', padding: '1.35rem', borderRadius: '16px', border: '1px solid #E5E7EB', boxShadow: '0 4px 15px -3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             <div>
-              <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'block', marginBottom: '0.3rem' }}>
-                <i className="fa-solid fa-calendar-days" style={{ marginRight: '0.3rem' }}></i>Mes y Año
+              <label style={{ fontSize: '0.825rem', fontWeight: '600', color: '#4B5563', display: 'block', marginBottom: '0.35rem' }}>
+                <i className="fa-solid fa-calendar-days" style={{ marginRight: '0.35rem', color: '#BC955B' }}></i> Mes y Año
               </label>
               <input
                 type="month"
@@ -315,228 +300,264 @@ export default function DashboardSemaforos() {
                     setMesFiltro('');
                   }
                 }}
-                style={{ width: '100%', padding: '0.5rem 0.8rem', border: '1px solid #9B9B9A', borderRadius: '8px', backgroundColor: 'white', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #D1D5DB', borderRadius: '10px', backgroundColor: 'white', fontSize: '0.875rem', outline: 'none' }}
               />
             </div>
+
             <div>
-              <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'block', marginBottom: '0.3rem' }}>Estado</label>
-              <select value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.8rem', border: '1px solid #9B9B9A', borderRadius: '8px', backgroundColor: 'white' }}>
-                <option>Todos</option>
-                <option>Pendiente</option>
-                <option>En Proceso</option>
-                <option>Resuelto</option>
+              <label style={{ fontSize: '0.825rem', fontWeight: '600', color: '#4B5563', display: 'block', marginBottom: '0.35rem' }}>
+                Estado del Reporte
+              </label>
+              <select
+                value={estadoFiltro}
+                onChange={(e) => setEstadoFiltro(e.target.value)}
+                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #D1D5DB', borderRadius: '10px', backgroundColor: 'white', fontSize: '0.875rem', outline: 'none' }}
+              >
+                <option value="Todos">Todos los Estados</option>
+                <option value="Pendiente">Pendientes</option>
+                <option value="En Proceso">En Proceso</option>
+                <option value="Resuelto">Resueltos</option>
               </select>
             </div>
           </div>
 
-          {/* Fila 2: Busqueda por Termino y Botón Excel */}
-          <div className="form-responsive-grid grid-2" style={{ alignItems: 'end' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
             <div>
-              <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'block', marginBottom: '0.3rem' }}>Buscar Término</label>
-              <input
-                type="text"
-                placeholder="Buscar por jefe de turno, folio, estación o crucero..."
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                style={{ width: '100%', padding: '0.5rem 0.8rem', border: '1px solid #9B9B9A', borderRadius: '8px', boxSizing: 'border-box' }}
-              />
+              <label style={{ fontSize: '0.825rem', fontWeight: '600', color: '#4B5563', display: 'block', marginBottom: '0.35rem' }}>
+                Buscar por Término
+              </label>
+              <div style={{ position: 'relative' }}>
+                <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF', fontSize: '0.85rem' }}></i>
+                <input
+                  type="text"
+                  placeholder="Jefe de turno, folio, estación, crucero o falla..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem 0.6rem 2.3rem', border: '1px solid #D1D5DB', borderRadius: '10px', fontSize: '0.875rem', outline: 'none' }}
+                />
+              </div>
             </div>
-            <div>
-              <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.3rem' }}>
-                <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+                <label style={{ fontSize: '0.8rem', color: '#4B5563', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
                   <input 
                     type="checkbox" 
                     checked={incluirImagenes} 
-                    onChange={(e) => setIncluirImagenes(e.target.checked)} 
+                    onChange={(e) => setIncluirImagenes(e.target.checked)}
+                    style={{ accentColor: '#BC955B' }}
                   />
-                  Incluir imágenes
+                  Incluir fotos en Excel
                 </label>
-                <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.8rem', color: '#4B5563', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
                   <input 
                     type="checkbox" 
                     checked={ordenAscendente} 
-                    onChange={(e) => setOrdenAscendente(e.target.checked)} 
+                    onChange={(e) => setOrdenAscendente(e.target.checked)}
+                    style={{ accentColor: '#BC955B' }}
                   />
-                  Ascendente (ID)
+                  Orden Ascendente
                 </label>
               </div>
-              <button onClick={descargarExcel} style={{ width: '100%', padding: '0.5rem', backgroundColor: '#166534', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '500', cursor: 'pointer' }}>
-                <i className="fa-solid fa-file-excel" style={{ marginRight: '0.4rem' }}></i>Generar Reporte Excel
+
+              <button
+                onClick={descargarExcel}
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 1.15rem',
+                  backgroundColor: '#059669',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: '700',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  boxShadow: '0 3px 10px rgba(5, 150, 105, 0.25)'
+                }}
+              >
+                <i className="fa-solid fa-file-excel"></i> Exportar a Excel
               </button>
             </div>
           </div>
         </div>
 
-        {/* ✅ TABLA */}
-        <div className="overflow-x-auto" style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f9fafb', borderBottom: '1px solid #9B9B9A' }}>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Folio</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Fecha</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Jefe de Turno</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Estación / Crucero</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Equipo</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Tipo de Falla</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Prioridad</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Estado</th>
-                <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', color: '#000000' }}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cargando ? (
-                <tr>
-                  <td colSpan={9} style={{ padding: '2.5rem', textAlign: 'center', color: '#6F7271' }}>
-                    Cargando reportes del servidor...
-                  </td>
+        {/* TABLA DE SEMÁFOROS (RESPONSIVA) */}
+        <div style={{ backgroundColor: 'white', borderRadius: '16px', border: '1px solid #E5E7EB', boxShadow: '0 4px 15px -3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1.5px solid #E5E7EB' }}>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Folio</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Fecha</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Jefe de Turno</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Estación / Crucero</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Tipo de Falla</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Estado</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Acciones</th>
                 </tr>
-              ) : reportesFiltrados.length === 0 ? (
-                <tr>
-                  <td colSpan={9} style={{ padding: '2.5rem', textAlign: 'center', color: '#6F7271' }}>
-                    No se encontraron reportes que coincidan con la búsqueda.
-                  </td>
-                </tr>
-              ) : (
-                reportesFiltrados.map(r => {
-                  const estiloPri = obtenerEstiloPrioridad(r.prioridad)
-                  return (
-                    <tr
-                      key={r.id}
-                      style={{ borderBottom: '1px solid #9B9B9A', transition: 'background 0.2s' }}
-                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                      onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                    >
-                      <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: '500' }}>{formatFolio(r.folio, r.id)}</td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
-                        {r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
-                      </td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem' }}>{r.jefeTurno}</td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem' }}>{r.estacion?.nombre || '—'} / {r.crucero?.nombre || '—'}</td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem' }}>Semáforo</td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem' }}>{r.tipoFalla?.nombre || '—'}</td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
-                        <span style={{
-                          padding: '0.25rem 0.7rem',
-                          borderRadius: '20px',
-                          backgroundColor: estiloPri.bg,
-                          color: estiloPri.color,
-                          fontWeight: '600',
-                          fontSize: '0.8rem',
-                          display: 'inline-block',
-                          minWidth: '70px',
-                          textAlign: 'center'
-                        }}>
-                          {estiloPri.label}
-                        </span>
-                      </td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
-                        <select
-                          value={r.estado}
-                          disabled={r.estado === 'resuelto'}
-                          onChange={(e) => {
-                            const nuevoEstado = e.target.value;
-                            if (nuevoEstado === 'resuelto') {
-                              setConfirmResuelto({ visible: true, id: r.id });
-                            } else {
-                              cambiarEstado(r.id, nuevoEstado);
-                            }
-                          }}
-                          style={{ 
-                            padding: '0.25rem 0.5rem', 
-                            border: '1px solid #9B9B9A', 
-                            borderRadius: '6px', 
-                            backgroundColor: r.estado === 'resuelto' ? '#f1f5f9' : 'white', 
-                            color: r.estado === 'resuelto' ? '#6F7271' : '#000',
-                            fontSize: '0.85rem', 
-                            outline: 'none', 
-                            cursor: r.estado === 'resuelto' ? 'not-allowed' : 'pointer' 
-                          }}
-                        >
-                          <option value="abierto">Pendiente</option>
-                          <option value="en_proceso">En Proceso</option>
-                          <option value="resuelto">Resuelto</option>
-                        </select>
-                      </td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', alignItems: 'center' }}>
-                          <button
-                            onClick={() => setVerDetalle(r)}
-                            title="Ver detalles"
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#BC955B',
-                              cursor: 'pointer',
-                              fontSize: '18px',
-                              padding: '4px'
+              </thead>
+              <tbody>
+                {cargando ? (
+                  <tr>
+                    <td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: '#6B7280' }}>
+                      <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '0.5rem', color: '#BC955B' }}></i>
+                      Cargando reportes de semáforos...
+                    </td>
+                  </tr>
+                ) : reportesFiltrados.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: '#6B7280' }}>
+                      No se encontraron reportes que coincidan con la búsqueda o filtros.
+                    </td>
+                  </tr>
+                ) : (
+                  reportesFiltrados.map(r => {
+                    return (
+                      <tr
+                        key={r.id}
+                        style={{ borderBottom: '1px solid #F3F4F6', transition: 'background-color 0.15s ease' }}
+                        onMouseOver={e => e.currentTarget.style.backgroundColor = '#F9FAFB'}
+                        onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <td style={{ padding: '0.85rem 1rem', fontWeight: '700', color: '#B45309' }}>
+                          {formatFolio(r.folio, r.id)}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', color: '#4B5563', whiteSpace: 'nowrap' }}>
+                          {r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', fontWeight: '600', color: '#111827' }}>
+                          {r.jefe_turno}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>
+                          <div>{r.estacion?.nombre || '—'}</div>
+                          <span style={{ fontSize: '0.775rem', color: '#9CA3AF' }}>{r.crucero?.ubicacion || '—'}</span>
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>{r.tipoFalla?.nombre || '—'}</td>
+                        <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
+                          <select
+                            value={r.estado}
+                            disabled={r.estado === 'resuelto'}
+                            onChange={(e) => {
+                              const nuevoEstado = e.target.value;
+                              if (nuevoEstado === 'resuelto') {
+                                setConfirmResuelto({ visible: true, id: r.id });
+                              } else {
+                                cambiarEstado(r.id, nuevoEstado);
+                              }
+                            }}
+                            style={{ 
+                              padding: '0.35rem 0.6rem', 
+                              border: '1px solid #D1D5DB', 
+                              borderRadius: '8px', 
+                              backgroundColor: r.estado === 'resuelto' ? '#ECFDF5' : r.estado === 'en_proceso' ? '#EFF6FF' : '#FFFBEB', 
+                              color: r.estado === 'resuelto' ? '#065F46' : r.estado === 'en_proceso' ? '#1E40AF' : '#92400E',
+                              fontWeight: '700',
+                              fontSize: '0.8rem', 
+                              outline: 'none', 
+                              cursor: r.estado === 'resuelto' ? 'not-allowed' : 'pointer' 
                             }}
                           >
-                            <FaEye />
-                          </button>
-                          <button
-                            onClick={() => eliminarReporte(r.id)}
-                            title="Eliminar"
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#ef4444',
-                              cursor: 'pointer',
-                              fontSize: '18px',
-                              padding: '4px'
-                            }}
-                          >
-                            <FaTrashAlt />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
+                            <option value="abierto">Pendiente</option>
+                            <option value="en_proceso">En Proceso</option>
+                            <option value="resuelto">Resuelto</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
+                            <button
+                              onClick={() => setVerDetalle(r)}
+                              title="Ver detalles"
+                              style={{
+                                backgroundColor: '#FEF3C7',
+                                color: '#B45309',
+                                border: 'none',
+                                borderRadius: '8px',
+                                width: '34px',
+                                height: '34px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <FaEye size={14} />
+                            </button>
+                            <button
+                              onClick={() => eliminarReporte(r.id)}
+                              title="Eliminar"
+                              style={{
+                                backgroundColor: '#FEE2E2',
+                                color: '#DC2626',
+                                border: 'none',
+                                borderRadius: '8px',
+                                width: '34px',
+                                height: '34px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <FaTrashAlt size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {/* ✅ MODAL DETALLES */}
+        {/* MODAL DE DETALLES DE SEMÁFOROS */}
         {verDetalle && (
-          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
-            <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '12px', width: '90%', maxWidth: '600px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', maxHeight: '90vh', overflowY: 'auto' }}>
-              <h3 style={{ color: '#BC955B', marginBottom: '1.5rem', fontSize: '1.4rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' }}>
-                Detalles del Reporte {formatFolio(verDetalle.folio, verDetalle.id)}
-              </h3>
-              <div className="form-responsive-grid grid-2" style={{ fontSize: '0.95rem', lineHeight: '1.5', color: '#334155' }}>
-                <div><strong>Jefe Turno:</strong> {verDetalle.jefeTurno}</div>
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
+            <div style={{ backgroundColor: 'white', padding: '1.75rem', borderRadius: '16px', width: '90%', maxWidth: '650px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E5E7EB', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
+                <h3 style={{ color: '#BC955B', margin: 0, fontSize: '1.25rem', fontWeight: '800' }}>
+                  Detalles del Reporte {formatFolio(verDetalle.folio, verDetalle.id)}
+                </h3>
+                <button
+                  onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }}
+                  style={{ background: 'none', border: 'none', fontSize: '1.2rem', color: '#6B7280', cursor: 'pointer' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', fontSize: '0.9rem', color: '#374151' }}>
+                <div><strong>Jefe de Turno:</strong> {verDetalle.jefe_turno}</div>
                 <div><strong>Estación:</strong> {verDetalle.estacion?.nombre || '—'}</div>
-                <div><strong>Crucero:</strong> {verDetalle.crucero?.nombre || '—'}</div>
+                <div><strong>Crucero:</strong> {verDetalle.crucero?.ubicacion || '—'}</div>
                 <div><strong>Tipo de Falla:</strong> {verDetalle.tipoFalla?.nombre || '—'}</div>
-                <div><strong>Prioridad:</strong> Alta</div>
+                <div><strong>Hora Estimada:</strong> {verDetalle.hora_dano ? new Date(verDetalle.hora_dano).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</div>
                 <div><strong>Estado:</strong> {obtenerNombreEstado(verDetalle.estado)}</div>
-                <div style={{ gridColumn: '1 / -1' }}><strong>Hora Siniestro:</strong> {new Date(verDetalle.horaDano).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                 <div style={{ gridColumn: '1 / -1' }}><strong>Fecha Registro:</strong> {new Date(verDetalle.createdAt).toLocaleString()}</div>
-                {verDetalle.fechaResolucion && (
-                  <div style={{ gridColumn: '1 / -1' }}><strong>Fecha Resolución:</strong> {new Date(verDetalle.fechaResolucion).toLocaleString()}</div>
-                )}
-                {verDetalle.atendidoPor && (
-                  <div style={{ gridColumn: '1 / -1' }}><strong>Atendido por:</strong> {verDetalle.atendidoPor.nombre} ({verDetalle.atendidoPor.username})</div>
-                )}
+
                 <div style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
-                  <strong>Descripción:</strong>
-                  <div style={{ backgroundColor: '#f8fafc', padding: '0.8rem', borderRadius: '8px', marginTop: '0.4rem', maxHeight: '120px', overflowY: 'auto', border: '1px solid #6F7271', fontSize: '0.9rem', fontStyle: 'italic' }}>
+                  <strong>Observaciones de la Falla:</strong>
+                  <div style={{ backgroundColor: '#F8FAFC', padding: '0.85rem', borderRadius: '10px', marginTop: '0.4rem', maxHeight: '120px', overflowY: 'auto', border: '1px solid #E5E7EB', fontSize: '0.875rem' }}>
                     {verDetalle.descripcion || 'Sin observaciones adicionales.'}
                   </div>
                 </div>
 
-                {/* ✅ IMAGEN DE EVIDENCIA */}
+                {/* EVIDENCIA FOTOGRÁFICA */}
                 {verDetalle.evidencias && verDetalle.evidencias.length > 0 && (
-                  <div style={{ gridColumn: '1 / -1', marginTop: '1.5rem' }}>
-                    <strong style={{ display: 'block', marginBottom: '0.8rem', fontSize: '1.05rem', color: '#1e293b' }}>
+                  <div style={{ gridColumn: '1 / -1', marginTop: '1.25rem' }}>
+                    <strong style={{ display: 'block', marginBottom: '0.75rem', fontSize: '0.95rem', color: '#111827' }}>
                       Evidencia Fotográfica:
                     </strong>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
                       {verDetalle.evidencias.map((ev) => (
                         <div key={ev.id} style={{ 
-                          border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', 
-                          maxWidth: '220px', backgroundColor: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' 
+                          border: '1px solid #E5E7EB', borderRadius: '10px', overflow: 'hidden', 
+                          maxWidth: '200px', backgroundColor: 'white'
                         }}>
                           {ev.mimetype?.startsWith('image/') ? (
                             <a
@@ -547,8 +568,7 @@ export default function DashboardSemaforos() {
                               <img
                                 src={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
                                 alt={ev.filename}
-                                style={{ width: '100%', height: '180px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
-                                onError={(e) => { e.target.style.display = 'none' }}
+                                style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
                               />
                             </a>
                           ) : (
@@ -556,109 +576,126 @@ export default function DashboardSemaforos() {
                               href={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
                               target="_blank"
                               rel="noreferrer"
-                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '180px', gap: '0.5rem', color: '#BC955B', textDecoration: 'none', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '160px', gap: '0.5rem', color: '#BC955B', textDecoration: 'none', backgroundColor: '#F8FAFC' }}
                             >
-                              <i className="fa-solid fa-file-pdf" style={{ fontSize: '2rem' }}></i>
+                              <i className="fa-solid fa-file" style={{ fontSize: '2rem' }}></i>
                             </a>
                           )}
-                          <div style={{ padding: '0.6rem 0.8rem', fontSize: '0.8rem', color: '#64748b', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {ev.filename}
-                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {verDetalle.evidencias && verDetalle.evidencias.length === 0 && (
-                  <div style={{ gridColumn: '1 / -1', marginTop: '1.5rem', color: '#9ca3af', fontSize: '0.9rem', fontStyle: 'italic' }}>
-                    Sin evidencia fotográfica adjunta.
-                  </div>
-                )}
-
-                {/* ✅ PIEZAS ASIGNADAS E INVENTARIO */}
-                <div style={{ gridColumn: '1 / -1', marginTop: '2rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <strong style={{ fontSize: '1.05rem', color: '#1e293b' }}>Componentes Asignados:</strong>
-                    <div 
+                {/* REFACCIONES / PIEZAS ASIGNADAS */}
+                <div style={{ gridColumn: '1 / -1', marginTop: '1.5rem', borderTop: '1px solid #E5E7EB', paddingTop: '1.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+                    <strong style={{ fontSize: '0.95rem', color: '#111827' }}>Piezas / Refacciones Utilizadas:</strong>
+                    <button
+                      type="button"
                       onClick={() => setMostrarInventario(!mostrarInventario)}
-                      style={{ 
-                        width: '46px', height: '24px', backgroundColor: mostrarInventario ? '#BC955B' : '#cbd5e1', 
-                        borderRadius: '12px', position: 'relative', cursor: 'pointer', transition: 'background-color 0.3s' 
+                      style={{
+                        backgroundColor: mostrarInventario ? '#BC955B' : '#F3F4F6',
+                        color: mostrarInventario ? 'white' : '#374151',
+                        border: '1px solid #D1D5DB',
+                        padding: '0.35rem 0.75rem',
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer'
                       }}
                     >
-                      <div style={{ 
-                        width: '20px', height: '20px', backgroundColor: 'white', borderRadius: '50%', 
-                        position: 'absolute', top: '2px', left: mostrarInventario ? '24px' : '2px', 
-                        transition: 'left 0.3s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' 
-                      }} />
-                    </div>
+                      {mostrarInventario ? 'Ocultar Catálogo' : '+ Asignar Pieza'}
+                    </button>
                   </div>
                   
                   {mostrarInventario && (
-                    <div style={{ backgroundColor: '#f1f5f9', padding: '1.2rem', borderRadius: '12px', marginBottom: '1.2rem' }}>
-                      <h4 style={{ margin: '0 0 0.8rem 0', fontSize: '0.9rem', color: '#475569', fontWeight: '600' }}>Inventario Disponible</h4>
-                      <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <div style={{ flex: '1', minWidth: '200px' }}>
-                          <CustomInventorySelect 
+                    <div style={{ backgroundColor: '#F8FAFC', padding: '1rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid #E5E7EB' }}>
+                      <h4 style={{ margin: '0 0 0.65rem 0', fontSize: '0.85rem', color: '#4B5563', fontWeight: '700' }}>Seleccionar del Inventario de Existencias</h4>
+                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <div style={{ flex: '1', minWidth: '180px' }}>
+                          <select
                             value={componenteSeleccionado}
-                            onChange={setComponenteSeleccionado}
-                            inventario={inventario}
-                          />
+                            onChange={(e) => setComponenteSeleccionado(e.target.value)}
+                            style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '0.85rem' }}
+                          >
+                            <option value="">-- Seleccionar pieza --</option>
+                            {inventario.map(p => (
+                              <option key={p.id} value={p.id}>
+                                {p.nombre || p.descripcion} (Disp: {p.cantidad ?? 'N/A'})
+                              </option>
+                            ))}
+                          </select>
                         </div>
-                        <input 
-                          type="number" 
-                          min="1" 
-                          value={cantidadAsignar} 
-                          onChange={e => setCantidadAsignar(Number(e.target.value))}
-                          style={{ width: '70px', padding: '0.7rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', outline: 'none' }} 
+                        <input
+                          type="number"
+                          min="1"
+                          value={cantidadAsignar}
+                          onChange={(e) => setCantidadAsignar(Number(e.target.value))}
+                          style={{ width: '70px', padding: '0.6rem 0.5rem', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '0.85rem' }}
                         />
-                        <button onClick={asignarPieza} style={{ padding: '0.7rem 1.5rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', transition: 'background 0.2s', fontSize: '0.95rem' }} onMouseOver={(e) => e.target.style.backgroundColor = '#0369a1'} onMouseOut={(e) => e.target.style.backgroundColor = '#0284c7'}>
+                        <button
+                          onClick={asignarPieza}
+                          style={{
+                            padding: '0.65rem 1.25rem',
+                            backgroundColor: '#2563EB',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontWeight: '700',
+                            fontSize: '0.875rem'
+                          }}
+                        >
                           Asignar
                         </button>
                       </div>
                     </div>
                   )}
 
-                  {verDetalle.piezasAsignadas && verDetalle.piezasAsignadas.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.8rem' }}>
-                      {verDetalle.piezasAsignadas.map((pieza, idx) => (
-                        <div key={idx} style={{ padding: '0.6rem 1rem', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem', color: '#334155', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                          <span>{pieza.componente?.nombre || 'Desconocido'}</span>
-                          <strong style={{ color: '#64748b' }}>(x{pieza.cantidad})</strong>
+                  {verDetalle.piezasUtilizadas && verDetalle.piezasUtilizadas.length > 0 ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                      {verDetalle.piezasUtilizadas.map((p, idx) => (
+                        <div key={idx} style={{ padding: '0.6rem 0.85rem', backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '10px', fontSize: '0.85rem', color: '#374151', display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontWeight: '700' }}>{p.existencia?.nombre || 'Pieza'}</span>
+                          <span style={{ fontSize: '0.775rem', color: '#6B7280' }}>
+                            Cantidad: {p.cantidad}
+                          </span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div style={{ fontSize: '0.9rem', color: '#94a3b8', fontStyle: 'italic', padding: '0.5rem 0' }}>No hay componentes asignados.</div>
+                    <div style={{ fontSize: '0.85rem', color: '#9CA3AF', fontStyle: 'italic' }}>No se han asignado piezas o refacciones.</div>
                   )}
                 </div>
 
               </div>
-              <button onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }} style={{ marginTop: '2rem', padding: '0.8rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '8px', width: '100%', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s', boxShadow: '0 2px 4px rgba(188, 149, 91, 0.3)' }} onMouseOver={(e) => e.target.style.backgroundColor = '#a07238'} onMouseOut={(e) => e.target.style.backgroundColor = '#BC955B'}>
+
+              <button
+                onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }}
+                style={{ marginTop: '1.5rem', padding: '0.75rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '10px', width: '100%', fontSize: '0.9rem', fontWeight: '700', cursor: 'pointer' }}
+              >
                 Cerrar Detalles
               </button>
             </div>
           </div>
         )}
 
-        {/* ✅ MODAL DE CONFIRMACIÓN DE RESOLUCIÓN */}
+        {/* MODAL DE CONFIRMACIÓN DE RESOLUCIÓN */}
         {confirmResuelto.visible && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-            <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '16px', width: '90%', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', textAlign: 'center', animation: 'fadeIn 0.2s ease-out' }}>
-              <div style={{ backgroundColor: '#fef3c7', color: '#d97706', width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', margin: '0 auto 1.5rem', fontWeight: 'bold' }}>
+            <div style={{ backgroundColor: 'white', padding: '1.75rem', borderRadius: '16px', width: '90%', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', textAlign: 'center' }}>
+              <div style={{ backgroundColor: '#FEF3C7', color: '#D97706', width: '54px', height: '54px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', margin: '0 auto 1.25rem', fontWeight: 'bold' }}>
                 ?
               </div>
-              <h3 style={{ color: '#1e293b', marginBottom: '0.8rem', fontSize: '1.3rem', fontWeight: 'bold' }}>¿Confirmar Resolución?</h3>
-              <p style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: '2rem', lineHeight: '1.5' }}>
+              <h3 style={{ color: '#111827', marginBottom: '0.75rem', fontSize: '1.2rem', fontWeight: '800' }}>¿Confirmar Resolución?</h3>
+              <p style={{ color: '#6B7280', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.5' }}>
                 Una vez marcado como <strong>Resuelto</strong>, no podrás volver a cambiar el estado de este reporte.
               </p>
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', gap: '0.85rem', justifyContent: 'center' }}>
                 <button 
                   onClick={() => setConfirmResuelto({ visible: false, id: null })} 
-                  style={{ flex: 1, padding: '0.7rem', backgroundColor: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' }}
-                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
-                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                  style={{ flex: 1, padding: '0.65rem', backgroundColor: '#F3F4F6', color: '#374151', border: '1px solid #D1D5DB', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
                 >
                   Cancelar
                 </button>
@@ -667,9 +704,7 @@ export default function DashboardSemaforos() {
                     cambiarEstado(confirmResuelto.id, 'resuelto');
                     setConfirmResuelto({ visible: false, id: null });
                   }} 
-                  style={{ flex: 1, padding: '0.7rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' }}
-                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#a07238'}
-                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#BC955B'}
+                  style={{ flex: 1, padding: '0.65rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
                 >
                   Aceptar
                 </button>
@@ -682,162 +717,3 @@ export default function DashboardSemaforos() {
     </div>
   )
 }
-
-// Componente Customizado para el Inventario
-const CustomInventorySelect = ({ value, onChange, inventario }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const [hoveredCategory, setHoveredCategory] = useState(null);
-  const selectRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (selectRef.current && !selectRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen]);
-
-  const selectedOption = inventario.find(o => o.id === Number(value));
-
-  const filteredOptions = inventario.filter(o =>
-    o.nombre.toLowerCase().includes(search.toLowerCase()) ||
-    (o.categoria && o.categoria.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  const gruposOpciones = inventario.reduce((acc, curr) => {
-    const group = curr.categoria || 'Sin Categoría';
-    if (!acc[group]) acc[group] = [];
-    acc[group].push(curr);
-    return acc;
-  }, {});
-
-  return (
-    <div ref={selectRef} style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-      <div
-        onClick={() => setIsOpen(!isOpen)}
-        style={{
-          padding: '0.7rem 1.2rem', border: isOpen ? '1.5px solid #0284c7' : '1px solid #cbd5e1', 
-          borderRadius: '8px', fontSize: '0.95rem', backgroundColor: 'white', 
-          cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem',
-          transition: 'all 0.2s', boxShadow: isOpen ? '0 0 0 3px rgba(2, 132, 199, 0.1)' : 'none'
-        }}
-      >
-        <span>
-          {selectedOption ? (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b', fontWeight: '500' }}>
-               {selectedOption.nombre}
-            </span>
-          ) : (
-            <span style={{ color: '#64748b', fontWeight: '400' }}>-- Seleccionar componente --</span>
-          )}
-        </span>
-        <FaChevronRight size={12} style={{ transform: isOpen ? 'rotate(-90deg)' : 'rotate(90deg)', transition: '0.2s', color: '#64748b' }} />
-      </div>
-
-      {isOpen && (
-        <>
-          <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 -4px 20px rgba(0,0,0,0.12)', zIndex: 50, border: '1px solid #e2e8f0', overflow: 'hidden', width: '100%', minWidth: '320px' }}>
-            <div style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
-              <input
-                type="text"
-                placeholder="Buscar componente..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                autoFocus
-                style={{ width: '100%', padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.9rem' }}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-
-            <div style={{ display: 'flex', height: '240px' }}>
-              {search ? (
-                <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto', overscrollBehavior: 'contain' }}>
-                  {filteredOptions.length > 0 ? filteredOptions.map(opcion => (
-                    <div
-                      key={opcion.id}
-                      onClick={() => { if(opcion.cantidad > 0) { onChange(opcion.id); setIsOpen(false); setSearch(''); } }}
-                      style={{ padding: '0.7rem 1rem', cursor: opcion.cantidad > 0 ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', transition: 'background-color 0.15s', backgroundColor: value === opcion.id ? '#fdf2f8' : 'transparent', opacity: opcion.cantidad > 0 ? 1 : 0.5 }}
-                      onMouseOver={e => { if(opcion.cantidad > 0) e.currentTarget.style.backgroundColor = '#f1f5f9' }}
-                      onMouseOut={e => { if(opcion.cantidad > 0) e.currentTarget.style.backgroundColor = value === opcion.id ? '#fdf2f8' : 'transparent' }}
-                    >
-                      <FaCogs color={opcion.cantidad > 0 ? "#691B31" : "#94a3b8"} size={16} />
-                      <span style={{ fontWeight: '500', color: '#334155' }}>{opcion.nombre} <small style={{color: '#64748b'}}>(x{opcion.cantidad})</small></span>
-                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginLeft: 'auto', backgroundColor: '#e2e8f0', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>{opcion.categoria}</span>
-                    </div>
-                  )) : (
-                    <div style={{ padding: '2rem', color: '#64748b', textAlign: 'center' }}>
-                      No se encontraron componentes para "{search}"
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <div style={{ width: '45%', borderRight: '1px solid #e2e8f0', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#ffffff', overscrollBehavior: 'contain' }}>
-                    {Object.keys(gruposOpciones).map((group) => (
-                      <div
-                        key={group}
-                        onMouseEnter={() => setHoveredCategory(group)}
-                        style={{
-                          padding: '0.75rem 0.85rem',
-                          cursor: 'pointer',
-                          borderRadius: '8px',
-                          fontWeight: '600',
-                          fontSize: '0.85rem',
-                          color: hoveredCategory === group ? '#691B31' : '#475569',
-                          backgroundColor: hoveredCategory === group ? '#fdf2f8' : 'transparent',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: '0.2rem',
-                          transition: 'background-color 0.2s, color 0.2s'
-                        }}
-                      >
-                        {group} <FaChevronRight size={9} style={{ opacity: hoveredCategory === group ? 1 : 0.3 }} />
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ width: '55%', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#f8fafc', overscrollBehavior: 'contain' }}>
-                    {hoveredCategory ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                        <div style={{ padding: '0.4rem 0.75rem', fontSize: '0.7rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          {hoveredCategory}
-                        </div>
-                        {gruposOpciones[hoveredCategory].map(opcion => (
-                          <div
-                            key={opcion.id}
-                            onClick={() => { if(opcion.cantidad > 0) { onChange(opcion.id); setIsOpen(false); setSearch(''); } }}
-                            style={{ padding: '0.65rem 0.85rem', cursor: opcion.cantidad > 0 ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: '0.65rem', borderRadius: '8px', transition: 'background-color 0.15s', backgroundColor: value === opcion.id ? '#fdf2f8' : 'transparent', opacity: opcion.cantidad > 0 ? 1 : 0.5 }}
-                            onMouseOver={e => { if(opcion.cantidad > 0) e.currentTarget.style.backgroundColor = '#e2e8f0'; }}
-                            onMouseOut={e => { if(opcion.cantidad > 0) e.currentTarget.style.backgroundColor = value === opcion.id ? '#fdf2f8' : 'transparent'; }}
-                          >
-                            <FaCogs color={value === opcion.id ? '#691B31' : '#64748b'} size={15} />
-                            <span style={{ fontSize: '0.9rem', fontWeight: '500', color: value === opcion.id ? '#691B31' : '#475569' }}>
-                              {opcion.nombre} <small style={{color: '#64748b'}}>(x{opcion.cantidad})</small>
-                            </span>
-                            {value === opcion.id && <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#691B31', fontWeight: '700' }}>✓</span>}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-                        <FaCogs size={28} color="#cbd5e1" />
-                        Pasa el cursor sobre una categoría
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-};

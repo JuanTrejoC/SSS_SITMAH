@@ -1,11 +1,10 @@
+// src/views/DashboardOficinas.jsx
 import { useState, useEffect, useRef } from 'react'
 import { FaEye, FaTrashAlt, FaChevronRight, FaCogs } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { formatFolio } from '../utils/formatFolio'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config'
-
-
 
 export default function DashboardOficinas() {
   const { user } = useAuth()
@@ -224,13 +223,13 @@ export default function DashboardOficinas() {
   const obtenerEstiloPrioridad = (prioridad) => {
     switch (prioridad?.toLowerCase()) {
       case 'baja':
-        return { bg: '#fef08a', color: '#854d0e', label: 'Baja' }
+        return { bg: '#FEF9C3', color: '#854D0E', label: 'Baja' }
       case 'media':
-        return { bg: '#fdba74', color: '#92400e', label: 'Media' }
+        return { bg: '#FFEDD5', color: '#9A3412', label: 'Media' }
       case 'alta':
-        return { bg: '#fca5a5', color: '#991b1b', label: 'Alta' }
+        return { bg: '#FEE2E2', color: '#991B1B', label: 'Alta' }
       default:
-        return { bg: '#f3f4f6', color: '#fef08a', label: prioridad || 'N/A' }
+        return { bg: '#F3F4F6', color: '#4B5563', label: prioridad || 'N/A' }
     }
   }
 
@@ -244,28 +243,36 @@ export default function DashboardOficinas() {
   }
 
   return (
-    <div className="main-content-padding" style={{ backgroundColor: '#f8fafc', minHeight: '100vh' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="main-content-padding" style={{ backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '3rem' }}>
+      <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-        {/* ✅ ENCABEZADO CON TABS DE NAVEGACIÓN */}
-        <div className="responsive-flex" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <h1 style={{ color: '#BC955B', fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>
-            <i className="fa-solid fa-building" style={{ marginRight: '0.5rem' }}></i> Panel de Reportes - Oficinas
-          </h1>
-          <div style={{ display: 'flex', gap: '0.5rem', backgroundColor: 'white', padding: '0.4rem', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+        {/* ENCABEZADO CON SWITCHER DE MODULOS */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h1 style={{ color: '#691B31', fontSize: 'clamp(1.3rem, 3vw, 1.85rem)', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <i className="fa-solid fa-building"></i> Panel de Reportes · Oficinas
+            </h1>
+            <p style={{ color: '#6B7280', margin: '0.25rem 0 0 0', fontSize: '0.9rem' }}>
+              Gestión centralizada de solicitudes de servicio e incidencias técnicas en sedes y áreas.
+            </p>
+          </div>
+
+          {/* Switcher Tabs */}
+          <div style={{ display: 'flex', gap: '0.35rem', backgroundColor: '#E2E8F0', padding: '0.35rem', borderRadius: '12px' }}>
             <button
               style={{
-                padding: '0.5rem 1.2rem',
-                borderRadius: '8px',
+                padding: '0.55rem 1.25rem',
+                borderRadius: '9px',
                 border: 'none',
                 backgroundColor: '#691B31',
                 color: 'white',
-                fontWeight: '600',
-                fontSize: '0.9rem',
+                fontWeight: '700',
+                fontSize: '0.875rem',
                 cursor: 'default',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.4rem'
+                gap: '0.45rem',
+                boxShadow: '0 2px 6px rgba(105,27,49,0.25)'
               }}
             >
               <i className="fa-solid fa-building"></i> Oficinas
@@ -273,34 +280,35 @@ export default function DashboardOficinas() {
             <button
               onClick={() => navigate('/dashboard-semaforos')}
               style={{
-                padding: '0.5rem 1.2rem',
-                borderRadius: '8px',
+                padding: '0.55rem 1.25rem',
+                borderRadius: '9px',
                 border: 'none',
                 backgroundColor: 'transparent',
-                color: '#6F7271',
-                fontWeight: '500',
-                fontSize: '0.9rem',
+                color: '#4B5563',
+                fontWeight: '600',
+                fontSize: '0.875rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.4rem',
-                transition: 'background 0.2s, color 0.2s'
+                gap: '0.45rem',
+                transition: 'all 0.2s ease'
               }}
-              onMouseOver={e => { e.currentTarget.style.backgroundColor = '#f1f5f9'; e.currentTarget.style.color = '#691B31' }}
-              onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#6F7271' }}
+              onMouseOver={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#691B31' }}
+              onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#4B5563' }}
             >
               <i className="fa-solid fa-traffic-light"></i> Semáforos
             </button>
           </div>
         </div>
 
-        {/* ✅ BARRA DE FILTROS */}
-        <div style={{ backgroundColor: 'white', padding: '1.2rem', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', marginBottom: '2rem' }}>
-          {/* Fila 1:  filtros de estado/prioridad y mes/año */}
-          <div className="form-responsive-grid grid-3" style={{ marginBottom: '1rem' }}>
+        {/* BARRA DE FILTROS Y BÚSQUEDA */}
+        <div style={{ backgroundColor: 'white', padding: '1.35rem', borderRadius: '16px', border: '1px solid #E5E7EB', boxShadow: '0 4px 15px -3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          
+          {/* Fila 1: Filtros dropdown */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             <div>
-              <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'block', marginBottom: '0.3rem' }}>
-                <i className="fa-solid fa-calendar-days" style={{ marginRight: '0.3rem' }}></i>Mes y Año
+              <label style={{ fontSize: '0.825rem', fontWeight: '600', color: '#4B5563', display: 'block', marginBottom: '0.35rem' }}>
+                <i className="fa-solid fa-calendar-days" style={{ marginRight: '0.35rem', color: '#BC955B' }}></i> Mes y Año
               </label>
               <input
                 type="month"
@@ -317,205 +325,272 @@ export default function DashboardOficinas() {
                     setMesFiltro('');
                   }
                 }}
-                style={{ width: '100%', padding: '0.5rem 0.8rem', border: '1px solid #9B9B9A', borderRadius: '8px', backgroundColor: 'white', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #D1D5DB', borderRadius: '10px', backgroundColor: 'white', fontSize: '0.875rem', outline: 'none' }}
               />
             </div>
+
             <div>
-              <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'block', marginBottom: '0.3rem' }}>Estado</label>
-              <select value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.8rem', border: '1px solid #9B9B9A', borderRadius: '8px', backgroundColor: 'white' }}>
-                <option>Todos</option>
-                <option>Pendiente</option>
-                <option>En Proceso</option>
-                <option>Resuelto</option>
+              <label style={{ fontSize: '0.825rem', fontWeight: '600', color: '#4B5563', display: 'block', marginBottom: '0.35rem' }}>
+                Estado del Reporte
+              </label>
+              <select
+                value={estadoFiltro}
+                onChange={(e) => setEstadoFiltro(e.target.value)}
+                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #D1D5DB', borderRadius: '10px', backgroundColor: 'white', fontSize: '0.875rem', outline: 'none' }}
+              >
+                <option value="Todos">Todos los Estados</option>
+                <option value="Pendiente">Pendientes</option>
+                <option value="En Proceso">En Proceso</option>
+                <option value="Resuelto">Resueltos</option>
               </select>
             </div>
+
             <div>
-              <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'block', marginBottom: '0.3rem' }}>Prioridad</label>
-              <select value={prioridadFiltro} onChange={(e) => setPrioridadFiltro(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.8rem', border: '1px solid #9B9B9A', borderRadius: '8px', backgroundColor: 'white' }}>
-                <option>Todas</option>
-                <option>Baja</option>
-                <option>Media</option>
-                <option>Alta</option>
+              <label style={{ fontSize: '0.825rem', fontWeight: '600', color: '#4B5563', display: 'block', marginBottom: '0.35rem' }}>
+                Prioridad
+              </label>
+              <select
+                value={prioridadFiltro}
+                onChange={(e) => setPrioridadFiltro(e.target.value)}
+                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #D1D5DB', borderRadius: '10px', backgroundColor: 'white', fontSize: '0.875rem', outline: 'none' }}
+              >
+                <option value="Todas">Todas las Prioridades</option>
+                <option value="Baja">Baja</option>
+                <option value="Media">Media</option>
+                <option value="Alta">Alta</option>
               </select>
             </div>
           </div>
 
-          {/* Fila 2: Busqueta por Termino y Botón Excel */}
-          <div className="form-responsive-grid grid-2" style={{ alignItems: 'end' }}>
+          {/* Fila 2: Búsqueda y Descarga Excel */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
             <div>
-              <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'block', marginBottom: '0.3rem' }}>Buscar Término</label>
-              <input
-                type="text"
-                placeholder="Buscar por solicitante, folio, área, sede o equipo..."
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                style={{ width: '100%', padding: '0.5rem 0.8rem', border: '1px solid #9B9B9A', borderRadius: '8px', boxSizing: 'border-box' }}
-              />
+              <label style={{ fontSize: '0.825rem', fontWeight: '600', color: '#4B5563', display: 'block', marginBottom: '0.35rem' }}>
+                Buscar por Término
+              </label>
+              <div style={{ position: 'relative' }}>
+                <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF', fontSize: '0.85rem' }}></i>
+                <input
+                  type="text"
+                  placeholder="Solicitante, folio, área, sede o equipo..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem 0.6rem 2.3rem', border: '1px solid #D1D5DB', borderRadius: '10px', fontSize: '0.875rem', outline: 'none' }}
+                />
+              </div>
             </div>
-            <div>
-              <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.3rem' }}>
-                <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+                <label style={{ fontSize: '0.8rem', color: '#4B5563', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
                   <input 
                     type="checkbox" 
                     checked={incluirImagenes} 
-                    onChange={(e) => setIncluirImagenes(e.target.checked)} 
+                    onChange={(e) => setIncluirImagenes(e.target.checked)}
+                    style={{ accentColor: '#691B31' }}
                   />
-                  Incluir imágenes
+                  Incluir fotos en Excel
                 </label>
-                <label style={{ fontSize: '0.8rem', color: '#6F7271', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.8rem', color: '#4B5563', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
                   <input 
                     type="checkbox" 
                     checked={ordenAscendente} 
-                    onChange={(e) => setOrdenAscendente(e.target.checked)} 
+                    onChange={(e) => setOrdenAscendente(e.target.checked)}
+                    style={{ accentColor: '#691B31' }}
                   />
-                  Ascendente (ID)
+                  Orden Ascendente
                 </label>
               </div>
-              <button onClick={descargarExcel} style={{ width: '100%', padding: '0.5rem', backgroundColor: '#166534', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '500', cursor: 'pointer' }}>
-                <i className="fa-solid fa-file-excel" style={{ marginRight: '0.4rem' }}></i>Generar Reporte Excel
+
+              <button
+                onClick={descargarExcel}
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 1.15rem',
+                  backgroundColor: '#059669',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: '700',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  boxShadow: '0 3px 10px rgba(5, 150, 105, 0.25)'
+                }}
+              >
+                <i className="fa-solid fa-file-excel"></i> Exportar a Excel
               </button>
             </div>
           </div>
         </div>
 
-        {/* ✅ TABLA */}
-        <div className="overflow-x-auto" style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f9fafb', borderBottom: '0.5px solid #9B9B9A' }}>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Folio</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Fecha</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Solicitante</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Área / Sede</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Equipo</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Categoría</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Prioridad</th>
-                <th style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', color: '#000000' }}>Estado</th>
-                <th style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', color: '#000000' }}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cargando ? (
-                <tr>
-                  <td colSpan={9} style={{ padding: '2.5rem', textAlign: 'center', color: '#9B9B9A' }}>
-                    Cargando reportes del servidor...
-                  </td>
+        {/* VISTA DE TABLA (RESPONSIVA) */}
+        <div style={{ backgroundColor: 'white', borderRadius: '16px', border: '1px solid #E5E7EB', boxShadow: '0 4px 15px -3px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px', fontSize: '0.9rem' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1.5px solid #E5E7EB' }}>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Folio</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Fecha</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Solicitante</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Área / Sede</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Equipo</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Categoría</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Prioridad</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Estado</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Acciones</th>
                 </tr>
-              ) : reportesFiltrados.length === 0 ? (
-                <tr>
-                  <td colSpan={9} style={{ padding: '2.5rem', textAlign: 'center', color: '#9B9B9A' }}>
-                    No se encontraron reportes que coincidan con la búsqueda.
-                  </td>
-                </tr>
-              ) : (
-                reportesFiltrados.map(r => {
-                  const estiloPri = obtenerEstiloPrioridad(r.prioridad)
-                  return (
-                    <tr
-                      key={r.id}
-                      style={{ borderBottom: '1px solid #9B9B9A', transition: 'background 0.2s' }}
-                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                      onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                    >
-                      <td style={{ padding: '1rem', fontSize: '0.9rem', fontWeight: '500' }}>{formatFolio(r.folio, r.id)}</td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
-                        {r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
-                      </td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem' }}>{r.solicitante}</td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem' }}>{r.area?.nombre || '—'} / {r.sede?.nombre || '—'}</td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem' }}>{r.equipo || '—'}</td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem' }}>{r.categoria?.nombre || '—'}</td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
-                        <span style={{
-                          padding: '0.25rem 0.7rem',
-                          borderRadius: '20px',
-                          backgroundColor: estiloPri.bg,
-                          color: estiloPri.color,
-                          fontWeight: '600',
-                          fontSize: '0.8rem',
-                          display: 'inline-block',
-                          minWidth: '70px',
-                          textAlign: 'center'
-                        }}>
-                          {estiloPri.label}
-                        </span>
-                      </td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem' }}>
-                        <select
-                          value={r.estado}
-                          disabled={r.estado === 'resuelto'}
-                          onChange={(e) => {
-                            const nuevoEstado = e.target.value;
-                            if (nuevoEstado === 'resuelto') {
-                              setConfirmResuelto({ visible: true, id: r.id });
-                            } else {
-                              cambiarEstado(r.id, nuevoEstado);
-                            }
-                          }}
-                          style={{ 
-                            padding: '0.25rem 0.5rem', 
-                            border: '1px solid #9B9B9A', 
-                            borderRadius: '6px', 
-                            backgroundColor: r.estado === 'resuelto' ? '#f1f5f9' : 'white', 
-                            color: r.estado === 'resuelto' ? '#6F7271' : '#000',
-                            fontSize: '0.85rem', 
-                            outline: 'none', 
-                            cursor: r.estado === 'resuelto' ? 'not-allowed' : 'pointer' 
-                          }}
-                        >
-                          <option value="abierto">Pendiente</option>
-                          <option value="en_proceso">En Proceso</option>
-                          <option value="resuelto">Resuelto</option>
-                        </select>
-                      </td>
-                      <td style={{ padding: '1rem', fontSize: '0.9rem', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', alignItems: 'center' }}>
-                          <button
-                            onClick={() => setVerDetalle(r)}
-                            title="Ver detalles"
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#BC955B',
-                              cursor: 'pointer',
-                              fontSize: '18px',
-                              padding: '4px'
+              </thead>
+              <tbody>
+                {cargando ? (
+                  <tr>
+                    <td colSpan={9} style={{ padding: '3rem', textAlign: 'center', color: '#6B7280' }}>
+                      <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '0.5rem', color: '#691B31' }}></i>
+                      Cargando reportes del servidor...
+                    </td>
+                  </tr>
+                ) : reportesFiltrados.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} style={{ padding: '3rem', textAlign: 'center', color: '#6B7280' }}>
+                      No se encontraron reportes que coincidan con la búsqueda o filtros.
+                    </td>
+                  </tr>
+                ) : (
+                  reportesFiltrados.map(r => {
+                    const estiloPri = obtenerEstiloPrioridad(r.prioridad)
+                    return (
+                      <tr
+                        key={r.id}
+                        style={{ borderBottom: '1px solid #F3F4F6', transition: 'background-color 0.15s ease' }}
+                        onMouseOver={e => e.currentTarget.style.backgroundColor = '#F9FAFB'}
+                        onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <td style={{ padding: '0.85rem 1rem', fontWeight: '700', color: '#691B31' }}>
+                          {formatFolio(r.folio, r.id)}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', color: '#4B5563', whiteSpace: 'nowrap' }}>
+                          {r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', fontWeight: '600', color: '#111827' }}>
+                          {r.solicitante}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>
+                          <div>{r.area?.nombre || '—'}</div>
+                          <span style={{ fontSize: '0.775rem', color: '#9CA3AF' }}>{r.sede?.nombre || '—'}</span>
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>{r.equipo || '—'}</td>
+                        <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>{r.categoria?.nombre || '—'}</td>
+                        <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '0.25rem 0.65rem',
+                            borderRadius: '12px',
+                            backgroundColor: estiloPri.bg,
+                            color: estiloPri.color,
+                            fontWeight: '700',
+                            fontSize: '0.775rem',
+                            display: 'inline-block'
+                          }}>
+                            {estiloPri.label}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
+                          <select
+                            value={r.estado}
+                            disabled={r.estado === 'resuelto'}
+                            onChange={(e) => {
+                              const nuevoEstado = e.target.value;
+                              if (nuevoEstado === 'resuelto') {
+                                setConfirmResuelto({ visible: true, id: r.id });
+                              } else {
+                                cambiarEstado(r.id, nuevoEstado);
+                              }
+                            }}
+                            style={{ 
+                              padding: '0.35rem 0.6rem', 
+                              border: '1px solid #D1D5DB', 
+                              borderRadius: '8px', 
+                              backgroundColor: r.estado === 'resuelto' ? '#ECFDF5' : r.estado === 'en_proceso' ? '#EFF6FF' : '#FFFBEB', 
+                              color: r.estado === 'resuelto' ? '#065F46' : r.estado === 'en_proceso' ? '#1E40AF' : '#92400E',
+                              fontWeight: '700',
+                              fontSize: '0.8rem', 
+                              outline: 'none', 
+                              cursor: r.estado === 'resuelto' ? 'not-allowed' : 'pointer' 
                             }}
                           >
-                            <FaEye />
-                          </button>
-                          <button
-                            onClick={() => eliminarReporte(r.id)}
-                            title="Eliminar"
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#ef4444',
-                              cursor: 'pointer',
-                              fontSize: '18px',
-                              padding: '4px'
-                            }}
-                          >
-                            <FaTrashAlt />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
+                            <option value="abierto">Pendiente</option>
+                            <option value="en_proceso">En Proceso</option>
+                            <option value="resuelto">Resuelto</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
+                            <button
+                              onClick={() => setVerDetalle(r)}
+                              title="Ver detalles"
+                              style={{
+                                backgroundColor: '#FEF3C7',
+                                color: '#B45309',
+                                border: 'none',
+                                borderRadius: '8px',
+                                width: '34px',
+                                height: '34px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <FaEye size={14} />
+                            </button>
+                            <button
+                              onClick={() => eliminarReporte(r.id)}
+                              title="Eliminar"
+                              style={{
+                                backgroundColor: '#FEE2E2',
+                                color: '#DC2626',
+                                border: 'none',
+                                borderRadius: '8px',
+                                width: '34px',
+                                height: '34px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              <FaTrashAlt size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {/* ✅ MODAL DE DETALLES */}
+        {/* MODAL DE DETALLES */}
         {verDetalle && (
-          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
-            <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '12px', width: '90%', maxWidth: '600px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', maxHeight: '90vh', overflowY: 'auto' }}>
-              <h3 style={{ color: '#BC955B', marginBottom: '1.5rem', fontSize: '1.4rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.5rem' }}>
-                Detalles del Reporte {formatFolio(verDetalle.folio, verDetalle.id)}
-              </h3>
-              <div className="form-responsive-grid grid-2" style={{ fontSize: '0.95rem', lineHeight: '1.5', color: '#334155' }}>
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '1rem' }}>
+            <div style={{ backgroundColor: 'white', padding: '1.75rem', borderRadius: '16px', width: '90%', maxWidth: '650px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', maxHeight: '90vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E5E7EB', paddingBottom: '0.85rem', marginBottom: '1.25rem' }}>
+                <h3 style={{ color: '#691B31', margin: 0, fontSize: '1.25rem', fontWeight: '800' }}>
+                  Detalles del Reporte {formatFolio(verDetalle.folio, verDetalle.id)}
+                </h3>
+                <button
+                  onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }}
+                  style={{ background: 'none', border: 'none', fontSize: '1.2rem', color: '#6B7280', cursor: 'pointer' }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', fontSize: '0.9rem', color: '#374151' }}>
                 <div><strong>Solicitante:</strong> {verDetalle.solicitante}</div>
                 <div><strong>Cargo:</strong> {verDetalle.cargo || '—'}</div>
                 <div><strong>Correo:</strong> {verDetalle.email}</div>
@@ -524,7 +599,7 @@ export default function DashboardOficinas() {
                 <div><strong>Sede:</strong> {verDetalle.sede?.nombre || '—'}</div>
                 <div><strong>Equipo:</strong> {verDetalle.equipo || '—'}</div>
                 <div><strong>Categoría:</strong> {verDetalle.categoria?.nombre || '—'}</div>
-                <div><strong>Prioridad:</strong> <span style={{ textTransform: 'capitalize' }}>{verDetalle.prioridad}</span></div>
+                <div><strong>Prioridad:</strong> <span style={{ textTransform: 'capitalize', fontWeight: '700' }}>{verDetalle.prioridad}</span></div>
                 <div><strong>Estado:</strong> {obtenerNombreEstado(verDetalle.estado)}</div>
                 <div style={{ gridColumn: '1 / -1' }}><strong>Fecha Registro:</strong> {new Date(verDetalle.createdAt).toLocaleString()}</div>
                 {verDetalle.fechaResolucion && (
@@ -535,22 +610,22 @@ export default function DashboardOficinas() {
                 )}
                 <div style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
                   <strong>Descripción del Incidente:</strong>
-                  <div style={{ backgroundColor: '#f8fafc', padding: '0.8rem', borderRadius: '8px', marginTop: '0.4rem', maxHeight: '120px', overflowY: 'auto', border: '1px solid #6F7271', fontSize: '0.9rem', fontStyle: 'italic' }}>
+                  <div style={{ backgroundColor: '#F8FAFC', padding: '0.85rem', borderRadius: '10px', marginTop: '0.4rem', maxHeight: '120px', overflowY: 'auto', border: '1px solid #E5E7EB', fontSize: '0.875rem' }}>
                     {verDetalle.descripcion || 'Sin descripción detallada.'}
                   </div>
                 </div>
 
-                {/* ✅ IMAGEN DE EVIDENCIA */}
+                {/* EVIDENCIA FOTOGRÁFICA */}
                 {verDetalle.evidencias && verDetalle.evidencias.length > 0 && (
-                  <div style={{ gridColumn: '1 / -1', marginTop: '1.5rem' }}>
-                    <strong style={{ display: 'block', marginBottom: '0.8rem', fontSize: '1.05rem', color: '#1e293b' }}>
+                  <div style={{ gridColumn: '1 / -1', marginTop: '1.25rem' }}>
+                    <strong style={{ display: 'block', marginBottom: '0.75rem', fontSize: '0.95rem', color: '#111827' }}>
                       Evidencia Fotográfica:
                     </strong>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
                       {verDetalle.evidencias.map((ev) => (
                         <div key={ev.id} style={{ 
-                          border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', 
-                          maxWidth: '220px', backgroundColor: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' 
+                          border: '1px solid #E5E7EB', borderRadius: '10px', overflow: 'hidden', 
+                          maxWidth: '200px', backgroundColor: 'white'
                         }}>
                           {ev.mimetype?.startsWith('image/') ? (
                             <a
@@ -561,8 +636,7 @@ export default function DashboardOficinas() {
                               <img
                                 src={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
                                 alt={ev.filename}
-                                style={{ width: '100%', height: '180px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
-                                onError={(e) => { e.target.style.display = 'none' }}
+                                style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
                               />
                             </a>
                           ) : (
@@ -570,49 +644,43 @@ export default function DashboardOficinas() {
                               href={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
                               target="_blank"
                               rel="noreferrer"
-                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '180px', gap: '0.5rem', color: '#BC955B', textDecoration: 'none', fontSize: '0.9rem', backgroundColor: '#f8fafc' }}
+                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '160px', gap: '0.5rem', color: '#BC955B', textDecoration: 'none', backgroundColor: '#F8FAFC' }}
                             >
                               <i className="fa-solid fa-file-pdf" style={{ fontSize: '2rem' }}></i>
                             </a>
                           )}
-                          <div style={{ padding: '0.6rem 0.8rem', fontSize: '0.8rem', color: '#64748b', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {ev.filename}
-                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {verDetalle.evidencias && verDetalle.evidencias.length === 0 && (
-                  <div style={{ gridColumn: '1 / -1', marginTop: '1.5rem', color: '#9ca3af', fontSize: '0.9rem', fontStyle: 'italic' }}>
-                    Sin evidencia fotográfica adjunta.
-                  </div>
-                )}
-
-                {/* ✅ EQUIPOS ASIGNADOS E INVENTARIO */}
-                <div style={{ gridColumn: '1 / -1', marginTop: '2rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                    <strong style={{ fontSize: '1.05rem', color: '#1e293b' }}>Equipos Asignados:</strong>
-                    <div 
+                {/* EQUIPOS ASIGNADOS E INVENTARIO */}
+                <div style={{ gridColumn: '1 / -1', marginTop: '1.5rem', borderTop: '1px solid #E5E7EB', paddingTop: '1.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+                    <strong style={{ fontSize: '0.95rem', color: '#111827' }}>Equipos Asignados:</strong>
+                    <button
+                      type="button"
                       onClick={() => setMostrarInventario(!mostrarInventario)}
-                      style={{ 
-                        width: '46px', height: '24px', backgroundColor: mostrarInventario ? '#BC955B' : '#cbd5e1', 
-                        borderRadius: '12px', position: 'relative', cursor: 'pointer', transition: 'background-color 0.3s' 
+                      style={{
+                        backgroundColor: mostrarInventario ? '#691B31' : '#F3F4F6',
+                        color: mostrarInventario ? 'white' : '#374151',
+                        border: '1px solid #D1D5DB',
+                        padding: '0.35rem 0.75rem',
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer'
                       }}
                     >
-                      <div style={{ 
-                        width: '20px', height: '20px', backgroundColor: 'white', borderRadius: '50%', 
-                        position: 'absolute', top: '2px', left: mostrarInventario ? '24px' : '2px', 
-                        transition: 'left 0.3s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' 
-                      }} />
-                    </div>
+                      {mostrarInventario ? 'Ocultar Inventario' : '+ Asignar Equipo'}
+                    </button>
                   </div>
                   
                   {mostrarInventario && (
-                    <div style={{ backgroundColor: '#f1f5f9', padding: '1.2rem', borderRadius: '12px', marginBottom: '1.2rem' }}>
-                      <h4 style={{ margin: '0 0 0.8rem 0', fontSize: '0.9rem', color: '#475569', fontWeight: '600' }}>Inventario Tecnológico</h4>
-                      <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ backgroundColor: '#F8FAFC', padding: '1rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid #E5E7EB' }}>
+                      <h4 style={{ margin: '0 0 0.65rem 0', fontSize: '0.85rem', color: '#4B5563', fontWeight: '700' }}>Seleccionar del Inventario Tecnológico</h4>
+                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                         <div style={{ flex: '1', minWidth: '200px' }}>
                           <CustomInventorySelect 
                             value={componenteSeleccionado}
@@ -620,7 +688,19 @@ export default function DashboardOficinas() {
                             inventario={inventario}
                           />
                         </div>
-                        <button onClick={asignarEquipo} style={{ padding: '0.7rem 1.5rem', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', transition: 'background 0.2s', fontSize: '0.95rem' }} onMouseOver={(e) => e.target.style.backgroundColor = '#0369a1'} onMouseOut={(e) => e.target.style.backgroundColor = '#0284c7'}>
+                        <button
+                          onClick={asignarEquipo}
+                          style={{
+                            padding: '0.65rem 1.25rem',
+                            backgroundColor: '#2563EB',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            fontWeight: '700',
+                            fontSize: '0.875rem'
+                          }}
+                        >
                           Asignar
                         </button>
                       </div>
@@ -628,49 +708,51 @@ export default function DashboardOficinas() {
                   )}
 
                   {verDetalle.equiposAsignados && verDetalle.equiposAsignados.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '0.8rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
                       {verDetalle.equiposAsignados.map((asignacion, idx) => (
-                        <div key={idx} style={{ padding: '0.6rem 1rem', backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.9rem', color: '#334155', display: 'flex', flexDirection: 'column', gap: '0.2rem', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-                          <span style={{ fontWeight: '600' }}>{asignacion.equipo?.tipo || 'Equipo'}</span>
-                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                        <div key={idx} style={{ padding: '0.6rem 0.85rem', backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '10px', fontSize: '0.85rem', color: '#374151', display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontWeight: '700' }}>{asignacion.equipo?.tipo || 'Equipo'}</span>
+                          <span style={{ fontSize: '0.775rem', color: '#6B7280' }}>
                             {asignacion.equipo?.marca} {asignacion.equipo?.modelo}
                           </span>
-                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                          <span style={{ fontSize: '0.725rem', color: '#9CA3AF' }}>
                             Inv: {asignacion.equipo?.numeroInventario || 'S/N'}
                           </span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div style={{ fontSize: '0.9rem', color: '#94a3b8', fontStyle: 'italic', padding: '0.5rem 0' }}>No hay equipos asignados.</div>
+                    <div style={{ fontSize: '0.85rem', color: '#9CA3AF', fontStyle: 'italic' }}>No hay equipos asignados a este reporte.</div>
                   )}
                 </div>
 
               </div>
-              <button onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }} style={{ marginTop: '2rem', padding: '0.8rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '8px', width: '100%', fontSize: '1rem', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s', boxShadow: '0 2px 4px rgba(188, 149, 91, 0.3)' }} onMouseOver={(e) => e.target.style.backgroundColor = '#a07238'} onMouseOut={(e) => e.target.style.backgroundColor = '#BC955B'}>
+
+              <button
+                onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }}
+                style={{ marginTop: '1.5rem', padding: '0.75rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '10px', width: '100%', fontSize: '0.9rem', fontWeight: '700', cursor: 'pointer' }}
+              >
                 Cerrar Detalles
               </button>
             </div>
           </div>
         )}
 
-        {/* ✅ MODAL DE CONFIRMACIÓN DE RESOLUCIÓN */}
+        {/* MODAL DE CONFIRMACIÓN DE RESOLUCIÓN */}
         {confirmResuelto.visible && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
-            <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '16px', width: '90%', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', textAlign: 'center', animation: 'fadeIn 0.2s ease-out' }}>
-              <div style={{ backgroundColor: '#fef3c7', color: '#d97706', width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.5rem', margin: '0 auto 1.5rem', fontWeight: 'bold' }}>
+            <div style={{ backgroundColor: 'white', padding: '1.75rem', borderRadius: '16px', width: '90%', maxWidth: '400px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', textAlign: 'center' }}>
+              <div style={{ backgroundColor: '#FEF3C7', color: '#D97706', width: '54px', height: '54px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', margin: '0 auto 1.25rem', fontWeight: 'bold' }}>
                 ?
               </div>
-              <h3 style={{ color: '#1e293b', marginBottom: '0.8rem', fontSize: '1.3rem', fontWeight: 'bold' }}>¿Confirmar Resolución?</h3>
-              <p style={{ color: '#64748b', fontSize: '0.95rem', marginBottom: '2rem', lineHeight: '1.5' }}>
+              <h3 style={{ color: '#111827', marginBottom: '0.75rem', fontSize: '1.2rem', fontWeight: '800' }}>¿Confirmar Resolución?</h3>
+              <p style={{ color: '#6B7280', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.5' }}>
                 Una vez marcado como <strong>Resuelto</strong>, no podrás volver a cambiar el estado de este reporte.
               </p>
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              <div style={{ display: 'flex', gap: '0.85rem', justifyContent: 'center' }}>
                 <button 
                   onClick={() => setConfirmResuelto({ visible: false, id: null })} 
-                  style={{ flex: 1, padding: '0.7rem', backgroundColor: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' }}
-                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
-                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                  style={{ flex: 1, padding: '0.65rem', backgroundColor: '#F3F4F6', color: '#374151', border: '1px solid #D1D5DB', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
                 >
                   Cancelar
                 </button>
@@ -679,9 +761,7 @@ export default function DashboardOficinas() {
                     cambiarEstado(confirmResuelto.id, 'resuelto');
                     setConfirmResuelto({ visible: false, id: null });
                   }} 
-                  style={{ flex: 1, padding: '0.7rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: 'background 0.2s' }}
-                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#a07238'}
-                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#BC955B'}
+                  style={{ flex: 1, padding: '0.65rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
                 >
                   Aceptar
                 </button>
@@ -740,128 +820,118 @@ const CustomInventorySelect = ({ value, onChange, inventario }) => {
       <div
         onClick={() => setIsOpen(!isOpen)}
         style={{
-          padding: '0.7rem 1.2rem', border: isOpen ? '1.5px solid #0284c7' : '1px solid #cbd5e1', 
-          borderRadius: '8px', fontSize: '0.95rem', backgroundColor: 'white', 
+          padding: '0.65rem 1rem', border: isOpen ? '1.5px solid #2563EB' : '1px solid #D1D5DB', 
+          borderRadius: '8px', fontSize: '0.9rem', backgroundColor: 'white', 
           cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem',
-          transition: 'all 0.2s', boxShadow: isOpen ? '0 0 0 3px rgba(2, 132, 199, 0.1)' : 'none'
+          transition: 'all 0.2s'
         }}
       >
         <span>
           {selectedOption ? (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b', fontWeight: '500' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#111827', fontWeight: '600' }}>
                {selectedOption.tipo} - {selectedOption.numeroInventario || selectedOption.numeroSerie || 'S/N'}
             </span>
           ) : (
-            <span style={{ color: '#64748b', fontWeight: '400' }}>-- Seleccionar equipo --</span>
+            <span style={{ color: '#9CA3AF', fontWeight: '400' }}>-- Seleccionar equipo --</span>
           )}
         </span>
-        <FaChevronRight size={12} style={{ transform: isOpen ? 'rotate(-90deg)' : 'rotate(90deg)', transition: '0.2s', color: '#64748b' }} />
+        <FaChevronRight size={12} style={{ transform: isOpen ? 'rotate(-90deg)' : 'rotate(90deg)', transition: '0.2s', color: '#6B7280' }} />
       </div>
 
       {isOpen && (
-        <>
-          <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 -4px 20px rgba(0,0,0,0.12)', zIndex: 50, border: '1px solid #e2e8f0', overflow: 'hidden', width: '100%', minWidth: '320px' }}>
-            <div style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#ffffff' }}>
-              <input
-                type="text"
-                placeholder="Buscar componente..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                autoFocus
-                style={{ width: '100%', padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.9rem' }}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
+        <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 -4px 20px rgba(0,0,0,0.12)', zIndex: 50, border: '1px solid #E5E7EB', overflow: 'hidden', width: '100%', minWidth: '320px' }}>
+          <div style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid #E5E7EB', backgroundColor: '#ffffff' }}>
+            <input
+              type="text"
+              placeholder="Buscar componente..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoFocus
+              style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #D1D5DB', outline: 'none', fontSize: '0.85rem' }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
 
-            <div style={{ display: 'flex', height: '240px' }}>
-              {search ? (
-                <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto', overscrollBehavior: 'contain' }}>
-                  {filteredOptions.length > 0 ? filteredOptions.map(opcion => (
-                    <div
-                      key={opcion.id}
-                      onClick={() => { onChange(opcion.id); setIsOpen(false); setSearch(''); }}
-                      style={{ padding: '0.7rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', transition: 'background-color 0.15s', backgroundColor: value === opcion.id ? '#fdf2f8' : 'transparent' }}
-                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                      onMouseOut={e => e.currentTarget.style.backgroundColor = value === opcion.id ? '#fdf2f8' : 'transparent'}
-                    >
-                      <FaCogs color="#691B31" size={16} />
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                        <span style={{ fontWeight: '500', color: '#334155' }}>{opcion.tipo}</span>
-                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Inv: {opcion.numeroInventario || 'S/N'} | {opcion.marca} {opcion.modelo}</span>
-                      </div>
-                      <span style={{ fontSize: '0.7rem', color: '#94a3b8', marginLeft: 'auto', backgroundColor: '#e2e8f0', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>{opcion.areaUbicacion || 'Sin área'}</span>
+          <div style={{ display: 'flex', height: '240px' }}>
+            {search ? (
+              <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto' }}>
+                {filteredOptions.length > 0 ? filteredOptions.map(opcion => (
+                  <div
+                    key={opcion.id}
+                    onClick={() => { onChange(opcion.id); setIsOpen(false); setSearch(''); }}
+                    style={{ padding: '0.65rem 0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', backgroundColor: value === opcion.id ? '#FEF2F2' : 'transparent' }}
+                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#F1F5F9'}
+                    onMouseOut={e => e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF2F2' : 'transparent'}
+                  >
+                    <FaCogs color="#691B31" size={16} />
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontWeight: '600', color: '#111827' }}>{opcion.tipo}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>Inv: {opcion.numeroInventario || 'S/N'} | {opcion.marca} {opcion.modelo}</span>
                     </div>
-                  )) : (
-                    <div style={{ padding: '2rem', color: '#64748b', textAlign: 'center' }}>
-                      No se encontraron equipos para "{search}"
+                  </div>
+                )) : (
+                  <div style={{ padding: '2rem', color: '#6B7280', textAlign: 'center', fontSize: '0.85rem' }}>
+                    No se encontraron equipos para "{search}"
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <div style={{ width: '45%', borderRight: '1px solid #E5E7EB', overflowY: 'auto', padding: '0.4rem', backgroundColor: '#ffffff' }}>
+                  {Object.keys(gruposOpciones).map((group) => (
+                    <div
+                      key={group}
+                      onMouseEnter={() => setHoveredCategory(group)}
+                      style={{
+                        padding: '0.65rem 0.75rem',
+                        cursor: 'pointer',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        fontSize: '0.825rem',
+                        color: hoveredCategory === group ? '#691B31' : '#4B5563',
+                        backgroundColor: hoveredCategory === group ? '#FEF2F2' : 'transparent',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {group} <FaChevronRight size={9} style={{ opacity: hoveredCategory === group ? 1 : 0.3 }} />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ width: '55%', overflowY: 'auto', padding: '0.4rem', backgroundColor: '#F8FAFC' }}>
+                  {hoveredCategory ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      {gruposOpciones[hoveredCategory].map(opcion => (
+                        <div
+                          key={opcion.id}
+                          onClick={() => { onChange(opcion.id); setIsOpen(false); setSearch(''); }}
+                          style={{ padding: '0.6rem 0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.65rem', borderRadius: '8px', backgroundColor: value === opcion.id ? '#FEF2F2' : 'transparent' }}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#E2E8F0'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF2F2' : 'transparent'}
+                        >
+                          <FaCogs color={value === opcion.id ? '#691B31' : '#6B7280'} size={14} />
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: value === opcion.id ? '#691B31' : '#374151' }}>
+                              {opcion.tipo}
+                            </span>
+                            <span style={{ fontSize: '0.725rem', color: '#6B7280' }}>
+                              Inv: {opcion.numeroInventario || 'S/N'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#9CA3AF', fontSize: '0.8rem' }}>
+                      Pasa el cursor sobre una categoría
                     </div>
                   )}
                 </div>
-              ) : (
-                <>
-                  <div style={{ width: '45%', borderRight: '1px solid #e2e8f0', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#ffffff', overscrollBehavior: 'contain' }}>
-                    {Object.keys(gruposOpciones).map((group) => (
-                      <div
-                        key={group}
-                        onMouseEnter={() => setHoveredCategory(group)}
-                        style={{
-                          padding: '0.75rem 0.85rem',
-                          cursor: 'pointer',
-                          borderRadius: '8px',
-                          fontWeight: '600',
-                          fontSize: '0.85rem',
-                          color: hoveredCategory === group ? '#691B31' : '#475569',
-                          backgroundColor: hoveredCategory === group ? '#fdf2f8' : 'transparent',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: '0.2rem',
-                          transition: 'background-color 0.2s, color 0.2s'
-                        }}
-                      >
-                        {group} <FaChevronRight size={9} style={{ opacity: hoveredCategory === group ? 1 : 0.3 }} />
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ width: '55%', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#f8fafc', overscrollBehavior: 'contain' }}>
-                    {hoveredCategory ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                        <div style={{ padding: '0.4rem 0.75rem', fontSize: '0.7rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          {hoveredCategory}
-                        </div>
-                        {gruposOpciones[hoveredCategory].map(opcion => (
-                          <div
-                            key={opcion.id}
-                            onClick={() => { onChange(opcion.id); setIsOpen(false); setSearch(''); }}
-                            style={{ padding: '0.65rem 0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.65rem', borderRadius: '8px', transition: 'background-color 0.15s', backgroundColor: value === opcion.id ? '#fdf2f8' : 'transparent' }}
-                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
-                            onMouseOut={e => e.currentTarget.style.backgroundColor = value === opcion.id ? '#fdf2f8' : 'transparent'}
-                          >
-                            <FaCogs color={value === opcion.id ? '#691B31' : '#64748b'} size={15} />
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <span style={{ fontSize: '0.9rem', fontWeight: '500', color: value === opcion.id ? '#691B31' : '#475569' }}>
-                                {opcion.tipo}
-                              </span>
-                              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                                Inv: {opcion.numeroInventario || 'S/N'} | {opcion.marca} {opcion.modelo}
-                              </span>
-                            </div>
-                            {value === opcion.id && <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#691B31', fontWeight: '700' }}>✓</span>}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-                        <FaCogs size={28} color="#cbd5e1" />
-                        Pasa el cursor sobre una categoría
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+              </>
+            )}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

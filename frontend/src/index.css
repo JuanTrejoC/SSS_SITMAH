@@ -591,4 +591,49 @@ input, select, textarea {
     right: 0.35rem; /* Desplazado al máximo a la derecha en móviles */
     bottom: 1.25rem;
   }
-}
+}
+
+/* ============================================================
+   CONTROLES DE FORMULARIO PREMIUM (UNIFORMES MULTI-OS)
+   ============================================================ */
+
+.premium-input,
+.premium-select,
+.premium-textarea {
+  width: 100%;
+  padding: 0.75rem 0.95rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  background-color: #f8fafc;
+  color: #1e293b;
+  outline: none;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+}
+
+.premium-input:hover,
+.premium-select:hover,
+.premium-textarea:hover {
+  background-color: #f1f5f9;
+}
+
+.premium-input:focus,
+.premium-select:focus,
+.premium-textarea:focus {
+  background-color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(105, 27, 49, 0.12);
+}
+
+.premium-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 2.5rem;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 1.15rem;
+}
+

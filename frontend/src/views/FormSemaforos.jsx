@@ -1,6 +1,8 @@
+// src/views/FormSemaforos.jsx
 import { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
 import { API_BASE_URL } from '../config'
+import { FaTrafficLight } from 'react-icons/fa'
 
 export default function FormSemaforos({ usuarioActual }) {
   const fileInputRef = useRef(null)
@@ -20,6 +22,8 @@ export default function FormSemaforos({ usuarioActual }) {
   const [mostrarOtro, setMostrarOtro] = useState(false)
   const [cargando, setCargando] = useState(false)
   const [vistaPrevia, setVistaPrevia] = useState(null)
+
+
 
   const [listaEstaciones, setListaEstaciones] = useState([])
   const [listaCruceros, setListaCruceros] = useState([])
@@ -54,12 +58,24 @@ export default function FormSemaforos({ usuarioActual }) {
     cargarCatalogos()
   }, [])
 
-  // ✅ SOLO LETRAS, ESPACIOS Y SIGNOS PERMITIDOS
+  // Filtrar cruceros cuando cambia la estación
+  useEffect(() => {
+    if (formData.estacion_id && listaCruceros.length > 0) {
+      const filtrados = listaCruceros.filter(
+        c => String(c.estacion_id) === String(formData.estacion_id)
+      )
+      setCrucerosFiltrados(filtrados.length > 0 ? filtrados : listaCruceros)
+    } else {
+      setCrucerosFiltrados(listaCruceros)
+    }
+  }, [formData.estacion_id, listaCruceros])
+
+  // Solo letras, espacios y signos permitidos
   const soloLetras = (texto) => {
     return texto.replace(/[^A-Za-zÁáÉéÍíÓóÚúÑñ\s.,-]/g, '')
   }
 
-  // ✅ VALIDACIÓN DE CADA CAMPO
+  // Validación de cada campo
   const validarCampo = (nombre, valor) => {
     let mensajeError = ''
     let esValido = false
@@ -89,7 +105,7 @@ export default function FormSemaforos({ usuarioActual }) {
     setValido(prev => ({ ...prev, [nombre]: esValido }))
   }
 
-  // ✅ COMPRESIÓN DE IMAGEN VÍA CANVAS (MÁX 1600px, CALIDAD 0.75)
+  // Compresión de imagen vía Canvas (máx 1600px, calidad 0.75)
   const comprimirImagen = (archivo) => {
     return new Promise((resolve) => {
       if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(archivo.type)) {
@@ -142,7 +158,7 @@ export default function FormSemaforos({ usuarioActual }) {
     })
   }
 
-  // ✅ VALIDACIÓN DE ARCHIVOS DE IMAGEN Y COMPRESIÓN
+  // Manejo de archivo
   const manejarArchivo = async (e) => {
     const archivo = e.target.files[0]
     if (!archivo) return
@@ -156,7 +172,6 @@ export default function FormSemaforos({ usuarioActual }) {
       return
     }
 
-    // Tamaño máximo: 10MB
     if (archivo.size > 10 * 1024 * 1024) {
       alert('❌ La imagen no debe superar los 10 MB')
       e.target.value = ''
@@ -187,13 +202,13 @@ export default function FormSemaforos({ usuarioActual }) {
     }
   }
 
-  // ✅ ENVÍO DE FORMULARIO
+  // Envío del formulario
   const enviar = async (e) => {
     e.preventDefault()
 
     const confirmar = await Swal.fire({
-      title: '¿Enviar reporte?',
-      text: 'Puede cancelar si desea revisar o editar algo antes de enviarlo.',
+      title: '¿Enviar reporte de semáforo?',
+      text: 'Puede cancelar si desea revisar o editar los datos ingresados.',
       icon: 'question',
       showCancelButton: true,
       confirmButtonColor: '#BC955B',
@@ -206,14 +221,12 @@ export default function FormSemaforos({ usuarioActual }) {
 
     setCargando(true)
 
-    // 🔍 VALIDACIÓN COMPLETA ANTES DE ENVIAR
     Object.keys(formData).forEach(campo => {
       if (campo !== 'descripcion' && campo !== 'evidencia') {
         validarCampo(campo, formData[campo])
       }
     })
 
-    // ⚠️ VERIFICAR SI HAY ERRORES
     const hayErrores = Object.values(valido).some(esValido => esValido === false)
     if (hayErrores) {
       alert('❌ Por favor complete todos los campos obligatorios correctamente')
@@ -222,19 +235,16 @@ export default function FormSemaforos({ usuarioActual }) {
     }
 
     try {
-      // 📅 FORMATO FECHA-HORA PARA BASE DE DATOS
-      const fechaActual = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+      const fechaActual = new Date().toISOString().slice(0, 10)
       const horaCompleta = formData.hora_dano
         ? `${fechaActual} ${formData.hora_dano}:00`
         : new Date().toISOString().slice(0, 19).replace('T', ' ')
 
-      // 📝 CONSTRUIR DESCRIPCIÓN FINAL
       let descripcionFinal = formData.descripcion?.trim() || ''
       if (mostrarOtro && formData.descripcion_otro?.trim()) {
         descripcionFinal = `TIPO DE FALLA: ${formData.descripcion_otro}. ${descripcionFinal}`
       }
 
-      // 🚀 DATOS A ENVIAR (IDs convertidos a número)
       const datosAEnviar = new FormData()
       datosAEnviar.append('jefe_turno', formData.jefe_turno.trim())
       datosAEnviar.append('estacion_id', Number(formData.estacion_id))
@@ -249,7 +259,6 @@ export default function FormSemaforos({ usuarioActual }) {
         datosAEnviar.append('evidencia', formData.evidencia)
       }
 
-      // 📡 PETICIÓN AL SERVIDOR
       const respuesta = await fetch(`${API_BASE_URL}/api/reportes/semaforo`, {
         method: 'POST',
         body: datosAEnviar
@@ -257,12 +266,10 @@ export default function FormSemaforos({ usuarioActual }) {
 
       const resultado = await respuesta.json()
 
-      // ✅ PROCESO EXITOSO
       if (resultado.ok) {
         const folioCreado = resultado.data?.folio || resultado.data?.id || 'Generado'
-        alert(`✅ Reporte guardado correctamente.\nFolio: ${folioCreado}`)
+        alert(`✅ Reporte registrado correctamente.\nFolio: ${folioCreado}`)
 
-        // 🔄 REINICIAR FORMULARIO
         setFormData({
           jefe_turno: '', estacion_id: '', crucero_id: '', tipo_falla_id: '',
           descripcion_otro: '', hora_dano: '', descripcion: '', evidencia: null
@@ -274,15 +281,11 @@ export default function FormSemaforos({ usuarioActual }) {
         setMostrarOtro(false)
         setErrores({})
         setValido({})
-      }
-      // ❌ ERROR DEL SERVIDOR
-      else {
+      } else {
         alert(`❌ Error: ${resultado.error || resultado.mensaje || 'Error desconocido'}`)
         console.error('Detalles del error:', resultado)
       }
-    }
-    // ❌ ERROR DE CONEXIÓN
-    catch (error) {
+    } catch (error) {
       alert(`❌ Sin conexión: ${error.message}`)
       console.error('Error completo:', error)
     }
@@ -290,288 +293,424 @@ export default function FormSemaforos({ usuarioActual }) {
     setCargando(false)
   }
 
+  const getBorderColor = (campo) => {
+    if (valido[campo] === true) return '#10B981'
+    if (valido[campo] === false) return '#EF4444'
+    return '#D1D5DB'
+  }
+
   return (
-    <div style={{ padding: '2rem', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
-      <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 12px rgb(0,0,0)', padding: '2.5rem' }}>
-        <h2 style={{ color: '#BC955B', fontSize: '1.2rem', fontWeight: '600', marginBottom: '1.8rem' }}>
-          Reporte de Infraestructura Vial
-        </h2>
+    <div className="main-content-padding" style={{ backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '3rem' }}>
+      <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
-        {/* FILA 1: Datos principales */}
-        <div className="form-responsive-grid grid-4" style={{ marginBottom: '1.2rem' }}>
-          <div>
-            <label style={{ fontSize: '0.85rem', fontWeight: '500', color: '#1f2937', display: 'block', marginBottom: '0.4rem' }}>
-              Jefe de Turno Operativo
-            </label>
-            <input
-              type="text"
-              placeholder="Nombre completo"
-              value={formData.jefe_turno}
-              onChange={(e) => {
-                const valor = soloLetras(e.target.value)
-                setFormData(prev => ({ ...prev, jefe_turno: valor }))
-                validarCampo('jefe_turno', valor)
-              }}
-              style={{
-                width: '100%', padding: '0.65rem',
-                border: `1px solid ${valido.jefe_turno ? '#22c55e' : valido.jefe_turno === false ? '#ef4444' : '#9B9B9A'
-                  }`,
-                borderRadius: '8px'
-              }}
-            />
-            {errores.jefe_turno && <small style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errores.jefe_turno}</small>}
+        {/* HEADER DE FORMULARIO */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #691B31 0%, #4e1325 100%)',
+            borderRadius: '16px',
+            padding: 'clamp(1.25rem, 3.5vw, 2rem)',
+            color: 'white',
+            boxShadow: '0 8px 20px -4px rgba(105, 27, 49, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1.25rem'
+          }}
+        >
+          <div
+            style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '14px',
+              backgroundColor: 'rgba(255, 255, 255, 0.15)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1.6rem',
+              flexShrink: 0,
+              color: '#BC955B'
+            }}
+          >
+            <FaTrafficLight size={28} />
           </div>
-
           <div>
-            <label style={{ fontSize: '0.85rem', fontWeight: '500', color: '#1f2937', display: 'block', marginBottom: '0.4rem' }}>
-              Estación Cercana
-            </label>
-            <select
-              value={formData.estacion_id}
-              onChange={(e) => {
-                const valor = e.target.value
-                setFormData(prev => ({ ...prev, estacion_id: valor, crucero_id: '' }))
-                validarCampo('estacion_id', valor)
+            <h1 style={{ fontSize: 'clamp(1.25rem, 3vw, 1.75rem)', fontWeight: '800', margin: 0 }}>
+              Reporte de Infraestructura Vial y Semáforos
+            </h1>
+            <p style={{ color: '#E5E7EB', margin: '0.35rem 0 0 0', fontSize: 'clamp(0.85rem, 2vw, 0.95rem)', opacity: 0.9 }}>
+              Reporte incidencias operativas, fallas de controlador, focos fundidos o averías en cruceros del sistema de transporte.
+            </p>
+          </div>
+        </div>
 
-                // Filtrar cruceros por estación seleccionada
-                if (valor) {
-                  const estacion = listaEstaciones.find(est => String(est.id) === String(valor))
-                  if (estacion && estacion.cruceros && estacion.cruceros.length > 0) {
-                    const crucerosDeEstacion = estacion.cruceros
-                      .map(ec => ec.crucero)
-                      .filter(c => c && c.activo !== false)
-                    setCrucerosFiltrados(crucerosDeEstacion)
-                  } else {
-                    // Sin asignaciones: mostrar todos los cruceros
-                    setCrucerosFiltrados(listaCruceros)
-                  }
-                } else {
-                  setCrucerosFiltrados([])
-                }
-              }}
+        {/* TARJETA DE FORMULARIO */}
+        <form
+          onSubmit={enviar}
+          style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            boxShadow: '0 4px 20px -2px rgba(0,0,0,0.06)',
+            border: '1px solid #E5E7EB',
+            padding: 'clamp(1.25rem, 4vw, 2.25rem)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2rem'
+          }}
+        >
+          {/* SECCIÓN 1: UBICACIÓN Y RESPONSABLE */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem', borderBottom: '2px solid #F3F4F6', paddingBottom: '0.65rem' }}>
+              <span style={{ backgroundColor: 'rgba(105, 27, 49, 0.1)', color: '#691B31', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.85rem' }}>1</span>
+              <h2 style={{ color: '#111827', fontSize: '1.1rem', fontWeight: '700', margin: 0 }}>
+                Ubicación y Responsable
+              </h2>
+            </div>
+
+            <div
               style={{
-                width: '100%', padding: '0.65rem',
-                border: `1px solid ${valido.estacion_id ? '#22c55e' : valido.estacion_id === false ? '#ef4444' : '#9B9B9A'
-                  }`,
-                borderRadius: '8px', backgroundColor: 'white'
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '1.15rem'
               }}
             >
-              <option value="">Seleccione estación</option>
-              {listaEstaciones.map((estacion) => (
-                <option key={estacion.id} value={estacion.id}>{estacion.nombre}</option>
-              ))}
-            </select>
-            {errores.estacion_id && <small style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errores.estacion_id}</small>}
-          </div>
-
-          <div>
-            <label style={{ fontSize: '0.85rem', fontWeight: '500', color: '#000000', display: 'block', marginBottom: '0.4rem' }}>
-              Crucero Semafórico
-            </label>
-            <select
-              value={formData.crucero_id}
-              onChange={(e) => {
-                const valor = e.target.value
-                setFormData(prev => ({ ...prev, crucero_id: valor }))
-                validarCampo('crucero_id', valor)
-              }}
-              style={{
-                width: '100%', padding: '0.65rem',
-                border: `1px solid ${valido.crucero_id ? '#22c55e' : valido.crucero_id === false ? '#ef4444' : '#9B9B9A'
-                  }`,
-                borderRadius: '8px', backgroundColor: 'white'
-              }}
-            >
-              <option value="">{formData.estacion_id ? 'Seleccione crucero' : 'Primero seleccione una estación'}</option>
-              {(formData.estacion_id ? crucerosFiltrados : []).map((crucero) => (
-                <option key={crucero.id} value={crucero.id}>{crucero.nombre}</option>
-              ))}
-            </select>
-            {errores.crucero_id && <small style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errores.crucero_id}</small>}
-          </div>
-
-          <div>
-            <label style={{ fontSize: '0.85rem', fontWeight: '500', color: '#000000', display: 'block', marginBottom: '0.4rem' }}>
-              Tipo de Falla Detectada
-            </label>
-            <select
-              value={formData.tipo_falla_id}
-              onChange={(e) => {
-                const valor = e.target.value
-                setFormData(prev => ({ ...prev, tipo_falla_id: valor, descripcion_otro: '' }))
-                const selectedFalla = listaTiposFalla.find(f => String(f.id) === String(valor))
-                setMostrarOtro(selectedFalla?.nombre?.toLowerCase().includes('otro') || false)
-                validarCampo('tipo_falla_id', valor)
-              }}
-              style={{
-                width: '100%', padding: '0.65rem',
-                border: `1px solid ${valido.tipo_falla_id ? '#22c55e' : valido.tipo_falla_id === false ? '#ef4444' : '#9B9B9A'
-                  }`,
-                borderRadius: '8px', backgroundColor: 'white'
-              }}
-            >
-              <option value="">Seleccione anomalía</option>
-              {listaTiposFalla.map((falla) => (
-                <option key={falla.id} value={falla.id}>{falla.nombre}</option>
-              ))}
-            </select>
-
-            {mostrarOtro && (
-              <div style={{ marginTop: '0.8rem' }}>
+              {/* Jefe de Turno */}
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                  Jefe de Turno<span style={{ color: '#EF4444' }}>*</span>
+                </label>
                 <input
                   type="text"
-                  placeholder="Especifique la falla..."
-                  value={formData.descripcion_otro}
+                  placeholder="Nombre de quien reporta"
+                  value={formData.jefe_turno}
                   onChange={(e) => {
-                    const valor = soloLetras(e.target.value)
-                    setFormData(prev => ({ ...prev, descripcion_otro: valor }))
-                    validarCampo('descripcion_otro', valor)
+                    const v = soloLetras(e.target.value)
+                    setFormData({ ...formData, jefe_turno: v })
+                    validarCampo('jefe_turno', v)
                   }}
+                  className="premium-input"
                   style={{
-                    width: '100%', padding: '0.5rem',
-                    border: `1px solid ${errores.descripcion_otro ? '#ef4444' : '#9B9B9A'}`,
-                    borderRadius: '6px'
+                    border: `1.5px solid ${getBorderColor('jefe_turno')}`
                   }}
                 />
-                {errores.descripcion_otro && <small style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errores.descripcion_otro}</small>}
+                {errores.jefe_turno && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.jefe_turno}</span>}
               </div>
-            )}
-            {errores.tipo_falla_id && <small style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errores.tipo_falla_id}</small>}
-          </div>
-        </div>
 
-        {/* FILA 2: Hora y Prioridad */}
-        <div className="form-responsive-grid grid-2" style={{ marginBottom: '1.5rem' }}>
-          <div>
-            <label style={{ fontSize: '0.85rem', fontWeight: '500', color: '#000000', display: 'block', marginBottom: '0.4rem' }}>
-              Hora Exacta del Siniestro
-            </label>
-            <input
-              type="time"
-              value={formData.hora_dano}
-              onChange={(e) => {
-                const valor = e.target.value
-                setFormData(prev => ({ ...prev, hora_dano: valor }))
-                validarCampo('hora_dano', valor)
-              }}
-              style={{
-                width: '100%', padding: '0.65rem',
-                border: `1px solid ${valido.hora_dano ? '#22c55e' : valido.hora_dano === false ? '#ef4444' : '#9B9B9A'
-                  }`,
-                borderRadius: '8px'
-              }}
-            />
-            {errores.hora_dano && <small style={{ color: '#ef4444', fontSize: '0.75rem' }}>{errores.hora_dano}</small>}
-          </div>
+              {/* Estación */}
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                  Estación <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <select
+                  value={formData.estacion_id}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setFormData({ ...formData, estacion_id: v, crucero_id: '' })
+                    validarCampo('estacion_id', v)
+                  }}
+                  className="premium-select"
+                  style={{
+                    border: `1.5px solid ${getBorderColor('estacion_id')}`
+                  }}
+                >
+                  <option value="">Seleccione estación</option>
+                  {listaEstaciones.map((est, i) => (
+                    <option key={i} value={est.id}>{est.nombre}</option>
+                  ))}
+                </select>
+                {errores.estacion_id && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.estacion_id}</span>}
+              </div>
 
-          <div>
-            <label style={{ fontSize: '0.85rem', fontWeight: '500', color: '#000000', display: 'block', marginBottom: '0.4rem' }}>
-              Prioridad Asignada
-            </label>
-            <div style={{
-              padding: '0.65rem 0.8rem', backgroundColor: '#fee2e2',
-              color: '#dc2626', fontWeight: 'bold', borderRadius: '8px',
-              textAlign: 'center'
-            }}>
-              ALTA
+              {/* Crucero */}
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                  Crucero Afectado <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <select
+                  value={formData.crucero_id}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setFormData({ ...formData, crucero_id: v })
+                    validarCampo('crucero_id', v)
+                  }}
+                  className="premium-select"
+                  style={{
+                    border: `1.5px solid ${getBorderColor('crucero_id')}`
+                  }}
+                >
+                  <option value="">Seleccione crucero</option>
+                  {crucerosFiltrados.map((c, i) => (
+                    <option key={i} value={c.id}>{c.ubicacion || c.nombre || `Crucero #${c.id}`}</option>
+                  ))}
+                </select>
+                {errores.crucero_id && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.crucero_id}</span>}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* NOTAS ADICIONALES */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ fontSize: '0.85rem', fontWeight: '500', color: '#000000', display: 'block', marginBottom: '0.4rem' }}>
-            Notas
-          </label>
-          <textarea
-            placeholder="Detalles de afectación, observaciones, etc..."
-            value={formData.descripcion}
-            onChange={(e) => {
-              const valor = soloLetras(e.target.value)
-              setFormData(prev => ({ ...prev, descripcion: valor }))
-            }}
-            style={{
-              width: '100%', minHeight: '90px', padding: '0.8rem',
-              border: '1px solid #9B9B9A', borderRadius: '8px',
-              fontSize: '0.9rem', resize: 'vertical'
-            }}
-          ></textarea>
-        </div>
+          {/* SECCIÓN 2: TIPO DE FALLA Y HORA */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem', borderBottom: '2px solid #F3F4F6', paddingBottom: '0.65rem' }}>
+              <span style={{ backgroundColor: 'rgba(188, 149, 91, 0.15)', color: '#B45309', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.85rem' }}>2</span>
+              <h2 style={{ color: '#111827', fontSize: '1.1rem', fontWeight: '700', margin: 0 }}>
+                Detalles del Daño e Incidencia
+              </h2>
+            </div>
 
-        {/* EVIDENCIA FOTOGRÁFICA */}
-        <div style={{ marginBottom: '2rem' }}>
-          <label style={{ fontSize: '0.85rem', fontWeight: '500', color: '#000000', display: 'block', marginBottom: '0.4rem' }}>
-            Fotografía del Estado Vial (Solo imágenes)
-          </label>
-          <div style={{
-            border: '1px solid #9B9B9A', borderRadius: '8px', padding: '0.65rem',
-            backgroundColor: 'white', display: 'flex', flexDirection: 'column', gap: '0.8rem'
-          }}>
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={manejarArchivo} style={{ fontSize: '0.9rem', width: '100%' }} />
-            {vistaPrevia && (
-              <div style={{ position: 'relative', display: 'inline-block', width: 'fit-content', marginTop: '0.5rem' }}>
-                <img 
-                  src={vistaPrevia} 
-                  alt="Vista previa" 
-                  style={{ maxWidth: '180px', maxHeight: '180px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #cbd5e1' }} 
-                />
-                <button
-                  type="button"
-                  onClick={eliminarEvidencia}
-                  title="Eliminar imagen"
-                  style={{
-                    position: 'absolute',
-                    top: '-8px',
-                    right: '-8px',
-                    backgroundColor: '#ef4444',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '50%',
-                    width: '24px',
-                    height: '24px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                    fontWeight: 'bold',
-                    fontSize: '12px',
-                    transition: 'transform 0.1s ease',
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '1.15rem'
+              }}
+            >
+              {/* Tipo de Falla */}
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                  Tipo de Falla <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <select
+                  value={formData.tipo_falla_id}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setFormData({ ...formData, tipo_falla_id: v, descripcion_otro: '' })
+                    const fallaObj = listaTiposFalla.find(f => String(f.id) === String(v))
+                    setMostrarOtro(fallaObj?.nombre?.toLowerCase().includes('otro') || false)
+                    validarCampo('tipo_falla_id', v)
                   }}
-                  onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-                  onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                  className="premium-select"
+                  style={{
+                    border: `1.5px solid ${getBorderColor('tipo_falla_id')}`
+                  }}
                 >
-                  ✕
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+                  <option value="">Seleccione tipo de falla</option>
+                  {listaTiposFalla.map((tf, i) => (
+                    <option key={i} value={tf.id}>{tf.nombre}</option>
+                  ))}
+                </select>
+                {errores.tipo_falla_id && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.tipo_falla_id}</span>}
 
-        {/* BOTONES DE ACCIÓN */}
-        <div className="form-responsive-buttons" style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
+                {mostrarOtro && (
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <input
+                      type="text"
+                      placeholder="Especifique cuál es la falla observada..."
+                      value={formData.descripcion_otro}
+                      onChange={(e) => {
+                        const v = soloLetras(e.target.value)
+                        setFormData({ ...formData, descripcion_otro: v })
+                        validarCampo('descripcion_otro', v)
+                      }}
+                      className="premium-input"
+                      style={{
+                        border: `1.5px solid ${errores.descripcion_otro ? '#EF4444' : '#D1D5DB'}`
+                      }}
+                    />
+                    {errores.descripcion_otro && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.descripcion_otro}</span>}
+                  </div>
+                )}
+              </div>
+
+              {/* Hora del Daño */}
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                  Hora del Siniestro <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <input
+                  type="time"
+                  value={formData.hora_dano}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setFormData({ ...formData, hora_dano: v })
+                    validarCampo('hora_dano', v)
+                  }}
+                  className="premium-input"
+                  style={{
+                    border: `1.5px solid ${getBorderColor('hora_dano')}`
+                  }}
+                />
+                {errores.hora_dano && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.hora_dano}</span>}
+              </div>
+            </div>
+
+            {/* Notas / Descripción */}
+            <div style={{ marginTop: '1.15rem' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                Observaciones o Notas Adicionales <span style={{ color: '#6B7280', fontWeight: 'normal' }}>(Opcional)</span>
+              </label>
+              <textarea
+                placeholder="Indique detalles de tráfico, si hubo impacto de vehículo, gabinete afectado o notas de seguridad..."
+                value={formData.descripcion}
+                onChange={(e) => {
+                  const v = soloLetras(e.target.value)
+                  setFormData({ ...formData, descripcion: v })
+                }}
+                className="premium-textarea"
+                style={{
+                  minHeight: '100px',
+                  resize: 'vertical',
+                  border: '1.5px solid #D1D5DB'
+                }}
+              />
+            </div>
+          </div>
+
+          {/* SECCIÓN 3: EVIDENCIA FOTOGRÁFICA */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem', borderBottom: '2px solid #F3F4F6', paddingBottom: '0.65rem' }}>
+              <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#059669', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.85rem' }}>3</span>
+              <h2 style={{ color: '#111827', fontSize: '1.1rem', fontWeight: '700', margin: 0 }}>
+                Fotografía del Crucero
+              </h2>
+            </div>
+
+            <div
+              style={{
+                border: '2px dashed #CBD5E1',
+                borderRadius: '14px',
+                padding: '1.25rem',
+                backgroundColor: '#F8FAFC',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '0.85rem'
+              }}
+            >
+              {!vistaPrevia ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', fontSize: '1.35rem' }}>
+                    <i className="fa-solid fa-camera"></i>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#334155' }}>
+                      Cargar foto de la falla en semáforo
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: '#64748B', display: 'block', marginTop: '0.2rem' }}>
+                      Formatos recomendados: JPG, PNG, WEBP (Máximo 10 MB)
+                    </span>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={manejarArchivo}
+                    style={{ display: 'none' }}
+                    id="input-evidencia-semaforos"
+                  />
+                  <label
+                    htmlFor="input-evidencia-semaforos"
+                    style={{
+                      backgroundColor: '#691B31',
+                      color: 'white',
+                      padding: '0.55rem 1.15rem',
+                      borderRadius: '8px',
+                      fontSize: '0.85rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      marginTop: '0.4rem'
+                    }}
+                  >
+                    <i className="fa-solid fa-upload"></i> Subir Fotografía
+                  </label>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '2px solid #BC955B', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                    <img
+                      src={vistaPrevia}
+                      alt="Vista previa crucero"
+                      style={{ maxWidth: '240px', maxHeight: '200px', display: 'block', objectFit: 'cover' }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={eliminarEvidencia}
+                    style={{
+                      backgroundColor: '#FEE2E2',
+                      color: '#DC2626',
+                      border: '1px solid #FCA5A5',
+                      padding: '0.4rem 0.85rem',
+                      borderRadius: '8px',
+                      fontSize: '0.825rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem'
+                    }}
+                  >
+                    <i className="fa-solid fa-trash"></i> Eliminar Imagen
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* BOTONES DE ACCIÓN */}
+          <div
             style={{
-              padding: '0.75rem 2rem', backgroundColor: '#9B9B9A', color: '#ffffffff',
-              border: 'none', borderRadius: '8px', fontWeight: '500', cursor: 'pointer'
+              display: 'flex',
+              justify: 'flex-end',
+              gap: '1rem',
+              borderTop: '1px solid #F3F4F6',
+              paddingTop: '1.25rem',
+              flexWrap: 'wrap'
             }}
-            disabled={cargando}
           >
-            Cancelar
-          </button>
-          <button
-            onClick={enviar}
-            style={{
-              padding: '0.75rem 2rem', backgroundColor: '#BC955B', color: 'white',
-              border: 'none', borderRadius: '8px', fontWeight: '500', cursor: 'pointer'
-            }}
-            disabled={cargando}
-          >
-            {cargando ? 'Enviando...' : 'Enviar Reporte Técnico'}
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              disabled={cargando}
+              style={{
+                backgroundColor: '#F3F4F6',
+                color: '#4B5563',
+                border: '1px solid #D1D5DB',
+                padding: '0.75rem 1.65rem',
+                borderRadius: '10px',
+                fontWeight: '600',
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                minHeight: '44px'
+              }}
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="submit"
+              disabled={cargando}
+              style={{
+                backgroundColor: '#BC955B',
+                color: 'white',
+                border: 'none',
+                padding: '0.75rem 2rem',
+                borderRadius: '10px',
+                fontWeight: '700',
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(188, 149, 91, 0.3)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                minHeight: '44px'
+              }}
+            >
+              {cargando ? (
+                <>
+                  <i className="fa-solid fa-spinner fa-spin"></i> Registrando...
+                </>
+              ) : (
+                <>
+                  <i className="fa-solid fa-paper-plane"></i> Enviar Reporte de Semáforo
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+
       </div>
     </div>
   )

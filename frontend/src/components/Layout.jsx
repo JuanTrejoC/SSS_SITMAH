@@ -17,7 +17,7 @@ export default function Layout() {
   }, [isSidebarOpen])
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc' }}>
 
       {/* Overlay oscuro */}
       <div
@@ -29,17 +29,16 @@ export default function Layout() {
       <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
       {/* Columna principal: siempre ocupa el espacio disponible */}
-      <div style={{
+      <div className="layout-main-col" style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        /* min-width:0 es clave para que flex no desborde */
         minWidth: 0,
-        overflow: 'hidden',
+        paddingTop: '90px',
       }}>
         <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
-        <main className="main-content-padding" style={{ flex: 1, overflowX: 'hidden' }}>
+        <main className="main-content-padding" style={{ flex: 1 }}>
           <Outlet />
         </main>
       </div>

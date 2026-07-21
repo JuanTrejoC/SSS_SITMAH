@@ -16,6 +16,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
   const profileRef = useRef(null);
   const loginRef = useRef(null);
 
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (profileRef.current && !profileRef.current.contains(event.target)) {
@@ -85,7 +86,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
         
         <div className="app-header__left">
           <button className="hamburger-btn header-hamburger" onClick={toggleSidebar} aria-label="Abrir menú" style={{ color: '#BC955B' }}>
-            <FaBars size={20} />
+            <FaBars size={26} />
           </button>
 
           {showBackButton && (
