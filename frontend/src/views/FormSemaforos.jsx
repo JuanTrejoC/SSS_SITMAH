@@ -165,7 +165,7 @@ export default function FormSemaforos({ usuarioActual }) {
 
     const tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
     if (!tiposPermitidos.includes(archivo.type)) {
-      alert('❌ Solo se permiten archivos de imagen (JPG, PNG, GIF, WEBP)')
+      Swal.fire('Error', 'Solo se permiten archivos de imagen (JPG, PNG, GIF, WEBP)', 'error');
       e.target.value = ''
       setFormData(prev => ({ ...prev, evidencia: null }))
       setVistaPrevia(null)
@@ -173,7 +173,7 @@ export default function FormSemaforos({ usuarioActual }) {
     }
 
     if (archivo.size > 10 * 1024 * 1024) {
-      alert('❌ La imagen no debe superar los 10 MB')
+      Swal.fire('Error', 'La imagen no debe superar los 10 MB', 'error');
       e.target.value = ''
       setFormData(prev => ({ ...prev, evidencia: null }))
       setVistaPrevia(null)
@@ -229,7 +229,7 @@ export default function FormSemaforos({ usuarioActual }) {
 
     const hayErrores = Object.values(valido).some(esValido => esValido === false)
     if (hayErrores) {
-      alert('❌ Por favor complete todos los campos obligatorios correctamente')
+      Swal.fire('Atención', 'Por favor complete todos los campos obligatorios correctamente', 'warning');
       setCargando(false)
       return
     }
@@ -268,7 +268,7 @@ export default function FormSemaforos({ usuarioActual }) {
 
       if (resultado.ok) {
         const folioCreado = resultado.data?.folio || resultado.data?.id || 'Generado'
-        alert(`✅ Reporte registrado correctamente.\nFolio: ${folioCreado}`)
+        Swal.fire('Éxito', `Reporte registrado correctamente.\nFolio: ${folioCreado}`, 'success');
 
         setFormData({
           jefe_turno: '', estacion_id: '', crucero_id: '', tipo_falla_id: '',
@@ -282,11 +282,11 @@ export default function FormSemaforos({ usuarioActual }) {
         setErrores({})
         setValido({})
       } else {
-        alert(`❌ Error: ${resultado.error || resultado.mensaje || 'Error desconocido'}`)
+        Swal.fire('Error', resultado.error || resultado.mensaje || 'Error desconocido', 'error');
         console.error('Detalles del error:', resultado)
       }
     } catch (error) {
-      alert(`❌ Sin conexión: ${error.message}`)
+      Swal.fire('Error', `Sin conexión: ${error.message}`, 'error');
       console.error('Error completo:', error)
     }
 

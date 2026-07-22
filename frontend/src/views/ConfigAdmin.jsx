@@ -4,6 +4,7 @@ import {
   FaEnvelope, FaPlus, FaEdit, FaTrashAlt, FaToggleOn, FaToggleOff,
   FaIdBadge, FaBus, FaTrafficLight, FaExclamationTriangle, FaLink
 } from 'react-icons/fa'
+import Swal from 'sweetalert2'
 import { useAuth } from '../context/AuthContext'
 import { API_BASE_URL } from '../config'
 
@@ -135,7 +136,7 @@ export default function ConfigAdmin() {
 
   const abrirGestor = (opcion) => {
     if (opcion.deshabilitado) {
-      alert('Esta función estará disponible en la próxima actualización.')
+      Swal.fire('Atención', 'Esta función estará disponible en la próxima actualización.', 'info');
       return
     }
     if (opcion.tipo === 'asignar-cruceros') {
@@ -207,7 +208,7 @@ export default function ConfigAdmin() {
       if (json.ok) setEstacionesConCruceros(json.data || [])
     } catch (err) {
       console.error('Error al cambiar asignación:', err)
-      alert('❌ Error al cambiar asignación')
+      Swal.fire('Error', 'Error al cambiar asignación', 'error');
     }
   }
 
@@ -237,7 +238,7 @@ export default function ConfigAdmin() {
     // Validación y construcción de payload
     if (catalogoSeleccionado === 'usuarios') {
       if (!username || !email || !nombre || (!editandoId && !password)) {
-        alert('Complete todos los campos obligatorios')
+        Swal.fire('Atención', 'Complete todos los campos obligatorios', 'warning');
         return
       }
       payload = { username, email, nombre }
@@ -248,7 +249,7 @@ export default function ConfigAdmin() {
         : `${API_BASE_URL}/api/admin/usuarios`
     } else if (catalogoSeleccionado === 'correos') {
       if (!nombre || !correoDestino) {
-        alert('Complete todos los campos')
+        Swal.fire('Atención', 'Complete todos los campos', 'warning');
         return
       }
       payload = { nombre, correo: correoDestino }
@@ -257,7 +258,7 @@ export default function ConfigAdmin() {
         : `${API_BASE_URL}/api/admin/correos`
     } else {
       if (!nombre) {
-        alert('El nombre es requerido')
+        Swal.fire('Atención', 'El nombre es requerido', 'warning');
         return
       }
       payload = { nombre }
@@ -277,15 +278,15 @@ export default function ConfigAdmin() {
       })
       const json = await response.json()
       if (response.ok && json.ok) {
-        alert(editandoId ? '✅ Modificado con éxito' : '✅ Creado con éxito')
+        Swal.fire('Éxito', editandoId ? 'Modificado con éxito' : 'Creado con éxito', 'success')
         limpiarFormulario()
         cargarItems(catalogoSeleccionado)
       } else {
-        alert('❌ Error: ' + (json.error || 'Operación fallida'))
+        Swal.fire('Error', json.error || 'Operación fallida', 'error')
       }
     } catch (err) {
       console.error('Error al guardar:', err)
-      alert('❌ Error de conexión al guardar')
+      Swal.fire('Error', 'Error de conexión al guardar', 'error')
     }
   }
 
@@ -312,7 +313,16 @@ export default function ConfigAdmin() {
       ? '¿Eliminar este usuario de forma permanente?'
       : '¿Dar de baja este registro? (Se marcará como inactivo)'
 
-    if (confirm(mensaje)) {
+    const result = await Swal.fire({
+      title: 'Confirmación',
+      text: mensaje,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, continuar',
+      cancelButtonText: 'Cancelar'
+    })
+
+    if (result.isConfirmed) {
       try {
         let url = ''
         let metodo = 'DELETE'
@@ -327,14 +337,14 @@ export default function ConfigAdmin() {
         })
         const json = await response.json()
         if (response.ok && json.ok) {
-          alert('✅ Operación exitosa')
+          Swal.fire('Éxito', 'Operación exitosa', 'success')
           cargarItems(catalogoSeleccionado)
         } else {
-          alert('❌ Error: ' + (json.error || 'No se pudo realizar la acción'))
+          Swal.fire('Error', json.error || 'No se pudo realizar la acción', 'error')
         }
       } catch (err) {
         console.error('Error al dar de baja:', err)
-        alert('❌ Error de red al eliminar item')
+        Swal.fire('Error', 'Error de red al eliminar item', 'error')
       }
     }
   }
@@ -357,14 +367,14 @@ export default function ConfigAdmin() {
       })
       const json = await response.json()
       if (response.ok && json.ok) {
-        alert('✅ Registro reactivado con éxito')
-        cargarItems(catalogoSeleccionado)
+        Swal.fire('Éxito', 'Registro reactivado con éxito', 'success');
+        cargarItems(catalogoSeleccionado);
       } else {
-        alert('❌ Error: ' + (json.error || 'No se pudo reactivar'))
+        Swal.fire('Error', json.error || 'No se pudo reactivar', 'error');
       }
     } catch (err) {
-      console.error('Error al reactivar:', err)
-      alert('❌ Error de conexión al reactivar')
+      console.error('Error al reactivar:', err);
+      Swal.fire('Error', 'Error de conexión al reactivar', 'error');
     }
   }
 

@@ -182,7 +182,7 @@ export default function FormOficinas({ usuarioActual }) {
 
     const tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
     if (!tiposPermitidos.includes(archivo.type)) {
-      alert('❌ Solo se permiten archivos de imagen (.jpg, .jpeg, .png, .gif, .webp)')
+      Swal.fire('Error', 'Solo se permiten archivos de imagen (.jpg, .jpeg, .png, .gif, .webp)', 'error');
       e.target.value = ''
       setFormData(prev => ({ ...prev, evidencia: null }))
       setVistaPrevia(null)
@@ -190,7 +190,7 @@ export default function FormOficinas({ usuarioActual }) {
     }
 
     if (archivo.size > 10 * 1024 * 1024) {
-      alert('❌ La imagen no debe superar los 10 MB')
+      Swal.fire('Error', 'La imagen no debe superar los 10 MB', 'error');
       e.target.value = ''
       setFormData(prev => ({ ...prev, evidencia: null }))
       setVistaPrevia(null)
@@ -243,7 +243,7 @@ export default function FormOficinas({ usuarioActual }) {
 
     const hayErrores = Object.values(valido).some(est => est === false)
     if (hayErrores) {
-      alert('❌ Complete todos los campos obligatorios')
+      Swal.fire('Atención', 'Complete todos los campos obligatorios', 'warning');
       return
     }
 
@@ -283,7 +283,7 @@ export default function FormOficinas({ usuarioActual }) {
 
       if (resultado.ok) {
         const folioCreado = resultado.data?.folio || resultado.data?.id || 'Generado'
-        alert(`✅ Reporte registrado en el sistema correctamente.\nFolio: ${folioCreado}`)
+        Swal.fire('Éxito', `Reporte registrado en el sistema correctamente.\nFolio: ${folioCreado}`, 'success');
 
         setFormData({ solicitante: '', area_id: '', cargo: '', email: '', telefono: '', sede_id: '', equipo: '', categoria_id: '', descripcion_otro: '', prioridad: '', descripcion: '', evidencia: null, estado: 'abierto', tipo_usuario: 'solicitante' })
         if (fileInputRef.current) {
@@ -294,11 +294,11 @@ export default function FormOficinas({ usuarioActual }) {
         setErrores({})
         setValido({})
       } else {
-        alert('❌ Error al guardar: ' + (resultado.error || resultado.mensaje || 'Desconocido'))
+        Swal.fire('Error', 'Error al guardar: ' + (resultado.error || resultado.mensaje || 'Desconocido'), 'error');
         console.error('Detalles del error:', resultado)
       }
     } catch (error) {
-      alert('❌ No se pudo conectar: ' + error.message)
+      Swal.fire('Error', 'No se pudo conectar: ' + error.message, 'error');
       console.error('Error completo:', error)
     }
 

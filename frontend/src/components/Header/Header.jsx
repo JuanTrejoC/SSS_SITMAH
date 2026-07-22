@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { FaExclamationCircle, FaCheckCircle, FaBars, FaLock } from 'react-icons/fa';
+import Swal from 'sweetalert2';
 import './Header.css';
 
 export default function Header({ toggleSidebar, hideLogos, hideBackButton = false }) {
@@ -62,7 +63,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
   const entrarAdmin = async (e) => {
     e.preventDefault();
     if (errores.usuario || errores.contrasena || !datosLogin.usuario || !datosLogin.contrasena) {
-      alert('❌ Corrige los campos marcados en rojo');
+      Swal.fire('Error', 'Corrige los campos marcados en rojo', 'error');
       return;
     }
     const res = await loginAdmin(datosLogin);
@@ -70,7 +71,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
       setMostrarLogin(false);
       navigate('/dashboard');
     } else {
-      alert(`❌ ${res.error}`);
+      Swal.fire('Error', res.error, 'error');
     }
   };
 

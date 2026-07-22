@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { formatFolio } from '../utils/formatFolio'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config'
+import Swal from 'sweetalert2'
 
 export default function DashboardOficinas() {
   const { user } = useAuth()
@@ -85,9 +86,23 @@ export default function DashboardOficinas() {
   }, [user]);
 
   const asignarPieza = async () => {
-    if (!componenteSeleccionado) return alert('Seleccione un componente');
-    if (!cantidadSeleccionada || cantidadSeleccionada < 1) return alert('Ingrese una cantidad válida');
-    if (!confirm(`¿Confirmas asignar ${cantidadSeleccionada} piezas de este componente?`)) return;
+    if (!componenteSeleccionado) {
+      Swal.fire('Atención', 'Seleccione un componente', 'warning');
+      return;
+    }
+    if (!cantidadSeleccionada || cantidadSeleccionada < 1) {
+      Swal.fire('Atención', 'Ingrese una cantidad válida', 'warning');
+      return;
+    }
+    const result = await Swal.fire({
+        title: '¿Confirmar?',
+        text: `¿Confirmas asignar ${cantidadSeleccionada} piezas de este componente?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, asignar',
+        cancelButtonText: 'Cancelar'
+    });
+    if (!result.isConfirmed) return;
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/admin/reportes/oficina/${verDetalle.id}/piezas`, {
@@ -119,10 +134,10 @@ export default function DashboardOficinas() {
         setCantidadSeleccionada(1);
         cargarInventario();
       } else {
-        alert('❌ Error: ' + (json.error || 'Desconocido'));
+        Swal.fire('Error', json.error || 'Desconocido', 'error');
       }
     } catch (err) {
-      alert('❌ Error de red');
+      Swal.fire('Error', 'Error de red', 'error');
     }
   };
 
@@ -145,18 +160,28 @@ export default function DashboardOficinas() {
       if (response.ok && json.ok) {
         cargarReportes()
       } else {
-        alert('❌ Error al cambiar el estado: ' + (json.error || 'Desconocido'))
+        Swal.fire('Error', 'Error al cambiar el estado: ' + (json.error || 'Desconocido'), 'error');
       }
     } catch (err) {
       console.error('Error al actualizar estado:', err)
-      alert('❌ Error de red al actualizar estado')
+      Swal.fire('Error', 'Error de red al actualizar estado', 'error');
     }
   }
 
   // ✅ ELIMINAR REPORTE EN BACKEND
   const eliminarReporte = async (id) => {
     if (!user?.token) return
-    if (confirm('¿Eliminar este reporte de forma permanente?')) {
+    const result = await Swal.fire({
+      title: '¿Eliminar reporte?',
+      text: "Esta acción no se puede deshacer.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar'
+    });
+
+    if (result.isConfirmed) {
       try {
         const response = await fetch(`${API_BASE_URL}/api/admin/reportes/oficina/${id}`, {
           method: 'DELETE',
@@ -166,14 +191,14 @@ export default function DashboardOficinas() {
         })
         const json = await response.json()
         if (response.ok && json.ok) {
-          alert('✅ Reporte eliminado correctamente')
+          Swal.fire('Eliminado', 'Reporte eliminado correctamente', 'success');
           cargarReportes()
         } else {
-          alert('❌ Error al eliminar reporte: ' + (json.error || 'Desconocido'))
+          Swal.fire('Error', 'Error al eliminar reporte: ' + (json.error || 'Desconocido'), 'error');
         }
       } catch (err) {
         console.error('Error al eliminar:', err)
-        alert('❌ Error de red al eliminar reporte')
+        Swal.fire('Error', 'Error de red al eliminar reporte', 'error');
       }
     }
   }
@@ -207,7 +232,7 @@ export default function DashboardOficinas() {
       a.click()
       URL.revokeObjectURL(urlObj)
     } catch (error) {
-      alert('❌ Error al generar y descargar el reporte Excel: ' + error.message)
+      Swal.fire('Error', 'Error al generar y descargar el reporte Excel: ' + error.message, 'error');
     }
   }
 
@@ -604,7 +629,7 @@ export default function DashboardOficinas() {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', fontSize: '0.9rem', color: '#374151' }}>
                 <div><strong>Solicitante:</strong> {verDetalle.solicitante}</div>
-                <div><strong>Cargo:</strong> {verDetalle.cargo || '—'}</div>
+                <div><strong>Cargo:</strong> {verDetalle.cargo?.nombre || '—'}</div>
                 <div><strong>Correo:</strong> {verDetalle.email}</div>
                 <div><strong>Teléfono:</strong> {verDetalle.telefono || '—'}</div>
                 <div><strong>Área:</strong> {verDetalle.area?.nombre || '—'}</div>

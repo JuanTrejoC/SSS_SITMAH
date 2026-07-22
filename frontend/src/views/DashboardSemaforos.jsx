@@ -1,6 +1,7 @@
 // src/views/DashboardSemaforos.jsx
 import { useState, useEffect, useRef } from 'react'
 import { FaEye, FaTrashAlt, FaChevronRight, FaCogs } from 'react-icons/fa'
+import Swal from 'sweetalert2'
 import { useAuth } from '../context/AuthContext'
 import { formatFolio } from '../utils/formatFolio'
 import { useNavigate } from 'react-router-dom'
@@ -81,7 +82,10 @@ export default function DashboardSemaforos() {
   }, [user, mesFiltro, anioFiltro])
 
   const asignarPieza = async () => {
-    if (!componenteSeleccionado || cantidadAsignar < 1) return alert('Seleccione un componente e ingrese cantidad válida')
+    if (!componenteSeleccionado || cantidadAsignar < 1) {
+      Swal.fire('Atención', 'Seleccione un componente e ingrese cantidad válida', 'warning');
+      return;
+    }
     try {
       const response = await fetch(`${API_BASE_URL}/api/admin/reportes/semaforo/${verDetalle.id}/piezas`, {
         method: 'POST',
@@ -112,10 +116,10 @@ export default function DashboardSemaforos() {
         setCantidadAsignar(1)
         cargarInventario()
       } else {
-        alert('❌ Error: ' + (json.error || 'Desconocido'))
+        Swal.fire('Error', json.error || 'Desconocido', 'error');
       }
     } catch (err) {
-      alert('❌ Error de red')
+      Swal.fire('Error', 'Error de red', 'error');
     }
   }
 
@@ -137,17 +141,27 @@ export default function DashboardSemaforos() {
       if (response.ok && json.ok) {
         cargarReportes()
       } else {
-        alert('❌ Error al cambiar el estado: ' + (json.error || 'Desconocido'))
+        Swal.fire('Error', 'Error al cambiar el estado: ' + (json.error || 'Desconocido'), 'error');
       }
     } catch (err) {
       console.error('Error al actualizar estado:', err)
-      alert('❌ Error de red al actualizar estado')
+      Swal.fire('Error', 'Error de red al actualizar estado', 'error');
     }
   }
 
   const eliminarReporte = async (id) => {
     if (!user?.token) return
-    if (confirm('¿Eliminar este reporte de semáforos de forma permanente?')) {
+    const result = await Swal.fire({
+      title: '¿Eliminar reporte?',
+      text: "Esta acción no se puede deshacer.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Sí, eliminar'
+    });
+
+    if (result.isConfirmed) {
       try {
         const response = await fetch(`${API_BASE_URL}/api/admin/reportes/semaforo/${id}`, {
           method: 'DELETE',
@@ -157,14 +171,14 @@ export default function DashboardSemaforos() {
         })
         const json = await response.json()
         if (response.ok && json.ok) {
-          alert('✅ Reporte eliminado correctamente')
+          Swal.fire('Eliminado', 'Reporte eliminado correctamente', 'success');
           cargarReportes()
         } else {
-          alert('❌ Error al eliminar reporte: ' + (json.error || 'Desconocido'))
+          Swal.fire('Error', 'Error al eliminar reporte: ' + (json.error || 'Desconocido'), 'error');
         }
       } catch (err) {
         console.error('Error al eliminar:', err)
-        alert('❌ Error de red al eliminar reporte')
+        Swal.fire('Error', 'Error de red al eliminar reporte', 'error');
       }
     }
   }
@@ -196,7 +210,7 @@ export default function DashboardSemaforos() {
       a.click()
       URL.revokeObjectURL(urlObj)
     } catch (error) {
-      alert('❌ Error al generar el reporte Excel: ' + error.message)
+      Swal.fire('Error', 'Error al generar el reporte Excel: ' + error.message, 'error');
     }
   }
 
@@ -205,7 +219,7 @@ export default function DashboardSemaforos() {
       r.jefe_turno?.toLowerCase().includes(busqueda.toLowerCase()) ||
       r.folio?.toLowerCase().includes(busqueda.toLowerCase()) ||
       r.estacion?.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      r.crucero?.ubicacion?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      r.crucero?.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
       r.tipoFalla?.nombre?.toLowerCase().includes(busqueda.toLowerCase())
 
     const coincideEstado = estadoFiltro === 'Todos' ||
@@ -442,7 +456,7 @@ export default function DashboardSemaforos() {
                         </td>
                         <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>
                           <div>{r.estacion?.nombre || '—'}</div>
-                          <span style={{ fontSize: '0.775rem', color: '#9CA3AF' }}>{r.crucero?.ubicacion || '—'}</span>
+                          <span style={{ fontSize: '0.775rem', color: '#9CA3AF' }}>{r.crucero?.nombre || '—'}</span>
                         </td>
                         <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>{r.tipoFalla?.nombre || '—'}</td>
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
@@ -542,9 +556,9 @@ export default function DashboardSemaforos() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', fontSize: '0.9rem', color: '#374151' }}>
                 <div><strong>Jefe de Turno:</strong> {verDetalle.jefe_turno}</div>
                 <div><strong>Estación:</strong> {verDetalle.estacion?.nombre || '—'}</div>
-                <div><strong>Crucero:</strong> {verDetalle.crucero?.ubicacion || '—'}</div>
+                <div><strong>Crucero:</strong> {verDetalle.crucero?.nombre || '—'}</div>
                 <div><strong>Tipo de Falla:</strong> {verDetalle.tipoFalla?.nombre || '—'}</div>
-                <div><strong>Hora Estimada:</strong> {verDetalle.hora_dano ? new Date(verDetalle.hora_dano).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</div>
+                <div><strong>Hora Estimada:</strong> {verDetalle.horaDano ? new Date(verDetalle.horaDano).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</div>
                 <div><strong>Estado:</strong> {obtenerNombreEstado(verDetalle.estado)}</div>
                 <div style={{ gridColumn: '1 / -1' }}><strong>Fecha Registro:</strong> {new Date(verDetalle.createdAt).toLocaleString()}</div>
 
