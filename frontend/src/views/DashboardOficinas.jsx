@@ -24,6 +24,7 @@ export default function DashboardOficinas() {
   const [inventario, setInventario] = useState([])
   const [mostrarInventario, setMostrarInventario] = useState(false)
   const [componenteSeleccionado, setComponenteSeleccionado] = useState('')
+  const [cantidadSeleccionada, setCantidadSeleccionada] = useState(1)
 
   useEffect(() => {
     if (verDetalle || confirmResuelto.visible) {
@@ -67,7 +68,7 @@ export default function DashboardOficinas() {
   const cargarInventario = async () => {
     if (!user?.token) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?limit=1000`, {
+      const response = await fetch(`${API_BASE_URL}/api/inventario/existencias?tipoInventario=tecnologico&limit=1000`, {
         headers: { 'Authorization': `Bearer ${user.token}` }
       });
       const json = await response.json();
@@ -83,28 +84,39 @@ export default function DashboardOficinas() {
     cargarInventario();
   }, [user]);
 
-  const asignarEquipo = async () => {
-    if (!componenteSeleccionado) return alert('Seleccione un equipo');
-    if (!confirm(`¿Confirmas asignar este equipo?`)) return;
+  const asignarPieza = async () => {
+    if (!componenteSeleccionado) return alert('Seleccione un componente');
+    if (!cantidadSeleccionada || cantidadSeleccionada < 1) return alert('Ingrese una cantidad válida');
+    if (!confirm(`¿Confirmas asignar ${cantidadSeleccionada} piezas de este componente?`)) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/reportes/oficina/${verDetalle.id}/equipos`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/reportes/oficina/${verDetalle.id}/piezas`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${user.token}`
         },
         body: JSON.stringify({
-          equipo_id: componenteSeleccionado
+          componente_id: componenteSeleccionado,
+          cantidad: cantidadSeleccionada
         })
       });
       const json = await response.json();
       if (response.ok && json.ok) {
+        const nuevaPieza = json.data;
         setVerDetalle({
           ...verDetalle,
-          equiposAsignados: [...(verDetalle.equiposAsignados || []), json.data]
+          piezasAsignadas: [...(verDetalle.piezasAsignadas || []), nuevaPieza]
         });
+        setReportes(prevReportes => 
+          prevReportes.map(rep => 
+            rep.id === verDetalle.id 
+              ? { ...rep, piezasAsignadas: [...(rep.piezasAsignadas || []), nuevaPieza] } 
+              : rep
+          )
+        );
         setComponenteSeleccionado('');
+        setCantidadSeleccionada(1);
         cargarInventario();
       } else {
         alert('❌ Error: ' + (json.error || 'Desconocido'));
@@ -688,8 +700,15 @@ export default function DashboardOficinas() {
                             inventario={inventario}
                           />
                         </div>
+                        <input
+                          type="number"
+                          min="1"
+                          value={cantidadSeleccionada}
+                          onChange={(e) => setCantidadSeleccionada(Number(e.target.value))}
+                          style={{ width: '80px', padding: '0.65rem', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '0.9rem' }}
+                        />
                         <button
-                          onClick={asignarEquipo}
+                          onClick={asignarPieza}
                           style={{
                             padding: '0.65rem 1.25rem',
                             backgroundColor: '#2563EB',
@@ -707,29 +726,54 @@ export default function DashboardOficinas() {
                     </div>
                   )}
 
-                  {verDetalle.equiposAsignados && verDetalle.equiposAsignados.length > 0 ? (
+                  {verDetalle.piezasAsignadas && verDetalle.piezasAsignadas.length > 0 ? (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
-                      {verDetalle.equiposAsignados.map((asignacion, idx) => (
-                        <div key={idx} style={{ padding: '0.6rem 0.85rem', backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '10px', fontSize: '0.85rem', color: '#374151', display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontWeight: '700' }}>{asignacion.equipo?.tipo || 'Equipo'}</span>
-                          <span style={{ fontSize: '0.775rem', color: '#6B7280' }}>
-                            {asignacion.equipo?.marca} {asignacion.equipo?.modelo}
-                          </span>
-                          <span style={{ fontSize: '0.725rem', color: '#9CA3AF' }}>
-                            Inv: {asignacion.equipo?.numeroInventario || 'S/N'}
-                          </span>
+                      {verDetalle.piezasAsignadas.map((asignacion, idx) => (
+                        <div key={idx} style={{ 
+                          padding: '0.85rem', 
+                          backgroundColor: 'white', 
+                          border: '1px solid #E5E7EB', 
+                          borderRadius: '12px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '0.85rem',
+                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.05)',
+                          transition: 'transform 0.2s, box-shadow 0.2s'
+                        }}
+                        onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px -2px rgba(0,0,0,0.08)' }}
+                        onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px -2px rgba(0,0,0,0.05)' }}
+                        >
+                          <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: 'rgba(105,27,49,0.08)', color: '#691B31', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
+                            <i className="fa-solid fa-box-open"></i>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                            <span style={{ fontWeight: '700', fontSize: '0.9rem', color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {asignacion.componente?.nombre || 'Componente'}
+                            </span>
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.75rem', color: '#6B7280', flexWrap: 'wrap' }}>
+                              <span style={{ backgroundColor: '#F3F4F6', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600', color: '#374151' }}>
+                                Cant: {asignacion.cantidad}
+                              </span>
+                              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {asignacion.componente?.marca} {asignacion.componente?.modelo}
+                              </span>
+                              <span style={{ color: '#9CA3AF' }}>
+                                • Inv: {asignacion.componente?.numeroInventario || 'S/N'}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div style={{ fontSize: '0.85rem', color: '#9CA3AF', fontStyle: 'italic' }}>No hay equipos asignados a este reporte.</div>
+                    <div style={{ fontSize: '0.85rem', color: '#9CA3AF', fontStyle: 'italic' }}>No hay componentes asignados a este reporte.</div>
                   )}
                 </div>
 
               </div>
 
               <button
-                onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }}
+                onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); setCantidadSeleccionada(1); }}
                 style={{ marginTop: '1.5rem', padding: '0.75rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '10px', width: '100%', fontSize: '0.9rem', fontWeight: '700', cursor: 'pointer' }}
               >
                 Cerrar Detalles
@@ -801,7 +845,7 @@ const CustomInventorySelect = ({ value, onChange, inventario }) => {
   const filteredOptions = inventario.filter(o => {
     const searchTerm = search.toLowerCase();
     return (
-      (o.tipo && o.tipo.toLowerCase().includes(searchTerm)) ||
+      (o.nombre && o.nombre.toLowerCase().includes(searchTerm)) ||
       (o.numeroInventario && o.numeroInventario.toLowerCase().includes(searchTerm)) ||
       (o.marca && o.marca.toLowerCase().includes(searchTerm)) ||
       (o.modelo && o.modelo.toLowerCase().includes(searchTerm))
@@ -809,7 +853,7 @@ const CustomInventorySelect = ({ value, onChange, inventario }) => {
   });
 
   const gruposOpciones = inventario.reduce((acc, curr) => {
-    const group = curr.tipo || 'Sin Tipo';
+    const group = curr.categoria || 'Sin Categoría';
     if (!acc[group]) acc[group] = [];
     acc[group].push(curr);
     return acc;
@@ -829,10 +873,10 @@ const CustomInventorySelect = ({ value, onChange, inventario }) => {
         <span>
           {selectedOption ? (
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#111827', fontWeight: '600' }}>
-               {selectedOption.tipo} - {selectedOption.numeroInventario || selectedOption.numeroSerie || 'S/N'}
+               {selectedOption.nombre || selectedOption.descripcion} (Disp: {selectedOption.cantidad ?? 'N/A'}) - Inv: {selectedOption.numeroInventario || selectedOption.numeroSerie || 'S/N'}
             </span>
           ) : (
-            <span style={{ color: '#9CA3AF', fontWeight: '400' }}>-- Seleccionar equipo --</span>
+            <span style={{ color: '#9CA3AF', fontWeight: '400' }}>-- Seleccionar componente --</span>
           )}
         </span>
         <FaChevronRight size={12} style={{ transform: isOpen ? 'rotate(-90deg)' : 'rotate(90deg)', transition: '0.2s', color: '#6B7280' }} />
@@ -863,15 +907,15 @@ const CustomInventorySelect = ({ value, onChange, inventario }) => {
                     onMouseOver={e => e.currentTarget.style.backgroundColor = '#F1F5F9'}
                     onMouseOut={e => e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF2F2' : 'transparent'}
                   >
-                    <FaCogs color="#691B31" size={16} />
+                    <FaCogs color="#691B31" size={14} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontWeight: '600', color: '#111827' }}>{opcion.tipo}</span>
-                      <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>Inv: {opcion.numeroInventario || 'S/N'} | {opcion.marca} {opcion.modelo}</span>
+                      <span style={{ fontWeight: '600', color: '#111827', fontSize: '0.85rem' }}>{opcion.nombre}</span>
+                      <span style={{ fontSize: '0.7rem', color: '#6B7280' }}>Inv: {opcion.numeroInventario || 'S/N'} | Stock: {opcion.cantidad}</span>
                     </div>
                   </div>
                 )) : (
                   <div style={{ padding: '2rem', color: '#6B7280', textAlign: 'center', fontSize: '0.85rem' }}>
-                    No se encontraron equipos para "{search}"
+                    No se encontraron componentes para "{search}"
                   </div>
                 )}
               </div>
@@ -913,10 +957,10 @@ const CustomInventorySelect = ({ value, onChange, inventario }) => {
                           <FaCogs color={value === opcion.id ? '#691B31' : '#6B7280'} size={14} />
                           <div style={{ display: 'flex', flexDirection: 'column' }}>
                             <span style={{ fontSize: '0.85rem', fontWeight: '600', color: value === opcion.id ? '#691B31' : '#374151' }}>
-                              {opcion.tipo}
+                              {opcion.nombre || opcion.descripcion}
                             </span>
                             <span style={{ fontSize: '0.725rem', color: '#6B7280' }}>
-                              Inv: {opcion.numeroInventario || 'S/N'}
+                              Disp: {opcion.cantidad ?? 'N/A'} | Inv: {opcion.numeroInventario || 'S/N'}
                             </span>
                           </div>
                         </div>
