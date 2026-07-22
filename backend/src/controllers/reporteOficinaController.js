@@ -146,6 +146,7 @@ async function listar(req, res) {
         sede: true,
         categoria: true,
         evidencias: true,
+        piezasAsignadas: { include: { componente: true } },
       },
       orderBy: { id: ordenParam },
       skip,
