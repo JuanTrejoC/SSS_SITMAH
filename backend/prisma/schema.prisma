@@ -168,7 +168,7 @@ model ReporteOficina {
   categoria   Categoria   @relation(fields: [categoriaId], references: [id])
   atendidoPor Usuario?    @relation("AtendidoOficina", fields: [atendidoPorId], references: [id])
   evidencias      Evidencia[]
-  equiposAsignados ReporteOficinaEquipo[]
+  piezasAsignadas ReporteOficinaPieza[]
 
   @@index([estado])
   @@index([sedeId])
@@ -263,7 +263,6 @@ model EquipoTecnologico {
   detalles         Json?    // Stores type-specific dynamic attributes
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
-  reportesOficina  ReporteOficinaEquipo[]
 
   @@map("equipo_tecnologico")
 }
@@ -308,6 +307,7 @@ model ExistenciaComponente {
   createdAt        DateTime               @default(now()) @map("created_at")
   updatedAt        DateTime               @updatedAt @map("updated_at")
   reportes         ReporteSemaforoPieza[]
+  reportesOficina  ReporteOficinaPieza[]
 
   @@map("existencia_componente")
 }
@@ -325,14 +325,15 @@ model ReporteSemaforoPieza {
   @@map("reporte_semaforo_pieza")
 }
 
-model ReporteOficinaEquipo {
+model ReporteOficinaPieza {
   id                Int                  @id @default(autoincrement())
   reporteOficinaId  Int                  @map("reporte_oficina_id")
-  equipoId          Int                  @map("equipo_id")
+  componenteId      Int                  @map("componente_id")
+  cantidad          Int
   createdAt         DateTime             @default(now()) @map("created_at")
 
   reporteOficina    ReporteOficina       @relation(fields: [reporteOficinaId], references: [id], onDelete: Cascade)
-  equipo            EquipoTecnologico    @relation(fields: [equipoId], references: [id])
+  componente        ExistenciaComponente @relation(fields: [componenteId], references: [id])
 
-  @@map("reporte_oficina_equipo")
+  @@map("reporte_oficina_pieza")
 }

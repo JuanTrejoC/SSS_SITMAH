@@ -37,8 +37,8 @@ router.get('/reportes/oficina', asyncHandler(reporteOficina.listar));
 router.get('/reportes/oficina/:id', asyncHandler(reporteOficina.obtener));
 router.patch('/reportes/oficina/:id/estado', asyncHandler(reporteOficina.cambiarEstado));
 router.delete('/reportes/oficina/:id', asyncHandler(reporteOficina.eliminar));
-router.post('/reportes/oficina/:id/equipos', asyncHandler(reporteOficina.asignarEquipo));
-router.delete('/reportes/oficina/:id/equipos/:piezaId', asyncHandler(reporteOficina.desasignarEquipo));
+router.post('/reportes/oficina/:id/piezas', asyncHandler(reporteOficina.asignarPieza));
+router.delete('/reportes/oficina/:id/piezas/:piezaId', asyncHandler(reporteOficina.desasignarPieza));
 
 router.get('/reportes/semaforo/resumen', asyncHandler(reporteSemaforo.resumen));
 router.get('/reportes/semaforo/export', asyncHandler(reporteSemaforo.exportar));

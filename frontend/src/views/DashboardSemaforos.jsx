@@ -63,7 +63,7 @@ export default function DashboardSemaforos() {
   const cargarInventario = async () => {
     if (!user?.token) return
     try {
-      const response = await fetch(`${API_BASE_URL}/api/inventario/existencias`, {
+      const response = await fetch(`${API_BASE_URL}/api/inventario/existencias?tipoInventario=semaforos`, {
         headers: { 'Authorization': `Bearer ${user.token}` }
       })
       const json = await response.json()
@@ -90,16 +90,24 @@ export default function DashboardSemaforos() {
           'Authorization': `Bearer ${user.token}`
         },
         body: JSON.stringify({
-          existencia_id: componenteSeleccionado,
+          componente_id: componenteSeleccionado,
           cantidad: cantidadAsignar
         })
       })
       const json = await response.json()
       if (response.ok && json.ok) {
+        const nuevaPieza = json.data;
         setVerDetalle({
           ...verDetalle,
-          piezasUtilizadas: [...(verDetalle.piezasUtilizadas || []), json.data]
-        })
+          piezasAsignadas: [...(verDetalle.piezasAsignadas || []), nuevaPieza]
+        });
+        setReportes(prevReportes => 
+          prevReportes.map(rep => 
+            rep.id === verDetalle.id 
+              ? { ...rep, piezasAsignadas: [...(rep.piezasAsignadas || []), nuevaPieza] } 
+              : rep
+          )
+        );
         setComponenteSeleccionado('')
         setCantidadAsignar(1)
         cargarInventario()
@@ -646,14 +654,39 @@ export default function DashboardSemaforos() {
                     </div>
                   )}
 
-                  {verDetalle.piezasUtilizadas && verDetalle.piezasUtilizadas.length > 0 ? (
+                  {verDetalle.piezasAsignadas && verDetalle.piezasAsignadas.length > 0 ? (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
-                      {verDetalle.piezasUtilizadas.map((p, idx) => (
-                        <div key={idx} style={{ padding: '0.6rem 0.85rem', backgroundColor: 'white', border: '1px solid #E5E7EB', borderRadius: '10px', fontSize: '0.85rem', color: '#374151', display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontWeight: '700' }}>{p.existencia?.nombre || 'Pieza'}</span>
-                          <span style={{ fontSize: '0.775rem', color: '#6B7280' }}>
-                            Cantidad: {p.cantidad}
-                          </span>
+                      {verDetalle.piezasAsignadas.map((p, idx) => (
+                        <div key={idx} style={{ 
+                          padding: '0.85rem', 
+                          backgroundColor: 'white', 
+                          border: '1px solid #E5E7EB', 
+                          borderRadius: '12px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: '0.85rem',
+                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.05)',
+                          transition: 'transform 0.2s, box-shadow 0.2s'
+                        }}
+                        onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px -2px rgba(0,0,0,0.08)' }}
+                        onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px -2px rgba(0,0,0,0.05)' }}
+                        >
+                          <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: '#FEF3C7', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
+                            <i className="fa-solid fa-microchip"></i>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                            <span style={{ fontWeight: '700', fontSize: '0.9rem', color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {p.componente?.nombre || 'Pieza'}
+                            </span>
+                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.75rem', color: '#6B7280' }}>
+                              <span style={{ backgroundColor: '#F3F4F6', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600', color: '#374151' }}>
+                                Cant: {p.cantidad}
+                              </span>
+                              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {p.componente?.marca} {p.componente?.modelo}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
