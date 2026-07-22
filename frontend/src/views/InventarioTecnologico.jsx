@@ -48,10 +48,27 @@ export default function InventarioTecnologico() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [form, setForm] = useState(getInitialForm());
-  const [sedesList, setSedesList] = useState(['Centro de Control', 'CETRAM']);
+  const [todosLosEquipos, setTodosLosEquipos] = useState([]);
+  const [dashboardTipo, setDashboardTipo] = useState(null);
+  const [dashboardArea, setDashboardArea] = useState(null);
+  const [dashboardExpandido, setDashboardExpandido] = useState(false);
+
+  const cargarTodosLosEquipos = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?limit=1000&tipo=tecnologico`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      });
+      const json = await res.json();
+      if (res.ok && json.ok) {
+        setTodosLosEquipos(json.data);
+      }
+    } catch (err) {
+      console.error('Error al cargar todos los equipos:', err);
+    }
+  };
 
   useEffect(() => {
-    const cargarSedes = async () => {
+    const cargarCatalogos = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/catalogos/sedes`);
         if (res.ok) {
@@ -63,8 +80,21 @@ export default function InventarioTecnologico() {
       } catch (err) {
         console.error('Error al cargar sedes:', err);
       }
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/catalogos/cargos`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.ok && json.data && json.data.length > 0) {
+            setCargosList(json.data.map(c => c.nombre));
+          }
+        }
+      } catch (err) {
+        console.error('Error al cargar cargos:', err);
+      }
     };
-    cargarSedes();
+    cargarCatalogos();
+    cargarTodosLosEquipos();
   }, []);
 
   function getInitialForm() {
@@ -97,6 +127,7 @@ export default function InventarioTecnologico() {
       if (res.ok && json.ok) {
         setEquipos(json.data);
         setTotal(json.meta.total);
+        cargarTodosLosEquipos();
       }
     } catch (err) {
       console.error('Error al cargar equipos:', err);
@@ -435,6 +466,221 @@ export default function InventarioTecnologico() {
         </button>
       </div>
 
+
+      {/* ================= DASHBOARD INTERACTIVO DRILL-DOWN ================= */}
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        padding: '1.25rem',
+        border: '1px solid #E5E7EB',
+        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+        marginBottom: '2rem'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setDashboardExpandido(!dashboardExpandido)}>
+          <h2 style={{ fontSize: '1.15rem', color: '#1E293B', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ color: '#691B31' }}></span> Dashboard Rápido e Interactivo de Inventario
+          </h2>
+          <button style={{ background: 'none', border: 'none', color: '#691B31', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem' }}>
+            {dashboardExpandido ? '▲ Ocultar' : '▼ Mostrar'}
+          </button>
+        </div>
+
+        {dashboardExpandido && (
+          <div style={{ marginTop: '1.25rem', borderTop: '1px solid #F1F5F9', paddingTop: '1.25rem' }}>
+            {/* BREADCRUMBS Y BOTÓN VOLVER */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#64748B', fontWeight: '500' }}>
+                <span style={{ cursor: 'pointer', color: '#691B31' }} onClick={() => { setDashboardTipo(null); setDashboardArea(null); }}>Inicio</span>
+                {dashboardTipo && (
+                  <>
+                    <span>/</span>
+                    <span
+                      style={{ cursor: dashboardArea ? 'pointer' : 'default', color: dashboardArea ? '#691B31' : '#475569', fontWeight: !dashboardArea ? 'bold' : '500' }}
+                      onClick={() => { setDashboardArea(null); }}
+                    >
+                      {TIPOS_EQUIPO.find(t => t.value === dashboardTipo)?.label || dashboardTipo}
+                    </span>
+                  </>
+                )}
+                {dashboardArea && (
+                  <>
+                    <span>/</span>
+                    <span style={{ fontWeight: 'bold', color: '#475569' }}>{dashboardArea}</span>
+                  </>
+                )}
+              </div>
+
+              {(dashboardTipo || dashboardArea) && (
+                <button
+                  onClick={() => {
+                    if (dashboardArea) {
+                      setDashboardArea(null);
+                    } else if (dashboardTipo) {
+                      setDashboardTipo(null);
+                    }
+                  }}
+                  style={{
+                    backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '6px',
+                    padding: '0.35rem 0.75rem', fontSize: '0.825rem', fontWeight: '600', cursor: 'pointer',
+                    color: '#475569', transition: 'all 0.15s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#E2E8F0'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#F1F5F9'}
+                >
+                  Volver Atras
+                </button>
+              )}
+            </div>
+
+            {/* NIVEL 1: POR TIPO DE EQUIPO */}
+            {!dashboardTipo && (
+              <div>
+                <p style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '1rem', marginTop: 0 }}>Selecciona un tipo de equipo para ver su distribución por área:</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
+                  {Object.entries(
+                    todosLosEquipos.reduce((acc, curr) => {
+                      const t = curr.tipo || 'otro';
+                      acc[t] = (acc[t] || 0) + 1;
+                      return acc;
+                    }, {})
+                  ).map(([tipo, count]) => {
+                    const eqMeta = TIPOS_EQUIPO.find(t => t.value === tipo);
+                    const label = eqMeta?.label || tipo;
+                    const IconComp = eqMeta?.icon || FaLaptop;
+                    return (
+                      <div
+                        key={tipo}
+                        onClick={() => setDashboardTipo(tipo)}
+                        style={{
+                          backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px',
+                          padding: '1rem', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem'
+                        }}
+                        onMouseOver={e => { e.currentTarget.style.borderColor = '#691B31'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                        onMouseOut={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.transform = 'none'; }}
+                      >
+                        <div style={{ color: '#691B31', fontSize: '1.5rem' }}><IconComp /></div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#334155', textTransform: 'capitalize' }}>{label}</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0F172A' }}>{count}</div>
+                      </div>
+                    );
+                  })}
+                  {todosLosEquipos.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '1.5rem', gridColumn: '1 / -1', color: '#64748b' }}>No hay equipos registrados en el inventario.</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* NIVEL 2: DESGLOSE POR ÁREA */}
+            {dashboardTipo && !dashboardArea && (
+              <div>
+                <p style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '1rem', marginTop: 0 }}>
+                  Distribución de <strong>{TIPOS_EQUIPO.find(t => t.value === dashboardTipo)?.label || dashboardTipo}s</strong> por área. Selecciona una para ver especificaciones de hardware:
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
+                  {Object.entries(
+                    todosLosEquipos
+                      .filter(eq => eq.tipo === dashboardTipo)
+                      .reduce((acc, curr) => {
+                        const area = curr.areaUbicacion || 'Sin Ubicación';
+                        acc[area] = (acc[area] || 0) + 1;
+                        return acc;
+                      }, {})
+                  ).map(([area, count]) => (
+                    <div
+                      key={area}
+                      onClick={() => setDashboardArea(area)}
+                      style={{
+                        backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px',
+                        padding: '1rem', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyItems: 'center', gap: '0.25rem'
+                      }}
+                      onMouseOver={e => { e.currentTarget.style.borderColor = '#691B31'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                      onMouseOut={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.transform = 'none'; }}
+                    >
+                      <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#334155' }}>{area}</div>
+                      <div style={{ fontSize: '1.35rem', fontWeight: '800', color: '#691B31' }}>{count}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748B' }}>Ver Equipos</div>
+                    </div>
+                  ))}
+                  {todosLosEquipos.filter(eq => eq.tipo === dashboardTipo).length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '1.5rem', gridColumn: '1 / -1', color: '#64748b' }}>No hay equipos de este tipo.</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* NIVEL 3: ESPECIFICACIONES DETALLADAS */}
+            {dashboardTipo && dashboardArea && (
+              <div>
+                <p style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '1.25rem', marginTop: 0 }}>
+                  Listado y especificaciones de hardware para <strong>{TIPOS_EQUIPO.find(t => t.value === dashboardTipo)?.label || dashboardTipo}s</strong> en <strong>{dashboardArea}</strong>:
+                </p>
+                <div style={{ overflowX: 'auto', border: '1px solid #E2E8F0', borderRadius: '8px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+                        <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>No. Inv / Serie</th>
+                        <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Marca / Modelo</th>
+                        <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Responsable</th>
+                        {['escritorio', 'laptop', 'servidor'].includes(dashboardTipo) && (
+                          <>
+                            <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Memoria RAM</th>
+                            <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Almacenamiento</th>
+                            <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Procesador</th>
+                          </>
+                        )}
+                        {!['escritorio', 'laptop', 'servidor'].includes(dashboardTipo) && (
+                          <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Detalles</th>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {todosLosEquipos
+                        .filter(eq => eq.tipo === dashboardTipo && (eq.areaUbicacion || 'Sin Ubicación') === dashboardArea)
+                        .map(eq => (
+                          <tr key={eq.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                            <td style={{ padding: '0.75rem 1rem', fontWeight: '500', color: '#1E293B' }}>
+                              <div>Inv: {eq.numeroInventario || '—'}</div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748B' }}>S/N: {eq.numeroSerie || '—'}</div>
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>
+                              {eq.marca || '—'} {eq.modelo || '—'}
+                            </td>
+                            <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>
+                              {eq.responsable || '—'}
+                              {eq.cargoResponsable && <div style={{ fontSize: '0.75rem', color: '#64748B' }}>{eq.cargoResponsable}</div>}
+                            </td>
+                            {['escritorio', 'laptop', 'servidor'].includes(dashboardTipo) && (
+                              <>
+                                <td style={{ padding: '0.75rem 1rem', color: '#0F172A', fontWeight: '600' }}>{eq.detalles?.ram || '—'}</td>
+                                <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>
+                                  {eq.detalles?.almacenamiento || '—'}
+                                  {eq.detalles?.tipoAlmacenamiento && <span style={{ fontSize: '0.75rem', color: '#64748B', marginLeft: '0.25rem' }}>({eq.detalles.tipoAlmacenamiento})</span>}
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>{eq.detalles?.procesador || '—'}</td>
+                              </>
+                            )}
+                            {!['escritorio', 'laptop', 'servidor'].includes(dashboardTipo) && (
+                              <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.8rem' }}>
+                                {Object.entries(eq.detalles || {}).map(([k, v]) => (
+                                  <div key={k}><strong>{k}:</strong> {String(v)}</div>
+                                ))}
+                                {Object.keys(eq.detalles || {}).length === 0 && 'Sin especificaciones'}
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
         <input
           type="text"
@@ -592,7 +838,19 @@ export default function InventarioTecnologico() {
                       <>
                         <div><label style={labelStyle}>Responsable del equipo</label><input type="text" value={form.responsable} onChange={e => setForm({ ...form, responsable: e.target.value })} style={inputStyle} /></div>
                         {(form.tipo === 'escritorio' || form.tipo === 'laptop') && (
-                          <div><label style={labelStyle}>Cargo del responsable</label><input type="text" value={form.cargoResponsable} onChange={e => setForm({ ...form, cargoResponsable: e.target.value })} style={inputStyle} /></div>
+                          <div>
+                            <label style={labelStyle}>Cargo del responsable</label>
+                            <select
+                              value={form.cargoResponsable}
+                              onChange={e => setForm({ ...form, cargoResponsable: e.target.value })}
+                              style={{ ...inputStyle, cursor: 'pointer' }}
+                            >
+                              <option value="">-- Seleccionar Cargo --</option>
+                              {cargosList.map(c => (
+                                <option key={c} value={c}>{c}</option>
+                              ))}
+                            </select>
+                          </div>
                         )}
                       </>
                     )}
@@ -623,7 +881,7 @@ export default function InventarioTecnologico() {
                         </>
                       )}
 
-                       {tieneAlmacenamiento && (
+                      {tieneAlmacenamiento && (
                         <>
                           <CustomSpecSelect
                             label="Almacenamiento (Capacidad)"
@@ -1168,7 +1426,7 @@ const CustomSpecSelect = ({ label, value, options, onChange, placeholder }) => {
   return (
     <div style={{ position: 'relative', width: '100%' }}>
       <label style={labelStyle}>{label}</label>
-      
+
       <div
         onClick={() => setIsOpen(!isOpen)}
         style={{
@@ -1223,7 +1481,7 @@ const CustomSpecSelect = ({ label, value, options, onChange, placeholder }) => {
                 {opt}
               </div>
             ))}
-            
+
             <div
               onClick={handleSelectOtro}
               style={{

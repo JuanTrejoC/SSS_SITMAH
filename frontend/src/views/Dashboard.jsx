@@ -68,7 +68,7 @@ export default function Dashboard() {
   return (
     <div className="main-content-padding" style={{ backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '3rem' }}>
       <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-        
+
         {/* ================= BANNER DE BIENVENIDA ================= */}
         <header
           style={{
@@ -102,10 +102,10 @@ export default function Dashboard() {
                 <span style={{ textTransform: 'capitalize', color: '#f3f4f6' }}>{fechaActual}</span>
               </div>
               <h1 style={{ fontSize: 'clamp(1.35rem, 3.5vw, 2.1rem)', fontWeight: '800', margin: 0, letterSpacing: '-0.02em' }}>
-                ¡Bienvenido{(user?.nombre || user?.username) ? `, ${user.nombre || user.username}` : ''}! 👋
+                ¡Bienvenido{(user?.nombre || user?.username) ? `, ${user.nombre || user.username}` : ''}!
               </h1>
               <p style={{ color: '#E5E7EB', margin: '0.5rem 0 0 0', fontSize: 'clamp(0.875rem, 2vw, 1.05rem)', maxWidth: '650px', opacity: 0.9 }}>
-                Panel general del Sistema de Transporte Metropolitano (SITMAH). Gestiona y monitorea incidencias operativas y de infraestructura en tiempo real.
+                Panel general del Sistema de Transporte Masivo de Hidalgo (SITMAH). Gestiona y monitorea incidencias operativas y de infraestructura en tiempo real.
               </p>
             </div>
 
@@ -188,7 +188,7 @@ export default function Dashboard() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ fontSize: '0.825rem', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Oficinas · Totales
+                  Reportes tecnológicos · Totales
                 </span>
                 <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#111827', lineHeight: 1.1, marginTop: '0.2rem' }}>
                   {totalOficinas}
@@ -237,7 +237,7 @@ export default function Dashboard() {
                   {pendientesOficinas}
                 </div>
                 <span style={{ fontSize: '0.775rem', color: pendientesOficinas > 0 ? '#DC2626' : '#6B7280', fontWeight: '600', display: 'inline-block', marginTop: '0.25rem' }}>
-                  {pendientesOficinas > 0 ? '⚠️ Requieren atención' : '✅ Al día'}
+                  {pendientesOficinas > 0 ? ' Requieren atención' : ' Al día'}
                 </span>
               </div>
             </div>
@@ -274,7 +274,7 @@ export default function Dashboard() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ fontSize: '0.825rem', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Semáforos · Totales
+                  Reportes semafóricos · Totales
                 </span>
                 <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#111827', lineHeight: 1.1, marginTop: '0.2rem' }}>
                   {totalSemaforos}
@@ -323,7 +323,7 @@ export default function Dashboard() {
                   {pendientesSemaforos}
                 </div>
                 <span style={{ fontSize: '0.775rem', color: pendientesSemaforos > 0 ? '#B45309' : '#6B7280', fontWeight: '600', display: 'inline-block', marginTop: '0.25rem' }}>
-                  {pendientesSemaforos > 0 ? '⚠️ En revisión' : '✅ Sin pendientes'}
+                  {pendientesSemaforos > 0 ? ' En revisión' : ' Sin pendientes'}
                 </span>
               </div>
             </div>
@@ -401,7 +401,7 @@ export default function Dashboard() {
                 </div>
 
                 <h3 style={{ color: '#111827', fontSize: '1.2rem', fontWeight: '700', margin: '0 0 0.4rem 0' }}>
-                  Reportes de Oficinas
+                  Reportes Tecnológicos
                 </h3>
                 <p style={{ color: '#6B7280', fontSize: '0.9rem', margin: 0, lineHeight: 1.5 }}>
                   Consulta la lista general, filtra por fecha o estado, gestiona el flujo de atención y exporta reportes en Excel.

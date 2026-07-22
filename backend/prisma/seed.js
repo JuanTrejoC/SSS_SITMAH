@@ -22,7 +22,7 @@ async function main() {
 
   // --- CATÁLOGOS ---
   const areas = ['Recursos Humanos', 'Sistemas', 'Mantenimiento', 'Operaciones', 'Administración'];
-  const sedes = ['Estación Central', 'Terminal Norte', 'Terminal Sur', 'Oficinas Generales', 'Taller Mantenimiento'];
+  const sedes = ['CCGO', 'CETRAM', 'Oficinas Téllez', 'Oficinas Patio Téllez'];
   const categorias = ['Hardware', 'Software', 'Redes', 'Infraestructura', 'Telefonía'];
   const cargos = ['Gerente', 'Supervisor', 'Técnico', 'Analista', 'Asistente'];
   const estaciones = ['Estación 1', 'Estación 2', 'Estación 3', 'Estación 4', 'Estación 5'];

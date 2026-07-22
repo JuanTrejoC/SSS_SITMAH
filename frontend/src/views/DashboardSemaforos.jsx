@@ -253,7 +253,7 @@ export default function DashboardSemaforos() {
               onMouseOver={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#691B31' }}
               onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#4B5563' }}
             >
-              <i className="fa-solid fa-building"></i> Oficinas
+              <i className="fa-solid fa-building"></i> Reportes Tecnológicos
             </button>
 
             <button

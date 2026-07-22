@@ -45,7 +45,7 @@ export default function InventarioHerramientas() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [form, setForm] = useState(getInitialForm());
-  const [sedesList, setSedesList] = useState(['Centro de Control', 'CETRAM']);
+  const [sedesList, setSedesList] = useState(['CCGO', 'CETRAM', 'Oficinas Téllez', 'Oficinas Patio Téllez']);
 
   useEffect(() => {
     const cargarSedes = async () => {

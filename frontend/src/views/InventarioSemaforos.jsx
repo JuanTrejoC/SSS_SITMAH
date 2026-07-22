@@ -115,6 +115,10 @@ export default function InventarioSemaforos() {
   // ESTADOS - CONTROLADORES INSTALADOS
   // ==========================================
   const [controladores, setControladores] = useState([])
+  const [todosLosControladores, setTodosLosControladores] = useState([])
+  const [dbSemaforosTipo, setDbSemaforosTipo] = useState(null)
+  const [dbSemaforosItem, setDbSemaforosItem] = useState(null)
+  const [dbSemaforosExpandido, setDbSemaforosExpandido] = useState(false)
   const [cargandoControladores, setCargandoControladores] = useState(false)
   const [totalControladores, setTotalControladores] = useState(0)
   const [paginaControladores, setPaginaControladores] = useState(1)
@@ -165,6 +169,7 @@ export default function InventarioSemaforos() {
       cargarExistencias()
     } else {
       cargarControladores()
+      cargarTodosLosControladores()
     }
   }, [tabActiva, paginaControladores])
 
@@ -208,6 +213,23 @@ export default function InventarioSemaforos() {
     }
   }
 
+  const cargarTodosLosControladores = async () => {
+    if (!user?.token) return
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/inventario/controladores?page=1&limit=1000`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      })
+      if (res.ok) {
+        const json = await res.json()
+        if (json.ok) {
+          setTodosLosControladores(json.data.items)
+        }
+      }
+    } catch (err) {
+      console.error('Error al cargar todos los controladores:', err)
+    }
+  }
+
   const cargarControladores = async () => {
     if (!user?.token) return
     setCargandoControladores(true)
@@ -221,6 +243,7 @@ export default function InventarioSemaforos() {
         if (json.ok) {
           setControladores(json.data.items)
           setTotalControladores(json.data.total)
+          cargarTodosLosControladores()
         }
       }
     } catch (err) {
@@ -557,6 +580,236 @@ export default function InventarioSemaforos() {
         )}
       </div>
 
+      {/* ================= SEMÁFOROS DASHBOARD INTERACTIVO DRILL-DOWN ================= */}
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        padding: '1.25rem',
+        border: '1px solid #E5E7EB',
+        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+        marginBottom: '2rem'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setDbSemaforosExpandido(!dbSemaforosExpandido)}>
+          <h2 style={{ fontSize: '1.15rem', color: '#1E293B', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ color: '#691B31' }}></span> Dashboard Rápido e Interactivo de {tabActiva === 'existencias' ? 'Existencias' : 'Controladores'}
+          </h2>
+          <button style={{ background: 'none', border: 'none', color: '#691B31', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem' }}>
+            {dbSemaforosExpandido ? '▲ Ocultar' : '▼ Mostrar'}
+          </button>
+        </div>
+
+        {dbSemaforosExpandido && (
+          <div style={{ marginTop: '1.25rem', borderTop: '1px solid #F1F5F9', paddingTop: '1.25rem' }}>
+            {/* BREADCRUMBS Y VOLVER */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: '#64748B', fontWeight: '500' }}>
+                <span style={{ cursor: 'pointer', color: '#691B31' }} onClick={() => { setDbSemaforosTipo(null); setDbSemaforosItem(null); }}>Inicio</span>
+                {dbSemaforosTipo && (
+                  <>
+                    <span>/</span>
+                    <span
+                      style={{ cursor: dbSemaforosItem ? 'pointer' : 'default', color: dbSemaforosItem ? '#691B31' : '#475569', fontWeight: !dbSemaforosItem ? 'bold' : '500' }}
+                      onClick={() => { setDbSemaforosItem(null); }}
+                    >
+                      {tabActiva === 'existencias' ? getCategoriaLabel(dbSemaforosTipo) : dbSemaforosTipo}
+                    </span>
+                  </>
+                )}
+                {dbSemaforosItem && (
+                  <>
+                    <span>/</span>
+                    <span style={{ fontWeight: 'bold', color: '#475569' }}>{dbSemaforosItem}</span>
+                  </>
+                )}
+              </div>
+
+              {(dbSemaforosTipo || dbSemaforosItem) && (
+                <button
+                  onClick={() => {
+                    if (dbSemaforosItem) {
+                      setDbSemaforosItem(null);
+                    } else if (dbSemaforosTipo) {
+                      setDbSemaforosTipo(null);
+                    }
+                  }}
+                  style={{
+                    backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '6px',
+                    padding: '0.35rem 0.75rem', fontSize: '0.825rem', fontWeight: '600', cursor: 'pointer',
+                    color: '#475569', transition: 'all 0.15s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#E2E8F0'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#F1F5F9'}
+                >
+                  Volver Atrás
+                </button>
+              )}
+            </div>
+
+            {/* TAB: EXISTENCIAS (REFACCIONES) */}
+            {tabActiva === 'existencias' && (
+              <>
+                {/* NIVEL 1: POR CATEGORIA */}
+                {!dbSemaforosTipo && (
+                  <div>
+                    <p style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '1rem', marginTop: 0 }}>Selecciona una categoría de componentes para ver las piezas en stock:</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
+                      {Object.entries(
+                        existencias.reduce((acc, curr) => {
+                          const c = curr.categoria || 'componente';
+                          acc[c] = (acc[c] || 0) + curr.cantidad;
+                          return acc;
+                        }, {})
+                      ).map(([cat, totalStock]) => (
+                        <div
+                          key={cat}
+                          onClick={() => setDbSemaforosTipo(cat)}
+                          style={{
+                            backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px',
+                            padding: '1rem', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem'
+                          }}
+                          onMouseOver={e => { e.currentTarget.style.borderColor = '#691B31'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                          onMouseOut={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.transform = 'none'; }}
+                        >
+                          <div style={{ fontSize: '1.5rem' }}>{getCategoriaIcon(cat)}</div>
+                          <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#334155' }}>{getCategoriaLabel(cat)}</div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0F172A' }}>{totalStock} unidades</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* NIVEL 2: LISTADO DE PIEZAS */}
+                {dbSemaforosTipo && (
+                  <div>
+                    <p style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '1rem', marginTop: 0 }}>
+                      Listado de existencias de la categoría <strong>{getCategoriaLabel(dbSemaforosTipo)}</strong>:
+                    </p>
+                    <div style={{ overflowX: 'auto', border: '1px solid #E2E8F0', borderRadius: '8px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', textAlign: 'left' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+                            <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Artículo</th>
+                            <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Marca / Modelo</th>
+                            <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Detalles</th>
+                            <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600', textAlign: 'right' }}>Cantidad</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {existencias
+                            .filter(item => item.categoria === dbSemaforosTipo)
+                            .map(item => (
+                              <tr key={item.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                                <td style={{ padding: '0.75rem 1rem', fontWeight: '700', color: '#1E293B', textTransform: 'capitalize' }}>
+                                  {item.nombre}
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>
+                                  {item.marca || '—'} {item.modelo || '—'}
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.8rem' }}>
+                                  {item.numeroSerie && <div>S/N: {item.numeroSerie}</div>}
+                                  {item.numeroInventario && <div>Inv: {item.numeroInventario}</div>}
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem', textAlign: 'right', fontWeight: '800', color: item.cantidad > 5 ? '#0f766e' : '#b45309', fontSize: '1.1rem' }}>
+                                  {item.cantidad}
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* TAB: CONTROLADORES INSTALADOS */}
+            {tabActiva === 'controladores' && (
+              <>
+                {/* NIVEL 1: POR MODELO */}
+                {!dbSemaforosTipo && (
+                  <div>
+                    <p style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '1rem', marginTop: 0 }}>Selecciona un modelo de controlador para ver sus cruceros instalados:</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
+                      {Object.entries(
+                        todosLosControladores.reduce((acc, curr) => {
+                          const m = curr.modelo || 'Otro';
+                          acc[m] = (acc[m] || 0) + 1;
+                          return acc;
+                        }, {})
+                      ).map(([modelo, count]) => (
+                        <div
+                          key={modelo}
+                          onClick={() => setDbSemaforosTipo(modelo)}
+                          style={{
+                            backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px',
+                            padding: '1rem', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem'
+                          }}
+                          onMouseOver={e => { e.currentTarget.style.borderColor = '#691B31'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                          onMouseOut={e => { e.currentTarget.style.borderColor = '#E2E8F0'; e.currentTarget.style.transform = 'none'; }}
+                        >
+                          <div style={{ color: '#691B31', fontSize: '1.5rem' }}><FaRoad /></div>
+                          <div style={{ fontSize: '0.9rem', fontWeight: '700', color: '#334155' }}>{modelo}</div>
+                          <div style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0F172A' }}>{count} instalados</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* NIVEL 2: CRUCEROS CON EL MODELO */}
+                {dbSemaforosTipo && (
+                  <div>
+                    <p style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '1rem', marginTop: 0 }}>
+                      Desglose de controladores modelo <strong>{dbSemaforosTipo}</strong> instalados en cruceros:
+                    </p>
+                    <div style={{ overflowX: 'auto', border: '1px solid #E2E8F0', borderRadius: '8px' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', textAlign: 'left' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+                            <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Crucero / Ubicación</th>
+                            <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Semáforos (3 L / 4 L)</th>
+                            <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>LEDs (V / R / A)</th>
+                            <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Accesorios Activos</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {todosLosControladores
+                            .filter(ctrl => ctrl.modelo === dbSemaforosTipo)
+                            .map(ctrl => (
+                              <tr key={ctrl.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                                <td style={{ padding: '0.75rem 1rem', fontWeight: '700', color: '#1E293B' }}>
+                                  {ctrl.crucero?.nombre || `Crucero #${ctrl.cruceroId}`}
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>
+                                  3 luces: {ctrl.semaforos3Luces} | 4 luces: {ctrl.semaforos4Luces}
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem', color: '#334155', fontSize: '0.85rem' }}>
+                                  🟢 {ctrl.totalLedsVerdes} | 🔴 {ctrl.totalLedsRojos} | 🟡 {ctrl.totalLedsAmarillos}
+                                </td>
+                                <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.85rem' }}>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                                    {ctrl.pasoPeatonal && <span style={{ backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.75rem' }}>Paso Peatonal</span>}
+                                    {ctrl.audible && <span style={{ backgroundColor: '#f0fdf4', color: '#15803d', padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.75rem' }}>Audible</span>}
+                                    {ctrl.pantallaLed && <span style={{ backgroundColor: '#fff7ed', color: '#c2410c', padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.75rem' }}>Pantalla LED</span>}
+                                    {ctrl.gps && <span style={{ backgroundColor: '#f5f3ff', color: '#6d28d9', padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.75rem' }}>GPS</span>}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* CONTROLES DE PESTAÑA (TABS) */}
       <div style={{ display: 'flex', gap: '1rem', borderBottom: '2px solid #E2E8F0', marginBottom: '2rem' }}>
         <button
@@ -667,7 +920,7 @@ export default function InventarioSemaforos() {
                     }}
                   >
                     <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', backgroundColor: '#691B31' }}></div>
-                    
+
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                       <div>
                         <span style={{
@@ -726,17 +979,7 @@ export default function InventarioSemaforos() {
                         >
                           <FaEdit size={14} />
                         </button>
-                        <button
-                          onClick={() => handleEliminarStock(item.id)}
-                          title="Eliminar refacción"
-                          style={{
-                            backgroundColor: '#fee2e2', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
-                          }}
-                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#fecaca'}
-                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#fee2e2'}
-                        >
-                          <FaTrashAlt size={14} />
-                        </button>
+                        {/* Botón de eliminar deshabilitado según requerimiento (solo se permite ajustar stock) */}
                       </div>
                     </div>
 
@@ -1187,7 +1430,7 @@ export default function InventarioSemaforos() {
                     const nuevoEstado = !todosSeleccionados;
                     const updates = {};
                     keys.forEach(key => { updates[key] = nuevoEstado; });
-                    
+
                     if (!nuevoEstado) {
                       updates.cpuDetalle = '';
                       updates.gpsDetalle = '';
@@ -1208,8 +1451,8 @@ export default function InventarioSemaforos() {
                 >
                   <FaCheckSquare size={16} />
                   {[
-                      'pasoPeatonal', 'audible', 'pantallaLed', 'tarjetaRelevadora',
-                      'fuentePoder', 'cpu', 'switch', 'fibraOptica', 'gps', 'botonera', 'poste'
+                    'pasoPeatonal', 'audible', 'pantallaLed', 'tarjetaRelevadora',
+                    'fuentePoder', 'cpu', 'switch', 'fibraOptica', 'gps', 'botonera', 'poste'
                   ].every(key => controladorForm[key]) ? 'Deseleccionar Todos' : 'Seleccionar Todos'}
                 </button>
               </div>
@@ -1535,32 +1778,32 @@ export default function InventarioSemaforos() {
                         return mesAnio === filtroMesHistorial;
                       })
                       .map((h, i) => (
-                      <tr key={i} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: i % 2 === 0 ? 'white' : '#f8fafc' }}>
-                        <td style={{ padding: '0.75rem 1rem', color: '#475569', whiteSpace: 'nowrap' }}>
-                          {new Date(h.fecha).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' })}
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', color: '#0284c7', fontWeight: '600' }}>{h.reporte?.folio || 'N/A'}</td>
-                        <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>
-                          <div><strong style={{ color: '#334155' }}>Estación:</strong> {h.reporte?.estacion || 'N/A'}</div>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Crucero: {h.reporte?.crucero || 'N/A'}</div>
-                        </td>
-                        <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: '700', color: '#ef4444' }}>
-                          -{h.cantidad}
-                        </td>
-                      </tr>
-                    ))}
+                        <tr key={i} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: i % 2 === 0 ? 'white' : '#f8fafc' }}>
+                          <td style={{ padding: '0.75rem 1rem', color: '#475569', whiteSpace: 'nowrap' }}>
+                            {new Date(h.fecha).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', color: '#0284c7', fontWeight: '600' }}>{h.reporte?.folio || 'N/A'}</td>
+                          <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>
+                            <div><strong style={{ color: '#334155' }}>Estación:</strong> {h.reporte?.estacion || 'N/A'}</div>
+                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Crucero: {h.reporte?.crucero || 'N/A'}</div>
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: '700', color: '#ef4444' }}>
+                            -{h.cantidad}
+                          </td>
+                        </tr>
+                      ))}
                     {historialData.filter(h => {
-                        if (!filtroMesHistorial) return true;
-                        const fecha = new Date(h.fecha);
-                        const mesAnio = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
-                        return mesAnio === filtroMesHistorial;
+                      if (!filtroMesHistorial) return true;
+                      const fecha = new Date(h.fecha);
+                      const mesAnio = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+                      return mesAnio === filtroMesHistorial;
                     }).length === 0 && (
-                      <tr>
-                        <td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
-                          No hay registros de historial {filtroMesHistorial ? 'para el mes seleccionado' : ''}.
-                        </td>
-                      </tr>
-                    )}
+                        <tr>
+                          <td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                            No hay registros de historial {filtroMesHistorial ? 'para el mes seleccionado' : ''}.
+                          </td>
+                        </tr>
+                      )}
                   </tbody>
                 </table>
               </div>

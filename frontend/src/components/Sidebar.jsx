@@ -103,7 +103,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             onClick={closeSidebar}
           >
             <FaFileAlt size={15} />
-            Crear Reporte Oficinas
+            Crear Reporte Tecnológico
           </Link>
         )}
 

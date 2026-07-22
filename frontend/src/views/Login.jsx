@@ -232,7 +232,7 @@ export default function Login() {
                 href="/crear-oficinas"
                 style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.3rem 0.5rem' }}
               >
-                Reporte de Oficinas
+                Reporte Tecnológico
               </a>
               <span style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center' }}>|</span>
               <a

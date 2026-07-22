@@ -407,17 +407,7 @@ export default function InventarioExistencias() {
                     >
                       <FaEdit size={14} />
                     </button>
-                    <button
-                      onClick={() => handleEliminar(item.id)}
-                      title="Eliminar refacción"
-                      style={{
-                        backgroundColor: '#fee2e2', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
-                      }}
-                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#fecaca'}
-                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#fee2e2'}
-                    >
-                      <FaTrashAlt size={14} />
-                    </button>
+                    {/* Botón de eliminar deshabilitado según requerimiento (solo se permite ajustar stock) */}
                   </div>
                 </div>
 

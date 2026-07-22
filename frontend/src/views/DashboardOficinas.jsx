@@ -250,7 +250,7 @@ export default function DashboardOficinas() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h1 style={{ color: '#691B31', fontSize: 'clamp(1.3rem, 3vw, 1.85rem)', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <i className="fa-solid fa-building"></i> Panel de Reportes · Oficinas
+              <i className="fa-solid fa-building"></i> Panel de Reportes Tecnológicos
             </h1>
             <p style={{ color: '#6B7280', margin: '0.25rem 0 0 0', fontSize: '0.9rem' }}>
               Gestión centralizada de solicitudes de servicio e incidencias técnicas en sedes y áreas.
@@ -275,7 +275,7 @@ export default function DashboardOficinas() {
                 boxShadow: '0 2px 6px rgba(105,27,49,0.25)'
               }}
             >
-              <i className="fa-solid fa-building"></i> Oficinas
+              <i className="fa-solid fa-building"></i> Reportes Tecnológicos
             </button>
             <button
               onClick={() => navigate('/dashboard-semaforos')}

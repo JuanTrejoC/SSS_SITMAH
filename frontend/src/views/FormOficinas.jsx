@@ -348,10 +348,10 @@ export default function FormOficinas({ usuarioActual }) {
           </div>
           <div>
             <h1 style={{ fontSize: 'clamp(1.25rem, 3vw, 1.75rem)', fontWeight: '800', margin: 0 }}>
-              Reporte de Incidencia en Oficinas
+              Reporte de Incidencia Tecnológicas
             </h1>
             <p style={{ color: '#E5E7EB', margin: '0.35rem 0 0 0', fontSize: 'clamp(0.85rem, 2vw, 0.95rem)', opacity: 0.9 }}>
-              Diligencie los campos a continuación para solicitar soporte técnico o reporte de mantenimiento informático y administrativo.
+              Complete los campos a continuación para solicitar soporte técnico o reporte de mantenimiento tecnológico.
             </p>
           </div>
         </div>

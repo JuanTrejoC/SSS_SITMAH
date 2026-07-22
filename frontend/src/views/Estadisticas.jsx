@@ -221,7 +221,7 @@ export default function Estadisticas() {
           <div className="graficas-flex-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem' }}>
             {/* GRÁFICO OFICINAS */}
             <div className="grafico-card" style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <h3 style={{ marginBottom: '0.5rem', color: '#000000', fontWeight: '600', fontSize: '1.2rem', textAlign: 'center' }}>Reportes de Oficinas</h3>
+              <h3 style={{ marginBottom: '0.5rem', color: '#000000', fontWeight: '600', fontSize: '1.2rem', textAlign: 'center' }}>Reportes Tecnológicos</h3>
               <div style={{ fontSize: '1.6rem', fontWeight: '700', color: '#691B31', marginBottom: '1.5rem', textAlign: 'center' }}>
                 Total: {datosOficina.total}
               </div>
@@ -257,7 +257,7 @@ export default function Estadisticas() {
             <div className="no-print responsive-flex" style={{ gap: '0.8rem', marginBottom: '1.5rem' }}>
               {[
                 { id: 'total', label: 'Todos' },
-                { id: 'Oficina', label: 'Reportes de Oficinas' },
+                { id: 'Oficina', label: 'Reportes Tecnológicos' },
                 { id: 'Semáforo', label: 'Reportes de Semáforos' }
               ].map(btn => (
                 <button
@@ -282,9 +282,9 @@ export default function Estadisticas() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
               {(filtroLista === 'total' || filtroLista === 'Oficina') && (
                 <div className="print-break-inside-avoid">
-                  <h3 style={{ color: '#691B31', borderBottom: '2px solid #691B31', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Oficinas</h3>
+                  <h3 style={{ color: '#691B31', borderBottom: '2px solid #691B31', paddingBottom: '0.5rem', marginBottom: '1rem' }}>Reportes Tecnológicos</h3>
                   {reportesList.filter(r => r.tipo === 'Oficina').length === 0 ? (
-                    <p style={{ color: '#6F7271' }}>No hay reportes de oficinas en este periodo.</p>
+                    <p style={{ color: '#6F7271' }}>No hay reportes tecnológicos en este periodo.</p>
                   ) : (
                     <div className="overflow-x-auto">
                       <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
