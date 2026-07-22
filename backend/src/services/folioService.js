@@ -1,7 +1,7 @@
 const prisma = require('../config/db');
 
 async function generarFolio(tipo) {
-  const prefijo = tipo === 'oficina' ? 'RO' : 'RS';
+  const prefijo = tipo === 'oficina' ? 'RT' : 'RS';
   const anio = new Date().getFullYear();
 
   const inicioAnio = new Date(`${anio}-01-01T00:00:00`);
@@ -19,11 +19,10 @@ async function generarFolio(tipo) {
     });
   }
 
-  // ✅ Aquí el cambio clave: 2 dígitos mínimo, sin límite
+  // Generar secuencia con padding de 2 dígitos
   const secuencia = String(count + 1).padStart(2, '0');
-  const anioCorto = String(anio).slice(-2);
 
-  return `${prefijo}-${secuencia}-${anioCorto}`;
+  return `${prefijo}-${secuencia}-${anio}`;
 }
 
 module.exports = { generarFolio };

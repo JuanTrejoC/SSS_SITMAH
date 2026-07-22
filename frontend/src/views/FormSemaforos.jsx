@@ -335,7 +335,7 @@ export default function FormSemaforos({ usuarioActual }) {
           </div>
           <div>
             <h1 style={{ fontSize: 'clamp(1.25rem, 3vw, 1.75rem)', fontWeight: '800', margin: 0 }}>
-              Reporte de Infraestructura Vial y Semáforos
+              Reporte Semafórico de Infraestructura Vial
             </h1>
             <p style={{ color: '#E5E7EB', margin: '0.35rem 0 0 0', fontSize: 'clamp(0.85rem, 2vw, 0.95rem)', opacity: 0.9 }}>
               Reporte incidencias operativas, fallas de controlador, focos fundidos o averías en cruceros del sistema de transporte.

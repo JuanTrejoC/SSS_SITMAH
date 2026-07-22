@@ -308,7 +308,7 @@ export default function DashboardOficinas() {
               onMouseOver={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#691B31' }}
               onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#4B5563' }}
             >
-              <i className="fa-solid fa-traffic-light"></i> Semáforos
+              <i className="fa-solid fa-traffic-light"></i> Reportes Semafóricos
             </button>
           </div>
         </div>

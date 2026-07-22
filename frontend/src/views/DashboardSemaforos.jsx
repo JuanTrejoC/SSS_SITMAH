@@ -233,7 +233,7 @@ export default function DashboardSemaforos() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h1 style={{ color: '#BC955B', fontSize: 'clamp(1.3rem, 3vw, 1.85rem)', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <i className="fa-solid fa-traffic-light"></i> Panel de Reportes · Semáforos
+              <i className="fa-solid fa-traffic-light"></i> Panel de Reportes Semafóricos
             </h1>
             <p style={{ color: '#6B7280', margin: '0.25rem 0 0 0', fontSize: '0.9rem' }}>
               Control de averías en intersecciones viales, mantenimiento de controladores y asignación de piezas.
@@ -280,7 +280,7 @@ export default function DashboardSemaforos() {
                 boxShadow: '0 2px 6px rgba(188, 149, 91, 0.3)'
               }}
             >
-              <i className="fa-solid fa-traffic-light"></i> Semáforos
+              <i className="fa-solid fa-traffic-light"></i> Reportes Semafóricos
             </button>
           </div>
         </div>

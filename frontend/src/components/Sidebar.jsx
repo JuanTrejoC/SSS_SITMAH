@@ -117,7 +117,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             onClick={closeSidebar}
           >
             <FaRoad size={15} />
-            Crear Reporte Semáforos
+            Crear Reporte Semafórico
           </Link>
         )}
       </div>

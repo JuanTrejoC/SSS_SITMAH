@@ -231,7 +231,7 @@ export default function Dashboard() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ fontSize: '0.825rem', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Oficinas · Pendientes
+                  Reportes tecnológicos · Pendientes
                 </span>
                 <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#111827', lineHeight: 1.1, marginTop: '0.2rem' }}>
                   {pendientesOficinas}
@@ -317,7 +317,7 @@ export default function Dashboard() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ fontSize: '0.825rem', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Semáforos · Pendientes
+                  Reportes semafóricos · Pendientes
                 </span>
                 <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#111827', lineHeight: 1.1, marginTop: '0.2rem' }}>
                   {pendientesSemaforos}
@@ -474,7 +474,7 @@ export default function Dashboard() {
                 </div>
 
                 <h3 style={{ color: '#111827', fontSize: '1.2rem', fontWeight: '700', margin: '0 0 0.4rem 0' }}>
-                  Reportes de Semáforos
+                  Reportes Semafóricos
                 </h3>
                 <p style={{ color: '#6B7280', fontSize: '0.9rem', margin: 0, lineHeight: 1.5 }}>
                   Administración de averías de semáforos, control de fallas por intersección, asignación de mantenimiento y descargas de reportes.
