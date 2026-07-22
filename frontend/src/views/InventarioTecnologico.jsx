@@ -52,6 +52,8 @@ export default function InventarioTecnologico() {
   const [dashboardTipo, setDashboardTipo] = useState(null);
   const [dashboardArea, setDashboardArea] = useState(null);
   const [dashboardExpandido, setDashboardExpandido] = useState(false);
+  const [sedesList, setSedesList] = useState([]);
+  const [cargosList, setCargosList] = useState([]);
 
   const cargarTodosLosEquipos = async () => {
     try {
