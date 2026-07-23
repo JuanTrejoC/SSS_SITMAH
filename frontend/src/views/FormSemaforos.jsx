@@ -60,15 +60,18 @@ export default function FormSemaforos({ usuarioActual }) {
 
   // Filtrar cruceros cuando cambia la estación
   useEffect(() => {
-    if (formData.estacion_id && listaCruceros.length > 0) {
-      const filtrados = listaCruceros.filter(
-        c => String(c.estacion_id) === String(formData.estacion_id)
-      )
-      setCrucerosFiltrados(filtrados.length > 0 ? filtrados : listaCruceros)
+    if (formData.estacion_id && listaEstaciones.length > 0) {
+      const estacionSeleccionada = listaEstaciones.find(e => String(e.id) === String(formData.estacion_id))
+      if (estacionSeleccionada && estacionSeleccionada.cruceros) {
+        const filtrados = estacionSeleccionada.cruceros.map(ec => ec.crucero).filter(Boolean)
+        setCrucerosFiltrados(filtrados)
+      } else {
+        setCrucerosFiltrados([])
+      }
     } else {
       setCrucerosFiltrados(listaCruceros)
     }
-  }, [formData.estacion_id, listaCruceros])
+  }, [formData.estacion_id, listaEstaciones, listaCruceros])
 
   // Solo letras, espacios y signos permitidos
   const soloLetras = (texto) => {
