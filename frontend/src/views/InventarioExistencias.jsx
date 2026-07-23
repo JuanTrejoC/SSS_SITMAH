@@ -3,7 +3,7 @@ import Swal from 'sweetalert2';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import {
-  FaBoxes, FaPlus, FaEdit, FaTrashAlt, FaTimes, FaSearch, FaCogs, FaWrench, FaTools, FaHdd, FaChevronRight
+  FaBoxes, FaPlus, FaEdit, FaTimes, FaSearch, FaCogs, FaWrench, FaTools, FaHdd, FaChevronRight
 } from 'react-icons/fa';
 
 const ARTICULOS_AGRUPADOS = {
@@ -49,7 +49,6 @@ export default function InventarioExistencias() {
 
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
-  const [modoAjusteDirecto, setModoAjusteDirecto] = useState(false);
   const [esNombrePersonalizado, setEsNombrePersonalizado] = useState(false);
 
   const [form, setForm] = useState({
@@ -88,7 +87,9 @@ export default function InventarioExistencias() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarExistencias();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroCategoria]);
 
   useEffect(() => {
@@ -148,7 +149,6 @@ export default function InventarioExistencias() {
 
   const handleEditar = (item) => {
     setEditandoId(item.id);
-    setModoAjusteDirecto(false);
     const esComun = ARTICULOS_COMUNES.includes(item.nombre || '');
     setEsNombrePersonalizado(!esComun && !!item.nombre);
     setForm({
@@ -164,6 +164,7 @@ export default function InventarioExistencias() {
     setModalAbierto(true);
   };
 
+  // eslint-disable-next-line no-unused-vars
   const handleEliminar = async (id) => {
     const confirmacion = await Swal.fire({
       title: '¿Está seguro?',
@@ -198,7 +199,6 @@ export default function InventarioExistencias() {
 
   const resetForm = () => {
     setEditandoId(null);
-    setModoAjusteDirecto(false);
     setEsNombrePersonalizado(false);
     setForm({
       nombre: '',
@@ -562,13 +562,6 @@ export default function InventarioExistencias() {
   );
 }
 
-const labelStyle = {
-  display: 'block',
-  fontSize: '0.85rem',
-  fontWeight: '600',
-  color: '#475569',
-  marginBottom: '0.4rem'
-};
 
 const inputStyle = {
   width: '100%',

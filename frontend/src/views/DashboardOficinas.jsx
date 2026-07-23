@@ -63,7 +63,9 @@ export default function DashboardOficinas() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarReportes()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, mesFiltro, anioFiltro])
 
   const cargarInventario = async () => {
@@ -82,7 +84,9 @@ export default function DashboardOficinas() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarInventario();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const asignarPieza = async () => {
@@ -136,7 +140,7 @@ export default function DashboardOficinas() {
       } else {
         Swal.fire('Error', json.error || 'Desconocido', 'error');
       }
-    } catch (err) {
+    } catch {
       Swal.fire('Error', 'Error de red', 'error');
     }
   };

@@ -93,14 +93,15 @@ export default function FormOficinas({ usuarioActual }) {
         else esValido = true
         break
 
-      case 'email':
+      case 'email': {
         const regexCorreo = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
         if (!valor) mensajeError = 'Campo obligatorio'
         else if (!regexCorreo.test(valor)) mensajeError = 'Correo inválido (ej: nombre@dominio.com)'
         else esValido = true
         break
+      }
 
-      case 'telefono':
+      case 'telefono': {
         const soloNumeros = valor.replace(/[^0-9]/g, '')
         if (valor !== soloNumeros) {
           setFormData(prev => ({ ...prev, telefono: soloNumeros }))
@@ -109,6 +110,7 @@ export default function FormOficinas({ usuarioActual }) {
         else if (soloNumeros.length !== 10) mensajeError = 'Debe tener 10 dígitos'
         else esValido = true
         break
+      }
 
       case 'descripcion_otro':
         if (mostrarOtro && !valor) mensajeError = 'Especifique la categoría'

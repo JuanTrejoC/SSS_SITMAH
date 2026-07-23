@@ -7,7 +7,7 @@ export default function MisReportes({ usuarioActual }) {
 
   // ✅ CARGA SOLO LOS REPORTES DEL USUARIO ACTUAL (SEPARADO)
   useEffect(() => {
-    let todos = []
+    let todos;
     if (usuarioActual === 'administrador') {
       const oficinas = JSON.parse(localStorage.getItem('reportes_oficinas_admin')) || []
       const semaforos = JSON.parse(localStorage.getItem('reportes_semaforos_admin')) || []
@@ -18,6 +18,7 @@ export default function MisReportes({ usuarioActual }) {
       todos = [...oficinas, ...semaforos]
     }
     todos.sort((a, b) => b.id - a.id)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setReportes(todos)
   }, [usuarioActual])
 

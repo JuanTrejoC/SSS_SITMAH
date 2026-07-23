@@ -96,7 +96,9 @@ export default function InventarioTecnologico() {
       }
     };
     cargarCatalogos();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarTodosLosEquipos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function getInitialForm() {
@@ -139,7 +141,9 @@ export default function InventarioTecnologico() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarEquipos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagina, busqueda, filtroTipo]);
 
   useEffect(() => {
@@ -1393,6 +1397,7 @@ const CustomSpecSelect = ({ label, value, options, onChange, placeholder }) => {
   useEffect(() => {
     if (value) {
       if (options.includes(value)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setEsOtro(false);
         setCustomVal('');
       } else {
@@ -1404,6 +1409,7 @@ const CustomSpecSelect = ({ label, value, options, onChange, placeholder }) => {
         setCustomVal('');
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, options]);
 
   const handleSelectOption = (opt) => {

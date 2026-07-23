@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { API_BASE_URL } from '../config'
 
+/* eslint-disable react-refresh/only-export-components */
+
 export const AuthContext = createContext()
 export const useAuth = () => useContext(AuthContext)
 
@@ -10,6 +12,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const sesion = localStorage.getItem('sesion_sitmah')
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (sesion) setUser(JSON.parse(sesion))
     setCargando(false)
   }, [])

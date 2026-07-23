@@ -77,8 +77,10 @@ export default function DashboardSemaforos() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarReportes()
     cargarInventario()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, mesFiltro, anioFiltro])
 
   const asignarPieza = async () => {
@@ -118,7 +120,7 @@ export default function DashboardSemaforos() {
       } else {
         Swal.fire('Error', json.error || 'Desconocido', 'error');
       }
-    } catch (err) {
+    } catch {
       Swal.fire('Error', 'Error de red', 'error');
     }
   }

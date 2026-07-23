@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   FaUsersCog, FaBuilding, FaMapMarkerAlt, FaTags,
-  FaEnvelope, FaPlus, FaEdit, FaTrashAlt, FaToggleOn, FaToggleOff,
+  FaEnvelope, FaEdit, FaTrashAlt, FaToggleOff,
   FaIdBadge, FaBus, FaTrafficLight, FaExclamationTriangle, FaLink
 } from 'react-icons/fa'
 import Swal from 'sweetalert2'
@@ -231,9 +231,9 @@ export default function ConfigAdmin() {
     e.preventDefault()
     if (!user?.token) return
 
-    let url = ''
+    let url
     let metodo = editandoId ? 'PUT' : 'POST'
-    let payload = {}
+    let payload
 
     // Validación y construcción de payload
     if (catalogoSeleccionado === 'usuarios') {

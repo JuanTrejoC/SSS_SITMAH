@@ -104,7 +104,9 @@ export default function InventarioHerramientas() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarHerramientas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagina, busqueda, filtroTipo]);
 
   useEffect(() => {

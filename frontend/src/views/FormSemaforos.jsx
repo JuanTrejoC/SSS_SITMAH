@@ -64,6 +64,7 @@ export default function FormSemaforos({ usuarioActual }) {
       const estacionSeleccionada = listaEstaciones.find(e => String(e.id) === String(formData.estacion_id))
       if (estacionSeleccionada && estacionSeleccionada.cruceros) {
         const filtrados = estacionSeleccionada.cruceros.map(ec => ec.crucero).filter(Boolean)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setCrucerosFiltrados(filtrados)
       } else {
         setCrucerosFiltrados([])

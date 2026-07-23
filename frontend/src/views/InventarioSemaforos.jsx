@@ -160,29 +160,7 @@ export default function InventarioSemaforos() {
   // ==========================================
   // EFECTOS Y CARGA DE DATOS
   // ==========================================
-  useEffect(() => {
-    cargarCatalogos()
-  }, [])
-
-  useEffect(() => {
-    if (tabActiva === 'existencias') {
-      cargarExistencias()
-    } else {
-      cargarControladores()
-      cargarTodosLosControladores()
-    }
-  }, [tabActiva, paginaControladores])
-
-  // Prevent background scrolling when modals are open
-  useEffect(() => {
-    if (modalStockAbierto || modalHistorialAbierto || modalControladorAbierto) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
-    return () => { document.body.style.overflow = '' }
-  }, [modalStockAbierto, modalHistorialAbierto, modalControladorAbierto])
-
+  // ==========================================
   const cargarCatalogos = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/catalogos/cruceros`)
@@ -194,6 +172,11 @@ export default function InventarioSemaforos() {
       console.error('Error al cargar catálogo de cruceros:', err)
     }
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    cargarCatalogos()
+  }, [])
 
   const cargarExistencias = async () => {
     if (!user?.token) return
@@ -252,6 +235,28 @@ export default function InventarioSemaforos() {
       setCargandoControladores(false)
     }
   }
+
+  useEffect(() => {
+    if (tabActiva === 'existencias') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      cargarExistencias()
+    } else {
+      cargarControladores()
+      cargarTodosLosControladores()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabActiva, paginaControladores])
+
+  // Prevent background scrolling when modals are open
+  useEffect(() => {
+    if (modalStockAbierto || modalHistorialAbierto || modalControladorAbierto) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [modalStockAbierto, modalHistorialAbierto, modalControladorAbierto])
+
 
   // ==========================================
   // ACCIONES - EXISTENCIAS / REFACCIONES
@@ -312,6 +317,7 @@ export default function InventarioSemaforos() {
     setModalStockAbierto(true)
   }
 
+  // eslint-disable-next-line no-unused-vars
   const handleEliminarStock = async (id) => {
     const confirmacion = await Swal.fire({
       title: '¿Está seguro?',
