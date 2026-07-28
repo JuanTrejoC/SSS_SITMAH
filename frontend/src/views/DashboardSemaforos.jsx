@@ -88,6 +88,17 @@ export default function DashboardSemaforos() {
       Swal.fire('Atención', 'Seleccione un componente e ingrese cantidad válida', 'warning');
       return;
     }
+
+    const result = await Swal.fire({
+        title: '¿Confirmar?',
+        text: `¿Confirmas asignar ${cantidadAsignar} piezas de este componente?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, asignar',
+        cancelButtonText: 'Cancelar'
+    });
+    if (!result.isConfirmed) return;
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/admin/reportes/semaforo/${verDetalle.id}/piezas`, {
         method: 'POST',

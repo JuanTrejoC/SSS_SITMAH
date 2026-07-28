@@ -636,4 +636,10 @@ input, select, textarea {
   background-position: right 0.85rem center;
   background-size: 1.15rem;
 }
-
+
+/* ============================================================
+   SWEETALERT2 Z-INDEX FIX
+   ============================================================ */
+.swal2-container {
+  z-index: 9999 !important;
+}
