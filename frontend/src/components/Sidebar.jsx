@@ -122,12 +122,14 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         )}
       </div>
 
-      {/* SECCIÓN: ADMINISTRACIÓN — solo admin */}
-      {user?.rol === 'administrador' && (
+      {/* SECCIÓN: ADMINISTRACIÓN — admin e infraestructura */}
+      {(user?.rol === 'administrador' || user?.rol === 'infraestructura') && (
         <div style={{ marginBottom: '1.5rem' }}>
           <p className="sidebar-section-label">Administración</p>
 
-          <Link
+          {user?.rol === 'administrador' && (
+            <>
+              <Link
             to="/estadisticas"
             style={linkStyle('/estadisticas')}
             onMouseOver={linkHover('/estadisticas').over}
@@ -178,9 +180,11 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             onMouseOut={linkHover('/inventario-existencias').out}
             onClick={closeSidebar}
           >
-            <FaBoxes size={15} />
-            Inventario de Existencias
-          </Link>
+              <FaBoxes size={15} />
+              Inventario de Existencias
+            </Link>
+            </>
+          )}
 
           <Link
             to="/inventario-herramientas"
@@ -196,7 +200,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       )}
 
       {/* REDES SOCIALES — solo solicitante */}
-      {user?.rol !== 'administrador' && (
+      {(user?.rol !== 'administrador' && user?.rol !== 'infraestructura') && (
         <div style={{
           marginTop: 'auto',
           paddingTop: '1.25rem',

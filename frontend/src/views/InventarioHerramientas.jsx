@@ -66,7 +66,7 @@ export default function InventarioHerramientas() {
 
   function getInitialForm() {
     return {
-      tipo: 'herramienta_tec',
+      tipo: user?.rol === 'infraestructura' ? 'herramienta_infra' : 'herramienta_tec',
       numeroInventario: '',
       numeroSerie: '',
       marca: '',
@@ -358,11 +358,13 @@ export default function InventarioHerramientas() {
           />
           <FaSearch style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
         </div>
-        <CustomFilterSelect
-          value={filtroTipo}
-          onChange={(val) => { setFiltroTipo(val); setPagina(1); }}
-          opciones={TIPOS_HERRAMIENTA}
-        />
+        {user?.rol !== 'infraestructura' && (
+          <CustomFilterSelect
+            value={filtroTipo}
+            onChange={(val) => { setFiltroTipo(val); setPagina(1); }}
+            opciones={TIPOS_HERRAMIENTA}
+          />
+        )}
       </div>
 
       {cargando ? (
@@ -452,13 +454,15 @@ export default function InventarioHerramientas() {
               {editandoId ? 'Actualizar Herramienta' : 'Registrar Nueva Herramienta'}
             </h2>
             <form onSubmit={handleGuardar}>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={labelStyle}>Tipo de Herramienta *</label>
-                <CustomToolTypeSelect
-                  value={form.tipo}
-                  onChange={nuevoTipo => setForm(prev => ({ ...prev, tipo: nuevoTipo }))}
-                />
-              </div>
+              {user?.rol !== 'infraestructura' && (
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={labelStyle}>Tipo de Herramienta *</label>
+                  <CustomToolTypeSelect
+                    value={form.tipo}
+                    onChange={nuevoTipo => setForm(prev => ({ ...prev, tipo: nuevoTipo }))}
+                  />
+                </div>
+              )}
 
               <div className="inventario-grid-2col">
                 {/* Dynamic fields */}

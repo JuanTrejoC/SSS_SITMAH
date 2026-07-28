@@ -12,7 +12,15 @@ export default function Login() {
   const [cargando, setCargando] = useState(false)
   const [errores, setErrores] = useState({ usuario: false, contrasena: false })
 
-  if (user) return <Navigate to="/dashboard" replace />
+  if (user) {
+    if (user.rol === 'infraestructura') {
+      return <Navigate to="/inventario-herramientas" replace />
+    }
+    if (user.rol === 'administrador') {
+      return <Navigate to="/dashboard" replace />
+    }
+    return <Navigate to="/crear-oficinas" replace />
+  }
 
   const manejarCambio = (e) => {
     const { name, value } = e.target
@@ -27,7 +35,15 @@ export default function Login() {
     setCargando(true)
     const res = await loginAdmin(datos)
     setCargando(false)
-    if (res.ok) window.location.href = '/dashboard'
+    if (res.ok) {
+      if (res.user?.rol === 'infraestructura') {
+        window.location.href = '/inventario-herramientas'
+      } else if (res.user?.rol === 'administrador') {
+        window.location.href = '/dashboard'
+      } else {
+        window.location.href = '/crear-oficinas'
+      }
+    }
     else setError(res.error || 'Credenciales incorrectas')
   }
 

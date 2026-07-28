@@ -1,19 +1,20 @@
 const express = require('express');
 const asyncHandler = require('../utils/asyncHandler');
 const authAdmin = require('../middleware/authAdmin');
+const authAdminOrInfra = require('../middleware/authAdminOrInfra');
 const inventario = require('../controllers/inventarioController');
 
 const router = express.Router();
 
-// Apply authAdmin middleware to all inventory routes
-router.use(authAdmin);
+// Technological Equipment Routes (Herramientas & Tecnologico)
+router.get('/tecnologico', authAdminOrInfra, asyncHandler(inventario.listarEquipoTecnologico));
+router.post('/tecnologico', authAdminOrInfra, asyncHandler(inventario.crearEquipoTecnologico));
+router.get('/tecnologico/:id', authAdminOrInfra, asyncHandler(inventario.obtenerEquipoTecnologico));
+router.put('/tecnologico/:id', authAdminOrInfra, asyncHandler(inventario.actualizarEquipoTecnologico));
+router.delete('/tecnologico/:id', authAdminOrInfra, asyncHandler(inventario.eliminarEquipoTecnologico));
 
-// Technological Equipment Routes
-router.get('/tecnologico', asyncHandler(inventario.listarEquipoTecnologico));
-router.post('/tecnologico', asyncHandler(inventario.crearEquipoTecnologico));
-router.get('/tecnologico/:id', asyncHandler(inventario.obtenerEquipoTecnologico));
-router.put('/tecnologico/:id', asyncHandler(inventario.actualizarEquipoTecnologico));
-router.delete('/tecnologico/:id', asyncHandler(inventario.eliminarEquipoTecnologico));
+// Apply authAdmin middleware to all remaining inventory routes
+router.use(authAdmin);
 
 // Traffic Light Controllers Routes
 router.get('/controladores', asyncHandler(inventario.listarControladoresSemaforo));

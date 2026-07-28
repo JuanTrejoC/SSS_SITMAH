@@ -70,14 +70,18 @@ async function listarEquipoTecnologico(req, res) {
   const { tipo, area, search } = req.query;
 
   const where = {};
-  if (tipo === 'herramientas') {
-    where.tipo = { in: ['herramienta_tec', 'herramienta_infra'] };
-  } else if (tipo === 'tecnologico') {
-    where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra'] };
-  } else if (tipo) {
-    where.tipo = tipo;
+  if (req.usuario && req.usuario.rol === 'infraestructura') {
+    where.tipo = 'herramienta_infra';
   } else {
-    where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra'] };
+    if (tipo === 'herramientas') {
+      where.tipo = { in: ['herramienta_tec', 'herramienta_infra'] };
+    } else if (tipo === 'tecnologico') {
+      where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra'] };
+    } else if (tipo) {
+      where.tipo = tipo;
+    } else {
+      where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra'] };
+    }
   }
   if (area) where.areaUbicacion = { contains: area };
 
@@ -110,6 +114,9 @@ async function crearEquipoTecnologico(req, res) {
   if (!parsed.success) return fail(res, parsed.error.errors[0].message);
 
   const data = parsed.data;
+  if (req.usuario && req.usuario.rol === 'infraestructura' && data.tipo !== 'herramienta_infra') {
+    return fail(res, 'No autorizado para crear este tipo de equipo', 403);
+  }
 
   // Validate unique inventory number if provided
   if (data.numeroInventario) {
@@ -142,6 +149,9 @@ async function obtenerEquipoTecnologico(req, res) {
   const id = Number(req.params.id);
   const equipo = await prisma.equipoTecnologico.findUnique({ where: { id } });
   if (!equipo) return fail(res, 'Equipo tecnológico no encontrado', 404);
+  if (req.usuario && req.usuario.rol === 'infraestructura' && equipo.tipo !== 'herramienta_infra') {
+    return fail(res, 'No autorizado para ver este equipo', 403);
+  }
   ok(res, equipo);
 }
 
@@ -154,6 +164,9 @@ async function actualizarEquipoTecnologico(req, res) {
 
   const actual = await prisma.equipoTecnologico.findUnique({ where: { id } });
   if (!actual) return fail(res, 'Equipo tecnológico no encontrado', 404);
+  if (req.usuario && req.usuario.rol === 'infraestructura' && (actual.tipo !== 'herramienta_infra' || data.tipo !== 'herramienta_infra')) {
+    return fail(res, 'No autorizado para modificar este equipo', 403);
+  }
 
   // Validate unique inventory number if it changed
   if (data.numeroInventario && data.numeroInventario !== actual.numeroInventario) {
@@ -187,6 +200,9 @@ async function eliminarEquipoTecnologico(req, res) {
   const id = Number(req.params.id);
   const existe = await prisma.equipoTecnologico.findUnique({ where: { id } });
   if (!existe) return fail(res, 'Equipo tecnológico no encontrado', 404);
+  if (req.usuario && req.usuario.rol === 'infraestructura' && existe.tipo !== 'herramienta_infra') {
+    return fail(res, 'No autorizado para eliminar este equipo', 403);
+  }
 
   await prisma.equipoTecnologico.delete({ where: { id } });
   ok(res, { message: 'Equipo tecnológico eliminado correctamente' });

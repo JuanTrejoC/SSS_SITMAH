@@ -49,7 +49,7 @@ export const AuthProvider = ({ children }) => {
 
         setUser(usuario)
         localStorage.setItem('sesion_sitmah', JSON.stringify(usuario))
-        return { ok: true }
+        return { ok: true, user: usuario }
       } else {
         return { ok: false, error: resultado.error || 'Usuario o contraseña incorrectos' }
       }

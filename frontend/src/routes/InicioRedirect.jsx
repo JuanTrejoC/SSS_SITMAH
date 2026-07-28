@@ -12,5 +12,9 @@ export default function InicioRedirect() {
     return <Navigate to="/dashboard" replace />
   }
 
+  if (user?.rol === 'infraestructura') {
+    return <Navigate to="/inventario-herramientas" replace />
+  }
+
   return <Navigate to="/crear-oficinas" replace />
 }

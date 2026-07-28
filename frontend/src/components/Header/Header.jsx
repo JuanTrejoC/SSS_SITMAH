@@ -48,6 +48,8 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
     }
     if (user.rol === 'administrador') {
       navigate('/dashboard');
+    } else if (user.rol === 'infraestructura') {
+      navigate('/inventario-herramientas');
     } else {
       navigate('/crear-oficinas');
     }
@@ -69,7 +71,11 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
     const res = await loginAdmin(datosLogin);
     if (res.ok) {
       setMostrarLogin(false);
-      navigate('/dashboard');
+      if (res.user?.rol === 'infraestructura') {
+        navigate('/inventario-herramientas');
+      } else {
+        navigate('/dashboard');
+      }
     } else {
       Swal.fire('Error', res.error, 'error');
     }

@@ -16,6 +16,18 @@ export function RutaSoloAdmin() {
   return <Outlet />
 }
 
+export function RutaAdminOrInfra() {
+  const { user, cargando } = useAuth()
+
+  if (cargando) return null
+
+  if (!user || (user.rol !== 'administrador' && user.rol !== 'infraestructura')) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <Outlet />
+}
+
 // SOLO SOLICITANTE: redirige al admin al dashboard si intenta crear reportes
 export function RutaSoloSolicitante() {
   const { user, cargando } = useAuth()

@@ -1,5 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom'
-import { RutaSoloAdmin, RutaSoloSolicitante } from './RutasProtegidas'
+import { RutaSoloAdmin, RutaSoloSolicitante, RutaAdminOrInfra } from './RutasProtegidas'
 import InicioRedirect from './InicioRedirect'
 import Layout from '../components/Layout'
 
@@ -43,7 +43,14 @@ const router = createBrowserRouter([
           { path: '/dashboard-semaforos', element: <DashboardSemaforos /> },
           { path: '/inventario-semaforos', element: <InventarioSemaforos /> },
           { path: '/inventario-tecnologico', element: <InventarioTecnologico /> },
-          { path: '/inventario-existencias', element: <InventarioExistencias /> },
+          { path: '/inventario-existencias', element: <InventarioExistencias /> }
+        ]
+      },
+
+      // ADMIN OR INFRA: Protegido
+      {
+        element: <RutaAdminOrInfra />,
+        children: [
           { path: '/inventario-herramientas', element: <InventarioHerramientas /> }
         ]
       }
