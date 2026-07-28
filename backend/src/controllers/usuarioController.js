@@ -8,6 +8,7 @@ const usuarioSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6).optional(),
   nombre: z.string().min(1).max(100),
+  rol: z.enum(['admin', 'infraestructura', 'administrador']).optional(),
 });
 
 function sinPassword(usuario) {
@@ -24,13 +25,14 @@ async function crear(req, res) {
   const parsed = usuarioSchema.safeParse(req.body);
   if (!parsed.success) return fail(res, parsed.error.errors[0].message);
 
-  const { username, email, password, nombre } = parsed.data;
+  const { username, email, password, nombre, rol } = parsed.data;
   if (!password) return fail(res, 'La contraseña es requerida al crear usuario');
 
   const passwordHash = await bcrypt.hash(password, 10);
+  const rolAsignado = rol === 'administrador' ? 'admin' : (rol || 'admin');
 
   const usuario = await prisma.usuario.create({
-    data: { username, email, passwordHash, nombre, rol: 'admin' },
+    data: { username, email, passwordHash, nombre, rol: rolAsignado },
   });
 
   ok(res, sinPassword(usuario), 201);
@@ -45,6 +47,9 @@ async function actualizar(req, res) {
   if (data.password) {
     data.passwordHash = await bcrypt.hash(data.password, 10);
     delete data.password;
+  }
+  if (data.rol) {
+    data.rol = data.rol === 'administrador' ? 'admin' : data.rol;
   }
 
   const usuario = await prisma.usuario.update({ where: { id }, data });

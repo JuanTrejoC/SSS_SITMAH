@@ -20,6 +20,19 @@ async function main() {
     },
   });
 
+  const passwordHashInfra = await bcrypt.hash('infra123', 10);
+  const infra = await prisma.usuario.upsert({
+    where: { username: 'infra' },
+    update: {},
+    create: {
+      username: 'infra',
+      email: 'infra@sitmah.gob.mx',
+      passwordHash: passwordHashInfra,
+      nombre: 'Gestor Infraestructura',
+      rol: 'infraestructura',
+    },
+  });
+
   // --- CATÁLOGOS ---
   const areas = ['Recursos Humanos', 'Sistemas', 'Mantenimiento', 'Operaciones', 'Administración'];
   const sedes = ['CCGO', 'CETRAM', 'Oficinas Téllez', 'Oficinas Patio Téllez'];

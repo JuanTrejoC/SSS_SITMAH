@@ -36,6 +36,7 @@ export default function ConfigAdmin() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [correoDestino, setCorreoDestino] = useState('')
+  const [rol, setRol] = useState('administrador')
 
   // Estado para modal de asignaciones estación-crucero
   const [modalAsignaciones, setModalAsignaciones] = useState(false)
@@ -223,6 +224,7 @@ export default function ConfigAdmin() {
     setEmail('')
     setPassword('')
     setCorreoDestino('')
+    setRol('administrador')
     setEditandoId(null)
   }
 
@@ -237,11 +239,11 @@ export default function ConfigAdmin() {
 
     // Validación y construcción de payload
     if (catalogoSeleccionado === 'usuarios') {
-      if (!username || !email || !nombre || (!editandoId && !password)) {
+      if (!username || !email || !nombre || (!editandoId && !password) || !rol) {
         Swal.fire('Atención', 'Complete todos los campos obligatorios', 'warning');
         return
       }
-      payload = { username, email, nombre }
+      payload = { username, email, nombre, rol }
       if (password) payload.password = password
 
       url = editandoId
@@ -297,6 +299,7 @@ export default function ConfigAdmin() {
       setUsername(item.username || '')
       setEmail(item.email || '')
       setNombre(item.nombre || '')
+      setRol(item.rol === 'admin' ? 'administrador' : (item.rol || 'administrador'))
       setPassword('')
     } else if (catalogoSeleccionado === 'correos') {
       setNombre(item.nombre || '')
@@ -535,9 +538,16 @@ export default function ConfigAdmin() {
                         <label style={{ fontSize: '0.8rem', fontWeight: '500', color: '#475569' }}>Email</label>
                         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '0.55rem', border: '1px solid #9B9B9A', borderRadius: '6px', fontSize: '0.85rem', marginTop: '0.2rem' }} required />
                       </div>
-                      <div style={{ marginBottom: '1.2rem' }}>
+                      <div style={{ marginBottom: '0.8rem' }}>
                         <label style={{ fontSize: '0.8rem', fontWeight: '500', color: '#475569' }}>Contraseña {editandoId && <small style={{ color: '#6F7271' }}>(dejar vacío para no cambiar)</small>}</label>
                         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '0.55rem', border: '1px solid #9B9B9A', borderRadius: '6px', fontSize: '0.85rem', marginTop: '0.2rem' }} required={!editandoId} />
+                      </div>
+                      <div style={{ marginBottom: '1.2rem' }}>
+                        <label style={{ fontSize: '0.8rem', fontWeight: '500', color: '#475569' }}>Tipo de Usuario</label>
+                        <select value={rol} onChange={(e) => setRol(e.target.value)} style={{ width: '100%', padding: '0.55rem', border: '1px solid #9B9B9A', borderRadius: '6px', fontSize: '0.85rem', marginTop: '0.2rem', backgroundColor: 'white' }} required>
+                          <option value="administrador">Administrador General</option>
+                          <option value="infraestructura">Gestor de Infraestructura</option>
+                        </select>
                       </div>
                     </>
                   )}
@@ -596,6 +606,7 @@ export default function ConfigAdmin() {
                             <>
                               <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left' }}>Usuario</th>
                               <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left' }}>Nombre</th>
+                              <th style={{ padding: '0.6rem 0.8rem', textAlign: 'left' }}>Rol</th>
                             </>
                           ) : catalogoSeleccionado === 'correos' ? (
                             <>
@@ -618,6 +629,11 @@ export default function ConfigAdmin() {
                               <>
                                 <td style={{ padding: '0.6rem 0.8rem', fontWeight: '500' }}>{item.username}</td>
                                 <td style={{ padding: '0.6rem 0.8rem' }}>{item.nombre}</td>
+                                <td style={{ padding: '0.6rem 0.8rem' }}>
+                                  <span style={{ padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: item.rol === 'admin' ? '#dcfce7' : '#e0e7ff', color: item.rol === 'admin' ? '#15803d' : '#3730a3' }}>
+                                    {item.rol === 'admin' ? 'Administrador' : item.rol === 'infraestructura' ? 'Infraestructura' : item.rol}
+                                  </span>
+                                </td>
                               </>
                             )}
 
