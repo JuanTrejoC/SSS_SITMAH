@@ -41,6 +41,7 @@ export default function InventarioHerramientas() {
   const [limite] = useState(10);
   const [busqueda, setBusqueda] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('');
+  const [dashboardExpandido, setDashboardExpandido] = useState(false);
 
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
@@ -345,6 +346,39 @@ export default function InventarioHerramientas() {
         >
           <FaPlus /> Agregar Herramienta
         </button>
+      </div>
+
+      {/* ================= DASHBOARD INTERACTIVO DRILL-DOWN ================= */}
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        padding: '1.25rem',
+        border: '1px solid #E5E7EB',
+        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+        marginBottom: '2rem'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }} onClick={() => setDashboardExpandido(!dashboardExpandido)}>
+          <h2 style={{ fontSize: '1.15rem', color: '#1E293B', fontWeight: '700', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ color: '#BC955B' }}></span> Dashboard de Herramientas
+          </h2>
+          <button style={{ background: 'none', border: 'none', color: '#BC955B', fontWeight: '600', cursor: 'pointer', fontSize: '0.9rem' }}>
+            {dashboardExpandido ? '▲ Ocultar' : '▼ Mostrar'}
+          </button>
+        </div>
+
+        {dashboardExpandido && (
+          <div style={{ marginTop: '1.25rem', borderTop: '1px solid #F1F5F9', paddingTop: '1.25rem' }}>
+            <div style={{ backgroundColor: '#f8fafc', padding: '1.5rem', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <h2 style={{ fontSize: '1.2rem', fontWeight: '600', color: '#1e293b', margin: 0 }}>Total de Piezas en Inventario</h2>
+                <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '0.2rem', marginBottom: 0 }}>Piezas registradas en el sistema</p>
+              </div>
+              <div style={{ fontSize: '2rem', fontWeight: '700', color: '#BC955B' }}>
+                {total}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>

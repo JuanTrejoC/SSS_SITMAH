@@ -94,7 +94,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         )}
 
         {/* Crear Reporte Oficinas — solo solicitante */}
-        {user?.rol !== 'administrador' && (
+        {user?.rol !== 'administrador' && user?.rol !== 'infraestructura' && (
           <Link
             to="/crear-oficinas"
             style={linkStyle('/crear-oficinas')}
@@ -108,7 +108,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         )}
 
         {/* Crear Reporte Semáforos — solo solicitante */}
-        {user?.rol !== 'administrador' && (
+        {user?.rol !== 'administrador' && user?.rol !== 'infraestructura' && (
           <Link
             to="/crear-semaforos"
             style={linkStyle('/crear-semaforos')}
