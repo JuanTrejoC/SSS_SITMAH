@@ -2,6 +2,7 @@ const { z } = require('zod');
 const prisma = require('../config/db');
 const { ok, fail } = require('../utils/response');
 const { parsePagination } = require('../utils/filters');
+const { exportarInventarioExistencias } = require('../services/excelService');
 
 // Schema validation for technological equipment
 const equipoTecnologicoSchema = z.object({
@@ -393,7 +394,236 @@ async function obtenerHistorialExistencia(req, res) {
   ok(res, historialMapeado);
 }
 
+async function exportarExistenciasExcel(req, res) {
+  const { categoria, tipoInventario, search, areaUbicacion, mes, includeImages } = req.query;
+  const where = {};
+  if (categoria) where.categoria = categoria;
+  if (tipoInventario) where.tipoInventario = tipoInventario;
+  if (areaUbicacion) where.areaUbicacion = { contains: areaUbicacion };
+  if (search) {
+    where.OR = [
+      { nombre: { contains: search } },
+      { marca: { contains: search } },
+      { modelo: { contains: search } },
+      { numeroSerie: { contains: search } },
+      { numeroInventario: { contains: search } },
+    ];
+  }
+  // Filter by month (format YYYY-MM)
+  if (mes) {
+    const [year, month] = mes.split('-').map(Number);
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 1);
+    where.createdAt = { gte: start, lt: end };
+  }
+
+  const existencias = await prisma.existenciaComponente.findMany({
+    where,
+    orderBy: { nombre: 'asc' },
+    include: { evidencias: true },
+  });
+
+  const buffer = await exportarInventarioExistencias(existencias, includeImages === 'true');
+
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  res.setHeader('Content-Disposition', 'attachment; filename="inventario_herramientas.xlsx"');
+  res.send(buffer);
+}
+
 module.exports = {
+  listarEquipoTecnologico,
+  crearEquipoTecnologico,
+  obtenerEquipoTecnologico,
+  actualizarEquipoTecnologico,
+  eliminarEquipoTecnologico,
+
+  listarControladoresSemaforo,
+  crearControladorSemaforo,
+  obtenerControladorSemaforo,
+  actualizarControladorSemaforo,
+  eliminarControladorSemaforo,
+
+  listarExistencias,
+  ingresarExistencia,
+  actualizarExistencia,
+  eliminarExistencia,
+  obtenerHistorialExistencia,
+  exportarExistenciasExcel,
+};
+  listarEquipoTecnologico,
+  crearEquipoTecnologico,
+  obtenerEquipoTecnologico,
+  actualizarEquipoTecnologico,
+  eliminarEquipoTecnologico,
+
+  listarControladoresSemaforo,
+  crearControladorSemaforo,
+  obtenerControladorSemaforo,
+  actualizarControladorSemaforo,
+  eliminarControladorSemaforo,
+
+  listarExistencias,
+  ingresarExistencia,
+  actualizarExistencia,
+  eliminarExistencia,
+  obtenerHistorialExistencia,
+  exportarExistenciasExcel,
+};
+  listarEquipoTecnologico,
+  crearEquipoTecnologico,
+  obtenerEquipoTecnologico,
+  actualizarEquipoTecnologico,
+  eliminarEquipoTecnologico,
+
+  listarControladoresSemaforo,
+  crearControladorSemaforo,
+  obtenerControladorSemaforo,
+  actualizarControladorSemaforo,
+  eliminarControladorSemaforo,
+
+  listarExistencias,
+  ingresarExistencia,
+  actualizarExistencia,
+  eliminarExistencia,
+  obtenerHistorialExistencia,
+  exportarExistenciasExcel,
+};
+  listarEquipoTecnologico,
+  crearEquipoTecnologico,
+  obtenerEquipoTecnologico,
+  actualizarEquipoTecnologico,
+  eliminarEquipoTecnologico,
+
+  listarControladoresSemaforo,
+  crearControladorSemaforo,
+  obtenerControladorSemaforo,
+  actualizarControladorSemaforo,
+  eliminarControladorSemaforo,
+
+  listarExistencias,
+  ingresarExistencia,
+  actualizarExistencia,
+  eliminarExistencia,
+  obtenerHistorialExistencia,
+  exportarExistenciasExcel,
+};
+  listarEquipoTecnologico,
+  crearEquipoTecnologico,
+  obtenerEquipoTecnologico,
+  actualizarEquipoTecnologico,
+  eliminarEquipoTecnologico,
+
+  listarControladoresSemaforo,
+  crearControladorSemaforo,
+  obtenerControladorSemaforo,
+  actualizarControladorSemaforo,
+  eliminarControladorSemaforo,
+
+  listarExistencias,
+  ingresarExistencia,
+  actualizarExistencia,
+  eliminarExistencia,
+  obtenerHistorialExistencia,
+  exportarExistenciasExcel,
+};
+  listarEquipoTecnologico,
+  crearEquipoTecnologico,
+  obtenerEquipoTecnologico,
+  actualizarEquipoTecnologico,
+  eliminarEquipoTecnologico,
+
+  listarControladoresSemaforo,
+  crearControladorSemaforo,
+  obtenerControladorSemaforo,
+  actualizarControladorSemaforo,
+  eliminarControladorSemaforo,
+
+  listarExistencias,
+  ingresarExistencia,
+  actualizarExistencia,
+  eliminarExistencia,
+  obtenerHistorialExistencia,
+  exportarExistenciasExcel,
+};
+  listarEquipoTecnologico,
+  crearEquipoTecnologico,
+  obtenerEquipoTecnologico,
+  actualizarEquipoTecnologico,
+  eliminarEquipoTecnologico,
+
+  listarControladoresSemaforo,
+  crearControladorSemaforo,
+  obtenerControladorSemaforo,
+  actualizarControladorSemaforo,
+  eliminarControladorSemaforo,
+
+  listarExistencias,
+  ingresarExistencia,
+  actualizarExistencia,
+  eliminarExistencia,
+  obtenerHistorialExistencia,
+  exportarExistenciasExcel,
+};
+  listarEquipoTecnologico,
+  crearEquipoTecnologico,
+  obtenerEquipoTecnologico,
+  actualizarEquipoTecnologico,
+  eliminarEquipoTecnologico,
+
+  listarControladoresSemaforo,
+  crearControladorSemaforo,
+  obtenerControladorSemaforo,
+  actualizarControladorSemaforo,
+  eliminarControladorSemaforo,
+
+  listarExistencias,
+  ingresarExistencia,
+  actualizarExistencia,
+  eliminarExistencia,
+  obtenerHistorialExistencia,
+  exportarExistenciasExcel,
+};
+  listarEquipoTecnologico,
+  crearEquipoTecnologico,
+  obtenerEquipoTecnologico,
+  actualizarEquipoTecnologico,
+  eliminarEquipoTecnologico,
+
+  listarControladoresSemaforo,
+  crearControladorSemaforo,
+  obtenerControladorSemaforo,
+  actualizarControladorSemaforo,
+  eliminarControladorSemaforo,
+
+  listarExistencias,
+  ingresarExistencia,
+  actualizarExistencia,
+  eliminarExistencia,
+  obtenerHistorialExistencia,
+  exportarExistenciasExcel,
+};
+  listarEquipoTecnologico,
+  crearEquipoTecnologico,
+  obtenerEquipoTecnologico,
+  actualizarEquipoTecnologico,
+  eliminarEquipoTecnologico,
+
+  listarControladoresSemaforo,
+  crearControladorSemaforo,
+  obtenerControladorSemaforo,
+  actualizarControladorSemaforo,
+  eliminarControladorSemaforo,
+
+  listarExistencias,
+  ingresarExistencia,
+  actualizarExistencia,
+  eliminarExistencia,
+  obtenerHistorialExistencia,
+  exportarExistenciasExcel,
+};
   listarEquipoTecnologico,
   crearEquipoTecnologico,
   obtenerEquipoTecnologico,

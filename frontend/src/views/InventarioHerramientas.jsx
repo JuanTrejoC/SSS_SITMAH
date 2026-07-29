@@ -3,7 +3,7 @@ import Swal from 'sweetalert2';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import {
-  FaWrench, FaHammer, FaPlus, FaEdit, FaTrashAlt, FaSearch, FaTimes, FaChevronLeft, FaChevronRight
+  FaWrench, FaHammer, FaPlus, FaEdit, FaTrashAlt, FaSearch, FaTimes, FaChevronLeft, FaChevronRight, FaFileExcel
 } from 'react-icons/fa';
 
 const TIPOS_HERRAMIENTA = [
@@ -41,6 +41,7 @@ export default function InventarioHerramientas() {
   const [limite] = useState(10);
   const [busqueda, setBusqueda] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('');
+  const [mesFiltro, setMesFiltro] = useState('');
   const [dashboardExpandido, setDashboardExpandido] = useState(false);
 
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -78,6 +79,35 @@ export default function InventarioHerramientas() {
       detalles: {}
     };
   }
+
+  const handleExport = async () => {
+    if (!user?.token) return;
+    const query = new URLSearchParams({
+      search: busqueda,
+      mes: mesFiltro,
+      includeImages: 'false',
+    });
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/inventario/existencias/export?${query}`, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'inventario_herramientas.xlsx';
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        const json = await res.json();
+        Swal.fire('Error', json.error || 'Error al exportar a Excel', 'error');
+      }
+    } catch (err) {
+      console.error('Error exportando a Excel:', err);
+      Swal.fire('Error', 'Error al exportar a Excel', 'error');
+    }
+  };
 
   const cargarHerramientas = async () => {
     if (!user?.token) return;
@@ -399,6 +429,29 @@ export default function InventarioHerramientas() {
             opciones={TIPOS_HERRAMIENTA}
           />
         )}
+        <input
+          type="month"
+          value={mesFiltro}
+          onChange={e => { setMesFiltro(e.target.value); setPagina(1); }}
+          style={{ ...inputStyle, maxWidth: '180px' }}
+        />
+        <button
+          onClick={handleExport}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            backgroundColor: '#059669',
+            color: 'white',
+            border: 'none',
+            padding: '0.5rem 1rem',
+            borderRadius: '8px',
+            cursor: 'pointer',
+          }}
+        >
+          <FaFileExcel size={16} />
+          Exportar Excel
+        </button>
       </div>
 
       {cargando ? (
@@ -678,7 +731,7 @@ const CustomToolTypeSelect = ({ value, onChange }) => {
                           onMouseOver={e => { e.currentTarget.style.backgroundColor = '#e2e8f0'; e.currentTarget.style.color = '#0f172a'; }}
                           onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#475569'; }}
                         >
-                          <Icon color="#64748b" size={16} /> 
+                          <Icon color="#64748b" size={16} />
                           <div>
                             <span style={{ fontSize: '0.95rem', fontWeight: '500', display: 'block' }}>{opcion.label}</span>
                             <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{opcion.description}</span>

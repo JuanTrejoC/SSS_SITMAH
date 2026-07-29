@@ -406,4 +406,47 @@ async function exportarReportesSemaforo(reportes, incluirImagenes = false) {
   return workbook.xlsx.writeBuffer();
 }
 
-module.exports = { exportarReportesOficina, exportarReportesSemaforo };
+async function exportarInventarioExistencias(existencias, incluirImagenes = false) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Inventario Herramientas');
+
+  const tieneImagenes = incluirImagenes && existencias.some(e => e.evidencias && e.evidencias.some(ev => ev.mimetype?.startsWith('image/')));
+
+  sheet.columns = [
+    { header: 'ID', key: 'id', width: 8 },
+    { header: 'Tipo', key: 'tipo', width: 18 },
+    { header: 'Serie', key: 'numeroSerie', width: 20 },
+    { header: 'Nombre', key: 'modelo', width: 25 },
+    { header: 'Marca', key: 'marca', width: 15 },
+    { header: 'Ubicación', key: 'areaUbicacion', width: 22 },
+    ...(tieneImagenes ? [{ header: 'Evidencia', key: 'evidencia', width: 22 }] : []),
+  ];
+
+  for (let i = 0; i < existencias.length; i++) {
+    const e = existencias[i];
+    const rowData = {
+      id: e.id,
+      tipo: e.tipo,
+      numeroSerie: e.numeroSerie || '',
+      modelo: e.modelo || '',
+      marca: e.marca || '',
+      areaUbicacion: e.areaUbicacion || '',
+    };
+    if (tieneImagenes) rowData.evidencia = '';
+    const row = sheet.addRow(rowData);
+    const rowNumber = row.number;
+    if (tieneImagenes && e.evidencias && e.evidencias.length > 0) {
+      const imgEv = e.evidencias.find(ev => ev.mimetype?.startsWith('image/'));
+      if (imgEv) {
+        row.height = 90;
+        const colIndex = 6; // 'evidencia' column index (0‑based)
+        await insertarImagenEvidencia(workbook, sheet, rowNumber - 1, colIndex, e.evidencias);
+      }
+    }
+  }
+
+  aplicarEstiloTabla(sheet);
+  return workbook.xlsx.writeBuffer();
+}
+
+module.exports = { exportarReportesOficina, exportarReportesSemaforo, exportarInventarioExistencias };
