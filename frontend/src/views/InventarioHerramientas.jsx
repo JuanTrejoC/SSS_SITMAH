@@ -82,13 +82,29 @@ export default function InventarioHerramientas() {
 
   const handleExport = async () => {
     if (!user?.token) return;
+    
+    const confirm = await Swal.fire({
+      title: '¿Desea descargar el archivo Excel?',
+      text: 'Se descargará el inventario actual ordenado ascendentemente.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#059669',
+      cancelButtonColor: '#6F7271',
+      confirmButtonText: 'Descargar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (!confirm.isConfirmed) return;
+
     const query = new URLSearchParams({
       search: busqueda,
+      tipo: filtroTipo || 'herramientas',
       mes: mesFiltro,
       includeImages: 'false',
+      order: 'asc'
     });
     try {
-      const res = await fetch(`${API_BASE_URL}/api/inventario/existencias/export?${query}`, {
+      const res = await fetch(`${API_BASE_URL}/api/inventario/tecnologico/export?${query}`, {
         headers: { Authorization: `Bearer ${user.token}` },
       });
       if (res.ok) {

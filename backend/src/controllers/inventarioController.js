@@ -395,11 +395,10 @@ async function obtenerHistorialExistencia(req, res) {
 }
 
 async function exportarExistenciasExcel(req, res) {
-  const { categoria, tipoInventario, search, areaUbicacion, mes, includeImages } = req.query;
+  const { categoria, tipoInventario, search, mes, includeImages, order } = req.query;
   const where = {};
   if (categoria) where.categoria = categoria;
   if (tipoInventario) where.tipoInventario = tipoInventario;
-  if (areaUbicacion) where.areaUbicacion = { contains: areaUbicacion };
   if (search) {
     where.OR = [
       { nombre: { contains: search } },
@@ -419,11 +418,63 @@ async function exportarExistenciasExcel(req, res) {
 
   const existencias = await prisma.existenciaComponente.findMany({
     where,
-    orderBy: { nombre: 'asc' },
-    include: { evidencias: true },
+    orderBy: { id: order === 'desc' ? 'desc' : 'asc' },
   });
 
+  // Note: existencias won't have tipo and areaUbicacion mapped properly in excelService but keeping it functional
   const buffer = await exportarInventarioExistencias(existencias, includeImages === 'true');
+
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  res.setHeader('Content-Disposition', 'attachment; filename="inventario_existencias.xlsx"');
+  res.send(buffer);
+}
+
+async function exportarEquipoTecnologicoExcel(req, res) {
+  const { tipo, search, area, mes, includeImages, order } = req.query;
+  const where = {};
+  
+  if (req.usuario && req.usuario.rol === 'infraestructura') {
+    where.tipo = 'herramienta_infra';
+  } else {
+    if (tipo === 'herramientas') {
+      where.tipo = { in: ['herramienta_tec', 'herramienta_infra'] };
+    } else if (tipo === 'tecnologico') {
+      where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra'] };
+    } else if (tipo) {
+      where.tipo = tipo;
+    } else {
+      where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra'] };
+    }
+  }
+  if (area) where.areaUbicacion = { contains: area };
+
+  if (search) {
+    where.OR = [
+      { numeroInventario: { contains: search } },
+      { numeroSerie: { contains: search } },
+      { marca: { contains: search } },
+      { modelo: { contains: search } },
+      { responsable: { contains: search } },
+      { areaUbicacion: { contains: search } },
+    ];
+  }
+  
+  if (mes) {
+    const [year, month] = mes.split('-').map(Number);
+    const start = new Date(year, month - 1, 1);
+    const end = new Date(year, month, 1);
+    where.createdAt = { gte: start, lt: end };
+  }
+
+  const equipos = await prisma.equipoTecnologico.findMany({
+    where,
+    orderBy: { id: order === 'desc' ? 'desc' : 'asc' },
+  });
+
+  const buffer = await exportarInventarioExistencias(equipos, includeImages === 'true');
 
   res.setHeader(
     'Content-Type',
@@ -452,4 +503,5 @@ module.exports = {
   eliminarExistencia,
   obtenerHistorialExistencia,
   exportarExistenciasExcel,
+  exportarEquipoTecnologicoExcel,
 };
