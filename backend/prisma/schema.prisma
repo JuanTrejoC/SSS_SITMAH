@@ -154,6 +154,7 @@ model ReporteOficina {
   telefono        String?          @db.VarChar(20)
   sedeId          Int              @map("sede_id")
   equipo          String?          @db.VarChar(100)
+  numeroSerie     String?          @map("numero_serie") @db.VarChar(100)
   categoriaId     Int              @map("categoria_id")
   prioridad       PrioridadOficina
   descripcion     String?          @db.Text

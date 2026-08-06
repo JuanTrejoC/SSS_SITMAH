@@ -246,6 +246,7 @@ export default function DashboardOficinas() {
       r.solicitante?.toLowerCase().includes(busqueda.toLowerCase()) ||
       r.folio?.toLowerCase().includes(busqueda.toLowerCase()) ||
       r.equipo?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      r.numeroSerie?.toLowerCase().includes(busqueda.toLowerCase()) ||
       r.sede?.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
       r.area?.nombre?.toLowerCase().includes(busqueda.toLowerCase())
 
@@ -478,7 +479,7 @@ export default function DashboardOficinas() {
                   <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Fecha</th>
                   <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Solicitante</th>
                   <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Área / Sede</th>
-                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Equipo</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Equipo / Serie</th>
                   <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Categoría</th>
                   <th style={{ padding: '0.9rem 1rem', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Prioridad</th>
                   <th style={{ padding: '0.9rem 1rem', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Estado</th>
@@ -522,7 +523,11 @@ export default function DashboardOficinas() {
                           <div>{r.area?.nombre || '—'}</div>
                           <span style={{ fontSize: '0.775rem', color: '#9CA3AF' }}>{r.sede?.nombre || '—'}</span>
                         </td>
-                        <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>{r.equipo || '—'}</td>
+                        <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>
+                          {r.equipo && <div style={{ fontSize: '0.85rem' }}><strong style={{ color: '#6B7280' }}>Inv:</strong> {r.equipo}</div>}
+                          {r.numeroSerie && <div style={{ fontSize: '0.85rem', marginTop: r.equipo ? '0.2rem' : '0' }}><strong style={{ color: '#6B7280' }}>Serie:</strong> {r.numeroSerie}</div>}
+                          {!r.equipo && !r.numeroSerie && '—'}
+                        </td>
                         <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>{r.categoria?.nombre || '—'}</td>
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                           <span style={{
@@ -638,7 +643,12 @@ export default function DashboardOficinas() {
                 <div><strong>Teléfono:</strong> {verDetalle.telefono || '—'}</div>
                 <div><strong>Área:</strong> {verDetalle.area?.nombre || '—'}</div>
                 <div><strong>Sede:</strong> {verDetalle.sede?.nombre || '—'}</div>
-                <div><strong>Equipo:</strong> {verDetalle.equipo || '—'}</div>
+                <div>
+                  <strong>Equipo / Serie:</strong><br />
+                  {verDetalle.equipo && <span style={{ display: 'block', fontSize: '0.85rem' }}><strong style={{ color: '#6B7280' }}>Inv:</strong> {verDetalle.equipo}</span>}
+                  {verDetalle.numeroSerie && <span style={{ display: 'block', fontSize: '0.85rem' }}><strong style={{ color: '#6B7280' }}>Serie:</strong> {verDetalle.numeroSerie}</span>}
+                  {!verDetalle.equipo && !verDetalle.numeroSerie && '—'}
+                </div>
                 <div><strong>Categoría:</strong> {verDetalle.categoria?.nombre || '—'}</div>
                 <div><strong>Prioridad:</strong> <span style={{ textTransform: 'capitalize', fontWeight: '700' }}>{verDetalle.prioridad}</span></div>
                 <div><strong>Estado:</strong> {obtenerNombreEstado(verDetalle.estado)}</div>

@@ -14,6 +14,7 @@ export default function FormOficinas({ usuarioActual }) {
     telefono: '',
     sede_id: '',
     equipo: '',
+    numero_serie: '',
     categoria_id: '',
     descripcion_otro: '',
     prioridad: '',
@@ -86,7 +87,6 @@ export default function FormOficinas({ usuarioActual }) {
       case 'area_id':
       case 'cargo':
       case 'sede_id':
-      case 'equipo':
       case 'categoria_id':
       case 'prioridad':
         if (!valor) mensajeError = 'Campo obligatorio'
@@ -108,6 +108,16 @@ export default function FormOficinas({ usuarioActual }) {
         }
         if (!soloNumeros) mensajeError = 'Campo obligatorio'
         else if (soloNumeros.length !== 10) mensajeError = 'Debe tener 10 dígitos'
+        else esValido = true
+        break
+      }
+
+      case 'equipo':
+      case 'numero_serie': {
+        const esEq = nombre === 'equipo'
+        const eqVal = esEq ? valor : (formData.equipo?.trim() || '')
+        const serVal = !esEq ? valor : (formData.numero_serie?.trim() || '')
+        if (!eqVal && !serVal) mensajeError = 'Ingrese Inventario o Serie'
         else esValido = true
         break
       }
@@ -243,6 +253,18 @@ export default function FormOficinas({ usuarioActual }) {
       }
     })
 
+    const eqVal = formData.equipo?.trim() || ''
+    const serVal = formData.numero_serie?.trim() || ''
+    if (!eqVal && !serVal) {
+      setErrores(prev => ({ ...prev, equipo: 'Ingrese Inventario o Serie', numero_serie: 'Ingrese Inventario o Serie' }))
+      setValido(prev => ({ ...prev, equipo: false, numero_serie: false }))
+      Swal.fire('Atención', 'Debe ingresar al menos el Número de Inventario o el Número de Serie del equipo', 'warning');
+      return
+    } else {
+      setErrores(prev => ({ ...prev, equipo: '', numero_serie: '' }))
+      setValido(prev => ({ ...prev, equipo: true, numero_serie: true }))
+    }
+
     const hayErrores = Object.values(valido).some(est => est === false)
     if (hayErrores) {
       Swal.fire('Atención', 'Complete todos los campos obligatorios', 'warning');
@@ -265,6 +287,7 @@ export default function FormOficinas({ usuarioActual }) {
       datosAEnviar.append('telefono', formData.telefono)
       datosAEnviar.append('sede_id', Number(formData.sede_id))
       datosAEnviar.append('equipo', formData.equipo)
+      datosAEnviar.append('numero_serie', formData.numero_serie)
       datosAEnviar.append('categoria_id', Number(formData.categoria_id))
       datosAEnviar.append('prioridad', formData.prioridad.toLowerCase())
       datosAEnviar.append('descripcion', descripcionFinal)
@@ -287,7 +310,7 @@ export default function FormOficinas({ usuarioActual }) {
         const folioCreado = resultado.data?.folio || resultado.data?.id || 'Generado'
         Swal.fire('Éxito', `Reporte registrado en el sistema correctamente.\nFolio: ${folioCreado}`, 'success');
 
-        setFormData({ solicitante: '', area_id: '', cargo: '', email: '', telefono: '', sede_id: '', equipo: '', categoria_id: '', descripcion_otro: '', prioridad: '', descripcion: '', evidencia: null, estado: 'abierto', tipo_usuario: 'solicitante' })
+        setFormData({ solicitante: '', area_id: '', cargo: '', email: '', telefono: '', sede_id: '', equipo: '', numero_serie: '', categoria_id: '', descripcion_otro: '', prioridad: '', descripcion: '', evidencia: null, estado: 'abierto', tipo_usuario: 'solicitante' })
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
         }
@@ -527,7 +550,7 @@ export default function FormOficinas({ usuarioActual }) {
               {/* Equipo Relacionado */}
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
-                  Equipo Relacionado <span style={{ color: '#EF4444' }}>*</span>
+                  Número de Inventario <span style={{ color: '#6B7280', fontWeight: 'normal' }}>(Opcional)</span>
                 </label>
                 <input
                   type="text"
@@ -540,6 +563,24 @@ export default function FormOficinas({ usuarioActual }) {
                   }}
                 />
                 {errores.equipo && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.equipo}</span>}
+              </div>
+
+              {/* Número de Serie */}
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                  Número de Serie <span style={{ color: '#6B7280', fontWeight: 'normal' }}>(Opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="En caso de no tener No. de Inventario"
+                  value={formData.numero_serie}
+                  onChange={(e) => { const valor = e.target.value; setFormData({ ...formData, numero_serie: valor }); validarCampo('numero_serie', valor) }}
+                  className="premium-input"
+                  style={{
+                    border: `1.5px solid ${getBorderColor('numero_serie')}`
+                  }}
+                />
+                {errores.numero_serie && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.numero_serie}</span>}
               </div>
             </div>
           </div>
