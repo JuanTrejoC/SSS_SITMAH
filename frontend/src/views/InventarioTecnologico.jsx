@@ -1076,15 +1076,73 @@ export default function InventarioTecnologico() {
                           <input type="checkbox" checked={!!form.detalles.tieneMonitores} onChange={e => handleDetalleChange('tieneMonitores', e.target.checked)} style={{ transform: 'scale(1.2)' }} />
                           ¿Tiene Monitores Asignados?
                         </label>
-                        {form.detalles.tieneMonitores && (
-                          <div className="inventario-grid-periferico-5">
-                            <div><label style={labelStyle}>No. Inventario</label><input type="text" placeholder="Inv. Monitor" value={form.detalles.numeroInventarioMonitores || ''} onChange={e => handleDetalleChange('numeroInventarioMonitores', e.target.value)} style={inputStyle} /></div>
-                            <div><label style={labelStyle}>Cantidad</label><input type="number" min="1" placeholder="Ej: 1" value={form.detalles.cantidadMonitores || ''} onChange={e => handleDetalleChange('cantidadMonitores', e.target.value)} style={inputStyle} /></div>
-                            <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Dell" value={form.detalles.marcaMonitores || ''} onChange={e => handleDetalleChange('marcaMonitores', e.target.value)} style={inputStyle} /></div>
-                            <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: P2419H" value={form.detalles.modeloMonitores || ''} onChange={e => handleDetalleChange('modeloMonitores', e.target.value)} style={inputStyle} /></div>
-                            <div><label style={labelStyle}>No. Serie</label><input type="text" placeholder="Ej: SN7890" value={form.detalles.serieMonitores || ''} onChange={e => handleDetalleChange('serieMonitores', e.target.value)} style={inputStyle} /></div>
-                          </div>
-                        )}
+                        {form.detalles.tieneMonitores && (() => {
+                          const cantidadRaw = parseInt(form.detalles.cantidadMonitores) || 1;
+                          const cantidad = Math.min(Math.max(cantidadRaw, 1), 3); // Limitar a un máximo de 3
+                          const monitores = form.detalles.monitores || [];
+                          
+                          if (monitores.length === 0 && (form.detalles.numeroInventarioMonitores || form.detalles.marcaMonitores || form.detalles.modeloMonitores || form.detalles.serieMonitores)) {
+                             monitores.push({
+                               numeroInventario: form.detalles.numeroInventarioMonitores || '',
+                               marca: form.detalles.marcaMonitores || '',
+                               modelo: form.detalles.modeloMonitores || '',
+                               serie: form.detalles.serieMonitores || ''
+                             });
+                          }
+
+                          const displayMonitores = Array(cantidad).fill(0).map((_, i) => 
+                            monitores[i] || { numeroInventario: '', marca: '', modelo: '', serie: '' }
+                          );
+
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                              <div>
+                                <label style={labelStyle}>Cantidad de Monitores</label>
+                                <input 
+                                  type="number" 
+                                  min="1"
+                                  max="3"
+                                  placeholder="Ej: 1" 
+                                  value={form.detalles.cantidadMonitores || ''} 
+                                  onChange={e => {
+                                    let val = parseInt(e.target.value);
+                                    if (val > 3) val = 3;
+                                    handleDetalleChange('cantidadMonitores', isNaN(val) ? '' : val.toString());
+                                  }} 
+                                  style={{...inputStyle, width: '150px'}} 
+                                />
+                              </div>
+                              
+                              {displayMonitores.map((monitor, index) => (
+                                <div key={index} style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                  <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#475569' }}>Monitor {index + 1}</h4>
+                                  <div className="inventario-grid-periferico-4">
+                                    <div><label style={labelStyle}>No. Inventario</label><input type="text" placeholder="Inv. Monitor" value={monitor.numeroInventario || ''} onChange={e => {
+                                      const nuevos = [...displayMonitores];
+                                      nuevos[index] = { ...nuevos[index], numeroInventario: e.target.value };
+                                      handleDetalleChange('monitores', nuevos);
+                                    }} style={inputStyle} /></div>
+                                    <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Dell" value={monitor.marca || ''} onChange={e => {
+                                      const nuevos = [...displayMonitores];
+                                      nuevos[index] = { ...nuevos[index], marca: e.target.value };
+                                      handleDetalleChange('monitores', nuevos);
+                                    }} style={inputStyle} /></div>
+                                    <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: P2419H" value={monitor.modelo || ''} onChange={e => {
+                                      const nuevos = [...displayMonitores];
+                                      nuevos[index] = { ...nuevos[index], modelo: e.target.value };
+                                      handleDetalleChange('monitores', nuevos);
+                                    }} style={inputStyle} /></div>
+                                    <div><label style={labelStyle}>No. Serie</label><input type="text" placeholder="Ej: SN7890" value={monitor.serie || ''} onChange={e => {
+                                      const nuevos = [...displayMonitores];
+                                      nuevos[index] = { ...nuevos[index], serie: e.target.value };
+                                      handleDetalleChange('monitores', nuevos);
+                                    }} style={inputStyle} /></div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                     </div>
