@@ -72,6 +72,8 @@ const crearEquipo = async (req, res) => {
       responsable,
       cargoResponsable,
       areaUbicacion,
+      procedencia,
+      estatus,
       detalles
     } = req.body;
 
@@ -113,6 +115,8 @@ const crearEquipo = async (req, res) => {
         responsable: responsable || null,
         cargoResponsable: cargoResponsable || null,
         areaUbicacion: areaUbicacion || null,
+        procedencia: procedencia || null,
+        estatus: estatus || 'Operando',
         detalles: detalles || {}
       }
     });
@@ -137,6 +141,8 @@ const actualizarEquipo = async (req, res) => {
       responsable,
       cargoResponsable,
       areaUbicacion,
+      procedencia,
+      estatus,
       detalles
     } = req.body;
 
@@ -187,6 +193,8 @@ const actualizarEquipo = async (req, res) => {
         responsable: responsable || null,
         cargoResponsable: cargoResponsable || null,
         areaUbicacion: areaUbicacion || null,
+        procedencia: procedencia || null,
+        estatus: estatus || 'Operando',
         detalles: detalles || {}
       }
     });

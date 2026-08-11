@@ -111,6 +111,8 @@ export default function InventarioTecnologico() {
       responsable: '',
       cargoResponsable: '',
       areaUbicacion: '',
+      procedencia: '',
+      estatus: 'Operando',
       detalles: {}
     };
   }
@@ -145,6 +147,35 @@ export default function InventarioTecnologico() {
     cargarEquipos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagina, busqueda, filtroTipo]);
+
+  const exportarAExcel = async () => {
+    const query = new URLSearchParams({
+      search: busqueda,
+      tipo: filtroTipo || 'tecnologico',
+      includeImages: 'false',
+      order: 'asc'
+    });
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/inventario/tecnologico/export?${query}`, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'inventario_tecnologico.xlsx';
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        const json = await res.json();
+        Swal.fire('Error', json.error || 'Error al exportar a Excel', 'error');
+      }
+    } catch (err) {
+      console.error('Error exportando a Excel:', err);
+      Swal.fire('Error', 'Error al exportar a Excel', 'error');
+    }
+  };
 
   useEffect(() => {
     if (modalAbierto) {
@@ -218,6 +249,8 @@ export default function InventarioTecnologico() {
       responsable: item.responsable || '',
       cargoResponsable: item.cargoResponsable || '',
       areaUbicacion: item.areaUbicacion || '',
+      procedencia: item.procedencia || '',
+      estatus: item.estatus || 'Operando',
       detalles: item.detalles || {}
     });
     setModalAbierto(true);
@@ -458,18 +491,32 @@ export default function InventarioTecnologico() {
             Gestione el stock de todos los equipos tecnológicos e infraestructura.
           </p>
         </div>
-        <button
-          onClick={() => { resetForm(); setModalAbierto(true); }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#691B31', color: 'white',
-            border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
-            boxShadow: '0 4px 6px rgba(105,27,49,0.2)', transition: 'background-color 0.2s', fontSize: '1rem'
-          }}
-          onMouseOver={e => e.currentTarget.style.backgroundColor = '#8a2441'}
-          onMouseOut={e => e.currentTarget.style.backgroundColor = '#691B31'}
-        >
-          <FaPlus /> Agregar Equipo
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button
+            onClick={exportarAExcel}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#10b981', color: 'white',
+              border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
+              boxShadow: '0 4px 6px rgba(16,185,129,0.2)', transition: 'background-color 0.2s', fontSize: '1rem'
+            }}
+            onMouseOver={e => e.currentTarget.style.backgroundColor = '#059669'}
+            onMouseOut={e => e.currentTarget.style.backgroundColor = '#10b981'}
+          >
+            Exportar a Excel
+          </button>
+          <button
+            onClick={() => { resetForm(); setModalAbierto(true); }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#691B31', color: 'white',
+              border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
+              boxShadow: '0 4px 6px rgba(105,27,49,0.2)', transition: 'background-color 0.2s', fontSize: '1rem'
+            }}
+            onMouseOver={e => e.currentTarget.style.backgroundColor = '#8a2441'}
+            onMouseOut={e => e.currentTarget.style.backgroundColor = '#691B31'}
+          >
+            <FaPlus /> Agregar Equipo
+          </button>
+        </div>
       </div>
 
 
@@ -715,13 +762,14 @@ export default function InventarioTecnologico() {
                 <th style={{ padding: '1.25rem' }}>Identificación</th>
                 <th style={{ padding: '1.25rem' }}>Marca / Modelo</th>
                 <th style={{ padding: '1.25rem' }}>Ubicación</th>
+                <th style={{ padding: '1.25rem' }}>Estatus</th>
                 <th style={{ padding: '1.25rem', textAlign: 'center' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {equipos.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontSize: '1.1rem' }}>
+                  <td colSpan="7" style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontSize: '1.1rem' }}>
                     No se encontraron equipos registrados.
                   </td>
                 </tr>
@@ -755,6 +803,19 @@ export default function InventarioTecnologico() {
                     </td>
                     <td style={{ padding: '1.25rem' }}>
                       <div style={{ fontWeight: '600', color: '#1e293b' }}>{item.areaUbicacion || 'N/A'}</div>
+                    </td>
+                    <td style={{ padding: '1.25rem' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: '9999px',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        backgroundColor: item.estatus === 'Stock Baja' ? '#fee2e2' : item.estatus === 'Stock Alta' ? '#fef3c7' : '#dcfce7',
+                        color: item.estatus === 'Stock Baja' ? '#991b1b' : item.estatus === 'Stock Alta' ? '#92400e' : '#166534'
+                      }}>
+                        {item.estatus || 'Operando'}
+                      </span>
                     </td>
                     <td style={{ padding: '1.25rem', textAlign: 'center' }}>
                       <button onClick={() => handleEditar(item)} style={{ backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', marginRight: '0.5rem', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}>
@@ -838,6 +899,78 @@ export default function InventarioTecnologico() {
                         ))}
                       </select>
                     </div>
+
+                    <div>
+                      <label style={labelStyle}>Procedencia</label>
+                      <select
+                        value={form.procedencia}
+                        onChange={e => setForm({ ...form, procedencia: e.target.value })}
+                        style={{ ...inputStyle, cursor: 'pointer' }}
+                      >
+                        <option value="">-- Seleccionar Procedencia --</option>
+                        <option value="De Gobierno">De Gobierno</option>
+                        <option value="Donacion">Donación</option>
+                        <option value="Fideicomiso">Fideicomiso</option>
+                        <option value="Recurso Propio">Recurso Propio</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Estatus</label>
+                      <select
+                        value={form.estatus}
+                        onChange={e => setForm({ ...form, estatus: e.target.value })}
+                        style={{ ...inputStyle, cursor: 'pointer' }}
+                      >
+                        <option value="Operando">Operando</option>
+                        <option value="Stock Alta">Stock Alta</option>
+                        <option value="Stock Baja">Stock Baja</option>
+                      </select>
+                    </div>
+
+                    {form.estatus === 'Stock Baja' && (
+                      <div>
+                        <label style={labelStyle}>Motivo de baja</label>
+                        <select
+                          value={form.detalles?.motivoBaja || ''}
+                          onChange={e => setForm({ ...form, detalles: { ...form.detalles, motivoBaja: e.target.value } })}
+                          style={{ ...inputStyle, cursor: 'pointer' }}
+                        >
+                          <option value="">-- Seleccionar motivo --</option>
+                          <option value="Robo">Robo</option>
+                          <option value="Siniestro">Siniestro</option>
+                          <option value="Vandalismo">Vandalismo</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {form.estatus === 'Stock Baja' && ['Siniestro', 'Robo', 'Vandalismo'].includes(form.detalles?.motivoBaja) && (
+                      <>
+                        {['Robo', 'Vandalismo'].includes(form.detalles?.motivoBaja) && (
+                          <div>
+                            <label style={labelStyle}>¿Carpeta de investigación?</label>
+                            <select
+                              value={form.detalles?.carpetaInvestigacion || ''}
+                              onChange={e => setForm({ ...form, detalles: { ...form.detalles, carpetaInvestigacion: e.target.value } })}
+                              style={{ ...inputStyle, cursor: 'pointer' }}
+                            >
+                              <option value="">-- Seleccionar --</option>
+                              <option value="Si">Sí</option>
+                              <option value="No">No</option>
+                            </select>
+                          </div>
+                        )}
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <label style={labelStyle}>Observaciones</label>
+                          <textarea
+                            value={form.detalles?.observacionesBaja || ''}
+                            onChange={e => setForm({ ...form, detalles: { ...form.detalles, observacionesBaja: e.target.value } })}
+                            style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
+                            placeholder={form.detalles?.motivoBaja === 'Siniestro' ? 'Especifica los detalles del siniestro aquí...' : 'Escribe las observaciones aquí...'}
+                          />
+                        </div>
+                      </>
+                    )}
 
                     {/* Campos Responsable */}
                     {requiereResponsable && (

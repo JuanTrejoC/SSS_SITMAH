@@ -262,6 +262,8 @@ model EquipoTecnologico {
   responsable      String?  @db.VarChar(100)
   cargoResponsable String?  @map("cargo_responsable") @db.VarChar(100)
   areaUbicacion    String?  @map("area_ubicacion") @db.VarChar(150)
+  procedencia      String?  @db.VarChar(50)
+  estatus          String?  @default("Operando") @db.VarChar(50)
   detalles         Json?    // Stores type-specific dynamic attributes
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")

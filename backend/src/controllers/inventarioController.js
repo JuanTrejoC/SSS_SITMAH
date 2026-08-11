@@ -14,6 +14,8 @@ const equipoTecnologicoSchema = z.object({
   responsable: z.string().nullable().optional(),
   cargoResponsable: z.string().nullable().optional(),
   areaUbicacion: z.string().nullable().optional(),
+  procedencia: z.string().nullable().optional(),
+  estatus: z.string().nullable().optional(),
   detalles: z.any().optional(),
 });
 
@@ -139,6 +141,8 @@ async function crearEquipoTecnologico(req, res) {
       responsable: data.responsable || null,
       cargoResponsable: data.cargoResponsable || null,
       areaUbicacion: data.areaUbicacion || null,
+      procedencia: data.procedencia || null,
+      estatus: data.estatus || 'Operando',
       detalles: data.detalles || {},
     },
   });
@@ -190,6 +194,8 @@ async function actualizarEquipoTecnologico(req, res) {
       responsable: data.responsable || null,
       cargoResponsable: data.cargoResponsable || null,
       areaUbicacion: data.areaUbicacion || null,
+      procedencia: data.procedencia || null,
+      estatus: data.estatus || 'Operando',
       detalles: data.detalles || {},
     },
   });

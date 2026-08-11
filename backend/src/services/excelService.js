@@ -419,6 +419,8 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
     { header: 'Nombre', key: 'modelo', width: 25 },
     { header: 'Marca', key: 'marca', width: 15 },
     { header: 'Ubicación', key: 'areaUbicacion', width: 22 },
+    { header: 'Procedencia', key: 'procedencia', width: 18 },
+    { header: 'Estatus', key: 'estatus', width: 15 },
     ...(tieneImagenes ? [{ header: 'Evidencia', key: 'evidencia', width: 22 }] : []),
   ];
 
@@ -431,6 +433,8 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
       modelo: e.modelo || '',
       marca: e.marca || '',
       areaUbicacion: e.areaUbicacion || '',
+      procedencia: e.procedencia || '',
+      estatus: e.estatus || 'Operando',
     };
     if (tieneImagenes) rowData.evidencia = '';
     const row = sheet.addRow(rowData);
