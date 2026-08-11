@@ -434,7 +434,7 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
       marca: e.marca || '',
       areaUbicacion: e.areaUbicacion || '',
       procedencia: e.procedencia || '',
-      estatus: e.estatus || 'Operando',
+      estatus: e.estatus || 'Activo',
     };
     if (tieneImagenes) rowData.evidencia = '';
     const row = sheet.addRow(rowData);

@@ -263,7 +263,7 @@ model EquipoTecnologico {
   cargoResponsable String?  @map("cargo_responsable") @db.VarChar(100)
   areaUbicacion    String?  @map("area_ubicacion") @db.VarChar(150)
   procedencia      String?  @db.VarChar(50)
-  estatus          String?  @default("Operando") @db.VarChar(50)
+  estatus          String?  @default("Activo") @db.VarChar(50)
   detalles         Json?    // Stores type-specific dynamic attributes
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
@@ -290,6 +290,7 @@ model ControladorSemaforo {
   fibraOptica         Boolean  @default(false) @map("fibra_optica")
   gps                 Boolean  @default(false)
   botonera            Boolean  @default(false)
+  archivoProgramacion String?  @map("archivo_programacion") @db.VarChar(500)
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 

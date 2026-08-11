@@ -116,7 +116,7 @@ const crearEquipo = async (req, res) => {
         cargoResponsable: cargoResponsable || null,
         areaUbicacion: areaUbicacion || null,
         procedencia: procedencia || null,
-        estatus: estatus || 'Operando',
+        estatus: estatus || 'Activo',
         detalles: detalles || {}
       }
     });
@@ -194,7 +194,7 @@ const actualizarEquipo = async (req, res) => {
         cargoResponsable: cargoResponsable || null,
         areaUbicacion: areaUbicacion || null,
         procedencia: procedencia || null,
-        estatus: estatus || 'Operando',
+        estatus: estatus || 'Activo',
         detalles: detalles || {}
       }
     });

@@ -12,6 +12,8 @@
   "dependencies": {
     "chart.js": "^4.5.1",
     "core-js": "^3.49.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.17.0",
     "react": "^19.2.6",
     "react-chartjs-2": "^5.3.1",

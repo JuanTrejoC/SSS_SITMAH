@@ -9,7 +9,7 @@ import {
   FaWalking, FaVolumeUp, FaDesktop, FaCreditCard,
   FaPowerOff, FaMicrochip, FaNetworkWired, FaProjectDiagram,
   FaMapMarkerAlt, FaHandPointer, FaSign, FaCheckSquare,
-  FaCalendarAlt, FaUpload, FaHistory
+  FaCalendarAlt, FaUpload, FaHistory, FaDownload
 } from 'react-icons/fa'
 
 // ==================================================
@@ -419,13 +419,25 @@ export default function InventarioSemaforos() {
     const metodo = editandoControladorId ? 'PUT' : 'POST'
 
     try {
+      const formData = new FormData()
+      Object.keys(controladorForm).forEach(key => {
+        formData.append(key, controladorForm[key])
+      })
+      
+      if (archivoProgramacion) {
+        if (archivoProgramacion instanceof File) {
+          formData.append('archivoProgramacion', archivoProgramacion)
+        }
+      } else if (editandoControladorId) {
+        formData.append('removerArchivo', 'true')
+      }
+
       const res = await fetch(url, {
         method: metodo,
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${user.token}`
         },
-        body: JSON.stringify(controladorForm)
+        body: formData
       })
 
       if (res.ok) {
@@ -478,6 +490,7 @@ export default function InventarioSemaforos() {
       poste: item.poste || false,
       modeloPoste: item.modeloPoste || ''
     })
+    setArchivoProgramacion(item.archivoProgramacion || null)
     setControladorErrores({})
     setModalControladorAbierto(true)
   }
@@ -539,6 +552,7 @@ export default function InventarioSemaforos() {
       poste: false,
       modeloPoste: ''
     })
+    setArchivoProgramacion(null)
     setControladorErrores({})
   }
 
@@ -1669,7 +1683,7 @@ export default function InventarioSemaforos() {
                   >
                     <FaUpload size={24} color="#94a3b8" style={{ marginBottom: '0.5rem' }} />
                     <span style={{ fontSize: '0.85rem', color: '#475569', fontWeight: '500', textAlign: 'center' }}>
-                      {archivoProgramacion ? archivoProgramacion.name : 'Haz clic para seleccionar un archivo o arrástralo aquí'}
+                      {archivoProgramacion ? (typeof archivoProgramacion === 'string' ? archivoProgramacion.split('/').pop() : archivoProgramacion.name) : 'Haz clic para seleccionar un archivo o arrástralo aquí'}
                     </span>
                     <input
                       type="file"
@@ -1682,13 +1696,24 @@ export default function InventarioSemaforos() {
                     />
                   </label>
                   {archivoProgramacion && (
-                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '0.5rem' }}>
+                      {typeof archivoProgramacion === 'string' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            window.open(`${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/descargar-programacion`, '_blank');
+                          }}
+                          style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'none', border: 'none', color: '#0ea5e9', fontSize: '0.85rem', cursor: 'pointer', fontWeight: '600' }}
+                        >
+                          <FaDownload /> Descargar
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setArchivoProgramacion(null)}
-                        style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '0.75rem', cursor: 'pointer', fontWeight: '600' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'none', border: 'none', color: '#ef4444', fontSize: '0.85rem', cursor: 'pointer', fontWeight: '600' }}
                       >
-                        Remover archivo
+                        <FaTimes /> Remover
                       </button>
                     </div>
                   )}

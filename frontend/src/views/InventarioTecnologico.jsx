@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   FaLaptop, FaPlus, FaEdit, FaTrashAlt,
   FaChevronLeft, FaChevronRight, FaTimes, FaDesktop, FaMobileAlt, FaNetworkWired,
   FaServer, FaShieldAlt, FaWifi, FaVideo, FaHdd, FaBroadcastTower, FaPrint, FaTv,
-  FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone
+  FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone, FaFilePdf
 } from 'react-icons/fa';
 
 const TIPOS_EQUIPO = [
@@ -112,7 +114,7 @@ export default function InventarioTecnologico() {
       cargoResponsable: '',
       areaUbicacion: '',
       procedencia: '',
-      estatus: 'Operando',
+      estatus: 'Activo',
       detalles: {}
     };
   }
@@ -149,9 +151,10 @@ export default function InventarioTecnologico() {
   }, [pagina, busqueda, filtroTipo]);
 
   const exportarAExcel = async () => {
+    // El Excel siempre descarga todo sin filtros (como fue solicitado)
     const query = new URLSearchParams({
-      search: busqueda,
-      tipo: filtroTipo || 'tecnologico',
+      search: '',
+      tipo: 'tecnologico',
       includeImages: 'false',
       order: 'asc'
     });
@@ -164,7 +167,7 @@ export default function InventarioTecnologico() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'inventario_tecnologico.xlsx';
+        a.download = 'inventario_tecnologico_completo.xlsx';
         a.click();
         window.URL.revokeObjectURL(url);
       } else {
@@ -174,6 +177,67 @@ export default function InventarioTecnologico() {
     } catch (err) {
       console.error('Error exportando a Excel:', err);
       Swal.fire('Error', 'Error al exportar a Excel', 'error');
+    }
+  };
+
+  const exportarAPdf = async () => {
+    try {
+      const query = new URLSearchParams({
+        limit: 10000,
+        search: busqueda,
+        tipo: filtroTipo || 'tecnologico'
+      });
+      const res = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?${query}`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      });
+      const json = await res.json();
+      
+      if (res.ok && json.ok) {
+        const registros = json.data;
+        if (registros.length === 0) {
+          Swal.fire('Atención', 'No hay registros para exportar con los filtros actuales.', 'warning');
+          return;
+        }
+
+        const doc = new jsPDF('landscape');
+        
+        doc.setFontSize(16);
+        doc.text('Inventario Tecnológico', 14, 15);
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`Generado el: ${new Date().toLocaleString()}`, 14, 22);
+
+        const tableColumn = ["ID", "No. Inv / Serie", "Tipo", "Marca / Modelo", "Ubicación", "Estatus"];
+        const tableRows = [];
+
+        registros.forEach(eq => {
+          const eqData = [
+            eq.id,
+            `Inv: ${eq.numeroInventario || 'N/A'}\nSerie: ${eq.numeroSerie || 'N/A'}`,
+            eq.tipo,
+            `${eq.marca || 'N/A'} - ${eq.modelo || 'N/A'}`,
+            eq.areaUbicacion || 'N/A',
+            eq.estatus || 'Activo'
+          ];
+          tableRows.push(eqData);
+        });
+
+        autoTable(doc, {
+          head: [tableColumn],
+          body: tableRows,
+          startY: 28,
+          theme: 'grid',
+          styles: { fontSize: 8, cellPadding: 3 },
+          headStyles: { fillColor: [15, 23, 42] }
+        });
+
+        doc.save(`inventario_tecnologico_${new Date().getTime()}.pdf`);
+      } else {
+        Swal.fire('Error', json.error || 'Error al obtener datos', 'error');
+      }
+    } catch (err) {
+      console.error('Error exportando a PDF:', err);
+      Swal.fire('Error', 'Error al exportar a PDF', 'error');
     }
   };
 
@@ -250,7 +314,7 @@ export default function InventarioTecnologico() {
       cargoResponsable: item.cargoResponsable || '',
       areaUbicacion: item.areaUbicacion || '',
       procedencia: item.procedencia || '',
-      estatus: item.estatus || 'Operando',
+      estatus: item.estatus || 'Activo',
       detalles: item.detalles || {}
     });
     setModalAbierto(true);
@@ -503,6 +567,18 @@ export default function InventarioTecnologico() {
             onMouseOut={e => e.currentTarget.style.backgroundColor = '#10b981'}
           >
             Exportar a Excel
+          </button>
+          <button
+            onClick={exportarAPdf}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#e11d48', color: 'white',
+              border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
+              boxShadow: '0 4px 6px rgba(225,29,72,0.2)', transition: 'background-color 0.2s', fontSize: '1rem'
+            }}
+            onMouseOver={e => e.currentTarget.style.backgroundColor = '#be123c'}
+            onMouseOut={e => e.currentTarget.style.backgroundColor = '#e11d48'}
+          >
+            <FaFilePdf /> Exportar a PDF
           </button>
           <button
             onClick={() => { resetForm(); setModalAbierto(true); }}
@@ -811,10 +887,10 @@ export default function InventarioTecnologico() {
                         borderRadius: '9999px',
                         fontSize: '0.85rem',
                         fontWeight: '600',
-                        backgroundColor: item.estatus === 'Stock Baja' ? '#fee2e2' : item.estatus === 'Stock Alta' ? '#fef3c7' : '#dcfce7',
-                        color: item.estatus === 'Stock Baja' ? '#991b1b' : item.estatus === 'Stock Alta' ? '#92400e' : '#166534'
+                        backgroundColor: item.estatus === 'Refacciones' ? '#fee2e2' : item.estatus === 'Stock' ? '#fef3c7' : '#dcfce7',
+                        color: item.estatus === 'Refacciones' ? '#991b1b' : item.estatus === 'Stock' ? '#92400e' : '#166534'
                       }}>
-                        {item.estatus || 'Operando'}
+                        {item.estatus || 'Activo'}
                       </span>
                     </td>
                     <td style={{ padding: '1.25rem', textAlign: 'center' }}>
@@ -922,13 +998,13 @@ export default function InventarioTecnologico() {
                         onChange={e => setForm({ ...form, estatus: e.target.value })}
                         style={{ ...inputStyle, cursor: 'pointer' }}
                       >
-                        <option value="Operando">Operando</option>
-                        <option value="Stock Alta">Stock Alta</option>
-                        <option value="Stock Baja">Stock Baja</option>
+                        <option value="Activo">Activo</option>
+                        <option value="Stock">Stock</option>
+                        <option value="Refacciones">Refacciones</option>
                       </select>
                     </div>
 
-                    {form.estatus === 'Stock Baja' && (
+                    {form.estatus === 'Refacciones' && (
                       <div>
                         <label style={labelStyle}>Motivo de baja</label>
                         <select
@@ -944,7 +1020,7 @@ export default function InventarioTecnologico() {
                       </div>
                     )}
 
-                    {form.estatus === 'Stock Baja' && ['Siniestro', 'Robo', 'Vandalismo'].includes(form.detalles?.motivoBaja) && (
+                    {form.estatus === 'Refacciones' && ['Siniestro', 'Robo', 'Vandalismo'].includes(form.detalles?.motivoBaja) && (
                       <>
                         {['Robo', 'Vandalismo'].includes(form.detalles?.motivoBaja) && (
                           <div>

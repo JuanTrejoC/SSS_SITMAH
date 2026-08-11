@@ -142,7 +142,7 @@ async function crearEquipoTecnologico(req, res) {
       cargoResponsable: data.cargoResponsable || null,
       areaUbicacion: data.areaUbicacion || null,
       procedencia: data.procedencia || null,
-      estatus: data.estatus || 'Operando',
+      estatus: data.estatus || 'Activo',
       detalles: data.detalles || {},
     },
   });
@@ -195,7 +195,7 @@ async function actualizarEquipoTecnologico(req, res) {
       cargoResponsable: data.cargoResponsable || null,
       areaUbicacion: data.areaUbicacion || null,
       procedencia: data.procedencia || null,
-      estatus: data.estatus || 'Operando',
+      estatus: data.estatus || 'Activo',
       detalles: data.detalles || {},
     },
   });
@@ -248,11 +248,25 @@ async function listarControladoresSemaforo(req, res) {
 }
 
 async function crearControladorSemaforo(req, res) {
-  const parsed = controladorSemaforoSchema.safeParse(req.body);
+  const body = { ...req.body };
+  // Convert boolean strings to actual booleans (from FormData)
+  const booleanFields = ['pasoPeatonal', 'audible', 'pantallaLed', 'tarjetaRelevadora', 'fuentePoder', 'cpu', 'switch', 'fibraOptica', 'gps', 'botonera'];
+  booleanFields.forEach(key => {
+    if (body[key] === 'true') body[key] = true;
+    if (body[key] === 'false') body[key] = false;
+  });
+
+  const parsed = controladorSemaforoSchema.safeParse(body);
   if (!parsed.success) return fail(res, parsed.error.errors[0].message);
 
+  const dataToSave = { ...parsed.data };
+  if (req.file) {
+    // Relative path to be stored in the database
+    dataToSave.archivoProgramacion = `uploads/${req.file.filename}`;
+  }
+
   const controlador = await prisma.controladorSemaforo.create({
-    data: parsed.data,
+    data: dataToSave,
   });
 
   ok(res, controlador, 201);
@@ -270,15 +284,31 @@ async function obtenerControladorSemaforo(req, res) {
 
 async function actualizarControladorSemaforo(req, res) {
   const id = Number(req.params.id);
-  const parsed = controladorSemaforoSchema.safeParse(req.body);
+  
+  const body = { ...req.body };
+  // Convert boolean strings to actual booleans (from FormData)
+  const booleanFields = ['pasoPeatonal', 'audible', 'pantallaLed', 'tarjetaRelevadora', 'fuentePoder', 'cpu', 'switch', 'fibraOptica', 'gps', 'botonera'];
+  booleanFields.forEach(key => {
+    if (body[key] === 'true') body[key] = true;
+    if (body[key] === 'false') body[key] = false;
+  });
+
+  const parsed = controladorSemaforoSchema.safeParse(body);
   if (!parsed.success) return fail(res, parsed.error.errors[0].message);
 
   const existe = await prisma.controladorSemaforo.findUnique({ where: { id } });
   if (!existe) return fail(res, 'Controlador semafórico no encontrado', 404);
 
+  const dataToUpdate = { ...parsed.data };
+  if (req.file) {
+    dataToUpdate.archivoProgramacion = `uploads/${req.file.filename}`;
+  } else if (body.removerArchivo === 'true') {
+    dataToUpdate.archivoProgramacion = null;
+  }
+
   const controlador = await prisma.controladorSemaforo.update({
     where: { id },
-    data: parsed.data,
+    data: dataToUpdate,
   });
 
   ok(res, controlador);
@@ -291,6 +321,23 @@ async function eliminarControladorSemaforo(req, res) {
 
   await prisma.controladorSemaforo.delete({ where: { id } });
   ok(res, { message: 'Controlador semafórico eliminado correctamente' });
+}
+
+async function descargarProgramacion(req, res) {
+  const id = Number(req.params.id);
+  const existe = await prisma.controladorSemaforo.findUnique({ where: { id } });
+  if (!existe || !existe.archivoProgramacion) {
+    return fail(res, 'Archivo no encontrado', 404);
+  }
+
+  const path = require('path');
+  const filePath = path.resolve(__dirname, '../../', existe.archivoProgramacion);
+  res.download(filePath, existe.archivoProgramacion.split('/').pop(), (err) => {
+    if (err) {
+      console.error('Error enviando archivo:', err);
+      res.status(500).send('Error al descargar el archivo.');
+    }
+  });
 }
 
 // ==========================================
@@ -502,6 +549,7 @@ module.exports = {
   obtenerControladorSemaforo,
   actualizarControladorSemaforo,
   eliminarControladorSemaforo,
+  descargarProgramacion,
 
   listarExistencias,
   ingresarExistencia,

@@ -3,6 +3,25 @@ const asyncHandler = require('../utils/asyncHandler');
 const authAdmin = require('../middleware/authAdmin');
 const authAdminOrInfra = require('../middleware/authAdminOrInfra');
 const inventario = require('../controllers/inventarioController');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Ensure uploads directory exists
+const uploadDir = path.join(__dirname, '../../uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `programacion-${Date.now()}${path.extname(file.originalname)}`);
+  }
+});
+const upload = multer({ storage });
 
 const router = express.Router();
 
@@ -19,9 +38,10 @@ router.use(authAdmin);
 
 // Traffic Light Controllers Routes
 router.get('/controladores', asyncHandler(inventario.listarControladoresSemaforo));
-router.post('/controladores', asyncHandler(inventario.crearControladorSemaforo));
+router.post('/controladores', upload.single('archivoProgramacion'), asyncHandler(inventario.crearControladorSemaforo));
 router.get('/controladores/:id', asyncHandler(inventario.obtenerControladorSemaforo));
-router.put('/controladores/:id', asyncHandler(inventario.actualizarControladorSemaforo));
+router.get('/controladores/:id/descargar-programacion', asyncHandler(inventario.descargarProgramacion));
+router.put('/controladores/:id', upload.single('archivoProgramacion'), asyncHandler(inventario.actualizarControladorSemaforo));
 router.delete('/controladores/:id', asyncHandler(inventario.eliminarControladorSemaforo));
 
 // Existencias / Stock Routes
