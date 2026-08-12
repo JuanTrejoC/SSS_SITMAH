@@ -112,6 +112,7 @@ export default function InventarioTecnologico() {
       modelo: '',
       responsable: '',
       cargoResponsable: '',
+      direccion: '',
       areaUbicacion: '',
       procedencia: '',
       estatus: 'Activo',
@@ -200,35 +201,211 @@ export default function InventarioTecnologico() {
         }
 
         const doc = new jsPDF('landscape');
+        const pageWidth = doc.internal.pageSize.width;
+        const pageHeight = doc.internal.pageSize.height;
         
-        doc.setFontSize(16);
-        doc.text('Inventario Tecnológico', 14, 15);
-        doc.setFontSize(10);
-        doc.setTextColor(100);
-        doc.text(`Generado el: ${new Date().toLocaleString()}`, 14, 22);
+        // Cargar imágenes con opción a entintado (para convertir logos blancos a color vino)
+        const loadImg = (src, tintColor) => new Promise((resolve) => {
+          const img = new Image();
+          img.src = src;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            
+            if (tintColor) {
+              ctx.globalCompositeOperation = 'source-in';
+              ctx.fillStyle = tintColor;
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+            resolve(canvas.toDataURL('image/png'));
+          };
+          img.onerror = () => resolve(null);
+        });
 
-        const tableColumn = ["ID", "No. Inv / Serie", "Tipo", "Marca / Modelo", "Ubicación", "Estatus"];
+        // Convertir SVG a PNG Base64
+        const loadSvg = (svgStr) => new Promise((resolve) => {
+          const img = new Image();
+          const svgData = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgStr);
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, 32, 32);
+            resolve(canvas.toDataURL('image/png'));
+          };
+          img.onerror = () => resolve(null);
+          img.src = svgData;
+        });
+
+        const logoHidalgo = await loadImg('/images/sitmah_logo.webp', '#691B31'); 
+        const logoSitmah = await loadImg('/images/sistema de tm.webp'); 
+
+        const iTot = await loadSvg('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>');
+        const iOp = await loadSvg('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>');
+        const iRef = await loadSvg('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>');
+        const iUbi = await loadSvg('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>');
+
+        const svgHeads = [
+          '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>',
+          '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>',
+          '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>',
+          '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v14M8 5v14M12 5v14M17 5v14M21 5v14"></path></svg>',
+          '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>',
+          '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>',
+          '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M16 10h.01M8 10h.01M8 14h.01M12 14h.01M16 14h.01"></path></svg>',
+          '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>',
+          '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>'
+        ];
+        const hIcons = await Promise.all(svgHeads.map(s => loadSvg(s)));
+
+        const drawHeaderFooter = (data) => {
+          doc.setFillColor(105, 27, 49); // #691B31
+          doc.rect(0, 0, pageWidth, 5, 'F');
+          
+          doc.setFillColor(105, 27, 49);
+          doc.rect(0, pageHeight - 8, pageWidth, 8, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(8);
+          doc.setFont(undefined, 'normal');
+          doc.text(`Página ${data.pageNumber}`, pageWidth - 15, pageHeight - 3, { align: 'right' });
+
+          if (data.pageNumber === 1) {
+            if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 8, 30, 10);
+            
+            doc.setTextColor(105, 27, 49);
+            doc.setFontSize(18);
+            doc.setFont(undefined, 'bold');
+            doc.text('INVENTARIO TECNOLÓGICO', pageWidth / 2, 16, { align: 'center' });
+            
+            doc.setTextColor(184, 134, 11);
+            doc.setFontSize(10);
+            doc.text('SISTEMA DE TRANSPORTE METROPOLITANO DE HIDALGO', pageWidth / 2, 21, { align: 'center' });
+
+            doc.setTextColor(100);
+            doc.setFontSize(8);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Fecha de generación:\n${new Date().toLocaleString()}`, pageWidth - 14, 12, { align: 'right' });
+
+            const total = registros.length;
+            const operando = registros.filter(r => r.estatus?.toLowerCase() === 'operando').length;
+            const refacciones = registros.filter(r => r.estatus?.toLowerCase().includes('refacciones')).length;
+            const ubicaciones = new Set(registros.map(r => r.areaUbicacion)).size;
+
+            const drawCard = (x, y, w, h, title, value, iconBase64) => {
+              doc.setDrawColor(197, 145, 62); // Dorado
+              doc.setLineWidth(0.3);
+              doc.roundedRect(x, y, w, h, 2, 2, 'S');
+              
+              if (iconBase64) {
+                 doc.setFillColor(197, 145, 62);
+                 doc.circle(x + 10, y + h / 2, 6, 'F');
+                 doc.addImage(iconBase64, 'PNG', x + 6, y + h / 2 - 4, 8, 8);
+              }
+              
+              doc.setFontSize(7);
+              doc.setTextColor(100);
+              doc.text(title, x + w / 2 + 5, y + 6, { align: 'center' });
+              doc.setFontSize(14);
+              doc.setTextColor(105, 27, 49);
+              doc.setFont(undefined, 'bold');
+              doc.text(value.toString(), x + w / 2 + 5, y + 14, { align: 'center' });
+              doc.setFont(undefined, 'normal');
+            };
+
+            const cardW = 50;
+            const gap = 15;
+            const startX = (pageWidth - (4 * cardW + 3 * gap)) / 2;
+            
+            drawCard(startX, 26, cardW, 18, 'TOTAL DE EQUIPOS', total, iTot);
+            drawCard(startX + cardW + gap, 26, cardW, 18, 'OPERANDO', operando, iOp);
+            drawCard(startX + 2 * (cardW + gap), 26, cardW, 18, 'EN REFACCIONES', refacciones, iRef);
+            drawCard(startX + 3 * (cardW + gap), 26, cardW, 18, 'UBICACIONES', ubicaciones, iUbi);
+          }
+          
+          if (logoSitmah) {
+             doc.addImage(logoSitmah, 'PNG', pageWidth / 2 - 15, pageHeight - 25, 30, 10);
+          }
+          doc.setTextColor(105, 27, 49);
+          doc.setFontSize(7);
+          doc.setFont(undefined, 'bold');
+          doc.text('NOTA:', 14, pageHeight - 20);
+          doc.setFont(undefined, 'normal');
+          doc.setTextColor(100);
+          doc.text('Este documento es un reporte generado automáticamente\npor el Sistema SITMAH.', 14, pageHeight - 16);
+        };
+
+        const tableColumn = ["TIPO", "RESPONSABLE", "NÚMERO DE\nINVENTARIO", "NÚMERO DE\nSERIE", "MARCA", "MODELO", "ÁREA", "UBICACIÓN", "ESTATUS"];
         const tableRows = [];
 
         registros.forEach(eq => {
-          const eqData = [
-            eq.id,
-            `Inv: ${eq.numeroInventario || 'N/A'}\nSerie: ${eq.numeroSerie || 'N/A'}`,
-            eq.tipo,
-            `${eq.marca || 'N/A'} - ${eq.modelo || 'N/A'}`,
+          tableRows.push([
+            eq.tipo || 'N/A',
+            eq.responsable ? `${eq.responsable}${eq.cargoResponsable ? `\n${eq.cargoResponsable}` : ''}` : 'N/A',
+            eq.numeroInventario || 'N/A',
+            eq.numeroSerie || 'N/A',
+            eq.marca || 'N/A',
+            eq.modelo || 'N/A',
+            eq.direccion || 'N/A',
             eq.areaUbicacion || 'N/A',
-            eq.estatus || 'Activo'
-          ];
-          tableRows.push(eqData);
+            (eq.estatus || 'Activo').toUpperCase()
+          ]);
         });
 
         autoTable(doc, {
           head: [tableColumn],
           body: tableRows,
-          startY: 28,
+          startY: 50,
           theme: 'grid',
-          styles: { fontSize: 8, cellPadding: 3 },
-          headStyles: { fillColor: [15, 23, 42] }
+          styles: { fontSize: 7, cellPadding: 3, halign: 'center', valign: 'middle', lineColor: [230, 230, 230] },
+          headStyles: { fillColor: [105, 27, 49], textColor: [255, 255, 255], fontStyle: 'bold', cellPadding: { top: 3, right: 3, bottom: 3, left: 8 } },
+          alternateRowStyles: { fillColor: [255, 251, 240] },
+          didDrawPage: drawHeaderFooter,
+          willDrawCell: (data) => {
+            if (data.section === 'body' && data.column.index === 8) {
+              doc.setTextColor(255, 255, 255); // Ocultar texto 
+            }
+          },
+          didDrawCell: (data) => {
+            if (data.section === 'head') {
+              const icon = hIcons[data.column.index];
+              if (icon) {
+                doc.addImage(icon, 'PNG', data.cell.x + 2, data.cell.y + (data.cell.height / 2) - 3, 6, 6);
+              }
+            }
+            if (data.section === 'body' && data.column.index === 8) { 
+              const estatus = data.cell.raw;
+              let bgColor = [229, 231, 235]; 
+              let textColor = [55, 65, 81];
+              
+              if (estatus.includes('OPERANDO')) {
+                bgColor = [220, 252, 231]; 
+                textColor = [22, 163, 74];
+              } else if (estatus.includes('REFACCIONES')) {
+                bgColor = [254, 249, 195]; 
+                textColor = [202, 138, 4];
+              } else if (estatus.includes('BAJA')) {
+                bgColor = [254, 226, 226]; 
+                textColor = [220, 38, 38];
+              }
+              
+              const x = data.cell.x + 2;
+              const y = data.cell.y + 2;
+              const w = data.cell.width - 4;
+              const h = data.cell.height - 4;
+              
+              doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+              doc.roundedRect(x, y, w, h, 2, 2, 'F');
+              
+              doc.setFontSize(6);
+              doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+              doc.setFont(undefined, 'bold');
+              doc.text(estatus, data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 2, { align: 'center' });
+            }
+          }
         });
 
         doc.save(`inventario_tecnologico_${new Date().getTime()}.pdf`);
@@ -312,6 +489,7 @@ export default function InventarioTecnologico() {
       modelo: item.modelo || '',
       responsable: item.responsable || '',
       cargoResponsable: item.cargoResponsable || '',
+      direccion: item.direccion || '',
       areaUbicacion: item.areaUbicacion || '',
       procedencia: item.procedencia || '',
       estatus: item.estatus || 'Activo',
@@ -813,7 +991,7 @@ export default function InventarioTecnologico() {
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
         <input
           type="text"
-          placeholder="Buscar por serie, inventario, marca, responsable..."
+          placeholder="Buscar en todos los campos..."
           value={busqueda}
           onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }}
           style={{ padding: '0.75rem 1.25rem', border: '1px solid #CBD5E1', borderRadius: '8px', flex: 1, minWidth: '300px', fontSize: '1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
@@ -837,6 +1015,7 @@ export default function InventarioTecnologico() {
                 <th style={{ padding: '1.25rem' }}>Responsable</th>
                 <th style={{ padding: '1.25rem' }}>Identificación</th>
                 <th style={{ padding: '1.25rem' }}>Marca / Modelo</th>
+                <th style={{ padding: '1.25rem' }}>Área</th>
                 <th style={{ padding: '1.25rem' }}>Ubicación</th>
                 <th style={{ padding: '1.25rem' }}>Estatus</th>
                 <th style={{ padding: '1.25rem', textAlign: 'center' }}>Acciones</th>
@@ -876,6 +1055,9 @@ export default function InventarioTecnologico() {
                     <td style={{ padding: '1.25rem' }}>
                       <div style={{ fontWeight: '600', color: '#1e293b' }}>{item.marca || 'N/A'}</div>
                       <div style={{ fontSize: '0.9rem', color: '#64748b' }}>{item.modelo || 'N/A'}</div>
+                    </td>
+                    <td style={{ padding: '1.25rem' }}>
+                      <div style={{ color: '#334155', fontWeight: '500' }}>{item.direccion || 'N/A'}</div>
                     </td>
                     <td style={{ padding: '1.25rem' }}>
                       <div style={{ fontWeight: '600', color: '#1e293b' }}>{item.areaUbicacion || 'N/A'}</div>
@@ -962,7 +1144,25 @@ export default function InventarioTecnologico() {
                     <div><label style={labelStyle}>No. Serie</label><input type="text" value={form.numeroSerie} onChange={e => setForm({ ...form, numeroSerie: e.target.value })} style={inputStyle} /></div>
 
                     <div>
-                      <label style={labelStyle}>Área / Ubicación *</label>
+                      <label style={labelStyle}>Área *</label>
+                      <select
+                        value={form.direccion}
+                        onChange={e => setForm({ ...form, direccion: e.target.value })}
+                        style={{ ...inputStyle, cursor: 'pointer' }}
+                        required
+                      >
+                        <option value="">-- Seleccionar Área --</option>
+                        <option value="Dirección General">Dirección General</option>
+                        <option value="Dirección de Planeación y Desarrollo">Dirección de Planeación y Desarrollo</option>
+                        <option value="Dirección Jurídica">Dirección Jurídica</option>
+                        <option value="Dirección de Administración y Finanzas">Dirección de Administración y Finanzas</option>
+                        <option value="Dirección de Operación y Supervisión">Dirección de Operación y Supervisión</option>
+                        <option value="Dirección de Logística e Ingeniería">Dirección de Logística e Ingeniería</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Ubicación *</label>
                       <select
                         value={form.areaUbicacion}
                         onChange={e => setForm({ ...form, areaUbicacion: e.target.value })}
@@ -984,7 +1184,7 @@ export default function InventarioTecnologico() {
                         style={{ ...inputStyle, cursor: 'pointer' }}
                       >
                         <option value="">-- Seleccionar Procedencia --</option>
-                        <option value="De Gobierno">De Gobierno</option>
+                        <option value="Gobierno del Estado">Gobierno del Estado</option>
                         <option value="Donacion">Donación</option>
                         <option value="Fideicomiso">Fideicomiso</option>
                         <option value="Recurso Propio">Recurso Propio</option>

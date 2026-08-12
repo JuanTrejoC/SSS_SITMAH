@@ -14,6 +14,7 @@ const equipoTecnologicoSchema = z.object({
   responsable: z.string().nullable().optional(),
   cargoResponsable: z.string().nullable().optional(),
   areaUbicacion: z.string().nullable().optional(),
+  direccion: z.string().nullable().optional(),
   procedencia: z.string().nullable().optional(),
   estatus: z.string().nullable().optional(),
   detalles: z.any().optional(),
@@ -90,14 +91,21 @@ async function listarEquipoTecnologico(req, res) {
 
   if (search) {
     where.OR = [
+      { tipo: { contains: search } },
       { numeroInventario: { contains: search } },
       { numeroSerie: { contains: search } },
       { marca: { contains: search } },
       { modelo: { contains: search } },
       { responsable: { contains: search } },
+      { cargoResponsable: { contains: search } },
       { areaUbicacion: { contains: search } },
+      { direccion: { contains: search } },
+      { procedencia: { contains: search } },
+      { estatus: { contains: search } },
     ];
   }
+
+  require('fs').writeFileSync('where_debug.json', JSON.stringify({ query: req.query, where }, null, 2));
 
   const [items, total] = await Promise.all([
     prisma.equipoTecnologico.findMany({
@@ -512,6 +520,7 @@ async function exportarEquipoTecnologicoExcel(req, res) {
       { modelo: { contains: search } },
       { responsable: { contains: search } },
       { areaUbicacion: { contains: search } },
+      { direccion: { contains: search } },
     ];
   }
   

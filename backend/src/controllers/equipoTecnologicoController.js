@@ -15,11 +15,17 @@ const obtenerEquipos = async (req, res) => {
     
     if (search) {
       where.OR = [
-        { marca: { contains: search } },
-        { modelo: { contains: search } },
+        { tipo: { contains: search } },
         { numeroInventario: { contains: search } },
         { numeroSerie: { contains: search } },
+        { marca: { contains: search } },
+        { modelo: { contains: search } },
         { responsable: { contains: search } },
+        { cargoResponsable: { contains: search } },
+        { areaUbicacion: { contains: search } },
+        { direccion: { contains: search } },
+        { procedencia: { contains: search } },
+        { estatus: { contains: search } },
       ];
     }
     
@@ -72,6 +78,7 @@ const crearEquipo = async (req, res) => {
       responsable,
       cargoResponsable,
       areaUbicacion,
+      direccion,
       procedencia,
       estatus,
       detalles
@@ -115,6 +122,7 @@ const crearEquipo = async (req, res) => {
         responsable: responsable || null,
         cargoResponsable: cargoResponsable || null,
         areaUbicacion: areaUbicacion || null,
+        direccion: direccion || null,
         procedencia: procedencia || null,
         estatus: estatus || 'Activo',
         detalles: detalles || {}
@@ -141,6 +149,7 @@ const actualizarEquipo = async (req, res) => {
       responsable,
       cargoResponsable,
       areaUbicacion,
+      direccion,
       procedencia,
       estatus,
       detalles
@@ -193,6 +202,7 @@ const actualizarEquipo = async (req, res) => {
         responsable: responsable || null,
         cargoResponsable: cargoResponsable || null,
         areaUbicacion: areaUbicacion || null,
+        direccion: direccion || null,
         procedencia: procedencia || null,
         estatus: estatus || 'Activo',
         detalles: detalles || {}

@@ -413,13 +413,13 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
   const tieneImagenes = incluirImagenes && existencias.some(e => e.evidencias && e.evidencias.some(ev => ev.mimetype?.startsWith('image/')));
 
   sheet.columns = [
-    { header: 'ID', key: 'id', width: 8 },
     { header: 'Tipo', key: 'tipo', width: 18 },
-    { header: 'Serie', key: 'numeroSerie', width: 20 },
-    { header: 'Nombre', key: 'modelo', width: 25 },
-    { header: 'Marca', key: 'marca', width: 15 },
+    { header: 'Responsable', key: 'responsable', width: 25 },
+    { header: 'No. Inventario', key: 'numeroInventario', width: 22 },
+    { header: 'No. Serie', key: 'numeroSerie', width: 22 },
+    { header: 'Marca / Modelo', key: 'marcaModelo', width: 25 },
+    { header: 'Área', key: 'direccion', width: 22 },
     { header: 'Ubicación', key: 'areaUbicacion', width: 22 },
-    { header: 'Procedencia', key: 'procedencia', width: 18 },
     { header: 'Estatus', key: 'estatus', width: 15 },
     ...(tieneImagenes ? [{ header: 'Evidencia', key: 'evidencia', width: 22 }] : []),
   ];
@@ -427,13 +427,13 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
   for (let i = 0; i < existencias.length; i++) {
     const e = existencias[i];
     const rowData = {
-      id: e.id,
-      tipo: e.tipo,
-      numeroSerie: e.numeroSerie || '',
-      modelo: e.modelo || '',
-      marca: e.marca || '',
-      areaUbicacion: e.areaUbicacion || '',
-      procedencia: e.procedencia || '',
+      tipo: e.tipo || 'N/A',
+      responsable: e.responsable ? `${e.responsable}${e.cargoResponsable ? ` - ${e.cargoResponsable}` : ''}` : 'N/A',
+      numeroInventario: e.numeroInventario || 'N/A',
+      numeroSerie: e.numeroSerie || 'N/A',
+      marcaModelo: `${e.marca || 'N/A'} - ${e.modelo || 'N/A'}`,
+      direccion: e.direccion || 'N/A',
+      areaUbicacion: e.areaUbicacion || 'N/A',
       estatus: e.estatus || 'Activo',
     };
     if (tieneImagenes) rowData.evidencia = '';
@@ -443,7 +443,7 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
       const imgEv = e.evidencias.find(ev => ev.mimetype?.startsWith('image/'));
       if (imgEv) {
         row.height = 90;
-        const colIndex = 6; // 'evidencia' column index (0‑based)
+        const colIndex = 8; // 'evidencia' column index (0-based)
         await insertarImagenEvidencia(workbook, sheet, rowNumber - 1, colIndex, e.evidencias);
       }
     }
