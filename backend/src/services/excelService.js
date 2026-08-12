@@ -437,6 +437,8 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
     { header: 'Monitores', key: 'monitores', width: 35 },
     { header: 'Teclado', key: 'teclado', width: 25 },
     { header: 'Mouse', key: 'mouse', width: 25 },
+    { header: 'Cargador', key: 'cargador', width: 25 },
+    { header: 'Diadema / Auricular', key: 'diadema', width: 25 },
     ...(tieneImagenes ? [{ header: 'Evidencia', key: 'evidencia', width: 25 }] : []),
   ];
 
@@ -447,6 +449,8 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
     let monitoresStr = '';
     let tecladoStr = '';
     let mouseStr = '';
+    let cargadorStr = '';
+    let diademaStr = '';
 
     if (e.detalles && typeof e.detalles === 'object') {
        const espPartes = [];
@@ -473,7 +477,11 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
                // Procesado abajo
             } else if (k.startsWith('marcaMouse') || k.startsWith('modeloMouse') || k.startsWith('serieMouse') || k.startsWith('numeroInventarioMouse')) {
                // Procesado abajo
-            } else if (k === 'cantidadMonitores' || k === 'tieneMonitores') {
+            } else if (k.startsWith('marcaCargador') || k.startsWith('modeloCargador') || k.startsWith('serieCargador') || k.startsWith('numeroInventarioCargador')) {
+               // Procesado abajo
+            } else if (k.startsWith('marcaDiadema') || k.startsWith('modeloDiadema') || k.startsWith('serieDiadema') || k.startsWith('numeroInventarioDiadema')) {
+               // Procesado abajo
+            } else if (k === 'cantidadMonitores' || k === 'tieneMonitores' || k === 'tieneCargador' || k === 'tieneDiadema') {
                // Omitir
             } else {
                const label = mapKeys[k] || k.charAt(0).toUpperCase() + k.slice(1).replace(/([A-Z])/g, ' $1');
@@ -488,6 +496,12 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
        }
        if (e.detalles.tieneMouse || e.detalles.marcaMouse || e.detalles.serieMouse || e.detalles.numeroInventarioMouse) {
           mouseStr = `Marca: ${e.detalles.marcaMouse || 'N/A'}\nModelo: ${e.detalles.modeloMouse || 'N/A'}\nSN: ${e.detalles.serieMouse || 'N/A'}\nInv: ${e.detalles.numeroInventarioMouse || 'N/A'}`;
+       }
+       if (e.detalles.tieneCargador || e.detalles.marcaCargador || e.detalles.serieCargador || e.detalles.numeroInventarioCargador) {
+          cargadorStr = `Marca: ${e.detalles.marcaCargador || 'N/A'}\nModelo: ${e.detalles.modeloCargador || 'N/A'}\nSN: ${e.detalles.serieCargador || 'N/A'}\nInv: ${e.detalles.numeroInventarioCargador || 'N/A'}`;
+       }
+       if (e.detalles.tieneDiadema || e.detalles.marcaDiadema || e.detalles.serieDiadema || e.detalles.numeroInventarioDiadema) {
+          diademaStr = `Marca: ${e.detalles.marcaDiadema || 'N/A'}\nModelo: ${e.detalles.modeloDiadema || 'N/A'}\nSN: ${e.detalles.serieDiadema || 'N/A'}\nInv: ${e.detalles.numeroInventarioDiadema || 'N/A'}`;
        }
     }
 
@@ -504,6 +518,8 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
       monitores: monitoresStr,
       teclado: tecladoStr,
       mouse: mouseStr,
+      cargador: cargadorStr,
+      diadema: diademaStr,
     };
     if (tieneImagenes) rowData.evidencia = '';
     const row = sheet.addRow(rowData);

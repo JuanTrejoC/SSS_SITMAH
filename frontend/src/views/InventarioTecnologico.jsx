@@ -1446,8 +1446,8 @@ export default function InventarioTecnologico() {
                     </div>
                   </div>
 
-                  {/* PERIFÉRICOS (SOLO ESCRITORIO) */}
-                  {form.tipo === 'escritorio' && (
+                  {/* PERIFÉRICOS (ESCRITORIO Y LAPTOP) */}
+                  {['escritorio', 'laptop'].includes(form.tipo) && (
                     <div style={{ padding: '1.75rem', backgroundColor: '#f0fdfa', borderRadius: '12px', border: '1px solid #ccfbf1', marginBottom: '2rem' }}>
                       <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#0f766e', marginBottom: '1.5rem', borderBottom: '1px solid #99f6e4', paddingBottom: '0.5rem' }}>Periféricos Asignados</h3>
 
@@ -1553,6 +1553,36 @@ export default function InventarioTecnologico() {
                             </div>
                           );
                         })()}
+                      </div>
+
+                      <div style={{ marginBottom: '1.8rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: '600', color: '#115e59', cursor: 'pointer', marginBottom: '1rem' }}>
+                          <input type="checkbox" checked={!!form.detalles.tieneCargador} onChange={e => handleDetalleChange('tieneCargador', e.target.checked)} style={{ transform: 'scale(1.2)' }} />
+                          ¿Tiene Cargador / Eliminador?
+                        </label>
+                        {form.detalles.tieneCargador && (
+                          <div className="inventario-grid-periferico-4">
+                            <div><label style={labelStyle}>No. Inventario</label><input type="text" placeholder="Inv. Cargador" value={form.detalles.numeroInventarioCargador || ''} onChange={e => handleDetalleChange('numeroInventarioCargador', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Dell" value={form.detalles.marcaCargador || ''} onChange={e => handleDetalleChange('marcaCargador', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: 65W AC" value={form.detalles.modeloCargador || ''} onChange={e => handleDetalleChange('modeloCargador', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>No. Serie</label><input type="text" placeholder="Ej: SN000" value={form.detalles.serieCargador || ''} onChange={e => handleDetalleChange('serieCargador', e.target.value)} style={inputStyle} /></div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ marginBottom: '1.8rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontWeight: '600', color: '#115e59', cursor: 'pointer', marginBottom: '1rem' }}>
+                          <input type="checkbox" checked={!!form.detalles.tieneDiadema} onChange={e => handleDetalleChange('tieneDiadema', e.target.checked)} style={{ transform: 'scale(1.2)' }} />
+                          ¿Tiene Diadema / Auricular?
+                        </label>
+                        {form.detalles.tieneDiadema && (
+                          <div className="inventario-grid-periferico-4">
+                            <div><label style={labelStyle}>No. Inventario</label><input type="text" placeholder="Inv. Diadema" value={form.detalles.numeroInventarioDiadema || ''} onChange={e => handleDetalleChange('numeroInventarioDiadema', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Jabra" value={form.detalles.marcaDiadema || ''} onChange={e => handleDetalleChange('marcaDiadema', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: Evolve 20" value={form.detalles.modeloDiadema || ''} onChange={e => handleDetalleChange('modeloDiadema', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>No. Serie</label><input type="text" placeholder="Ej: SN111" value={form.detalles.serieDiadema || ''} onChange={e => handleDetalleChange('serieDiadema', e.target.value)} style={inputStyle} /></div>
+                          </div>
+                        )}
                       </div>
 
                     </div>
