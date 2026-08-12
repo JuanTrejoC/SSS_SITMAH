@@ -215,8 +215,9 @@ function aplicarEstiloTabla(sheet) {
       // Ajustar la altura de la fila si hay muchas líneas de texto (calculado aprox 12px por línea)
       if (lines.length > 3) {
          const neededHeight = lines.length * 15;
-         if (!row.height || row.height < neededHeight) {
-            row.height = neededHeight;
+         const rowObj = sheet.getRow(cell.row);
+         if (!rowObj.height || rowObj.height < neededHeight) {
+            rowObj.height = neededHeight;
          }
       }
     });
