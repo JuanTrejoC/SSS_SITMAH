@@ -11,7 +11,7 @@ function aplicarEstiloTabla(sheet) {
 
   // Configurar altura de la fila de cabecera
   const headerRow = sheet.getRow(1);
-  headerRow.height = 28;
+  headerRow.height = 40;
 
   // Estilo para la cabecera
   headerRow.eachCell((cell) => {
@@ -44,8 +44,8 @@ function aplicarEstiloTabla(sheet) {
     if (rowNumber === 1) return; // Omitir cabecera
 
     // Respetar altura si ya fue modificada (ej. miniatura de evidencia)
-    if (row.height === undefined || row.height < 22) {
-      row.height = 22;
+    if (row.height === undefined || row.height < 40) {
+      row.height = 40;
     }
 
     const esPar = rowNumber % 2 === 0;
@@ -211,13 +211,21 @@ function aplicarEstiloTabla(sheet) {
           maxLength = line.length;
         }
       }
+      
+      // Ajustar la altura de la fila si hay muchas líneas de texto (calculado aprox 12px por línea)
+      if (lines.length > 3) {
+         const neededHeight = lines.length * 15;
+         if (!row.height || row.height < neededHeight) {
+            row.height = neededHeight;
+         }
+      }
     });
     
     if (column.key === 'evidencia' && maxLength < 25) {
       column.width = 25;
     } else {
-      // Poner un máximo de 50 de ancho para no exagerar y permitir que wrapText haga su trabajo
-      column.width = Math.min(maxLength < 10 ? 10 : maxLength + 3, 50);
+      // Poner un máximo de 60 de ancho para no exagerar y permitir que wrapText haga su trabajo
+      column.width = Math.min(maxLength < 10 ? 15 : maxLength + 3, 60);
     }
   });
 }
@@ -416,7 +424,7 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
   const tieneImagenes = incluirImagenes && existencias.some(e => e.evidencias && e.evidencias.some(ev => ev.mimetype?.startsWith('image/')));
 
   sheet.columns = [
-    { header: 'Tipo', key: 'tipo', width: 18 },
+    { header: 'Tipo', key: 'tipo', width: 20 },
     { header: 'Responsable', key: 'responsable', width: 25 },
     { header: 'No. Inventario', key: 'numeroInventario', width: 22 },
     { header: 'No. Serie', key: 'numeroSerie', width: 22 },
@@ -424,29 +432,24 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
     { header: 'Área', key: 'direccion', width: 22 },
     { header: 'Ubicación', key: 'areaUbicacion', width: 22 },
     { header: 'Estatus', key: 'estatus', width: 15 },
-    { header: 'Detalles / Periféricos', key: 'detalles', width: 45 },
-    ...(tieneImagenes ? [{ header: 'Evidencia', key: 'evidencia', width: 22 }] : []),
+    { header: 'Especificaciones Técnicas', key: 'especificaciones', width: 35 },
+    { header: 'Monitores', key: 'monitores', width: 35 },
+    { header: 'Teclado', key: 'teclado', width: 25 },
+    { header: 'Mouse', key: 'mouse', width: 25 },
+    ...(tieneImagenes ? [{ header: 'Evidencia', key: 'evidencia', width: 25 }] : []),
   ];
 
   for (let i = 0; i < existencias.length; i++) {
     const e = existencias[i];
     
-    let detallesStr = '';
+    let especificacionesStr = '';
+    let monitoresStr = '';
+    let tecladoStr = '';
+    let mouseStr = '';
+
     if (e.detalles && typeof e.detalles === 'object') {
-       const partes = [];
+       const espPartes = [];
        const mapKeys = {
-         numeroInventarioMonitor: 'Inv. Monitor',
-         marcaMonitor: 'Marca Monitor',
-         modeloMonitor: 'Modelo Monitor',
-         serieMonitor: 'Serie Monitor',
-         numeroInventarioTeclado: 'Inv. Teclado',
-         marcaTeclado: 'Marca Teclado',
-         modeloTeclado: 'Modelo Teclado',
-         serieTeclado: 'Serie Teclado',
-         numeroInventarioMouse: 'Inv. Mouse',
-         marcaMouse: 'Marca Mouse',
-         modeloMouse: 'Modelo Mouse',
-         serieMouse: 'Serie Mouse',
          ipPredeterminada: 'IP',
          sistemaOperativo: 'OS',
          tarjetaGrafica: 'Gráfica',
@@ -455,13 +458,36 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
        };
 
        for (let k in e.detalles) {
-         // Omitir booleanos (ej. tieneMonitor, tieneTeclado)
-         if (e.detalles[k] && typeof e.detalles[k] !== 'boolean') {
-            const label = mapKeys[k] || k.charAt(0).toUpperCase() + k.slice(1).replace(/([A-Z])/g, ' $1');
-            partes.push(`${label}: ${e.detalles[k]}`);
+         if (e.detalles[k] !== undefined && e.detalles[k] !== null && typeof e.detalles[k] !== 'boolean') {
+            if (k === 'monitores' && Array.isArray(e.detalles[k])) {
+               const mons = e.detalles[k];
+               const mPartes = [];
+               mons.forEach((m, idx) => {
+                 if(m.marca || m.modelo || m.serie || m.numeroInventario) {
+                   mPartes.push(`Monitor ${idx + 1}:\nMarca: ${m.marca||'N/A'}\nModelo: ${m.modelo||'N/A'}\nSN: ${m.serie||'N/A'}\nInv: ${m.numeroInventario||'N/A'}\n`);
+                 }
+               });
+               monitoresStr = mPartes.join('\n').trim();
+            } else if (k.startsWith('marcaTeclado') || k.startsWith('modeloTeclado') || k.startsWith('serieTeclado') || k.startsWith('numeroInventarioTeclado')) {
+               // Procesado abajo
+            } else if (k.startsWith('marcaMouse') || k.startsWith('modeloMouse') || k.startsWith('serieMouse') || k.startsWith('numeroInventarioMouse')) {
+               // Procesado abajo
+            } else if (k === 'cantidadMonitores' || k === 'tieneMonitores') {
+               // Omitir
+            } else {
+               const label = mapKeys[k] || k.charAt(0).toUpperCase() + k.slice(1).replace(/([A-Z])/g, ' $1');
+               espPartes.push(`${label}: ${e.detalles[k]}`);
+            }
          }
        }
-       detallesStr = partes.join('\n');
+       especificacionesStr = espPartes.join('\n');
+
+       if (e.detalles.tieneTeclado || e.detalles.marcaTeclado || e.detalles.serieTeclado || e.detalles.numeroInventarioTeclado) {
+          tecladoStr = `Marca: ${e.detalles.marcaTeclado || 'N/A'}\nModelo: ${e.detalles.modeloTeclado || 'N/A'}\nSN: ${e.detalles.serieTeclado || 'N/A'}\nInv: ${e.detalles.numeroInventarioTeclado || 'N/A'}`;
+       }
+       if (e.detalles.tieneMouse || e.detalles.marcaMouse || e.detalles.serieMouse || e.detalles.numeroInventarioMouse) {
+          mouseStr = `Marca: ${e.detalles.marcaMouse || 'N/A'}\nModelo: ${e.detalles.modeloMouse || 'N/A'}\nSN: ${e.detalles.serieMouse || 'N/A'}\nInv: ${e.detalles.numeroInventarioMouse || 'N/A'}`;
+       }
     }
 
     const rowData = {
@@ -473,7 +499,10 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
       direccion: e.direccion || 'N/A',
       areaUbicacion: e.areaUbicacion || 'N/A',
       estatus: e.estatus || 'Activo',
-      detalles: detallesStr,
+      especificaciones: especificacionesStr,
+      monitores: monitoresStr,
+      teclado: tecladoStr,
+      mouse: mouseStr,
     };
     if (tieneImagenes) rowData.evidencia = '';
     const row = sheet.addRow(rowData);
