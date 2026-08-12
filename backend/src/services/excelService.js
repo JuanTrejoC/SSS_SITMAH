@@ -203,18 +203,21 @@ function aplicarEstiloTabla(sheet) {
   sheet.columns.forEach(column => {
     let maxLength = 0;
     column.eachCell({ includeEmpty: true }, function (cell) {
-      // Ignorar celdas con imágenes (el valor es null o vacío) para el cálculo de ancho de texto,
-      // pero para la columna 'evidencia', daremos un ancho mínimo.
       const valStr = cell.value ? cell.value.toString() : '';
-      if (valStr.length > maxLength) {
-        maxLength = valStr.length;
+      // Considerar saltos de línea para el ancho de la columna
+      const lines = valStr.split('\n');
+      for (const line of lines) {
+        if (line.length > maxLength) {
+          maxLength = line.length;
+        }
       }
     });
-    // Si la columna es evidencia y se agregaron imágenes, dar un ancho base
+    
     if (column.key === 'evidencia' && maxLength < 25) {
       column.width = 25;
     } else {
-      column.width = maxLength < 10 ? 10 : maxLength + 2;
+      // Poner un máximo de 50 de ancho para no exagerar y permitir que wrapText haga su trabajo
+      column.width = Math.min(maxLength < 10 ? 10 : maxLength + 3, 50);
     }
   });
 }
@@ -421,20 +424,56 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
     { header: 'Área', key: 'direccion', width: 22 },
     { header: 'Ubicación', key: 'areaUbicacion', width: 22 },
     { header: 'Estatus', key: 'estatus', width: 15 },
+    { header: 'Detalles / Periféricos', key: 'detalles', width: 45 },
     ...(tieneImagenes ? [{ header: 'Evidencia', key: 'evidencia', width: 22 }] : []),
   ];
 
   for (let i = 0; i < existencias.length; i++) {
     const e = existencias[i];
+    
+    let detallesStr = '';
+    if (e.detalles && typeof e.detalles === 'object') {
+       const partes = [];
+       const mapKeys = {
+         numeroInventarioMonitor: 'Inv. Monitor',
+         marcaMonitor: 'Marca Monitor',
+         modeloMonitor: 'Modelo Monitor',
+         serieMonitor: 'Serie Monitor',
+         numeroInventarioTeclado: 'Inv. Teclado',
+         marcaTeclado: 'Marca Teclado',
+         modeloTeclado: 'Modelo Teclado',
+         serieTeclado: 'Serie Teclado',
+         numeroInventarioMouse: 'Inv. Mouse',
+         marcaMouse: 'Marca Mouse',
+         modeloMouse: 'Modelo Mouse',
+         serieMouse: 'Serie Mouse',
+         ipPredeterminada: 'IP',
+         sistemaOperativo: 'OS',
+         tarjetaGrafica: 'Gráfica',
+         pantallasAsignadas: 'Pantallas',
+         numeroTelefono: 'Teléfono',
+       };
+
+       for (let k in e.detalles) {
+         // Omitir booleanos (ej. tieneMonitor, tieneTeclado)
+         if (e.detalles[k] && typeof e.detalles[k] !== 'boolean') {
+            const label = mapKeys[k] || k.charAt(0).toUpperCase() + k.slice(1).replace(/([A-Z])/g, ' $1');
+            partes.push(`${label}: ${e.detalles[k]}`);
+         }
+       }
+       detallesStr = partes.join('\n');
+    }
+
     const rowData = {
       tipo: e.tipo || 'N/A',
-      responsable: e.responsable ? `${e.responsable}${e.cargoResponsable ? ` - ${e.cargoResponsable}` : ''}` : 'N/A',
+      responsable: e.responsable ? `${e.responsable}${e.cargoResponsable ? `\n${e.cargoResponsable}` : ''}` : 'N/A',
       numeroInventario: e.numeroInventario || 'N/A',
       numeroSerie: e.numeroSerie || 'N/A',
-      marcaModelo: `${e.marca || 'N/A'} - ${e.modelo || 'N/A'}`,
+      marcaModelo: `${e.marca || 'N/A'} \n ${e.modelo || 'N/A'}`,
       direccion: e.direccion || 'N/A',
       areaUbicacion: e.areaUbicacion || 'N/A',
       estatus: e.estatus || 'Activo',
+      detalles: detallesStr,
     };
     if (tieneImagenes) rowData.evidencia = '';
     const row = sheet.addRow(rowData);

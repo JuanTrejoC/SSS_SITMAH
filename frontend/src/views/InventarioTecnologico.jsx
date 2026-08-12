@@ -8,7 +8,7 @@ import {
   FaLaptop, FaPlus, FaEdit, FaTrashAlt,
   FaChevronLeft, FaChevronRight, FaTimes, FaDesktop, FaMobileAlt, FaNetworkWired,
   FaServer, FaShieldAlt, FaWifi, FaVideo, FaHdd, FaBroadcastTower, FaPrint, FaTv,
-  FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone, FaFilePdf
+  FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone, FaFilePdf, FaPlug
 } from 'react-icons/fa';
 
 const TIPOS_EQUIPO = [
@@ -31,6 +31,7 @@ const TIPOS_EQUIPO = [
   { value: 'telefono', label: 'Teléfono', icon: FaPhone, group: 'Comunicación' },
   { value: 'radio', label: 'Radio', icon: FaMicrophone, group: 'Comunicación' },
   { value: 'aire', label: 'Aire Acondicionado', icon: FaFan, group: 'Infraestructura' },
+  { value: 'no_break', label: 'No Break (UPS)', icon: FaPlug, group: 'Infraestructura' },
   { value: 'lectora_tags', label: 'Lectora de Tags', icon: FaBroadcastTower, group: 'Peaje y Control' },
   { value: 'controladora', label: 'Controladora', icon: FaShieldAlt, group: 'Peaje y Control' },
 ];
@@ -544,7 +545,7 @@ export default function InventarioTecnologico() {
   const tieneAlmacenamiento = ['servidor', 'escritorio', 'laptop', 'celular'].includes(form.tipo);
   const tieneProcesador = ['servidor', 'escritorio', 'laptop'].includes(form.tipo);
   const sinInventario = ['internet', 'aire', 'telefono'].includes(form.tipo);
-  const requiereResponsable = ['escritorio', 'laptop', 'radio'].includes(form.tipo);
+  const requiereResponsable = ['escritorio', 'laptop', 'radio', 'no_break'].includes(form.tipo);
 
   // Agrupando las opciones por grupo
   const gruposOpciones = TIPOS_EQUIPO.reduce((acc, curr) => {
