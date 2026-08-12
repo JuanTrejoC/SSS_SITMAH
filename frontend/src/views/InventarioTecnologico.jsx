@@ -291,7 +291,7 @@ export default function InventarioTecnologico() {
             doc.text(`Fecha de generación:\n${new Date().toLocaleString()}`, pageWidth - 14, 12, { align: 'right' });
 
             const total = registros.length;
-            const operando = registros.filter(r => r.estatus?.toLowerCase() === 'operando').length;
+            const operando = registros.filter(r => r.estatus?.toLowerCase() === 'operando' || r.estatus?.toLowerCase() === 'activo').length;
             const refacciones = registros.filter(r => r.estatus?.toLowerCase().includes('refacciones')).length;
             const ubicaciones = new Set(registros.map(r => r.areaUbicacion)).size;
 
@@ -381,7 +381,7 @@ export default function InventarioTecnologico() {
               let bgColor = [229, 231, 235]; 
               let textColor = [55, 65, 81];
               
-              if (estatus.includes('OPERANDO')) {
+              if (estatus.includes('OPERANDO') || estatus.includes('ACTIVO')) {
                 bgColor = [220, 252, 231]; 
                 textColor = [22, 163, 74];
               } else if (estatus.includes('REFACCIONES')) {
