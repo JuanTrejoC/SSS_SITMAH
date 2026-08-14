@@ -1,0 +1,11 @@
+{
+  "query": {},
+  "where": {
+    "tipo": {
+      "notIn": [
+        "herramienta_tec",
+        "herramienta_infra"
+      ]
+    }
+  }
+}

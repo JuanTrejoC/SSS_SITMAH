@@ -60,6 +60,14 @@ model Area {
   @@map("area")
 }
 
+model Subdireccion {
+  id     Int     @id @default(autoincrement())
+  nombre String  @db.VarChar(100)
+  activo Boolean @default(true)
+
+  @@map("subdireccion")
+}
+
 model Sede {
   id     Int     @id @default(autoincrement())
   nombre String  @db.VarChar(100)
@@ -268,6 +276,7 @@ model EquipoTecnologico {
   detalles         Json?    // Stores type-specific dynamic attributes
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
+  resguardos       Resguardo[]
 
   @@map("equipo_tecnologico")
 }
@@ -296,6 +305,7 @@ model ControladorSemaforo {
   updatedAt           DateTime @updatedAt @map("updated_at")
 
   crucero             Crucero  @relation(fields: [cruceroId], references: [id])
+  resguardos          Resguardo[]
 
   @@map("controlador_semaforo")
 }
@@ -314,6 +324,7 @@ model ExistenciaComponente {
   updatedAt        DateTime               @updatedAt @map("updated_at")
   reportes         ReporteSemaforoPieza[]
   reportesOficina  ReporteOficinaPieza[]
+  resguardos       Resguardo[]
 
   @@map("existencia_componente")
 }
@@ -342,4 +353,54 @@ model ReporteOficinaPieza {
   componente        ExistenciaComponente @relation(fields: [componenteId], references: [id])
 
   @@map("reporte_oficina_pieza")
+}
+
+model InventarioMobiliario {
+  id                 Int      @id @default(autoincrement())
+  numeroInventario   String   @unique @map("numero_inventario") @db.VarChar(100)
+  bien               String   @db.VarChar(100)
+  marca              String?  @db.VarChar(100)
+  modelo             String?  @db.VarChar(100)
+  numeroSerie        String?  @map("numero_serie") @db.VarChar(100)
+  descripcion        String   @db.Text
+  direccion          String   @db.VarChar(150)
+  subdireccion       String   @db.VarChar(150)
+  area               String   @db.VarChar(150)
+  nombreResguardante String   @map("nombre_resguardante") @db.VarChar(150)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  resguardos         Resguardo[]
+
+  @@map("inventario_mobiliario")
+}
+
+model Resguardo {
+  id                   Int       @id @default(autoincrement())
+  tipoInventario       String    @map("tipo_inventario") @db.VarChar(50) // 'mobiliario', 'tecnologico', 'semaforos'
+  
+  mobiliarioId         Int?      @map("mobiliario_id")
+  equipoTecnologicoId  Int?      @map("equipo_tecnologico_id")
+  existenciaId         Int?      @map("existencia_id")
+  controladorSemaforoId Int?     @map("controlador_semaforo_id")
+
+  descripcionPdf       String?   @map("descripcion_pdf") @db.Text
+  numeroSeriePdf       String?   @map("numero_serie_pdf") @db.VarChar(100)
+
+  fechaPrestamo        DateTime  @default(now()) @map("fecha_prestamo")
+  fechaDevolucion      DateTime? @map("fecha_devolucion")
+  
+  nombreResguardante   String    @map("nombre_resguardante") @db.VarChar(150)
+  area                 String    @db.VarChar(150)
+  estado               String    @default("Activo") @db.VarChar(50) // Activo, Devuelto
+  observaciones        String?   @db.Text
+
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  mobiliario           InventarioMobiliario? @relation(fields: [mobiliarioId], references: [id])
+  equipoTecnologico    EquipoTecnologico?    @relation(fields: [equipoTecnologicoId], references: [id])
+  existencia           ExistenciaComponente? @relation(fields: [existenciaId], references: [id])
+  controladorSemaforo  ControladorSemaforo?  @relation(fields: [controladorSemaforoId], references: [id])
+
+  @@map("resguardo")
 }

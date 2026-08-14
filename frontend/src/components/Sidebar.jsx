@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   FaTachometerAlt, FaFileAlt, FaRoad,
-  FaChartBar, FaCog, FaTimes, FaLaptop, FaBoxes, FaWrench
+  FaChartBar, FaCog, FaTimes, FaLaptop, FaBoxes, FaWrench, FaChair, FaClipboardCheck
 } from 'react-icons/fa'
 import { FaFacebook, FaXTwitter } from 'react-icons/fa6'
 import logoSitmah from '../assets/logo.png'
@@ -196,6 +196,32 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             <FaWrench size={15} />
             Inventario de Herramientas
           </Link>
+
+          {user?.rol === 'administrador' && (
+            <Link
+              to="/inventario-mobiliario"
+              style={linkStyle('/inventario-mobiliario')}
+              onMouseOver={linkHover('/inventario-mobiliario').over}
+              onMouseOut={linkHover('/inventario-mobiliario').out}
+              onClick={closeSidebar}
+            >
+              <FaChair size={15} />
+              Mobiliario
+            </Link>
+          )}
+
+          {user?.rol === 'administrador' && (
+            <Link
+              to="/resguardos"
+              style={linkStyle('/resguardos')}
+              onMouseOver={linkHover('/resguardos').over}
+              onMouseOut={linkHover('/resguardos').out}
+              onClick={closeSidebar}
+            >
+              <FaClipboardCheck size={15} />
+              Resguardos
+            </Link>
+          )}
         </div>
       )}
 

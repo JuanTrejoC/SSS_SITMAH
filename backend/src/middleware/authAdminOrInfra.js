@@ -12,7 +12,7 @@ function authAdminOrInfra(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.rol !== 'admin' && decoded.rol !== 'infraestructura') {
+    if (decoded.rol !== 'admin' && decoded.rol !== 'administrador' && decoded.rol !== 'infraestructura') {
         return fail(res, 'No autorizado para esta acción', 403);
     }
     req.usuario = decoded;

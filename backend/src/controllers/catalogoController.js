@@ -19,6 +19,10 @@ const catalogosPublicos = {
     where: { activo: true }, 
     orderBy: { nombre: 'asc' }
   }),
+  subdirecciones: () => prisma.subdireccion.findMany({
+    where: { activo: true },
+    orderBy: { nombre: 'asc' }
+  }),
   sedes: () => prisma.sede.findMany({ 
     where: { activo: true }, 
     orderBy: { nombre: 'asc' }

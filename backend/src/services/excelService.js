@@ -538,4 +538,43 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
   return workbook.xlsx.writeBuffer();
 }
 
-module.exports = { exportarReportesOficina, exportarReportesSemaforo, exportarInventarioExistencias };
+async function exportarInventarioMobiliario(mobiliario) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Inventario Mobiliario');
+
+  sheet.columns = [
+    { header: 'NO. DE INVENTARIO', key: 'numeroInventario', width: 22 },
+    { header: 'BIEN', key: 'bien', width: 25 },
+    { header: 'MARCA', key: 'marca', width: 20 },
+    { header: 'MODELO', key: 'modelo', width: 20 },
+    { header: 'NO. DE SERIE', key: 'numeroSerie', width: 22 },
+    { header: 'DESCRIPCIÓN', key: 'descripcion', width: 35 },
+    { header: 'DIRECCIÓN', key: 'direccion', width: 25 },
+    { header: 'SUBDIRECCIÓN', key: 'subdireccion', width: 25 },
+    { header: 'ÁREA', key: 'area', width: 25 },
+    { header: 'NOMBRE DEL RESGUARDANTE', key: 'nombreResguardante', width: 30 },
+  ];
+
+  for (let i = 0; i < mobiliario.length; i++) {
+    const m = mobiliario[i];
+    
+    sheet.addRow({
+      numeroInventario: m.numeroInventario || 'S/N',
+      bien: m.bien || 'N/A',
+      marca: m.marca || 'S/M',
+      modelo: m.modelo || 'S/M',
+      numeroSerie: m.numeroSerie || 'S/S',
+      descripcion: m.descripcion || 'N/A',
+      direccion: m.direccion || 'N/A',
+      subdireccion: m.subdireccion || 'N/A',
+      area: m.area || 'N/A',
+      nombreResguardante: m.nombreResguardante || 'N/A',
+    });
+  }
+
+  aplicarEstiloTabla(sheet);
+  return workbook.xlsx.writeBuffer();
+}
+
+module.exports = { exportarReportesOficina, exportarReportesSemaforo, exportarInventarioExistencias, exportarInventarioMobiliario };
+

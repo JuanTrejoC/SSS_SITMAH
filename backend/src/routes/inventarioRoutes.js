@@ -51,5 +51,12 @@ router.get('/existencias/:id/historial', asyncHandler(inventario.obtenerHistoria
 router.put('/existencias/:id', asyncHandler(inventario.actualizarExistencia));
 router.get('/existencias/export', asyncHandler(inventario.exportarExistenciasExcel));
 
+// Mobiliario Routes
+router.get('/mobiliario', asyncHandler(inventario.listarMobiliario));
+router.post('/mobiliario', asyncHandler(inventario.crearMobiliario));
+router.get('/mobiliario/export', asyncHandler(inventario.exportarMobiliarioExcel));
+router.get('/mobiliario/:id', asyncHandler(inventario.obtenerMobiliario));
+router.put('/mobiliario/:id', asyncHandler(inventario.actualizarMobiliario));
+router.delete('/mobiliario/:id', asyncHandler(inventario.eliminarMobiliario));
 
 module.exports = router;

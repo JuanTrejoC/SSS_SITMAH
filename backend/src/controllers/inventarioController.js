@@ -2,7 +2,21 @@ const { z } = require('zod');
 const prisma = require('../config/db');
 const { ok, fail } = require('../utils/response');
 const { parsePagination } = require('../utils/filters');
-const { exportarInventarioExistencias } = require('../services/excelService');
+const { exportarInventarioExistencias, exportarInventarioMobiliario } = require('../services/excelService');
+
+// Schema validation for mobiliario
+const mobiliarioSchema = z.object({
+  numeroInventario: z.string().min(1, "El número de inventario es requerido"),
+  bien: z.string().min(1, "El bien es requerido"),
+  marca: z.string().nullable().optional(),
+  modelo: z.string().nullable().optional(),
+  numeroSerie: z.string().nullable().optional(),
+  descripcion: z.string().min(1, "La descripción es requerida"),
+  direccion: z.string().min(1, "La dirección es requerida"),
+  subdireccion: z.string().min(1, "La subdirección es requerida"),
+  area: z.string().min(1, "El área es requerida"),
+  nombreResguardante: z.string().min(1, "El nombre del resguardante es requerido"),
+});
 
 // Schema validation for technological equipment
 const equipoTecnologicoSchema = z.object({
@@ -546,6 +560,156 @@ async function exportarEquipoTecnologicoExcel(req, res) {
   res.send(buffer);
 }
 
+// ==========================================
+// 4. INVENTARIO DE MOBILIARIO
+// ==========================================
+
+async function listarMobiliario(req, res) {
+  const { page, limit, skip } = parsePagination(req.query);
+  const { search } = req.query;
+
+  const where = {};
+  if (search) {
+    where.OR = [
+      { numeroInventario: { contains: search } },
+      { bien: { contains: search } },
+      { descripcion: { contains: search } },
+      { direccion: { contains: search } },
+      { subdireccion: { contains: search } },
+      { area: { contains: search } },
+      { nombreResguardante: { contains: search } },
+    ];
+  }
+
+  const [items, total] = await Promise.all([
+    prisma.inventarioMobiliario.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { id: 'desc' },
+    }),
+    prisma.inventarioMobiliario.count({ where }),
+  ]);
+
+  ok(res, { items, total, page, limit });
+}
+
+async function crearMobiliario(req, res) {
+  const parsed = mobiliarioSchema.safeParse(req.body);
+  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+
+  const data = parsed.data;
+
+  const existe = await prisma.inventarioMobiliario.findUnique({
+    where: { numeroInventario: data.numeroInventario },
+  });
+  if (existe) {
+    return fail(res, `El número de inventario '${data.numeroInventario}' ya existe`);
+  }
+
+  const mobiliario = await prisma.inventarioMobiliario.create({
+    data: {
+      numeroInventario: data.numeroInventario,
+      bien: data.bien,
+      marca: data.marca || null,
+      modelo: data.modelo || null,
+      numeroSerie: data.numeroSerie || null,
+      descripcion: data.descripcion,
+      direccion: data.direccion,
+      subdireccion: data.subdireccion,
+      area: data.area,
+      nombreResguardante: data.nombreResguardante,
+    },
+  });
+
+  ok(res, mobiliario, 201);
+}
+
+async function obtenerMobiliario(req, res) {
+  const id = Number(req.params.id);
+  const mobiliario = await prisma.inventarioMobiliario.findUnique({ where: { id } });
+  if (!mobiliario) return fail(res, 'Mobiliario no encontrado', 404);
+  ok(res, mobiliario);
+}
+
+async function actualizarMobiliario(req, res) {
+  const id = Number(req.params.id);
+  const parsed = mobiliarioSchema.safeParse(req.body);
+  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+
+  const data = parsed.data;
+
+  const actual = await prisma.inventarioMobiliario.findUnique({ where: { id } });
+  if (!actual) return fail(res, 'Mobiliario no encontrado', 404);
+
+  if (data.numeroInventario !== actual.numeroInventario) {
+    const existe = await prisma.inventarioMobiliario.findUnique({
+      where: { numeroInventario: data.numeroInventario },
+    });
+    if (existe) {
+      return fail(res, `El número de inventario '${data.numeroInventario}' ya está asignado`);
+    }
+  }
+
+  const mobiliario = await prisma.inventarioMobiliario.update({
+    where: { id },
+    data: {
+      numeroInventario: data.numeroInventario,
+      bien: data.bien,
+      marca: data.marca || null,
+      modelo: data.modelo || null,
+      numeroSerie: data.numeroSerie || null,
+      descripcion: data.descripcion,
+      direccion: data.direccion,
+      subdireccion: data.subdireccion,
+      area: data.area,
+      nombreResguardante: data.nombreResguardante,
+    },
+  });
+
+  ok(res, mobiliario);
+}
+
+async function eliminarMobiliario(req, res) {
+  const id = Number(req.params.id);
+  const existe = await prisma.inventarioMobiliario.findUnique({ where: { id } });
+  if (!existe) return fail(res, 'Mobiliario no encontrado', 404);
+
+  await prisma.inventarioMobiliario.delete({ where: { id } });
+  ok(res, { message: 'Mobiliario eliminado correctamente' });
+}
+
+async function exportarMobiliarioExcel(req, res) {
+  const { search, order } = req.query;
+  const where = {};
+  
+  if (search) {
+    where.OR = [
+      { numeroInventario: { contains: search } },
+      { bien: { contains: search } },
+      { descripcion: { contains: search } },
+      { direccion: { contains: search } },
+      { subdireccion: { contains: search } },
+      { area: { contains: search } },
+      { nombreResguardante: { contains: search } },
+    ];
+  }
+
+  const mobiliario = await prisma.inventarioMobiliario.findMany({
+    where,
+    orderBy: { id: order === 'desc' ? 'desc' : 'asc' },
+  });
+
+  const buffer = await exportarInventarioMobiliario(mobiliario);
+
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  res.setHeader('Content-Disposition', 'attachment; filename="inventario_mobiliario.xlsx"');
+  res.send(buffer);
+}
+
 module.exports = {
   listarEquipoTecnologico,
   crearEquipoTecnologico,
@@ -567,4 +731,11 @@ module.exports = {
   obtenerHistorialExistencia,
   exportarExistenciasExcel,
   exportarEquipoTecnologicoExcel,
+
+  listarMobiliario,
+  crearMobiliario,
+  obtenerMobiliario,
+  actualizarMobiliario,
+  eliminarMobiliario,
+  exportarMobiliarioExcel,
 };

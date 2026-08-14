@@ -4,6 +4,7 @@ const { ok, fail } = require('../utils/response');
 
 const modelos = {
   areas: { model: () => prisma.area, nombre: 'Área' },
+  subdirecciones: { model: () => prisma.subdireccion, nombre: 'Subdirección' },
   sedes: { model: () => prisma.sede, nombre: 'Sede' },
   categorias: { model: () => prisma.categoria, nombre: 'Categoría' },
   cargos: { model: () => prisma.cargo, nombre: 'Cargo' },

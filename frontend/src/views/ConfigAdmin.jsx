@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   FaUsersCog, FaBuilding, FaMapMarkerAlt, FaTags,
   FaEnvelope, FaEdit, FaTrashAlt, FaToggleOff,
-  FaIdBadge, FaBus, FaTrafficLight, FaExclamationTriangle, FaLink
+  FaIdBadge, FaBus, FaTrafficLight, FaExclamationTriangle, FaLink, FaSitemap
 } from 'react-icons/fa'
 import Swal from 'sweetalert2'
 import { useAuth } from '../context/AuthContext'
@@ -63,6 +63,12 @@ export default function ConfigAdmin() {
       icono: <FaBuilding size={28} />,
       titulo: 'Áreas',
       descripcion: 'Registrar y configurar las áreas operativas.'
+    },
+    {
+      tipo: 'subdirecciones',
+      icono: <FaSitemap size={28} />,
+      titulo: 'Subdirecciones',
+      descripcion: 'Configurar las subdirecciones operativas.'
     },
       {
       tipo: 'cargos',
