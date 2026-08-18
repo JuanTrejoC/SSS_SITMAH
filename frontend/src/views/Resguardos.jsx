@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react';
 import { FaClipboardCheck, FaPlus, FaSearch, FaFilePdf, FaCheck } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import logoSitmah from '../assets/logo.png';
-import logoSSS from '../assets/logoSSS.png';
+import autoTable from 'jspdf-autotable';
+import headerLogos from '../assets/header_logos.png';
 import { useAuth } from '../context/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -12,6 +11,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 function Resguardos() {
   const { user, logout } = useAuth();
   const [resguardos, setResguardos] = useState([]);
+  const [areas, setAreas] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   
@@ -112,9 +112,26 @@ function Resguardos() {
     }
   };
 
+  const cargarAreas = async () => {
+    if (!user?.token) return;
+    try {
+      const token = user.token;
+      const res = await fetch(`${API_BASE_URL}/api/catalogos/areas`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAreas(data.data);
+      }
+    } catch (err) {
+      console.error('Error al cargar áreas:', err);
+    }
+  };
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarResguardos();
+    cargarAreas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -212,107 +229,117 @@ function Resguardos() {
     return 'Desconocido';
   };
 
-  const generarPdf = (resguardo) => {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    
-    // Logo 1
-    const img1 = new Image();
-    img1.src = logoSitmah;
-    
-    const img2 = new Image();
-    img2.src = logoSSS;
-    
-    img1.onload = () => {
-      doc.addImage(img1, 'PNG', 40, 10, 40, 15);
+  const generarPdf = async (resguardo) => {
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
       
-      img2.onload = () => {
-        doc.addImage(img2, 'PNG', 120, 10, 50, 15);
-        continuarPdf(doc, resguardo, pageWidth);
-      };
-      
-      img2.onerror = () => {
-        // Fallback si no carga el logo 2
-        continuarPdf(doc, resguardo, pageWidth);
-      };
-    };
+      const loadImage = (src) => new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = (e) => reject(new Error('Failed to load image: ' + src));
+        img.src = src;
+      });
 
-    img1.onerror = () => {
-      // Fallback si no carga el logo 1
+      try {
+        const imgHeader = await loadImage(headerLogos);
+        // Alinear totalmente a la derecha, con logos un poco más grandes
+        doc.addImage(imgHeader, 'PNG', pageWidth - 160, 10, 150, 24);
+      } catch (e) {
+        console.warn('Header logo no cargado', e);
+      }
+
       continuarPdf(doc, resguardo, pageWidth);
-    };
+    } catch (error) {
+      console.error('Error in generarPdf:', error);
+      Swal.fire('Error PDF', error.message || 'Error al generar PDF', 'error');
+    }
   };
 
   const continuarPdf = (doc, resguardo, pageWidth) => {
-    const fechaBase = new Date(resguardo.fechaPrestamo);
-    const meses = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
-    const fechaTexto = `PACHUCA DE SOTO, HIDALGO., A ${fechaBase.getDate().toString().padStart(2, '0')} DE ${meses[fechaBase.getMonth()]} DEL ${fechaBase.getFullYear()}.`;
+    try {
+      const fechaBase = new Date(resguardo.fechaPrestamo);
+      const meses = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+      const fechaTexto = `PACHUCA DE SOTO, HIDALGO., A ${fechaBase.getDate().toString().padStart(2, '0')} DE ${meses[fechaBase.getMonth()]} DEL ${fechaBase.getFullYear()}.`;
 
-    doc.setFontSize(9);
-    doc.setTextColor(50);
-    doc.text(fechaTexto, pageWidth - 20, 45, { align: 'right' });
+      doc.setFontSize(9);
+      doc.setTextColor(0);
+      doc.text(fechaTexto, pageWidth - 10, 38, { align: 'right' });
 
-    doc.setFontSize(14);
-    doc.setTextColor(178, 34, 34); // Red color for title
-    doc.setFont('helvetica', 'bold');
-    doc.text('RESGUARDO DE BIENES', pageWidth / 2, 60, { align: 'center' });
+      doc.setFontSize(16);
+      doc.setTextColor(178, 34, 34); // Red color for title
+      doc.setFont('helvetica', 'bold');
+      doc.text('RESGUARDO DE BIENES', pageWidth / 2, 60, { align: 'center' });
 
-    // Organo / Dependencia box
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(20, 65, 170, 25, 3, 3);
-    
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    doc.setFont('helvetica', 'bold');
-    doc.text('ÓRGANO SUPERIOR', 25, 73);
-    doc.setFont('helvetica', 'normal');
-    doc.text('SECRETARÍA DE MOVILIDAD Y TRANSPORTE', 70, 73);
-    
-    doc.setFont('helvetica', 'bold');
-    doc.text('DEPENDENCIA', 25, 83);
-    doc.setFont('helvetica', 'normal');
-    doc.text('SISTEMA INTEGRADO DE TRANSPORTE MASIVO', 70, 83);
+      // Organo / Dependencia box
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(20, 65, 170, 32, 3, 3);
+      
+      doc.setFontSize(12);
+      doc.setTextColor(0);
+      doc.setFont('helvetica', 'bold');
+      doc.text('ÓRGANO SUPERIOR', 25, 74);
+      doc.setFont('helvetica', 'normal');
+      doc.text('SECRETARÍA DE MOVILIDAD Y TRANSPORTE', 75, 78);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('DEPENDENCIA', 25, 88);
+      doc.setFont('helvetica', 'normal');
+      doc.text('SISTEMA INTEGRADO DE TRANSPORTE MASIVO', 75, 92);
 
-    // Table for Description and Serial Number
-    doc.autoTable({
-      startY: 95,
-      theme: 'grid',
-      headStyles: { fillColor: [255, 255, 255], textColor: 0, lineColor: 0, lineWidth: 0.5, halign: 'center', fontStyle: 'bold' },
-      bodyStyles: { textColor: 0, lineColor: 0, lineWidth: 0.5, halign: 'center', valign: 'middle' },
-      head: [['DESCRIPCIÓN', 'NÚMERO DE SERIE']],
-      body: [
-        [resguardo.descripcionPdf || '', resguardo.numeroSeriePdf || '']
-      ],
-      styles: { cellPadding: 8, fontSize: 10 }
-    });
+      // Table for Description and Serial Number
+      autoTable(doc, {
+        startY: 105,
+        theme: 'grid',
+        headStyles: { fillColor: [255, 255, 255], textColor: 0, lineColor: 0, lineWidth: 0.5, halign: 'center', fontStyle: 'bold' },
+        bodyStyles: { textColor: 0, lineColor: 0, lineWidth: 0.5, valign: 'middle' },
+        columnStyles: {
+          0: { halign: 'left' },
+          1: { halign: 'center' }
+        },
+        head: [['DESCRIPCIÓN', 'NÚMERO DE SERIE']],
+        body: [
+          [resguardo.descripcionPdf || '', resguardo.numeroSeriePdf || '']
+        ],
+        styles: { cellPadding: 8, fontSize: 12 }
+      });
 
-    // Disclaimer text
-    const finalY = doc.lastAutoTable.finalY + 10;
-    doc.setFontSize(9);
-    doc.setTextColor(80);
-    const disclaimer = 'ESTE DISPOSITIVO SE DESTINA EXCLUSIVAMENTE A ACTIVIDADES LABORALES DE ENCIERRO. EN CASO DE DAÑO, EL USUARIO SERÁ RESPONSABLE DE SU REPOSICIÓN TOTAL, CUBRIENDO EL 100% DEL COSTO.\nQUEDANDO PROHIBIDO CUALQUIER OTRO USO NO AUTORIZADO.';
-    const lines = doc.splitTextToSize(disclaimer, 170);
-    doc.text(lines, 20, finalY);
+      // Disclaimer text
+      const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : 150;
+      doc.setFontSize(11);
+      doc.setTextColor(80);
+      const disclaimer = 'ESTE DISPOSITIVO SE DESTINA EXCLUSIVAMENTE A ACTIVIDADES LABORALES DE ENCIERRO. EN CASO DE DAÑO, EL USUARIO SERÁ RESPONSABLE DE SU REPOSICIÓN TOTAL, CUBRIENDO EL 100% DEL COSTO.\nQUEDANDO PROHIBIDO CUALQUIER OTRO USO NO AUTORIZADO.';
+      const lines = doc.splitTextToSize(disclaimer, 170);
+      doc.text(lines, 20, finalY);
 
-    // Signature line
-    const signY = finalY + 60;
-    doc.setDrawColor(0);
-    doc.setLineWidth(0.5);
-    doc.line(60, signY, 150, signY);
-    doc.setFontSize(10);
-    doc.setTextColor(0);
-    doc.setFont('helvetica', 'bold');
-    doc.text('NOMBRE Y FIRMA DEL RESGUARDANTE', pageWidth / 2, signY + 5, { align: 'center' });
+      // Signature line
+      const signY = finalY + 70;
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.5);
+      doc.line(60, signY, 150, signY);
+      doc.setFontSize(12);
+      doc.setTextColor(0);
+      doc.setFont('helvetica', 'bold');
+      doc.text('NOMBRE Y FIRMA DEL RESGUARDANTE', pageWidth / 2, signY + 6, { align: 'center' });
 
-    // Footer
-    doc.setFontSize(8);
-    doc.setTextColor(120);
-    doc.setFont('helvetica', 'normal');
-    const footer = 'Blvd. Felipe Angeles Km 86 + 040\nCol. Venta Prieta\nPachuca de Soto, Hgo.,\nC. P. 42083.';
-    doc.text(footer, pageWidth - 20, 270, { align: 'right' });
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(120);
+      doc.setFont('helvetica', 'normal');
+      const footer = 'Blvd. Felipe Angeles Km 86 + 040\nCol. Venta Prieta\nPachuca de Soto, Hgo.,\nC. P. 42083.';
+      doc.text(footer, pageWidth - 20, 270, { align: 'right' });
 
-    doc.save(`Resguardo_${resguardo.nombreResguardante.replace(/\s+/g, '_')}_${resguardo.id}.pdf`);
+      // Extract the first word of the item name
+      const nombreItemCompleto = getNombreItem(resguardo);
+      const primeraPalabraItem = nombreItemCompleto.split(' ')[0] || 'Bien';
+      
+      doc.save(`Resguardo_${primeraPalabraItem}.pdf`);
+    } catch (err) {
+      console.error('Error in continuarPdf:', err);
+      Swal.fire('Error PDF', err.message || 'Error al generar el contenido del PDF', 'error');
+    }
   };
 
   return (
@@ -445,7 +472,12 @@ function Resguardos() {
 
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569' }}>Área de Adscripción *</label>
-                  <input required type="text" value={form.area} onChange={e => setForm({...form, area: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }} placeholder="Ej. Dirección General" />
+                  <select required value={form.area} onChange={e => setForm({...form, area: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', backgroundColor: 'white' }}>
+                    <option value="">Seleccione un área...</option>
+                    {areas.map(a => (
+                      <option key={a.id} value={a.nombre}>{a.nombre}</option>
+                    ))}
+                  </select>
                 </div>
 
               </div>
