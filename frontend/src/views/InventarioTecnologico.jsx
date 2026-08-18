@@ -544,7 +544,7 @@ export default function InventarioTecnologico() {
   const tienePuertosRed = ['switch', 'firewall', 'router', 'dvr'].includes(form.tipo);
   const tieneAlmacenamiento = ['servidor', 'escritorio', 'laptop', 'celular'].includes(form.tipo);
   const tieneProcesador = ['servidor', 'escritorio', 'laptop'].includes(form.tipo);
-  const sinInventario = ['internet', 'aire', 'telefono'].includes(form.tipo);
+  const sinInventario = ['internet', 'aire'].includes(form.tipo);
   const requiereResponsable = ['escritorio', 'laptop', 'radio', 'no_break'].includes(form.tipo);
 
   // Agrupando las opciones por grupo
@@ -1050,7 +1050,7 @@ export default function InventarioTecnologico() {
                       )}
                     </td>
                     <td style={{ padding: '1.25rem' }}>
-                      {!['internet', 'aire', 'telefono'].includes(item.tipo) && <div style={{ fontWeight: '600', color: '#1e293b' }}>Inv: {item.numeroInventario || 'N/A'}</div>}
+                      {!['internet', 'aire'].includes(item.tipo) && <div style={{ fontWeight: '600', color: '#1e293b' }}>Inv: {item.numeroInventario || 'N/A'}</div>}
                       <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Serie: {item.numeroSerie || 'N/A'}</div>
                     </td>
                     <td style={{ padding: '1.25rem' }}>
