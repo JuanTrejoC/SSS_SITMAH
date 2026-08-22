@@ -57,6 +57,8 @@ export default function InventarioTecnologico() {
   const [dashboardExpandido, setDashboardExpandido] = useState(false);
   const [sedesList, setSedesList] = useState([]);
   const [cargosList, setCargosList] = useState([]);
+  const [areasList, setAreasList] = useState([]);
+  const [estacionesList, setEstacionesList] = useState([]);
 
   const cargarTodosLosEquipos = async () => {
     try {
@@ -96,6 +98,30 @@ export default function InventarioTecnologico() {
         }
       } catch (err) {
         console.error('Error al cargar cargos:', err);
+      }
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/catalogos/areas`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.ok && json.data && json.data.length > 0) {
+            setAreasList(json.data.map(a => a.nombre));
+          }
+        }
+      } catch (err) {
+        console.error('Error al cargar areas:', err);
+      }
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/catalogos/estaciones`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.ok && json.data && json.data.length > 0) {
+            setEstacionesList(json.data);
+          }
+        }
+      } catch (err) {
+        console.error('Error al cargar estaciones:', err);
       }
     };
     cargarCatalogos();
@@ -1153,12 +1179,9 @@ export default function InventarioTecnologico() {
                         required
                       >
                         <option value="">-- Seleccionar Área --</option>
-                        <option value="Dirección General">Dirección General</option>
-                        <option value="Dirección de Planeación y Desarrollo">Dirección de Planeación y Desarrollo</option>
-                        <option value="Dirección Jurídica">Dirección Jurídica</option>
-                        <option value="Dirección de Administración y Finanzas">Dirección de Administración y Finanzas</option>
-                        <option value="Dirección de Operación y Supervisión">Dirección de Operación y Supervisión</option>
-                        <option value="Dirección de Logística e Ingeniería">Dirección de Logística e Ingeniería</option>
+                        {areasList.map(a => (
+                          <option key={a} value={a}>{a}</option>
+                        ))}
                       </select>
                     </div>
 
@@ -1373,6 +1396,22 @@ export default function InventarioTecnologico() {
                           onChange={val => handleDetalleChange('megapixeles', val)}
                           placeholder="Ej: 3MP"
                         />
+                      )}
+
+                      {form.tipo === 'camara' && (
+                        <div>
+                          <label style={labelStyle}>Estación</label>
+                          <select
+                            value={form.detalles.estacion || ''}
+                            onChange={e => handleDetalleChange('estacion', e.target.value)}
+                            style={{ ...inputStyle, cursor: 'pointer' }}
+                          >
+                            <option value="">-- Seleccionar Estación --</option>
+                            {estacionesList.map(est => (
+                              <option key={est.id} value={est.nombre}>{est.nombre}</option>
+                            ))}
+                          </select>
+                        </div>
                       )}
 
                       {form.tipo === 'dvr' && (
