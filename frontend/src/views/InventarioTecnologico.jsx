@@ -36,7 +36,6 @@ const TIPOS_EQUIPO = [
   { value: 'controladora', label: 'Controladora', icon: FaShieldAlt, group: 'Peaje y Control' },
 ];
 
-
 export default function InventarioTecnologico() {
   const { user } = useAuth();
 
@@ -1194,7 +1193,7 @@ export default function InventarioTecnologico() {
                         required
                       >
                         <option value="">-- Seleccionar Ubicación --</option>
-                        {sedesList.map(s => (
+                        {(form.tipo === 'camara' ? estacionesList.map(e => typeof e === 'string' ? e : e.nombre) : sedesList).map(s => (
                           <option key={s} value={s}>{s}</option>
                         ))}
                       </select>
@@ -1398,21 +1397,7 @@ export default function InventarioTecnologico() {
                         />
                       )}
 
-                      {form.tipo === 'camara' && (
-                        <div>
-                          <label style={labelStyle}>Estación</label>
-                          <select
-                            value={form.detalles.estacion || ''}
-                            onChange={e => handleDetalleChange('estacion', e.target.value)}
-                            style={{ ...inputStyle, cursor: 'pointer' }}
-                          >
-                            <option value="">-- Seleccionar Estación --</option>
-                            {estacionesList.map(est => (
-                              <option key={est.id} value={est.nombre}>{est.nombre}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
+
 
                       {form.tipo === 'dvr' && (
                         <CustomSpecSelect

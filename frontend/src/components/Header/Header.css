@@ -275,38 +275,95 @@
   background: rgba(255,255,255,0.15);
 }
 
+.app-header__right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  position: relative;
+  flex-shrink: 0;
+}
+
 .header-admin-login-btn {
-  padding: 0.6rem 1.2rem;
+  padding: 0.55rem 1.1rem;
   background-color: #BC955B;
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 0.925rem;
+  font-size: 0.875rem;
   cursor: pointer;
-  transition: background 0.2s, transform 0.15s;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   white-space: nowrap;
   font-weight: 600;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+  flex-shrink: 0;
 }
 
 .header-admin-login-btn:hover {
   background-color: #DDC9A3;
-  transform: scale(1.02);
+  color: #691B31;
+  transform: translateY(-1px);
+}
+
+.header-admin-lock-icon {
+  color: white;
+  font-size: 0.85rem;
+  transition: color 0.2s ease;
+}
+
+.header-admin-login-btn:hover .header-admin-lock-icon {
+  color: #691B31;
+}
+
+@media (max-width: 768px) {
+  .header-admin-login-btn {
+    padding: 0.45rem 0.8rem;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .app-header__right {
+    gap: 0.35rem;
+  }
+  .header-admin-btn-text {
+    display: none;
+  }
+  .header-admin-login-btn {
+    padding: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    gap: 0;
+  }
+  .header-admin-lock-icon {
+    font-size: 1.05rem;
+  }
 }
 
 .header-login-dropdown {
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + 8px);
   right: 0;
   background-color: white;
   padding: 1.25rem;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.25);
   border-radius: 12px;
-  width: clamp(220px, 90vw, 260px);
-  z-index: 999;
+  width: 270px;
+  max-width: calc(100vw - 1.5rem);
+  z-index: 9999;
   border: 1px solid #e8ecef;
+  box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .header-login-dropdown {
+    right: -0.25rem;
+    width: calc(100vw - 2rem);
+  }
 }
 
 .header-login-title {
@@ -328,7 +385,7 @@
 
 .header-login-input {
   width: 100%;
-  padding: 0.5rem 0.5rem 0.5rem 2rem;
+  padding: 0.5rem 0.5rem 0.5rem 0.75rem;
   border: 1.5px solid #d1d5db;
   border-radius: 7px;
   font-size: 0.82rem;

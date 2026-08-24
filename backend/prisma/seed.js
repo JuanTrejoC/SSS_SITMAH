@@ -33,19 +33,102 @@ async function main() {
     },
   });
 
-  // --- CATÁLOGOS ---
-  const areas = ['Recursos Humanos', 'Sistemas', 'Mantenimiento', 'Operaciones', 'Administración'];
+  const areas = [
+    'Dirección de Operación y Supervisión',
+    'Dirección General',
+    'Dirección Jurídica',
+    'Dirección de Administración y Finanzas',
+    'Dirección de Planeación y Desarrollo',
+    'Dirección de Logística e Ingeniería',
+    'Dirección de Operación e Inspección',
+    'Contraloría'
+  ];
   const sedes = ['CCGO', 'CETRAM', 'Oficinas Téllez', 'Oficinas Patio Téllez'];
   const categorias = ['Hardware', 'Software', 'Redes', 'Infraestructura', 'Telefonía'];
-  const cargos = ['Gerente', 'Supervisor', 'Técnico', 'Analista', 'Asistente'];
-  const estaciones = ['Estación 1', 'Estación 2', 'Estación 3', 'Estación 4', 'Estación 5'];
-  const cruceros = ['Av. Central y 1ra', 'Av. Norte y 2da', 'Blvd. Sur y 3ra', 'Calle Este y 4ta', 'Periférico y 5ta'];
+  const estaciones = [
+    'Terminal Téllez', 'Gabriel Mancera', 'Matilde', 'Efrén Rebolledo', 'Tercera Edad',
+    'San Antonio', 'Ejército Mexicano', 'Felipe Ángeles', 'Centro de Justicia oriente',
+    'Centro de Justicia poniente', 'Vicente Segura', 'Juan C. Doria', 'Hospitales',
+    'SEPH', 'Tecnológico', 'Bicentenario oriente', 'Bicentenario poniente', 'Centro Minero',
+    'Zona Plateada', 'Tecnológico de Monterrey', 'Estadio Hidalgo', 'Central de Autobuses',
+    'Cuna de Fútbol', 'Santa Julia', 'Prepa 1', 'Revolución', 'Manuel Dublán',
+    'Presidente Alemán', 'Niños Heroes oriente', 'Niños Heroes poniente', 'Centro Histórico',
+    'Plaza Juárez', 'Parque del Maestro', 'Bioparque'
+  const cruceros = [
+    "BLVD. TÉLLEZ - SAN ALFONSO",
+    "FELIPE ÁNGELES - VENTA PRIETA",
+    "FELIPE ÁNGELES - GALERÍAS",
+    "FELIPE ÁNGELES - PREPA SIGLO XXI",
+    "CENTRAL AUTOBUSES",
+    "F. ÁNGELES - ROJO GÓMEZ",
+    "F. ÁNGELES - POLIFORUM",
+    "F. ÁNGELES - RETORNO NISSAN",
+    "F. ÁNGELES - 5 DE MAYO",
+    "F. ÁNGELES - ARTICULO 3RO",
+    "F. ÁNGELES - PREPA1",
+    "FELIPE ÁNGELES - GYM PREPA",
+    "B. JUÁREZ - INSURGENTES",
+    "REVOLUCIÓN - 16 DE ENERO",
+    "REVOLUCIÓN - JAIME NUNO",
+    "REVOLUCIÓN - SAMUEL CARRO",
+    "REVOLUCIÓN - MANUEL DÚBLAN",
+    "REVOLUCIÓN - GABRIEL HERNÁNDEZ",
+    "REVOLUCIÓN - 15 DE SEPTIEMBRE",
+    "REVOLUCIÓN - 5 DE FEBRERO",
+    "REVOLUCIÓN - MADERO",
+    "REVOLUCIÓN - BELISARIO",
+    "ARISPE - ALLENDE-MATAMOROS",
+    "MATAMOROS - OCAMPO",
+    "VILLAGRAN -ALLENDE-ZARAGOZA",
+    "B. JUÁREZ - BELISARIO DOMINGUEZ",
+    "B. JUÁREZ - GUERRERO",
+    "B. JUÁREZ - MADERO",
+    "B. JUÁREZ - DANIEL CERECEDO",
+    "B. JUÁREZ - J M. IGLESIAS",
+    "B. JUÁREZ - GRAL MEJIA",
+    "B. JUÁREZ - MANUEL DÚBLAN",
+    "B. JUÁREZ - SAMUEL CARRO",
+    "B. JUÁREZ - 12 DE OCTUBRE",
+    "B. JUÁREZ - BOCANEGRA",
+    "B. JUÁREZ - 16 DE ENERO"
+  ];
   const fallas = ['Falla Eléctrica', 'Luz Fundida', 'Controlador Apagado', 'Vandalismo', 'Cortocircuito'];
 
+  const cargos = [
+    { id: 1, nombre: "Técnico Especializado", activo: true },
+    { id: 2, nombre: "Asesor Técnico/Gestor", activo: true },
+    { id: 3, nombre: "Jefatura de Área", activo: false },
+    { id: 4, nombre: "Subdirección de Área", activo: false },
+    { id: 5, nombre: "Subdirector Adjunto", activo: true },
+    { id: 6, nombre: "Director de Área", activo: true },
+    { id: 7, nombre: "Jefatura de Departamento", activo: true },
+    { id: 8, nombre: "Subdirector De Área", activo: true },
+    { id: 9, nombre: "Asistente General", activo: true },
+    { id: 10, nombre: "Director General", activo: true }
+  ];
+
+  const subdirecciones = [
+    'Secretaría Técnica',
+    'Subdirección de Planeación',
+    'Subdirección de Desarrollo y Proyectos Estratégicos',
+    'Subdirección de Vigilancia en Vías Exclusivas',
+    'Subdirección Consultiva',
+    'Subdirección de Procesos',
+    'Subdirección de Finanzas',
+    'Subdirección de Administración',
+    'Subdirección de Verificación Operacional',
+    'Subdirección de Monitoreo, Supervisión e Inspección',
+    'Subdirección de Mantenimiento del Parque Vehicular',
+    'Subdirección de Tecnología',
+    'Subdirección de Logística y Operación',
+    'Subdirección de Infraestructura y Abastos'
+  ];
+
   for (const nombre of areas) await prisma.area.upsert({ where: { id: areas.indexOf(nombre) + 1 }, update: {}, create: { nombre } }).catch(() => prisma.area.create({ data: { nombre } }));
+  for (const nombre of subdirecciones) await prisma.subdireccion.upsert({ where: { id: subdirecciones.indexOf(nombre) + 1 }, update: { nombre }, create: { id: subdirecciones.indexOf(nombre) + 1, nombre } }).catch(() => {});
   for (const nombre of sedes) await prisma.sede.upsert({ where: { id: sedes.indexOf(nombre) + 1 }, update: {}, create: { nombre } }).catch(() => prisma.sede.create({ data: { nombre } }));
   for (const nombre of categorias) await prisma.categoria.upsert({ where: { id: categorias.indexOf(nombre) + 1 }, update: {}, create: { nombre } }).catch(() => prisma.categoria.create({ data: { nombre } }));
-  for (const nombre of cargos) await prisma.cargo.upsert({ where: { id: cargos.indexOf(nombre) + 1 }, update: {}, create: { nombre } }).catch(() => prisma.cargo.create({ data: { nombre } }));
+  for (const c of cargos) await prisma.cargo.upsert({ where: { id: c.id }, update: { nombre: c.nombre, activo: c.activo }, create: { id: c.id, nombre: c.nombre, activo: c.activo } }).catch(() => {});
   for (const nombre of estaciones) await prisma.estacion.upsert({ where: { id: estaciones.indexOf(nombre) + 1 }, update: {}, create: { nombre } }).catch(() => prisma.estacion.create({ data: { nombre } }));
   for (const nombre of cruceros) await prisma.crucero.upsert({ where: { id: cruceros.indexOf(nombre) + 1 }, update: {}, create: { nombre } }).catch(() => prisma.crucero.create({ data: { nombre } }));
   for (const nombre of fallas) await prisma.tipoFalla.upsert({ where: { id: fallas.indexOf(nombre) + 1 }, update: {}, create: { nombre } }).catch(() => prisma.tipoFalla.create({ data: { nombre } }));
@@ -58,6 +141,16 @@ async function main() {
   const dbEstaciones = await prisma.estacion.findMany({ take: 5 });
   const dbCruceros = await prisma.crucero.findMany({ take: 5 });
   const dbFallas = await prisma.tipoFalla.findMany({ take: 5 });
+
+  for (let i = 0; i < dbEstaciones.length; i++) {
+    if (dbEstaciones[i] && dbCruceros[i]) {
+      await prisma.estacionCrucero.upsert({
+        where: { estacionId_cruceroId: { estacionId: dbEstaciones[i].id, cruceroId: dbCruceros[i].id } },
+        update: {},
+        create: { estacionId: dbEstaciones[i].id, cruceroId: dbCruceros[i].id }
+      }).catch(() => {});
+    }
+  }
 
   // --- EXISTENCIAS ---
   const componentesSemaforos = [

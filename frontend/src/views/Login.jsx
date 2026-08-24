@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Navigate } from 'react-router-dom'
 import ThemeToggle from '../components/ThemeToggle'
-import { FaExclamationCircle, FaCheckCircle, FaLock, FaUser } from 'react-icons/fa'
+import { FaExclamationCircle, FaCheckCircle, FaLock, FaUser, FaEye, FaEyeSlash } from 'react-icons/fa'
 import logoSitmah from '../assets/logo.png'
 
 export default function Login() {
@@ -10,6 +10,7 @@ export default function Login() {
   const [datos, setDatos] = useState({ usuario: '', contrasena: '' })
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
+  const [verContrasena, setVerContrasena] = useState(false)
   const [errores, setErrores] = useState({ usuario: false, contrasena: false })
 
   if (user) {
@@ -167,22 +168,37 @@ export default function Login() {
                     style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
                   />
                   <input
-                    type="password"
+                    type={verContrasena ? "text" : "password"}
                     name="contrasena"
                     value={datos.contrasena}
                     onChange={manejarCambio}
                     placeholder="••••••••"
                     required
                     autoComplete="current-password"
-                    style={inputStyle('contrasena')}
+                    style={{ ...inputStyle('contrasena'), paddingRight: '2.5rem' }}
                     onFocus={(e) => { if (!errores.contrasena) e.target.style.borderColor = '#691B31'; e.target.style.boxShadow = '0 0 0 3px rgba(105,27,49,0.1)' }}
                     onBlur={(e) => { if (!errores.contrasena && !datos.contrasena) e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none' }}
                   />
-                  {datos.contrasena && (
-                    errores.contrasena
-                      ? <FaExclamationCircle color="#ef4444" size={14} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
-                      : <FaCheckCircle color="#22c55e" size={14} style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)' }} />
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setVerContrasena(!verContrasena)}
+                    style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '0.2rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: '#6b7280'
+                    }}
+                    aria-label={verContrasena ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {verContrasena ? <FaEyeSlash size={15} /> : <FaEye size={15} />}
+                  </button>
                 </div>
                 {errores.contrasena && <small style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.25rem', display: 'block' }}>Mínimo 4 caracteres</small>}
               </div>
