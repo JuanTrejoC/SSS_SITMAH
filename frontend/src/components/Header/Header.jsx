@@ -147,7 +147,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
           {!user && (
             <div ref={loginRef} style={{ position: 'relative' }}>
               <button
-                onClick={() => setMostrarLogin(!mostrarLogin)}
+                onClick={() => navigate('/login')}
                 className="header-admin-login-btn"
                 title="Acceso Administrador"
                 aria-label="Acceso Administrador"
@@ -155,79 +155,6 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
                 <FaLock className="header-admin-lock-icon" />
                 <span className="header-admin-btn-text">Acceso Administrador</span>
               </button>
-
-              {mostrarLogin && (
-                <div className="header-login-dropdown">
-                  <p className="header-login-title">Acceso Administrador</p>
-                  <form onSubmit={entrarAdmin}>
-                    <div style={{ marginBottom: '0.85rem' }}>
-                      <label className="header-login-label">Usuario</label>
-                      <div style={{ position: 'relative' }}>
-                        <input
-                          type="text"
-                          name="usuario"
-                          value={datosLogin.usuario}
-                          onChange={manejarCambio}
-                          placeholder="Ingresa tu usuario"
-                          className="header-login-input"
-                          style={{
-                            borderColor: errores.usuario && datosLogin.usuario ? '#ef4444' : datosLogin.usuario ? '#22c55e' : '#d1d5db'
-                          }}
-                        />
-                        {datosLogin.usuario && (
-                          errores.usuario
-                            ? <FaExclamationCircle color="#ef4444" size={13} style={{ position: 'absolute', left: '0.55rem', top: '50%', transform: 'translateY(-50%)' }} />
-                            : <FaCheckCircle color="#22c55e" size={13} style={{ position: 'absolute', left: '0.55rem', top: '50%', transform: 'translateY(-50%)' }} />
-                        )}
-                      </div>
-                      {errores.usuario && datosLogin.usuario && <small style={{ color: '#ef4444', fontSize: '0.72rem' }}>Mínimo 3 caracteres</small>}
-                    </div>
-
-                    <div style={{ marginBottom: '1.1rem' }}>
-                      <label className="header-login-label">Contraseña</label>
-                      <div style={{ position: 'relative' }}>
-                        <input
-                          type={verContrasena ? "text" : "password"}
-                          name="contrasena"
-                          value={datosLogin.contrasena}
-                          onChange={manejarCambio}
-                          placeholder="••••••••"
-                          className="header-login-input"
-                          style={{
-                            paddingRight: '2.5rem',
-                            borderColor: errores.contrasena && datosLogin.contrasena ? '#ef4444' : datosLogin.contrasena ? '#22c55e' : '#d1d5db'
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setVerContrasena(!verContrasena)}
-                          style={{
-                            position: 'absolute',
-                            right: '0.65rem',
-                            top: '50%',
-                            transform: 'translateY(-50%)',
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '0.2rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            color: '#6F7271'
-                          }}
-                          aria-label={verContrasena ? "Ocultar contraseña" : "Mostrar contraseña"}
-                        >
-                          {verContrasena ? <FaEyeSlash size={15} /> : <FaEye size={15} />}
-                        </button>
-                      </div>
-                      {errores.contrasena && datosLogin.contrasena && <small style={{ color: '#ef4444', fontSize: '0.72rem' }}>Mínimo 4 caracteres</small>}
-                    </div>
-
-                    <button type="submit" className="header-login-submit">
-                      Ingresar
-                    </button>
-                  </form>
-                </div>
-              )}
             </div>
           )}
 
