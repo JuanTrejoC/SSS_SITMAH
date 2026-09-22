@@ -230,6 +230,7 @@ model Evidencia {
   filepath          String   @db.VarChar(500)
   mimetype          String?  @db.VarChar(100)
   sizeBytes         Int?     @map("size_bytes")
+  tipo              String   @default("inicial") @db.VarChar(50)
   uploadedAt        DateTime @default(now()) @map("uploaded_at")
 
   reporteOficina  ReporteOficina?  @relation(fields: [reporteOficinaId], references: [id], onDelete: Cascade)

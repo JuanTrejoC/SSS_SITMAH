@@ -23,14 +23,14 @@ export default function FormSemaforos({ usuarioActual }) {
     fecha_dano: obtenerFechaHoy(), // Formato: YYYY-MM-DD
     hora_dano: obtenerHoraActual(), // Formato: HH:mm
     descripcion: '',       // Notas adicionales (hasta 250 caracteres, con números y especiales)
-    evidencia: null
+    evidencias: []
   })
 
   const [errores, setErrores] = useState({})
   const [valido, setValido] = useState({})
   const [mostrarOtro, setMostrarOtro] = useState(false)
   const [cargando, setCargando] = useState(false)
-  const [vistaPrevia, setVistaPrevia] = useState(null)
+  const [vistasPrevias, setVistasPrevias] = useState([])
 
   const [listaCruceros, setListaCruceros] = useState([])
   const [listaTiposFalla, setListaTiposFalla] = useState([])
@@ -108,7 +108,7 @@ export default function FormSemaforos({ usuarioActual }) {
 
     switch (nombre) {
       case 'jefe_turno':
-        if (!valorLimpio) mensajeError = 'Indique el nombre de quien reporta'
+        if (!valorLimpio) mensajeError = 'Indique el jefe de turno'
         else esValido = true
         break
 
@@ -209,45 +209,83 @@ export default function FormSemaforos({ usuarioActual }) {
     })
   }
 
-  // Manejo de archivo
-  const manejarArchivo = async (e) => {
-    const archivo = e.target.files[0]
-    if (!archivo) return
+  // Manejo de múltiples archivos de evidencia
+  const manejarArchivos = async (e) => {
+    const archivos = Array.from(e.target.files || [])
+    if (archivos.length === 0) return
 
     const tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
-    if (!tiposPermitidos.includes(archivo.type)) {
-      Swal.fire('Error', 'Solo se permiten archivos de imagen (JPG, PNG, GIF, WEBP)', 'error')
-      e.target.value = ''
-      setFormData((prev) => ({ ...prev, evidencia: null }))
-      setVistaPrevia(null)
+    const archivosValidos = []
+
+    for (const archivo of archivos) {
+      if (!tiposPermitidos.includes(archivo.type)) {
+        Swal.fire('Formato no permitido', `El archivo "${archivo.name}" no es una imagen válida (JPG, PNG, GIF, WEBP).`, 'error')
+        continue
+      }
+      if (archivo.size > 10 * 1024 * 1024) {
+        Swal.fire('Archivo muy pesado', `La imagen "${archivo.name}" supera el límite de 10 MB.`, 'error')
+        continue
+      }
+      archivosValidos.push(archivo)
+    }
+
+    if (archivosValidos.length === 0) {
+      if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
 
-    if (archivo.size > 10 * 1024 * 1024) {
-      Swal.fire('Error', 'La imagen no debe superar los 10 MB', 'error')
-      e.target.value = ''
-      setFormData((prev) => ({ ...prev, evidencia: null }))
-      setVistaPrevia(null)
-      return
-    }
+    const procesados = await Promise.all(
+      archivosValidos.map(async (arch) => {
+        try {
+          return await comprimirImagen(arch)
+        } catch {
+          return arch
+        }
+      })
+    )
 
-    try {
-      const archivoComprimido = await comprimirImagen(archivo)
-      setFormData((prev) => ({ ...prev, evidencia: archivoComprimido }))
-      setVistaPrevia(URL.createObjectURL(archivoComprimido))
-    } catch (err) {
-      console.error('Error al comprimir la imagen:', err)
-      setFormData((prev) => ({ ...prev, evidencia: archivo }))
-      setVistaPrevia(URL.createObjectURL(archivo))
+    const nuevasVistas = procesados.map((arch) => ({
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      url: URL.createObjectURL(arch),
+      name: arch.name,
+      size: (arch.size / (1024 * 1024)).toFixed(2)
+    }))
+
+    setFormData((prev) => ({
+      ...prev,
+      evidencias: [...(prev.evidencias || []), ...procesados]
+    }))
+
+    setVistasPrevias((prev) => [...prev, ...nuevasVistas])
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
     }
   }
 
-  const eliminarEvidencia = () => {
-    setFormData((prev) => ({ ...prev, evidencia: null }))
-    if (vistaPrevia) {
-      URL.revokeObjectURL(vistaPrevia)
-      setVistaPrevia(null)
-    }
+  const eliminarEvidencia = (index) => {
+    setFormData((prev) => {
+      const nuevas = [...(prev.evidencias || [])]
+      nuevas.splice(index, 1)
+      return { ...prev, evidencias: nuevas }
+    })
+
+    setVistasPrevias((prev) => {
+      const nuevas = [...prev]
+      if (nuevas[index]?.url) {
+        URL.revokeObjectURL(nuevas[index].url)
+      }
+      nuevas.splice(index, 1)
+      return nuevas
+    })
+  }
+
+  const eliminarTodasEvidencias = () => {
+    vistasPrevias.forEach((vp) => {
+      if (vp.url) URL.revokeObjectURL(vp.url)
+    })
+    setVistasPrevias([])
+    setFormData((prev) => ({ ...prev, evidencias: [] }))
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -322,8 +360,10 @@ export default function FormSemaforos({ usuarioActual }) {
       datosAEnviar.append('prioridad', 'alta')
       datosAEnviar.append('usuario_remitente', usuarioActual || 'Usuario General')
 
-      if (formData.evidencia) {
-        datosAEnviar.append('evidencia', formData.evidencia)
+      if (formData.evidencias && formData.evidencias.length > 0) {
+        formData.evidencias.forEach((arch) => {
+          datosAEnviar.append('evidencia', arch)
+        })
       }
 
       const respuesta = await fetch(`${API_BASE_URL}/api/reportes/semaforo`, {
@@ -337,6 +377,11 @@ export default function FormSemaforos({ usuarioActual }) {
         const folioCreado = resultado.data?.folio || resultado.data?.id || 'Generado'
         Swal.fire('Éxito', `Reporte registrado correctamente.\nFolio: ${folioCreado}`, 'success')
 
+        vistasPrevias.forEach((vp) => {
+          if (vp.url) URL.revokeObjectURL(vp.url)
+        })
+        setVistasPrevias([])
+
         setFormData({
           jefe_turno: '',
           origen: '',
@@ -346,13 +391,12 @@ export default function FormSemaforos({ usuarioActual }) {
           fecha_dano: obtenerFechaHoy(),
           hora_dano: obtenerHoraActual(),
           descripcion: '',
-          evidencia: null
+          evidencias: []
         })
         setBusquedaCrucero('')
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
         }
-        setVistaPrevia(null)
         setMostrarOtro(false)
         setErrores({})
         setValido({})
@@ -448,14 +492,14 @@ export default function FormSemaforos({ usuarioActual }) {
                 gap: '1.25rem'
               }}
             >
-              {/* Nombre de quien reporta */}
+              {/* Jefe de Turno */}
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
-                  Nombre de quien reporta <span style={{ color: '#EF4444' }}>*</span>
+                  Jefe de Turno <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="Nombre y apellido de quien reporta"
+                  placeholder="Nombre del jefe de turno"
                   value={formData.jefe_turno}
                   onChange={(e) => {
                     const v = soloLetrasYNombres(e.target.value)
@@ -808,9 +852,19 @@ export default function FormSemaforos({ usuarioActual }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem', borderBottom: '2px solid #F3F4F6', paddingBottom: '0.65rem' }}>
               <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#059669', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.85rem' }}>3</span>
               <h2 style={{ color: '#111827', fontSize: '1.1rem', fontWeight: '700', margin: 0 }}>
-                Fotografía del Crucero
+                Evidencia Fotográfica del Crucero
               </h2>
             </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={manejarArchivos}
+              style={{ display: 'none' }}
+              id="input-evidencia-semaforos"
+            />
 
             <div
               style={{
@@ -818,81 +872,176 @@ export default function FormSemaforos({ usuarioActual }) {
                 borderRadius: '14px',
                 padding: '1.25rem',
                 backgroundColor: '#F8FAFC',
-                textAlign: 'center',
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'center',
-                gap: '0.85rem'
+                gap: '1rem'
               }}
             >
-              {!vistaPrevia ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', fontSize: '1.35rem' }}>
+              {vistasPrevias.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', textAlign: 'center', padding: '1rem 0' }}>
+                  <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', fontSize: '1.4rem' }}>
                     <i className="fa-solid fa-camera"></i>
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#334155' }}>
-                      Cargar foto de la falla en semáforo
+                    <span style={{ fontSize: '0.95rem', fontWeight: '700', color: '#334155' }}>
+                      Cargar fotos de la falla en semáforo
                     </span>
                     <span style={{ fontSize: '0.8rem', color: '#64748B', display: 'block', marginTop: '0.2rem' }}>
-                      Formatos recomendados: JPG, PNG, WEBP (Máximo 10 MB)
+                      Puedes seleccionar múltiples fotografías (JPG, PNG, WEBP — Máximo 10 MB c/u)
                     </span>
                   </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={manejarArchivo}
-                    style={{ display: 'none' }}
-                    id="input-evidencia-semaforos"
-                  />
                   <label
                     htmlFor="input-evidencia-semaforos"
                     style={{
                       backgroundColor: '#691B31',
                       color: 'white',
-                      padding: '0.55rem 1.15rem',
+                      padding: '0.6rem 1.3rem',
                       borderRadius: '8px',
-                      fontSize: '0.85rem',
+                      fontSize: '0.875rem',
                       fontWeight: '600',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '0.4rem',
-                      marginTop: '0.4rem'
+                      gap: '0.5rem',
+                      marginTop: '0.5rem',
+                      boxShadow: '0 2px 6px rgba(105, 27, 49, 0.25)',
+                      transition: 'background-color 0.2s'
                     }}
                   >
-                    <i className="fa-solid fa-upload"></i> Subir Fotografía
+                    <i className="fa-solid fa-upload"></i> Subir Fotografías
                   </label>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-                  <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '2px solid #BC955B', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-                    <img
-                      src={vistaPrevia}
-                      alt="Vista previa crucero"
-                      style={{ maxWidth: '240px', maxHeight: '200px', display: 'block', objectFit: 'cover' }}
-                    />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Barra superior con resumen y botones */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <span style={{ backgroundColor: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', padding: '0.3rem 0.85rem', borderRadius: '20px', fontWeight: '700', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <i className="fa-solid fa-images"></i> {vistasPrevias.length} {vistasPrevias.length === 1 ? 'foto seleccionada' : 'fotos seleccionadas'}
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <label
+                        htmlFor="input-evidencia-semaforos"
+                        style={{
+                          backgroundColor: '#BC955B',
+                          color: 'white',
+                          padding: '0.4rem 0.85rem',
+                          borderRadius: '6px',
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem'
+                        }}
+                      >
+                        <i className="fa-solid fa-plus"></i> Agregar más fotos
+                      </label>
+                      <button
+                        type="button"
+                        onClick={eliminarTodasEvidencias}
+                        style={{
+                          backgroundColor: '#FEE2E2',
+                          color: '#DC2626',
+                          border: '1px solid #FCA5A5',
+                          padding: '0.4rem 0.85rem',
+                          borderRadius: '6px',
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem'
+                        }}
+                      >
+                        <i className="fa-solid fa-trash"></i> Quitar todas
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={eliminarEvidencia}
+
+                  {/* Cuadrícula de fotos */}
+                  <div
                     style={{
-                      backgroundColor: '#FEE2E2',
-                      color: '#DC2626',
-                      border: '1px solid #FCA5A5',
-                      padding: '0.4rem 0.85rem',
-                      borderRadius: '8px',
-                      fontSize: '0.825rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.4rem'
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                      gap: '0.85rem'
                     }}
                   >
-                    <i className="fa-solid fa-trash"></i> Eliminar Imagen
-                  </button>
+                    {vistasPrevias.map((item, index) => (
+                      <div
+                        key={item.id || index}
+                        style={{
+                          position: 'relative',
+                          borderRadius: '10px',
+                          overflow: 'hidden',
+                          border: '2px solid #BC955B',
+                          boxShadow: '0 4px 10px rgba(0,0,0,0.08)',
+                          backgroundColor: '#FFFFFF',
+                          display: 'flex',
+                          flexDirection: 'column'
+                        }}
+                      >
+                        {/* Badge de número */}
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: '6px',
+                            left: '6px',
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                            color: 'white',
+                            fontSize: '0.7rem',
+                            fontWeight: '700',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            zIndex: 2
+                          }}
+                        >
+                          #{index + 1}
+                        </span>
+
+                        {/* Botón eliminar individual */}
+                        <button
+                          type="button"
+                          onClick={() => eliminarEvidencia(index)}
+                          title="Eliminar esta foto"
+                          style={{
+                            position: 'absolute',
+                            top: '6px',
+                            right: '6px',
+                            backgroundColor: '#DC2626',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '24px',
+                            height: '24px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.75rem',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                            zIndex: 2
+                          }}
+                        >
+                          <i className="fa-solid fa-xmark"></i>
+                        </button>
+
+                        <img
+                          src={item.url}
+                          alt={`Evidencia ${index + 1}`}
+                          style={{
+                            width: '100%',
+                            height: '110px',
+                            objectFit: 'cover',
+                            display: 'block'
+                          }}
+                        />
+
+                        <div style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem', color: '#64748B', backgroundColor: '#F8FAFC', borderTop: '1px solid #E2E8F0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.name || `Foto ${index + 1}`} ({item.size} MB)
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

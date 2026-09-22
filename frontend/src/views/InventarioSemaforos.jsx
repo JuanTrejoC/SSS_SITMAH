@@ -273,6 +273,8 @@ export default function InventarioSemaforos() {
       : `${API_BASE_URL}/api/inventario/existencias`
     const method = editandoStockId ? 'PUT' : 'POST'
 
+    const cantidadFinal = stockForm.cantidad === '' || isNaN(Number(stockForm.cantidad)) ? 1 : Math.max(0, Number(stockForm.cantidad))
+
     try {
       const res = await fetch(url, {
         method,
@@ -280,7 +282,7 @@ export default function InventarioSemaforos() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${user.token}`
         },
-        body: JSON.stringify(stockForm)
+        body: JSON.stringify({ ...stockForm, cantidad: cantidadFinal })
       })
 
       if (res.ok) {
@@ -367,7 +369,7 @@ export default function InventarioSemaforos() {
     setStockForm({
       nombre: '',
       categoria: 'componente',
-      cantidad: 1,
+      cantidad: '',
       tipoInventario: 'semaforos'
     })
   }
@@ -1234,8 +1236,18 @@ export default function InventarioSemaforos() {
                 <input
                   type="number"
                   min="0"
-                  value={stockForm.cantidad}
-                  onChange={(e) => setStockForm({ ...stockForm, cantidad: Math.max(0, Number(e.target.value)) })}
+                  placeholder="1"
+                  value={stockForm.cantidad ?? ''}
+                  onFocus={e => e.target.select()}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setStockForm(prev => ({ ...prev, cantidad: '' }));
+                    } else {
+                      const num = parseInt(val, 10);
+                      setStockForm(prev => ({ ...prev, cantidad: isNaN(num) ? '' : Math.max(0, num) }));
+                    }
+                  }}
                   style={{ width: '100%', padding: '0.65rem', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '0.9rem' }}
                 />
               </div>

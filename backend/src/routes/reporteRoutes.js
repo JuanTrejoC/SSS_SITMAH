@@ -10,14 +10,14 @@ const router = express.Router();
 router.post(
   '/oficina',
   reporteLimiter,
-  upload.single('evidencia'),
+  upload.array('evidencia', 10),
   asyncHandler(reporteOficina.crear)
 );
 
 router.post(
   '/semaforo',
   reporteLimiter,
-  upload.single('evidencia'),
+  upload.array('evidencia', 10),
   asyncHandler(reporteSemaforo.crear)
 );
 

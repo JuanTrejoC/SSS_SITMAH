@@ -115,6 +115,8 @@ export default function InventarioExistencias() {
       : `${API_BASE_URL}/api/inventario/existencias`;
     const method = editandoId ? 'PUT' : 'POST';
 
+    const cantidadFinal = form.cantidad === '' || isNaN(Number(form.cantidad)) ? 1 : Math.max(0, Number(form.cantidad));
+
     try {
       const res = await fetch(url, {
         method,
@@ -122,7 +124,7 @@ export default function InventarioExistencias() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${user.token}`
         },
-        body: JSON.stringify(form)
+        body: JSON.stringify({ ...form, cantidad: cantidadFinal })
       });
 
       if (res.ok) {
@@ -203,7 +205,7 @@ export default function InventarioExistencias() {
     setForm({
       nombre: '',
       categoria: 'componente',
-      cantidad: 1,
+      cantidad: '',
       marca: '',
       modelo: '',
       numeroSerie: '',
@@ -525,8 +527,18 @@ export default function InventarioExistencias() {
                 <input
                   type="number"
                   min="0"
-                  value={form.cantidad}
-                  onChange={e => setForm({ ...form, cantidad: Math.max(0, Number(e.target.value)) })}
+                  placeholder="1"
+                  value={form.cantidad ?? ''}
+                  onFocus={e => e.target.select()}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setForm(prev => ({ ...prev, cantidad: '' }));
+                    } else {
+                      const num = parseInt(val, 10);
+                      setForm(prev => ({ ...prev, cantidad: isNaN(num) ? '' : Math.max(0, num) }));
+                    }
+                  }}
                   style={inputStyle}
                   required
                 />

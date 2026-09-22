@@ -576,45 +576,58 @@ export default function DashboardSemaforos() {
                   </div>
                 </div>
 
-                {/* EVIDENCIA FOTOGRÁFICA */}
-                {verDetalle.evidencias && verDetalle.evidencias.length > 0 && (
-                  <div style={{ gridColumn: '1 / -1', marginTop: '1.25rem' }}>
-                    <strong style={{ display: 'block', marginBottom: '0.75rem', fontSize: '0.95rem', color: '#111827' }}>
-                      Evidencia Fotográfica:
-                    </strong>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
-                      {verDetalle.evidencias.map((ev) => (
-                        <div key={ev.id} style={{ 
-                          border: '1px solid #E5E7EB', borderRadius: '10px', overflow: 'hidden', 
-                          maxWidth: '200px', backgroundColor: 'white'
-                        }}>
-                          {ev.mimetype?.startsWith('image/') ? (
-                            <a
-                              href={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              <img
-                                src={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
-                                alt={ev.filename}
-                                style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
-                              />
-                            </a>
-                          ) : (
-                            <a
-                              href={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '160px', gap: '0.5rem', color: '#BC955B', textDecoration: 'none', backgroundColor: '#F8FAFC' }}
-                            >
-                              <i className="fa-solid fa-file" style={{ fontSize: '2rem' }}></i>
-                            </a>
-                          )}
-                        </div>
-                      ))}
+                {/* EVIDENCIA FOTOGRÁFICA INICIAL */}
+                {(() => {
+                  const evidenciasIniciales = verDetalle.evidencias?.filter(e => {
+                    if (e.tipo === 'solucion') return false
+                    if (e.tipo === 'inicial') return true
+                    if (verDetalle.estado === 'resuelto' && verDetalle.evidencias.length > 1) {
+                      return e.id !== verDetalle.evidencias[verDetalle.evidencias.length - 1].id
+                    }
+                    return true
+                  }) || []
+
+                  if (evidenciasIniciales.length === 0) return null
+
+                  return (
+                    <div style={{ gridColumn: '1 / -1', marginTop: '1.25rem' }}>
+                      <strong style={{ display: 'block', marginBottom: '0.75rem', fontSize: '0.95rem', color: '#111827' }}>
+                        Evidencia Fotográfica Inicial:
+                      </strong>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
+                        {evidenciasIniciales.map((ev) => (
+                          <div key={ev.id} style={{ 
+                            border: '1px solid #E5E7EB', borderRadius: '10px', overflow: 'hidden', 
+                            maxWidth: '200px', backgroundColor: 'white'
+                          }}>
+                            {ev.mimetype?.startsWith('image/') ? (
+                              <a
+                                href={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                <img
+                                  src={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
+                                  alt={ev.filename}
+                                  style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
+                                />
+                              </a>
+                            ) : (
+                              <a
+                                href={`${API_BASE_URL}/api/evidencias/${ev.id}?token=${user.token}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '160px', gap: '0.5rem', color: '#BC955B', textDecoration: 'none', backgroundColor: '#F8FAFC' }}
+                              >
+                                <i className="fa-solid fa-file" style={{ fontSize: '2rem' }}></i>
+                              </a>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
 
                 {/* REFACCIONES / PIEZAS ASIGNADAS */}
                 <div style={{ gridColumn: '1 / -1', marginTop: '1.5rem', borderTop: '1px solid #E5E7EB', paddingTop: '1.25rem' }}>

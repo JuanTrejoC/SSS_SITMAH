@@ -72,14 +72,19 @@ async function crear(req, res) {
     },
   });
 
-  if (req.file) {
+  const files = req.files
+    ? (Array.isArray(req.files) ? req.files : Object.values(req.files).flat())
+    : (req.file ? [req.file] : []);
+
+  for (const file of files) {
     await prisma.evidencia.create({
       data: {
         reporteSemaforoId: reporte.id,
-        filename: req.file.originalname,
-        filepath: req.file.filename,
-        mimetype: req.file.mimetype,
-        sizeBytes: req.file.size,
+        filename: file.originalname,
+        filepath: file.filename,
+        mimetype: file.mimetype,
+        sizeBytes: file.size,
+        tipo: 'inicial',
       },
     });
   }
@@ -220,6 +225,7 @@ async function cambiarEstado(req, res) {
         filepath: req.file.filename,
         mimetype: req.file.mimetype,
         sizeBytes: req.file.size,
+        tipo: 'solucion',
       },
     });
   }

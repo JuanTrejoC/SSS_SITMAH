@@ -239,6 +239,12 @@ export default function AtencionReporte({ reporte, tipo, user, onActualizado, ap
   // RENDER: CUANDO EL REPORTE YA ESTÁ RESUELTO
   // ==========================================
   if (reporte.estado === 'resuelto') {
+    // Filtrar la(s) foto(s) de solución del técnico
+    const evidenciasSolucion = reporte.evidencias?.filter(e => e.tipo === 'solucion') || []
+    const fotosSolucion = (evidenciasSolucion.length === 0 && reporte.evidencias && reporte.evidencias.length > 1)
+      ? [reporte.evidencias[reporte.evidencias.length - 1]]
+      : evidenciasSolucion
+
     return (
       <div style={{ marginTop: '1.5rem', borderTop: '1px solid #E5E7EB', paddingTop: '1.25rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
@@ -266,9 +272,49 @@ export default function AtencionReporte({ reporte, tipo, user, onActualizado, ap
             </div>
           </div>
 
-          {/* FIRMA DE SATISFACCIÓN */}
+          {/* FOTOGRAFÍA DE EVIDENCIA DE SOLUCIÓN (ARRIBA DE LA FIRMA) */}
+          {fotosSolucion && fotosSolucion.length > 0 && (
+            <div style={{ gridColumn: '1 / -1', marginTop: '0.65rem' }}>
+              <strong style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#111827' }}>
+                Fotografía de Evidencia de Solución:
+              </strong>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
+                {fotosSolucion.map((ev) => (
+                  <div key={ev.id} style={{ 
+                    border: '1px solid #E5E7EB', borderRadius: '10px', overflow: 'hidden', 
+                    maxWidth: '200px', backgroundColor: 'white'
+                  }}>
+                    {ev.mimetype?.startsWith('image/') ? (
+                      <a
+                        href={`${apiBaseUrl}/api/evidencias/${ev.id}?token=${user?.token}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <img
+                          src={`${apiBaseUrl}/api/evidencias/${ev.id}?token=${user?.token}`}
+                          alt={ev.filename || 'Evidencia de solución'}
+                          style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block', cursor: 'pointer' }}
+                        />
+                      </a>
+                    ) : (
+                      <a
+                        href={`${apiBaseUrl}/api/evidencias/${ev.id}?token=${user?.token}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '160px', gap: '0.5rem', color: '#BC955B', textDecoration: 'none', backgroundColor: '#F8FAFC' }}
+                      >
+                        <i className="fa-solid fa-file" style={{ fontSize: '2rem' }}></i>
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* FIRMA DE SATISFACCIÓN (DEBAJO DE LA FOTO) */}
           {reporte.firmaSatisfaccion && (
-            <div style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
+            <div style={{ gridColumn: '1 / -1', marginTop: '0.65rem' }}>
               <strong style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem', color: '#111827' }}>
                 Firma de Conformidad / Satisfacción:
               </strong>

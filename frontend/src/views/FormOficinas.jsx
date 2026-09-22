@@ -19,7 +19,7 @@ export default function FormOficinas({ usuarioActual }) {
     descripcion_otro: '',
     prioridad: '',
     descripcion: '',
-    evidencia: null,
+    evidencias: [],
     estado: 'Pendiente',       // ✅ ESTADO POR DEFECTO
     tipo_usuario: 'solicitante'// ✅ PARA QUE EL ADMIN LO VEA
   })
@@ -28,7 +28,7 @@ export default function FormOficinas({ usuarioActual }) {
   const [valido, setValido] = useState({})
   const [mostrarOtro, setMostrarOtro] = useState(false)
   const [cargando, setCargando] = useState(false)
-  const [vistaPrevia, setVistaPrevia] = useState(null)
+  const [vistasPrevias, setVistasPrevias] = useState([])
 
   const [listaAreas, setListaAreas] = useState([])
   const [listaCargos, setListaCargos] = useState([])
@@ -193,44 +193,102 @@ export default function FormOficinas({ usuarioActual }) {
     })
   }
 
-  const manejarArchivo = async (e) => {
-    const archivo = e.target.files[0]
-    if (!archivo) return
+  // Manejo de múltiples archivos de evidencia (máximo 3 fotos)
+  const MAX_FOTOS_OFICINA = 3
+
+  const manejarArchivos = async (e) => {
+    const archivos = Array.from(e.target.files || [])
+    if (archivos.length === 0) return
+
+    const espacioDisponible = MAX_FOTOS_OFICINA - (formData.evidencias?.length || 0)
+    if (espacioDisponible <= 0) {
+      Swal.fire('Límite alcanzado', `Solo se permite un máximo de ${MAX_FOTOS_OFICINA} fotografías como evidencia.`, 'warning')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
+    let archivosAProcesar = archivos
+    if (archivos.length > espacioDisponible) {
+      Swal.fire(
+        'Límite de fotos',
+        `Solo puedes agregar ${espacioDisponible} foto(s) más (máximo ${MAX_FOTOS_OFICINA} en total). Se tomarán solo las primeras ${espacioDisponible}.`,
+        'info'
+      )
+      archivosAProcesar = archivos.slice(0, espacioDisponible)
+    }
 
     const tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
-    if (!tiposPermitidos.includes(archivo.type)) {
-      Swal.fire('Error', 'Solo se permiten archivos de imagen (.jpg, .jpeg, .png, .gif, .webp)', 'error');
-      e.target.value = ''
-      setFormData(prev => ({ ...prev, evidencia: null }))
-      setVistaPrevia(null)
+    const archivosValidos = []
+
+    for (const archivo of archivosAProcesar) {
+      if (!tiposPermitidos.includes(archivo.type)) {
+        Swal.fire('Error', `El archivo "${archivo.name}" no es una imagen válida (.jpg, .png, .gif, .webp)`, 'error')
+        continue
+      }
+      if (archivo.size > 10 * 1024 * 1024) {
+        Swal.fire('Error', `La imagen "${archivo.name}" no debe superar los 10 MB`, 'error')
+        continue
+      }
+      archivosValidos.push(archivo)
+    }
+
+    if (archivosValidos.length === 0) {
+      if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
 
-    if (archivo.size > 10 * 1024 * 1024) {
-      Swal.fire('Error', 'La imagen no debe superar los 10 MB', 'error');
-      e.target.value = ''
-      setFormData(prev => ({ ...prev, evidencia: null }))
-      setVistaPrevia(null)
-      return
-    }
+    const procesados = await Promise.all(
+      archivosValidos.map(async (arch) => {
+        try {
+          return await comprimirImagen(arch)
+        } catch {
+          return arch
+        }
+      })
+    )
 
-    try {
-      const archivoComprimido = await comprimirImagen(archivo)
-      setFormData(prev => ({ ...prev, evidencia: archivoComprimido }))
-      setVistaPrevia(URL.createObjectURL(archivoComprimido))
-    } catch (err) {
-      console.error('Error al comprimir la imagen:', err)
-      setFormData(prev => ({ ...prev, evidencia: archivo }))
-      setVistaPrevia(URL.createObjectURL(archivo))
+    const nuevasVistas = procesados.map((arch) => ({
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      url: URL.createObjectURL(arch),
+      name: arch.name,
+      size: (arch.size / (1024 * 1024)).toFixed(2)
+    }))
+
+    setFormData((prev) => ({
+      ...prev,
+      evidencias: [...(prev.evidencias || []), ...procesados]
+    }))
+
+    setVistasPrevias((prev) => [...prev, ...nuevasVistas])
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
     }
   }
 
-  const eliminarEvidencia = () => {
-    setFormData(prev => ({ ...prev, evidencia: null }))
-    if (vistaPrevia) {
-      URL.revokeObjectURL(vistaPrevia)
-      setVistaPrevia(null)
-    }
+  const eliminarEvidencia = (index) => {
+    setFormData((prev) => {
+      const nuevas = [...(prev.evidencias || [])]
+      nuevas.splice(index, 1)
+      return { ...prev, evidencias: nuevas }
+    })
+
+    setVistasPrevias((prev) => {
+      const nuevas = [...prev]
+      if (nuevas[index]?.url) {
+        URL.revokeObjectURL(nuevas[index].url)
+      }
+      nuevas.splice(index, 1)
+      return nuevas
+    })
+  }
+
+  const eliminarTodasEvidencias = () => {
+    vistasPrevias.forEach((vp) => {
+      if (vp.url) URL.revokeObjectURL(vp.url)
+    })
+    setVistasPrevias([])
+    setFormData((prev) => ({ ...prev, evidencias: [] }))
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -253,7 +311,7 @@ export default function FormOficinas({ usuarioActual }) {
     if (!confirmar.isConfirmed) return
 
     Object.keys(formData).forEach(campo => {
-      if (campo !== 'evidencia' && campo !== 'descripcion') {
+      if (campo !== 'evidencia' && campo !== 'evidencias' && campo !== 'descripcion') {
         validarCampo(campo, formData[campo])
       }
     })
@@ -300,8 +358,10 @@ export default function FormOficinas({ usuarioActual }) {
       datosAEnviar.append('estado', formData.estado)
       datosAEnviar.append('tipo_usuario', formData.tipo_usuario)
 
-      if (formData.evidencia) {
-        datosAEnviar.append('evidencia', formData.evidencia)
+      if (formData.evidencias && formData.evidencias.length > 0) {
+        formData.evidencias.forEach((arch) => {
+          datosAEnviar.append('evidencia', arch)
+        })
       }
 
       const respuesta = await fetch(`${API_BASE_URL}/api/reportes/oficina`, {
@@ -315,11 +375,15 @@ export default function FormOficinas({ usuarioActual }) {
         const folioCreado = resultado.data?.folio || resultado.data?.id || 'Generado'
         Swal.fire('Éxito', `Reporte registrado en el sistema correctamente.\nFolio: ${folioCreado}`, 'success');
 
-        setFormData({ solicitante: '', area_id: '', cargo: '', email: '', telefono: '', sede_id: '', equipo: '', numero_serie: '', categoria_id: '', descripcion_otro: '', prioridad: '', descripcion: '', evidencia: null, estado: 'abierto', tipo_usuario: 'solicitante' })
+        vistasPrevias.forEach((vp) => {
+          if (vp.url) URL.revokeObjectURL(vp.url)
+        })
+        setVistasPrevias([])
+
+        setFormData({ solicitante: '', area_id: '', cargo: '', email: '', telefono: '', sede_id: '', equipo: '', numero_serie: '', categoria_id: '', descripcion_otro: '', prioridad: '', descripcion: '', evidencias: [], estado: 'abierto', tipo_usuario: 'solicitante' })
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
         }
-        setVistaPrevia(null)
         setMostrarOtro(false)
         setErrores({})
         setValido({})
@@ -711,14 +775,24 @@ export default function FormOficinas({ usuarioActual }) {
             </div>
           </div>
 
-          {/* SECCIÓN 4: EVIDENCIA FOTOGRÁFICA */}
+          {/* SECCIÓN 4: EVIDENCIA FOTOGRÁFICA (MÁXIMO 3 FOTOS) */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem', borderBottom: '2px solid #F3F4F6', paddingBottom: '0.65rem' }}>
               <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#059669', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.85rem' }}>4</span>
               <h2 style={{ color: '#111827', fontSize: '1.1rem', fontWeight: '700', margin: 0 }}>
-                Evidencia Fotográfica
+                Evidencia Fotográfica (Máximo 3 fotos)
               </h2>
             </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={manejarArchivos}
+              style={{ display: 'none' }}
+              id="input-evidencia-oficinas"
+            />
 
             <div
               style={{
@@ -726,81 +800,182 @@ export default function FormOficinas({ usuarioActual }) {
                 borderRadius: '14px',
                 padding: '1.25rem',
                 backgroundColor: '#F8FAFC',
-                textAlign: 'center',
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'center',
-                gap: '0.85rem'
+                gap: '1rem'
               }}
             >
-              {!vistaPrevia ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', fontSize: '1.35rem' }}>
+              {vistasPrevias.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', textAlign: 'center', padding: '1rem 0' }}>
+                  <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', fontSize: '1.4rem' }}>
                     <i className="fa-solid fa-cloud-arrow-up"></i>
                   </div>
                   <div>
-                    <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#334155' }}>
-                      Cargar foto o captura del fallo
+                    <span style={{ fontSize: '0.95rem', fontWeight: '700', color: '#334155' }}>
+                      Cargar fotos o capturas del fallo
                     </span>
                     <span style={{ fontSize: '0.8rem', color: '#64748B', display: 'block', marginTop: '0.2rem' }}>
-                      Formatos permitidos: JPG, PNG, WEBP (Máximo 10 MB)
+                      Puedes seleccionar hasta 3 fotografías (JPG, PNG, WEBP — Máx. 10 MB c/u)
                     </span>
                   </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={manejarArchivo}
-                    style={{ display: 'none' }}
-                    id="input-evidencia-oficinas"
-                  />
                   <label
                     htmlFor="input-evidencia-oficinas"
                     style={{
                       backgroundColor: '#691B31',
                       color: 'white',
-                      padding: '0.55rem 1.15rem',
+                      padding: '0.6rem 1.3rem',
                       borderRadius: '8px',
-                      fontSize: '0.85rem',
+                      fontSize: '0.875rem',
                       fontWeight: '600',
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '0.4rem',
-                      marginTop: '0.4rem'
+                      gap: '0.5rem',
+                      marginTop: '0.5rem',
+                      boxShadow: '0 2px 6px rgba(105, 27, 49, 0.25)',
+                      transition: 'background-color 0.2s'
                     }}
                   >
-                    <i className="fa-solid fa-image"></i> Seleccionar Imagen
+                    <i className="fa-solid fa-image"></i> Seleccionar Imágenes
                   </label>
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-                  <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '2px solid #BC955B', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-                    <img
-                      src={vistaPrevia}
-                      alt="Vista previa evidencia"
-                      style={{ maxWidth: '240px', maxHeight: '200px', display: 'block', objectFit: 'cover' }}
-                    />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {/* Barra superior con resumen y botones */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <span style={{ backgroundColor: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', padding: '0.3rem 0.85rem', borderRadius: '20px', fontWeight: '700', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <i className="fa-solid fa-images"></i> {vistasPrevias.length} de 3 fotos seleccionadas
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      {vistasPrevias.length < 3 ? (
+                        <label
+                          htmlFor="input-evidencia-oficinas"
+                          style={{
+                            backgroundColor: '#BC955B',
+                            color: 'white',
+                            padding: '0.4rem 0.85rem',
+                            borderRadius: '6px',
+                            fontSize: '0.8rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem'
+                          }}
+                        >
+                          <i className="fa-solid fa-plus"></i> Agregar más ({3 - vistasPrevias.length} restante{3 - vistasPrevias.length > 1 ? 's' : ''})
+                        </label>
+                      ) : (
+                        <span style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: '600', padding: '0.4rem 0.5rem', display: 'inline-flex', alignItems: 'center' }}>
+                          ✓ Máximo alcanzado (3/3)
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={eliminarTodasEvidencias}
+                        style={{
+                          backgroundColor: '#FEE2E2',
+                          color: '#DC2626',
+                          border: '1px solid #FCA5A5',
+                          padding: '0.4rem 0.85rem',
+                          borderRadius: '6px',
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem'
+                        }}
+                      >
+                        <i className="fa-solid fa-trash"></i> Quitar todas
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={eliminarEvidencia}
+
+                  {/* Cuadrícula de fotos */}
+                  <div
                     style={{
-                      backgroundColor: '#FEE2E2',
-                      color: '#DC2626',
-                      border: '1px solid #FCA5A5',
-                      padding: '0.4rem 0.85rem',
-                      borderRadius: '8px',
-                      fontSize: '0.825rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.4rem'
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                      gap: '0.85rem'
                     }}
                   >
-                    <i className="fa-solid fa-trash"></i> Eliminar Imagen
-                  </button>
+                    {vistasPrevias.map((item, index) => (
+                      <div
+                        key={item.id || index}
+                        style={{
+                          position: 'relative',
+                          borderRadius: '10px',
+                          overflow: 'hidden',
+                          border: '2px solid #BC955B',
+                          boxShadow: '0 4px 10px rgba(0,0,0,0.08)',
+                          backgroundColor: '#FFFFFF',
+                          display: 'flex',
+                          flexDirection: 'column'
+                        }}
+                      >
+                        {/* Badge de número */}
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: '6px',
+                            left: '6px',
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                            color: 'white',
+                            fontSize: '0.7rem',
+                            fontWeight: '700',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            zIndex: 2
+                          }}
+                        >
+                          #{index + 1}
+                        </span>
+
+                        {/* Botón eliminar individual */}
+                        <button
+                          type="button"
+                          onClick={() => eliminarEvidencia(index)}
+                          title="Eliminar esta foto"
+                          style={{
+                            position: 'absolute',
+                            top: '6px',
+                            right: '6px',
+                            backgroundColor: '#DC2626',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '24px',
+                            height: '24px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.75rem',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                            zIndex: 2
+                          }}
+                        >
+                          <i className="fa-solid fa-xmark"></i>
+                        </button>
+
+                        <img
+                          src={item.url}
+                          alt={`Evidencia ${index + 1}`}
+                          style={{
+                            width: '100%',
+                            height: '110px',
+                            objectFit: 'cover',
+                            display: 'block'
+                          }}
+                        />
+
+                        <div style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem', color: '#64748B', backgroundColor: '#F8FAFC', borderTop: '1px solid #E2E8F0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.name || `Foto ${index + 1}`} ({item.size} MB)
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
