@@ -8,12 +8,13 @@ import {
   FaLaptop, FaPlus, FaEdit, FaTrashAlt,
   FaChevronLeft, FaChevronRight, FaTimes, FaDesktop, FaMobileAlt, FaNetworkWired,
   FaServer, FaShieldAlt, FaWifi, FaVideo, FaHdd, FaBroadcastTower, FaPrint, FaTv,
-  FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone, FaFilePdf, FaPlug
+  FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone, FaFilePdf, FaPlug, FaTabletAlt
 } from 'react-icons/fa';
 
 const TIPOS_EQUIPO = [
   { value: 'escritorio', label: 'Escritorio', icon: FaDesktop, group: 'Computadoras' },
   { value: 'laptop', label: 'Laptop', icon: FaLaptop, group: 'Computadoras' },
+  { value: 'tableta', label: 'Tableta', icon: FaTabletAlt, group: 'Computadoras' },
   { value: 'servidor', label: 'Servidor', icon: FaServer, group: 'Computadoras' },
   { value: 'router', label: 'Router', icon: FaNetworkWired, group: 'Redes y Conectividad' },
   { value: 'switch', label: 'Switch', icon: FaNetworkWired, group: 'Redes y Conectividad' },
@@ -567,10 +568,10 @@ export default function InventarioTecnologico() {
   const tieneMAC = ['switch', 'servidor', 'firewall', 'access_point', 'camara', 'dvr', 'antena', 'impresora', 'plotter', 'router'].includes(form.tipo);
   const tieneIP = ['switch', 'servidor', 'firewall', 'access_point', 'camara', 'dvr', 'antena', 'impresora', 'plotter', 'router'].includes(form.tipo);
   const tienePuertosRed = ['switch', 'firewall', 'router', 'dvr'].includes(form.tipo);
-  const tieneAlmacenamiento = ['servidor', 'escritorio', 'laptop', 'celular'].includes(form.tipo);
+  const tieneAlmacenamiento = ['servidor', 'escritorio', 'laptop', 'celular', 'tableta'].includes(form.tipo);
   const tieneProcesador = ['servidor', 'escritorio', 'laptop'].includes(form.tipo);
   const sinInventario = ['internet', 'aire'].includes(form.tipo);
-  const requiereResponsable = ['escritorio', 'laptop', 'radio', 'no_break'].includes(form.tipo);
+  const requiereResponsable = ['escritorio', 'laptop', 'radio', 'no_break', 'tableta'].includes(form.tipo);
 
   // Agrupando las opciones por grupo
   const gruposOpciones = TIPOS_EQUIPO.reduce((acc, curr) => {
@@ -957,14 +958,14 @@ export default function InventarioTecnologico() {
                         <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>No. Inv / Serie</th>
                         <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Marca / Modelo</th>
                         <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Responsable</th>
-                        {['escritorio', 'laptop', 'servidor'].includes(dashboardTipo) && (
+                        {['escritorio', 'laptop', 'servidor', 'tableta'].includes(dashboardTipo) && (
                           <>
                             <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Memoria RAM</th>
                             <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Almacenamiento</th>
-                            <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Procesador</th>
+                            <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Procesador / SO</th>
                           </>
                         )}
-                        {!['escritorio', 'laptop', 'servidor'].includes(dashboardTipo) && (
+                        {!['escritorio', 'laptop', 'servidor', 'tableta'].includes(dashboardTipo) && (
                           <th style={{ padding: '0.75rem 1rem', color: '#475569', fontWeight: '600' }}>Detalles</th>
                         )}
                       </tr>
@@ -985,17 +986,17 @@ export default function InventarioTecnologico() {
                               {eq.responsable || '—'}
                               {eq.cargoResponsable && <div style={{ fontSize: '0.75rem', color: '#64748B' }}>{eq.cargoResponsable}</div>}
                             </td>
-                            {['escritorio', 'laptop', 'servidor'].includes(dashboardTipo) && (
+                            {['escritorio', 'laptop', 'servidor', 'tableta'].includes(dashboardTipo) && (
                               <>
                                 <td style={{ padding: '0.75rem 1rem', color: '#0F172A', fontWeight: '600' }}>{eq.detalles?.ram || '—'}</td>
                                 <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>
                                   {eq.detalles?.almacenamiento || '—'}
                                   {eq.detalles?.tipoAlmacenamiento && <span style={{ fontSize: '0.75rem', color: '#64748B', marginLeft: '0.25rem' }}>({eq.detalles.tipoAlmacenamiento})</span>}
                                 </td>
-                                <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>{eq.detalles?.procesador || '—'}</td>
+                                <td style={{ padding: '0.75rem 1rem', color: '#334155' }}>{eq.detalles?.procesador || eq.detalles?.sistemaOperativo || '—'}</td>
                               </>
                             )}
-                            {!['escritorio', 'laptop', 'servidor'].includes(dashboardTipo) && (
+                            {!['escritorio', 'laptop', 'servidor', 'tableta'].includes(dashboardTipo) && (
                               <td style={{ padding: '0.75rem 1rem', color: '#64748B', fontSize: '0.8rem' }}>
                                 {Object.entries(eq.detalles || {}).map(([k, v]) => (
                                   <div key={k}><strong>{k}:</strong> {String(v)}</div>
@@ -1357,7 +1358,7 @@ export default function InventarioTecnologico() {
                         />
                       )}
 
-                      {['escritorio', 'laptop', 'celular'].includes(form.tipo) && (
+                      {['escritorio', 'laptop', 'celular', 'tableta'].includes(form.tipo) && (
                         <CustomSpecSelect
                           label="Sistema Operativo"
                           value={form.detalles.sistemaOperativo || ''}
