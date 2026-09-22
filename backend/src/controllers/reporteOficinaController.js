@@ -202,24 +202,28 @@ async function cambiarEstado(req, res) {
 
   const { estado, comentario, tecnico_atendio, firma_satisfaccion, diagnostico_solucion, fecha_resolucion } = parsed.data;
 
+  const files = req.files
+    ? (Array.isArray(req.files) ? req.files : Object.values(req.files).flat())
+    : (req.file ? [req.file] : []);
+
   // Si se intenta cerrar como resuelto, verificar que exista al menos una evidencia fotográfica
   if (estado === 'resuelto') {
     const tieneEvidenciaPrevia = actual.evidencias && actual.evidencias.length > 0;
-    const tieneNuevaEvidencia = !!req.file;
+    const tieneNuevaEvidencia = files.length > 0;
     if (!tieneEvidenciaPrevia && !tieneNuevaEvidencia) {
       return fail(res, 'Para cerrar el reporte es obligatorio adjuntar al menos una evidencia fotográfica', 400);
     }
   }
 
-  // Si se subió un nuevo archivo de evidencia al resolver
-  if (req.file) {
+  // Si se subieron nuevos archivos de evidencia al resolver
+  for (const file of files) {
     await prisma.evidencia.create({
       data: {
         reporteOficinaId: id,
-        filename: req.file.originalname,
-        filepath: req.file.filename,
-        mimetype: req.file.mimetype,
-        sizeBytes: req.file.size,
+        filename: file.originalname,
+        filepath: file.filename,
+        mimetype: file.mimetype,
+        sizeBytes: file.size,
         tipo: 'solucion',
       },
     });

@@ -17,9 +17,9 @@ export default function AtencionReporte({ reporte, tipo, user, onActualizado, ap
     tecnicoAtendio: reporte?.tecnicoAtendio || '',
     fechaAtencion: obtenerFechaHoy(),
     diagnostico: reporte?.diagnosticoSolucion || '',
-    evidenciaSolucion: null
+    evidenciasSolucion: []
   })
-  const [vistaPreviaEvidencia, setVistaPreviaEvidencia] = useState(null)
+  const [vistasPreviasEvidencia, setVistasPreviasEvidencia] = useState([])
 
   // Sincronizar campos cuando cambia el reporte
   useEffect(() => {
@@ -27,9 +27,12 @@ export default function AtencionReporte({ reporte, tipo, user, onActualizado, ap
       tecnicoAtendio: reporte?.tecnicoAtendio || '',
       fechaAtencion: obtenerFechaHoy(),
       diagnostico: reporte?.diagnosticoSolucion || '',
-      evidenciaSolucion: null
+      evidenciasSolucion: []
     })
-    setVistaPreviaEvidencia(null)
+    vistasPreviasEvidencia.forEach(vp => {
+      if (vp.url) URL.revokeObjectURL(vp.url)
+    })
+    setVistasPreviasEvidencia([])
     setHayFirma(false)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -101,31 +104,89 @@ export default function AtencionReporte({ reporte, tipo, user, onActualizado, ap
     }
   }
 
-  // Manejo de nueva foto de evidencia
-  const manejarFotoSolucion = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
+  // Manejo de nuevas fotos de evidencia de solución
+  const MAX_FOTOS = tipo === 'oficina' ? 3 : 10
 
-    if (!file.type.startsWith('image/')) {
-      Swal.fire('Formato no válido', 'Por favor selecciona un archivo de imagen (JPG, PNG, WEBP)', 'error')
+  const manejarFotosSolucion = (e) => {
+    const archivos = Array.from(e.target.files || [])
+    if (archivos.length === 0) return
+
+    const espacioDisponible = MAX_FOTOS - (datosCierre.evidenciasSolucion?.length || 0)
+    if (espacioDisponible <= 0) {
+      Swal.fire('Límite alcanzado', `Solo se permite un máximo de ${MAX_FOTOS} fotografías como evidencia.`, 'warning')
+      if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      Swal.fire('Tamaño excedido', 'La imagen no debe superar los 10 MB', 'error')
+    let archivosAProcesar = archivos
+    if (archivos.length > espacioDisponible) {
+      Swal.fire(
+        'Límite de fotos',
+        `Solo puedes agregar ${espacioDisponible} foto(s) más (máximo ${MAX_FOTOS} en total). Se tomarán solo las primeras ${espacioDisponible}.`,
+        'info'
+      )
+      archivosAProcesar = archivos.slice(0, espacioDisponible)
+    }
+
+    const archivosValidos = []
+    for (const file of archivosAProcesar) {
+      if (!file.type.startsWith('image/')) {
+        Swal.fire('Formato no válido', `El archivo "${file.name}" no es una imagen válida (JPG, PNG, WEBP).`, 'error')
+        continue
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        Swal.fire('Tamaño excedido', `La imagen "${file.name}" supera el límite de 10 MB.`, 'error')
+        continue
+      }
+      archivosValidos.push(file)
+    }
+
+    if (archivosValidos.length === 0) {
+      if (fileInputRef.current) fileInputRef.current.value = ''
       return
     }
 
-    setDatosCierre(prev => ({ ...prev, evidenciaSolucion: file }))
-    setVistaPreviaEvidencia(URL.createObjectURL(file))
+    const nuevasVistas = archivosValidos.map((file) => ({
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      url: URL.createObjectURL(file),
+      name: file.name,
+      size: (file.size / (1024 * 1024)).toFixed(2)
+    }))
+
+    setDatosCierre(prev => ({
+      ...prev,
+      evidenciasSolucion: [...(prev.evidenciasSolucion || []), ...archivosValidos]
+    }))
+    setVistasPreviasEvidencia(prev => [...prev, ...nuevasVistas])
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
   }
 
-  const eliminarFotoSolucion = () => {
-    setDatosCierre(prev => ({ ...prev, evidenciaSolucion: null }))
-    if (vistaPreviaEvidencia) {
-      URL.revokeObjectURL(vistaPreviaEvidencia)
-      setVistaPreviaEvidencia(null)
-    }
+  const eliminarFotoSolucion = (index) => {
+    setDatosCierre(prev => {
+      const nuevas = [...(prev.evidenciasSolucion || [])]
+      nuevas.splice(index, 1)
+      return { ...prev, evidenciasSolucion: nuevas }
+    })
+
+    setVistasPreviasEvidencia(prev => {
+      const nuevas = [...prev]
+      if (nuevas[index]?.url) {
+        URL.revokeObjectURL(nuevas[index].url)
+      }
+      nuevas.splice(index, 1)
+      return nuevas
+    })
+  }
+
+  const eliminarTodasFotosSolucion = () => {
+    vistasPreviasEvidencia.forEach(vp => {
+      if (vp.url) URL.revokeObjectURL(vp.url)
+    })
+    setVistasPreviasEvidencia([])
+    setDatosCierre(prev => ({ ...prev, evidenciasSolucion: [] }))
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -135,12 +196,12 @@ export default function AtencionReporte({ reporte, tipo, user, onActualizado, ap
   const resolverReporte = async () => {
     // 1. Validar que exista al menos una evidencia
     const tieneEvidenciaPrevia = reporte.evidencias && reporte.evidencias.length > 0
-    const tieneNuevaEvidencia = !!datosCierre.evidenciaSolucion
+    const tieneNuevaEvidencia = datosCierre.evidenciasSolucion && datosCierre.evidenciasSolucion.length > 0
 
     if (!tieneEvidenciaPrevia && !tieneNuevaEvidencia) {
       Swal.fire({
         title: 'Evidencia Fotográfica Requerida',
-        text: 'Para cerrar y resolver el reporte es obligatorio adjuntar la fotografía de la atención/solución.',
+        text: 'Para cerrar y resolver el reporte es obligatorio adjuntar al menos una fotografía de la atención/solución.',
         icon: 'warning',
         confirmButtonColor: '#BC955B'
       })
@@ -201,8 +262,10 @@ export default function AtencionReporte({ reporte, tipo, user, onActualizado, ap
         formData.append('firma_satisfaccion', firmaBase64)
       }
 
-      if (datosCierre.evidenciaSolucion) {
-        formData.append('evidencia', datosCierre.evidenciaSolucion)
+      if (datosCierre.evidenciasSolucion && datosCierre.evidenciasSolucion.length > 0) {
+        datosCierre.evidenciasSolucion.forEach((arch) => {
+          formData.append('evidencia', arch)
+        })
       }
 
       const endpoint = tipo === 'oficina'
@@ -421,9 +484,9 @@ export default function AtencionReporte({ reporte, tipo, user, onActualizado, ap
 
         {/* FOTOGRAFÍA / EVIDENCIA DE SOLUCIÓN */}
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap', gap: '0.35rem' }}>
             <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#374151', margin: 0 }}>
-              Fotografía de Evidencia de Solución <span style={{ color: '#DC2626' }}>* (Obligatoria para cerrar)</span>
+              Fotografía de Evidencia de Solución <span style={{ color: '#DC2626' }}>* (Obligatoria para cerrar{tipo === 'oficina' ? ' — máx. 3 fotos' : ''})</span>
             </label>
             {reporte.evidencias && reporte.evidencias.length > 0 && (
               <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: '600' }}>
@@ -432,71 +495,173 @@ export default function AtencionReporte({ reporte, tipo, user, onActualizado, ap
             )}
           </div>
 
-          {!vistaPreviaEvidencia ? (
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={manejarFotosSolucion}
+            style={{ display: 'none' }}
+            id={`input-evidencia-solucion-${reporte.id}`}
+          />
+
+          {vistasPreviasEvidencia.length === 0 ? (
             <div style={{ border: '2px dashed #CBD5E1', borderRadius: '10px', padding: '1.25rem', backgroundColor: '#F8FAFC', textAlign: 'center' }}>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={manejarFotoSolucion}
-                style={{ display: 'none' }}
-                id={`input-evidencia-solucion-${reporte.id}`}
-              />
               <label
                 htmlFor={`input-evidencia-solucion-${reporte.id}`}
                 style={{
                   backgroundColor: tipo === 'semaforo' ? '#BC955B' : '#691B31',
                   color: 'white',
-                  padding: '0.5rem 1.15rem',
+                  padding: '0.55rem 1.2rem',
                   borderRadius: '8px',
                   fontSize: '0.85rem',
                   fontWeight: '600',
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '0.4rem'
+                  gap: '0.45rem',
+                  boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
                 }}
               >
-                <FaCamera /> Subir Fotografía de Solución
+                <FaCamera /> Subir Fotografía{tipo === 'semaforo' ? 's' : 's'} de Solución
               </label>
               <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748B', marginTop: '0.35rem' }}>
-                JPG, PNG o WEBP (máx. 10 MB)
+                {tipo === 'oficina'
+                  ? 'Formatos JPG, PNG o WEBP (hasta 3 fotografías, máx. 10 MB c/u)'
+                  : 'Formatos JPG, PNG o WEBP (puedes subir varias fotografías, máx. 10 MB c/u)'}
               </span>
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', backgroundColor: '#F8FAFC', padding: '0.75rem', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-              <img
-                src={vistaPreviaEvidencia}
-                alt="Vista previa solución"
-                style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #CBD5E1' }}
-              />
-              <div style={{ flex: 1 }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#1E293B', display: 'block' }}>
-                  {datosCierre.evidenciaSolucion?.name || 'Fotografía seleccionada'}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', backgroundColor: '#F8FAFC', padding: '0.85rem', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+              {/* Barra superior de fotos */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#065F46', backgroundColor: '#D1FAE5', padding: '0.2rem 0.6rem', borderRadius: '12px', border: '1px solid #A7F3D0' }}>
+                  {tipo === 'oficina'
+                    ? `✓ ${vistasPreviasEvidencia.length} de ${MAX_FOTOS} foto(s) de solución`
+                    : `✓ ${vistasPreviasEvidencia.length} foto(s) de solución seleccionada(s)`}
                 </span>
-                <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: '600' }}>
-                  ✓ Lista para adjuntarse al cierre
-                </span>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  {vistasPreviasEvidencia.length < MAX_FOTOS && (
+                    <label
+                      htmlFor={`input-evidencia-solucion-${reporte.id}`}
+                      style={{
+                        backgroundColor: tipo === 'semaforo' ? '#BC955B' : '#691B31',
+                        color: 'white',
+                        padding: '0.3rem 0.7rem',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.3rem'
+                      }}
+                    >
+                      + Agregar más
+                    </label>
+                  )}
+                  <button
+                    type="button"
+                    onClick={eliminarTodasFotosSolucion}
+                    style={{
+                      backgroundColor: '#FEE2E2',
+                      color: '#DC2626',
+                      border: '1px solid #FCA5A5',
+                      padding: '0.3rem 0.7rem',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.3rem'
+                    }}
+                  >
+                    <FaTrash /> Quitar todas
+                  </button>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={eliminarFotoSolucion}
+
+              {/* Cuadrícula de fotos */}
+              <div
                 style={{
-                  backgroundColor: '#FEE2E2',
-                  color: '#DC2626',
-                  border: '1px solid #FCA5A5',
-                  padding: '0.4rem 0.75rem',
-                  borderRadius: '6px',
-                  fontSize: '0.8rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.3rem'
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+                  gap: '0.65rem'
                 }}
               >
-                <FaTrash /> Quitar
-              </button>
+                {vistasPreviasEvidencia.map((item, index) => (
+                  <div
+                    key={item.id || index}
+                    style={{
+                      position: 'relative',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      border: '1.5px solid #BC955B',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+                      backgroundColor: 'white'
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: '4px',
+                        left: '4px',
+                        backgroundColor: 'rgba(0,0,0,0.7)',
+                        color: 'white',
+                        fontSize: '0.65rem',
+                        fontWeight: '700',
+                        padding: '1px 5px',
+                        borderRadius: '3px',
+                        zIndex: 2
+                      }}
+                    >
+                      #{index + 1}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => eliminarFotoSolucion(index)}
+                      title="Eliminar foto"
+                      style={{
+                        position: 'absolute',
+                        top: '4px',
+                        right: '4px',
+                        backgroundColor: '#DC2626',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '20px',
+                        height: '20px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.65rem',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                        zIndex: 2
+                      }}
+                    >
+                      ✕
+                    </button>
+
+                    <img
+                      src={item.url}
+                      alt={`Solución ${index + 1}`}
+                      style={{
+                        width: '100%',
+                        height: '90px',
+                        objectFit: 'cover',
+                        display: 'block'
+                      }}
+                    />
+
+                    <div style={{ padding: '0.2rem 0.35rem', fontSize: '0.65rem', color: '#64748B', backgroundColor: '#F8FAFC', borderTop: '1px solid #E2E8F0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.name || `Foto ${index + 1}`} ({item.size} MB)
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
