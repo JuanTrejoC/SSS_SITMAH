@@ -31,6 +31,10 @@ const crearSchema = z.object({
 const estadoSchema = z.object({
   estado: z.enum(['abierto', 'en_proceso', 'resuelto']),
   comentario: z.string().optional(),
+  tecnico_atendio: z.string().optional().nullable(),
+  firma_satisfaccion: z.string().optional().nullable(),
+  diagnostico_solucion: z.string().optional().nullable(),
+  fecha_resolucion: z.string().optional().nullable(),
 });
 
 const includeDetalle = {
@@ -99,25 +103,27 @@ async function crear(req, res) {
 
   const categoria = await prisma.categoria.findUnique({
     where: { id: data.categoria_id },
-    select: { nombre: true }
+    select: { nombre: true },
   });
   const categoriaNombre = categoria ? categoria.nombre : 'General';
 
-  // Enviar correos en segundo plano para no demorar la respuesta del servidor
-  Promise.all([
-    enviarConfirmacionReporte({ email: data.email, folio, tipo: 'oficina' }),
-    enviarNotificacionAdmins({
-      folio,
-      fecha: new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' }),
-      tipo: 'oficina',
-      prioridad: data.prioridad,
-      falla: categoriaNombre,
-      descripcion: data.descripcion,
-      solicitante: data.solicitante,
-      correos: correosAdmin.map((c) => c.correo),
-    })
-  ]).catch((err) => {
-    console.error('Error al enviar correos en segundo plano:', err.message);
+  const datosReporteCorreo = {
+    folio,
+    fecha: new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' }),
+    tipo: 'oficina',
+    solicitante: data.solicitante,
+    email: data.email,
+    categoria: categoriaNombre,
+    prioridad: data.prioridad,
+    descripcion: data.descripcion,
+    correos: correosAdmin.map((c) => c.correo),
+  };
+
+  enviarConfirmacionReporte(datosReporteCorreo).catch((err) => {
+    console.error('Error al enviar correo al solicitante en segundo plano:', err.message);
+  });
+  enviarNotificacionAdmins(datosReporteCorreo).catch((err) => {
+    console.error('Error al enviar correos admin en segundo plano:', err.message);
   });
 
   ok(res, reporte, 201);
@@ -131,35 +137,39 @@ async function resumen(req, res) {
     prisma.reporteOficina.count({ where: { estado: 'resuelto' } }),
   ]);
 
-  ok(res, { total, abiertos, en_proceso: enProceso, resueltos });
+  ok(res, { total, abiertos, enProceso, resueltos });
 }
 
 async function listar(req, res) {
+  const { page, limit, skip } = parsePagination(req.query);
   const { keyword, where } = buildReporteFilters(req.query);
   const whereFinal = applyKeywordOficina(where, keyword);
-  const { page, limit, skip } = parsePagination(req.query);
-
   const ordenParam = req.query.orden === 'asc' ? 'asc' : 'desc';
 
-  const [items, total] = await Promise.all([
+  const [total, reportes] = await Promise.all([
+    prisma.reporteOficina.count({ where: whereFinal }),
     prisma.reporteOficina.findMany({
       where: whereFinal,
-      include: {
-        area: true,
-        sede: true,
-        categoria: true,
-        cargo: true,
-        evidencias: true,
-        piezasAsignadas: { include: { componente: true } },
-      },
-      orderBy: { id: ordenParam },
+      include: includeDetalle,
       skip,
       take: limit,
+      orderBy: { id: ordenParam },
     }),
-    prisma.reporteOficina.count({ where: whereFinal }),
   ]);
 
-  ok(res, { items, total, page, limit });
+  ok(res, {
+    items: reportes,
+    reportes,
+    total,
+    page,
+    limit,
+    paginacion: {
+      total,
+      pagina: page,
+      limite: limit,
+      totalPaginas: Math.ceil(total / limit),
+    },
+  });
 }
 
 async function obtener(req, res) {
@@ -168,7 +178,6 @@ async function obtener(req, res) {
     where: { id },
     include: includeDetalle,
   });
-
   if (!reporte) return fail(res, 'Reporte no encontrado', 404);
 
   const historial = await obtenerHistorial('oficina', id);
@@ -180,20 +189,53 @@ async function cambiarEstado(req, res) {
   const parsed = estadoSchema.safeParse(req.body);
   if (!parsed.success) return fail(res, parsed.error.errors[0].message);
 
-  const actual = await prisma.reporteOficina.findUnique({ where: { id } });
+  const actual = await prisma.reporteOficina.findUnique({
+    where: { id },
+    include: { evidencias: true },
+  });
   if (!actual) return fail(res, 'Reporte no encontrado', 404);
 
-  const { estado, comentario } = parsed.data;
+  const { estado, comentario, tecnico_atendio, firma_satisfaccion, diagnostico_solucion, fecha_resolucion } = parsed.data;
+
+  // Si se intenta cerrar como resuelto, verificar que exista al menos una evidencia fotográfica
+  if (estado === 'resuelto') {
+    const tieneEvidenciaPrevia = actual.evidencias && actual.evidencias.length > 0;
+    const tieneNuevaEvidencia = !!req.file;
+    if (!tieneEvidenciaPrevia && !tieneNuevaEvidencia) {
+      return fail(res, 'Para cerrar el reporte es obligatorio adjuntar al menos una evidencia fotográfica', 400);
+    }
+  }
+
+  // Si se subió un nuevo archivo de evidencia al resolver
+  if (req.file) {
+    await prisma.evidencia.create({
+      data: {
+        reporteOficinaId: id,
+        filename: req.file.originalname,
+        filepath: req.file.filename,
+        mimetype: req.file.mimetype,
+        sizeBytes: req.file.size,
+      },
+    });
+  }
+
   const data = {
     estado,
     atendidoPorId: req.usuario.id,
   };
 
+  if (tecnico_atendio !== undefined) data.tecnicoAtendio = tecnico_atendio;
+  if (firma_satisfaccion !== undefined) data.firmaSatisfaccion = firma_satisfaccion;
+  if (diagnostico_solucion !== undefined) data.diagnosticoSolucion = diagnostico_solucion;
   if (estado === 'resuelto') {
-    data.fechaResolucion = new Date();
+    data.fechaResolucion = fecha_resolucion ? new Date(fecha_resolucion) : new Date();
   }
 
-  const reporte = await prisma.reporteOficina.update({ where: { id }, data });
+  const reporte = await prisma.reporteOficina.update({
+    where: { id },
+    data,
+    include: includeDetalle,
+  });
 
   if (actual.estado !== estado) {
     await registrarHistorial({
@@ -202,7 +244,7 @@ async function cambiarEstado(req, res) {
       reporteId: id,
       estadoAnterior: actual.estado,
       estadoNuevo: estado,
-      comentario,
+      comentario: comentario || diagnostico_solucion || 'Estado actualizado',
     });
   }
 

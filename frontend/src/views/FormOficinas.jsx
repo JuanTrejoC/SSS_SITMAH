@@ -127,6 +127,11 @@ export default function FormOficinas({ usuarioActual }) {
         else esValido = true
         break
 
+      case 'descripcion':
+        if (valor && valor.length > 250) mensajeError = 'Máximo 250 caracteres'
+        else esValido = true
+        break
+
       default:
         esValido = true
         break
@@ -466,9 +471,11 @@ export default function FormOficinas({ usuarioActual }) {
                   }}
                 >
                   <option value="">Seleccione cargo</option>
-                  {listaCargos.map((cargo) => (
-                    <option key={cargo.id} value={cargo.nombre}>{cargo.nombre}</option>
-                  ))}
+                  {listaCargos
+                    .filter((c) => c.nombre?.toLowerCase() !== 'jefatura de departamento')
+                    .map((cargo) => (
+                      <option key={cargo.id} value={cargo.nombre}>{cargo.nombre}</option>
+                    ))}
                 </select>
                 {errores.cargo && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.cargo}</span>}
               </div>
@@ -687,9 +694,11 @@ export default function FormOficinas({ usuarioActual }) {
                 <textarea
                   placeholder="Detalle los síntomas del problema, mensajes de error en pantalla o circunstancias en las que ocurre..."
                   value={formData.descripcion}
+                  maxLength={250}
                   onChange={(e) => {
-                    const v = soloLetras(e.target.value)
+                    const v = e.target.value
                     setFormData({ ...formData, descripcion: v })
+                    validarCampo('descripcion', v)
                   }}
                   className="premium-textarea"
                   style={{

@@ -54,6 +54,7 @@ async function main() {
     'Cuna de Fútbol', 'Santa Julia', 'Prepa 1', 'Revolución', 'Manuel Dublán',
     'Presidente Alemán', 'Niños Heroes oriente', 'Niños Heroes poniente', 'Centro Histórico',
     'Plaza Juárez', 'Parque del Maestro', 'Bioparque'
+  ];
   const cruceros = [
     "BLVD. TÉLLEZ - SAN ALFONSO",
     "FELIPE ÁNGELES - VENTA PRIETA",
@@ -101,7 +102,7 @@ async function main() {
     { id: 4, nombre: "Subdirección de Área", activo: false },
     { id: 5, nombre: "Subdirector Adjunto", activo: true },
     { id: 6, nombre: "Director de Área", activo: true },
-    { id: 7, nombre: "Jefatura de Departamento", activo: true },
+    { id: 7, nombre: "Jefatura de Departamento", activo: false },
     { id: 8, nombre: "Subdirector De Área", activo: true },
     { id: 9, nombre: "Asistente General", activo: true },
     { id: 10, nombre: "Director General", activo: true }

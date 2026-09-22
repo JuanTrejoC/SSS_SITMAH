@@ -6,6 +6,7 @@ import { formatFolio } from '../utils/formatFolio'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config'
 import Swal from 'sweetalert2'
+import AtencionReporte from '../components/AtencionReporte'
 
 export default function DashboardOficinas() {
   const { user } = useAuth()
@@ -51,7 +52,8 @@ export default function DashboardOficinas() {
       })
       const json = await response.json()
       if (response.ok && json.ok) {
-        setReportes(json.data.items || [])
+        const lista = json.data?.items || json.data?.reportes || (Array.isArray(json.data) ? json.data : [])
+        setReportes(lista)
       } else {
         console.error('Error al obtener reportes:', json.error)
       }
@@ -807,6 +809,20 @@ export default function DashboardOficinas() {
                   ) : (
                     <div style={{ fontSize: '0.85rem', color: '#9CA3AF', fontStyle: 'italic' }}>No hay componentes asignados a este reporte.</div>
                   )}
+                </div>
+
+                {/* ATENCIÓN Y CIERRE DEL REPORTE */}
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <AtencionReporte
+                    reporte={verDetalle}
+                    tipo="oficina"
+                    user={user}
+                    apiBaseUrl={API_BASE_URL}
+                    onActualizado={(reporteActualizado) => {
+                      setVerDetalle(reporteActualizado)
+                      cargarReportes()
+                    }}
+                  />
                 </div>
 
               </div>

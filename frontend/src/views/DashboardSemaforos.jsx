@@ -1,11 +1,12 @@
 // src/views/DashboardSemaforos.jsx
 import { useState, useEffect, useRef } from 'react'
-import { FaEye, FaTrashAlt, FaChevronRight, FaCogs } from 'react-icons/fa'
+import { FaEye, FaTrashAlt, FaChevronRight, FaCogs, FaFileExcel } from 'react-icons/fa'
 import Swal from 'sweetalert2'
 import { useAuth } from '../context/AuthContext'
 import { formatFolio } from '../utils/formatFolio'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config'
+import AtencionReporte from '../components/AtencionReporte'
 
 export default function DashboardSemaforos() {
   const { user } = useAuth()
@@ -50,7 +51,8 @@ export default function DashboardSemaforos() {
       })
       const json = await response.json()
       if (response.ok && json.ok) {
-        setReportes(json.data.items || [])
+        const lista = json.data?.items || json.data?.reportes || (Array.isArray(json.data) ? json.data : [])
+        setReportes(lista)
       } else {
         console.error('Error al obtener reportes de semáforos:', json.error)
       }
@@ -229,11 +231,11 @@ export default function DashboardSemaforos() {
 
   const reportesFiltrados = reportes.filter(r => {
     const coincideBusqueda =
-      r.jefe_turno?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      (r.jefeTurno || r.jefe_turno || '')?.toLowerCase().includes(busqueda.toLowerCase()) ||
       r.folio?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      r.estacion?.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
       r.crucero?.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-      r.tipoFalla?.nombre?.toLowerCase().includes(busqueda.toLowerCase())
+      r.tipoFalla?.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      r.origen?.toLowerCase().includes(busqueda.toLowerCase())
 
     const coincideEstado = estadoFiltro === 'Todos' ||
       (estadoFiltro === 'Pendiente' && r.estado === 'abierto') ||
@@ -365,7 +367,7 @@ export default function DashboardSemaforos() {
                 <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF', fontSize: '0.85rem' }}></i>
                 <input
                   type="text"
-                  placeholder="Jefe de turno, folio, estación, crucero o falla..."
+                  placeholder="Nombre de quien reporta, folio, crucero o falla..."
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
                   style={{ width: '100%', padding: '0.6rem 0.85rem 0.6rem 2.3rem', border: '1px solid #D1D5DB', borderRadius: '10px', fontSize: '0.875rem', outline: 'none' }}
@@ -376,45 +378,34 @@ export default function DashboardSemaforos() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
                 <label style={{ fontSize: '0.8rem', color: '#4B5563', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={incluirImagenes} 
+                  <input
+                    type="checkbox"
+                    checked={incluirImagenes}
                     onChange={(e) => setIncluirImagenes(e.target.checked)}
                     style={{ accentColor: '#BC955B' }}
                   />
-                  Incluir fotos en Excel
-                </label>
-                <label style={{ fontSize: '0.8rem', color: '#4B5563', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={ordenAscendente} 
-                    onChange={(e) => setOrdenAscendente(e.target.checked)}
-                    style={{ accentColor: '#BC955B' }}
-                  />
-                  Orden Ascendente
+                  Incluir imágenes en Excel
                 </label>
               </div>
 
               <button
                 onClick={descargarExcel}
                 style={{
-                  width: '100%',
-                  padding: '0.65rem 1.15rem',
-                  backgroundColor: '#059669',
+                  backgroundColor: '#BC955B',
                   color: 'white',
                   border: 'none',
                   borderRadius: '10px',
-                  fontWeight: '700',
+                  padding: '0.6rem 1.25rem',
+                  fontWeight: '600',
                   fontSize: '0.875rem',
-                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
                   gap: '0.5rem',
-                  boxShadow: '0 3px 10px rgba(5, 150, 105, 0.25)'
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(188, 149, 91, 0.2)'
                 }}
               >
-                <i className="fa-solid fa-file-excel"></i> Exportar a Excel
+                <FaFileExcel /> Exportar Reportes Excel
               </button>
             </div>
           </div>
@@ -428,8 +419,9 @@ export default function DashboardSemaforos() {
                 <tr style={{ backgroundColor: '#F8FAFC', borderBottom: '1.5px solid #E5E7EB' }}>
                   <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Folio</th>
                   <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Fecha</th>
-                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Jefe de Turno</th>
-                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Estación / Crucero</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Nombre de quien reporta</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Origen</th>
+                  <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Crucero Afectado</th>
                   <th style={{ padding: '0.9rem 1rem', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Tipo de Falla</th>
                   <th style={{ padding: '0.9rem 1rem', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Estado</th>
                   <th style={{ padding: '0.9rem 1rem', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Acciones</th>
@@ -438,14 +430,14 @@ export default function DashboardSemaforos() {
               <tbody>
                 {cargando ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: '#6B7280' }}>
+                    <td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: '#6B7280' }}>
                       <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '0.5rem', color: '#BC955B' }}></i>
                       Cargando reportes de semáforos...
                     </td>
                   </tr>
                 ) : reportesFiltrados.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ padding: '3rem', textAlign: 'center', color: '#6B7280' }}>
+                    <td colSpan={8} style={{ padding: '3rem', textAlign: 'center', color: '#6B7280' }}>
                       No se encontraron reportes que coincidan con la búsqueda o filtros.
                     </td>
                   </tr>
@@ -465,11 +457,13 @@ export default function DashboardSemaforos() {
                           {r.createdAt ? new Date(r.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
                         </td>
                         <td style={{ padding: '0.85rem 1rem', fontWeight: '600', color: '#111827' }}>
-                          {r.jefe_turno}
+                          {r.jefeTurno || r.jefe_turno || '—'}
                         </td>
                         <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>
-                          <div>{r.estacion?.nombre || '—'}</div>
-                          <span style={{ fontSize: '0.775rem', color: '#9CA3AF' }}>{r.crucero?.nombre || '—'}</span>
+                          {r.origen || '—'}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>
+                          {r.crucero?.nombre || '—'}
                         </td>
                         <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>{r.tipoFalla?.nombre || '—'}</td>
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
@@ -567,13 +561,13 @@ export default function DashboardSemaforos() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', fontSize: '0.9rem', color: '#374151' }}>
-                <div><strong>Jefe de Turno:</strong> {verDetalle.jefe_turno}</div>
-                <div><strong>Estación:</strong> {verDetalle.estacion?.nombre || '—'}</div>
-                <div><strong>Crucero:</strong> {verDetalle.crucero?.nombre || '—'}</div>
+                <div><strong>Nombre de quien reporta:</strong> {verDetalle.jefeTurno || verDetalle.jefe_turno || '—'}</div>
+                <div><strong>Origen del Reporte:</strong> {verDetalle.origen || '—'}</div>
+                <div><strong>Crucero Afectado:</strong> {verDetalle.crucero?.nombre || '—'}</div>
                 <div><strong>Tipo de Falla:</strong> {verDetalle.tipoFalla?.nombre || '—'}</div>
-                <div><strong>Hora Estimada:</strong> {verDetalle.horaDano ? new Date(verDetalle.horaDano).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</div>
+                <div><strong>Fecha y Hora del Siniestro:</strong> {verDetalle.horaDano ? new Date(verDetalle.horaDano).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</div>
                 <div><strong>Estado:</strong> {obtenerNombreEstado(verDetalle.estado)}</div>
-                <div style={{ gridColumn: '1 / -1' }}><strong>Fecha Registro:</strong> {new Date(verDetalle.createdAt).toLocaleString()}</div>
+                <div style={{ gridColumn: '1 / -1' }}><strong>Fecha Registro:</strong> {new Date(verDetalle.createdAt).toLocaleString('es-MX')}</div>
 
                 <div style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
                   <strong>Observaciones de la Falla:</strong>
@@ -720,6 +714,20 @@ export default function DashboardSemaforos() {
                   ) : (
                     <div style={{ fontSize: '0.85rem', color: '#9CA3AF', fontStyle: 'italic' }}>No se han asignado piezas o refacciones.</div>
                   )}
+                </div>
+
+                {/* ATENCIÓN Y CIERRE DEL REPORTE */}
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <AtencionReporte
+                    reporte={verDetalle}
+                    tipo="semaforo"
+                    user={user}
+                    apiBaseUrl={API_BASE_URL}
+                    onActualizado={(reporteActualizado) => {
+                      setVerDetalle(reporteActualizado)
+                      cargarReportes()
+                    }}
+                  />
                 </div>
 
               </div>

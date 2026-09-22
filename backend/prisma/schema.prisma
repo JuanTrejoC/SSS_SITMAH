@@ -168,6 +168,9 @@ model ReporteOficina {
   descripcion     String?          @db.Text
   estado          EstadoReporte    @default(abierto)
   atendidoPorId   Int?             @map("atendido_por")
+  tecnicoAtendio  String?          @map("tecnico_atendio") @db.VarChar(150)
+  firmaSatisfaccion String?        @map("firma_satisfaccion") @db.LongText
+  diagnosticoSolucion String?      @map("diagnostico_solucion") @db.Text
   fechaResolucion DateTime?        @map("fecha_resolucion")
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
@@ -190,7 +193,8 @@ model ReporteSemaforo {
   id              Int               @id @default(autoincrement())
   folio           String?           @unique @db.VarChar(30)
   jefeTurno       String            @map("jefe_turno") @db.VarChar(100)
-  estacionId      Int               @map("estacion_id")
+  origen          String?           @db.VarChar(50)
+  estacionId      Int?              @map("estacion_id")
   cruceroId       Int               @map("crucero_id")
   tipoFallaId     Int               @map("tipo_falla_id")
   descripcion     String?           @db.Text
@@ -198,11 +202,14 @@ model ReporteSemaforo {
   prioridad       PrioridadSemaforo @default(alta)
   estado          EstadoReporte     @default(abierto)
   atendidoPorId   Int?              @map("atendido_por")
+  tecnicoAtendio  String?           @map("tecnico_atendio") @db.VarChar(150)
+  firmaSatisfaccion String?         @map("firma_satisfaccion") @db.LongText
+  diagnosticoSolucion String?       @map("diagnostico_solucion") @db.Text
   fechaResolucion DateTime?         @map("fecha_resolucion")
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
 
-  estacion    Estacion    @relation(fields: [estacionId], references: [id])
+  estacion    Estacion?   @relation(fields: [estacionId], references: [id])
   crucero     Crucero     @relation(fields: [cruceroId], references: [id])
   tipoFalla   TipoFalla   @relation(fields: [tipoFallaId], references: [id])
   atendidoPor     Usuario?               @relation("AtendidoSemaforo", fields: [atendidoPorId], references: [id])

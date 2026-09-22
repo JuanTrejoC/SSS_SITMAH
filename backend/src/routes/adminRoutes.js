@@ -9,6 +9,8 @@ const estadisticas = require('../controllers/estadisticasController');
 
 const router = express.Router();
 
+const upload = require('../middleware/upload');
+
 router.use(authAdmin);
 
 router.get('/catalogos/:tipo', asyncHandler(adminCatalogo.listar));
@@ -35,7 +37,7 @@ router.get('/reportes/oficina/resumen', asyncHandler(reporteOficina.resumen));
 router.get('/reportes/oficina/export', asyncHandler(reporteOficina.exportar));
 router.get('/reportes/oficina', asyncHandler(reporteOficina.listar));
 router.get('/reportes/oficina/:id', asyncHandler(reporteOficina.obtener));
-router.patch('/reportes/oficina/:id/estado', asyncHandler(reporteOficina.cambiarEstado));
+router.patch('/reportes/oficina/:id/estado', upload.single('evidencia'), asyncHandler(reporteOficina.cambiarEstado));
 router.delete('/reportes/oficina/:id', asyncHandler(reporteOficina.eliminar));
 router.post('/reportes/oficina/:id/piezas', asyncHandler(reporteOficina.asignarPieza));
 router.delete('/reportes/oficina/:id/piezas/:piezaId', asyncHandler(reporteOficina.desasignarPieza));
@@ -44,7 +46,7 @@ router.get('/reportes/semaforo/resumen', asyncHandler(reporteSemaforo.resumen));
 router.get('/reportes/semaforo/export', asyncHandler(reporteSemaforo.exportar));
 router.get('/reportes/semaforo', asyncHandler(reporteSemaforo.listar));
 router.get('/reportes/semaforo/:id', asyncHandler(reporteSemaforo.obtener));
-router.patch('/reportes/semaforo/:id/estado', asyncHandler(reporteSemaforo.cambiarEstado));
+router.patch('/reportes/semaforo/:id/estado', upload.single('evidencia'), asyncHandler(reporteSemaforo.cambiarEstado));
 router.delete('/reportes/semaforo/:id', asyncHandler(reporteSemaforo.eliminar));
 router.post('/reportes/semaforo/:id/piezas', asyncHandler(reporteSemaforo.asignarPieza));
 router.delete('/reportes/semaforo/:id/piezas/:piezaId', asyncHandler(reporteSemaforo.desasignarPieza));

@@ -2,18 +2,27 @@
 import { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
 import { API_BASE_URL } from '../config'
-import { FaTrafficLight } from 'react-icons/fa'
+import { FaTrafficLight, FaSearch, FaTimes, FaCheck, FaChevronDown } from 'react-icons/fa'
 
 export default function FormSemaforos({ usuarioActual }) {
   const fileInputRef = useRef(null)
+  const cruceroDropdownRef = useRef(null)
+
+  const obtenerFechaHoy = () => new Date().toISOString().slice(0, 10)
+  const obtenerHoraActual = () => {
+    const ahora = new Date()
+    return `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`
+  }
+
   const [formData, setFormData] = useState({
     jefe_turno: '',
-    estacion_id: '',       // ID numérico
+    origen: '',            // 'Municipio', 'Conductores', 'Redes Sociales', etc.
     crucero_id: '',        // ID numérico
     tipo_falla_id: '',     // ID numérico
     descripcion_otro: '',
-    hora_dano: '',         // Formato: HH:mm
-    descripcion: '',       // Notas adicionales
+    fecha_dano: obtenerFechaHoy(), // Formato: YYYY-MM-DD
+    hora_dano: obtenerHoraActual(), // Formato: HH:mm
+    descripcion: '',       // Notas adicionales (hasta 250 caracteres, con números y especiales)
     evidencia: null
   })
 
@@ -23,33 +32,30 @@ export default function FormSemaforos({ usuarioActual }) {
   const [cargando, setCargando] = useState(false)
   const [vistaPrevia, setVistaPrevia] = useState(null)
 
-
-
-  const [listaEstaciones, setListaEstaciones] = useState([])
   const [listaCruceros, setListaCruceros] = useState([])
   const [listaTiposFalla, setListaTiposFalla] = useState([])
 
-  // Lista de cruceros filtrados por estación seleccionada
-  const [crucerosFiltrados, setCrucerosFiltrados] = useState([])
+  // Estado para el buscador de cruceros
+  const [busquedaCrucero, setBusquedaCrucero] = useState('')
+  const [dropdownCruceroAbierto, setDropdownCruceroAbierto] = useState(false)
 
   // Cargar catálogos desde el backend al montar
   useEffect(() => {
     const cargarCatalogos = async () => {
       try {
-        const resEstaciones = await fetch(`${API_BASE_URL}/api/catalogos/estaciones`)
-        if (resEstaciones.ok) {
-          const json = await resEstaciones.json()
-          if (json.ok && json.data && json.data.length > 0) setListaEstaciones(json.data)
-        }
         const resCruceros = await fetch(`${API_BASE_URL}/api/catalogos/cruceros`)
         if (resCruceros.ok) {
           const json = await resCruceros.json()
-          if (json.ok && json.data && json.data.length > 0) setListaCruceros(json.data)
+          if (json.ok && json.data && json.data.length > 0) {
+            setListaCruceros(json.data)
+          }
         }
         const resFallas = await fetch(`${API_BASE_URL}/api/catalogos/tipos-falla`)
         if (resFallas.ok) {
           const json = await resFallas.json()
-          if (json.ok && json.data && json.data.length > 0) setListaTiposFalla(json.data)
+          if (json.ok && json.data && json.data.length > 0) {
+            setListaTiposFalla(json.data)
+          }
         }
       } catch (err) {
         console.error('Error al cargar catálogos de semáforos:', err)
@@ -58,24 +64,39 @@ export default function FormSemaforos({ usuarioActual }) {
     cargarCatalogos()
   }, [])
 
-  // Filtrar cruceros cuando cambia la estación
+  // Cerrar dropdown al hacer clic fuera
   useEffect(() => {
-    if (formData.estacion_id && listaEstaciones.length > 0) {
-      const estacionSeleccionada = listaEstaciones.find(e => String(e.id) === String(formData.estacion_id))
-      if (estacionSeleccionada && estacionSeleccionada.cruceros) {
-        const filtrados = estacionSeleccionada.cruceros.map(ec => ec.crucero).filter(Boolean)
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setCrucerosFiltrados(filtrados)
-      } else {
-        setCrucerosFiltrados([])
+    const handleClickAfuera = (event) => {
+      if (cruceroDropdownRef.current && !cruceroDropdownRef.current.contains(event.target)) {
+        setDropdownCruceroAbierto(false)
       }
-    } else {
-      setCrucerosFiltrados(listaCruceros)
     }
-  }, [formData.estacion_id, listaEstaciones, listaCruceros])
+    document.addEventListener('mousedown', handleClickAfuera)
+    return () => document.removeEventListener('mousedown', handleClickAfuera)
+  }, [])
 
-  // Solo letras, espacios y signos permitidos
-  const soloLetras = (texto) => {
+  // Función para normalizar texto (quitar acentos y diacríticos para búsqueda flexible)
+  const normalizarTexto = (texto) => {
+    return (texto || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+  }
+
+  // Filtrado de cruceros por búsqueda
+  const crucerosFiltrados = listaCruceros.filter((c) => {
+    if (!busquedaCrucero.trim()) return true
+    const nombreCrucero = normalizarTexto(c.nombre || c.ubicacion || '')
+    const query = normalizarTexto(busquedaCrucero)
+    return nombreCrucero.includes(query)
+  })
+
+  // Obtener nombre del crucero seleccionado
+  const cruceroSeleccionado = listaCruceros.find((c) => String(c.id) === String(formData.crucero_id))
+
+  // Solo letras, espacios y signos permitidos para nombres de personas
+  const soloLetrasYNombres = (texto) => {
     return texto.replace(/[^A-Za-zÁáÉéÍíÓóÚúÑñ\s.,-]/g, '')
   }
 
@@ -83,15 +104,36 @@ export default function FormSemaforos({ usuarioActual }) {
   const validarCampo = (nombre, valor) => {
     let mensajeError = ''
     let esValido = false
-    const valorLimpio = valor?.trim() || ''
+    const valorLimpio = typeof valor === 'string' ? valor.trim() : (valor ? String(valor) : '')
 
     switch (nombre) {
       case 'jefe_turno':
-      case 'estacion_id':
+        if (!valorLimpio) mensajeError = 'Indique el nombre de quien reporta'
+        else esValido = true
+        break
+
+      case 'origen':
+        if (!valorLimpio) mensajeError = 'Seleccione el origen del reporte'
+        else esValido = true
+        break
+
       case 'crucero_id':
+        if (!valorLimpio) mensajeError = 'Seleccione un crucero'
+        else esValido = true
+        break
+
       case 'tipo_falla_id':
+        if (!valorLimpio) mensajeError = 'Seleccione el tipo de falla'
+        else esValido = true
+        break
+
+      case 'fecha_dano':
+        if (!valorLimpio) mensajeError = 'Indique la fecha del siniestro'
+        else esValido = true
+        break
+
       case 'hora_dano':
-        if (!valorLimpio) mensajeError = 'Campo obligatorio'
+        if (!valorLimpio) mensajeError = 'Indique la hora del siniestro'
         else esValido = true
         break
 
@@ -100,13 +142,18 @@ export default function FormSemaforos({ usuarioActual }) {
         else esValido = true
         break
 
+      case 'descripcion':
+        if (valor && valor.length > 250) mensajeError = 'Máximo 250 caracteres'
+        else esValido = true
+        break
+
       default:
         esValido = true
         break
     }
 
-    setErrores(prev => ({ ...prev, [nombre]: mensajeError }))
-    setValido(prev => ({ ...prev, [nombre]: esValido }))
+    setErrores((prev) => ({ ...prev, [nombre]: mensajeError }))
+    setValido((prev) => ({ ...prev, [nombre]: esValido }))
   }
 
   // Compresión de imagen vía Canvas (máx 1600px, calidad 0.75)
@@ -169,34 +216,34 @@ export default function FormSemaforos({ usuarioActual }) {
 
     const tiposPermitidos = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
     if (!tiposPermitidos.includes(archivo.type)) {
-      Swal.fire('Error', 'Solo se permiten archivos de imagen (JPG, PNG, GIF, WEBP)', 'error');
+      Swal.fire('Error', 'Solo se permiten archivos de imagen (JPG, PNG, GIF, WEBP)', 'error')
       e.target.value = ''
-      setFormData(prev => ({ ...prev, evidencia: null }))
+      setFormData((prev) => ({ ...prev, evidencia: null }))
       setVistaPrevia(null)
       return
     }
 
     if (archivo.size > 10 * 1024 * 1024) {
-      Swal.fire('Error', 'La imagen no debe superar los 10 MB', 'error');
+      Swal.fire('Error', 'La imagen no debe superar los 10 MB', 'error')
       e.target.value = ''
-      setFormData(prev => ({ ...prev, evidencia: null }))
+      setFormData((prev) => ({ ...prev, evidencia: null }))
       setVistaPrevia(null)
       return
     }
 
     try {
       const archivoComprimido = await comprimirImagen(archivo)
-      setFormData(prev => ({ ...prev, evidencia: archivoComprimido }))
+      setFormData((prev) => ({ ...prev, evidencia: archivoComprimido }))
       setVistaPrevia(URL.createObjectURL(archivoComprimido))
     } catch (err) {
       console.error('Error al comprimir la imagen:', err)
-      setFormData(prev => ({ ...prev, evidencia: archivo }))
+      setFormData((prev) => ({ ...prev, evidencia: archivo }))
       setVistaPrevia(URL.createObjectURL(archivo))
     }
   }
 
   const eliminarEvidencia = () => {
-    setFormData(prev => ({ ...prev, evidencia: null }))
+    setFormData((prev) => ({ ...prev, evidencia: null }))
     if (vistaPrevia) {
       URL.revokeObjectURL(vistaPrevia)
       setVistaPrevia(null)
@@ -225,33 +272,49 @@ export default function FormSemaforos({ usuarioActual }) {
 
     setCargando(true)
 
-    Object.keys(formData).forEach(campo => {
-      if (campo !== 'descripcion' && campo !== 'evidencia') {
-        validarCampo(campo, formData[campo])
-      }
-    })
+    // Validar campos requeridos
+    validarCampo('jefe_turno', formData.jefe_turno)
+    validarCampo('origen', formData.origen)
+    validarCampo('crucero_id', formData.crucero_id)
+    validarCampo('tipo_falla_id', formData.tipo_falla_id)
+    validarCampo('fecha_dano', formData.fecha_dano)
+    validarCampo('hora_dano', formData.hora_dano)
+    if (mostrarOtro) {
+      validarCampo('descripcion_otro', formData.descripcion_otro)
+    }
 
-    const hayErrores = Object.values(valido).some(esValido => esValido === false)
-    if (hayErrores) {
-      Swal.fire('Atención', 'Por favor complete todos los campos obligatorios correctamente', 'warning');
+    if (
+      !formData.jefe_turno.trim() ||
+      !formData.origen ||
+      !formData.crucero_id ||
+      !formData.tipo_falla_id ||
+      !formData.fecha_dano ||
+      !formData.hora_dano ||
+      (mostrarOtro && !formData.descripcion_otro.trim())
+    ) {
+      Swal.fire('Atención', 'Por favor complete todos los campos obligatorios marcados con asterisco (*)', 'warning')
       setCargando(false)
       return
     }
 
     try {
-      const fechaActual = new Date().toISOString().slice(0, 10)
-      const horaCompleta = formData.hora_dano
-        ? `${fechaActual} ${formData.hora_dano}:00`
-        : new Date().toISOString().slice(0, 19).replace('T', ' ')
+      const fechaSiniestro = formData.fecha_dano || obtenerFechaHoy()
+      const horaSiniestro = formData.hora_dano || obtenerHoraActual()
+      const horaCompleta = `${fechaSiniestro} ${horaSiniestro}:00`
 
       let descripcionFinal = formData.descripcion?.trim() || ''
       if (mostrarOtro && formData.descripcion_otro?.trim()) {
         descripcionFinal = `TIPO DE FALLA: ${formData.descripcion_otro}. ${descripcionFinal}`
       }
 
+      // Asegurar que no supere 250 caracteres en caso de concatenación
+      if (descripcionFinal.length > 250) {
+        descripcionFinal = descripcionFinal.substring(0, 250)
+      }
+
       const datosAEnviar = new FormData()
       datosAEnviar.append('jefe_turno', formData.jefe_turno.trim())
-      datosAEnviar.append('estacion_id', Number(formData.estacion_id))
+      datosAEnviar.append('origen', formData.origen)
       datosAEnviar.append('crucero_id', Number(formData.crucero_id))
       datosAEnviar.append('tipo_falla_id', Number(formData.tipo_falla_id))
       datosAEnviar.append('descripcion', descripcionFinal)
@@ -272,12 +335,20 @@ export default function FormSemaforos({ usuarioActual }) {
 
       if (resultado.ok) {
         const folioCreado = resultado.data?.folio || resultado.data?.id || 'Generado'
-        Swal.fire('Éxito', `Reporte registrado correctamente.\nFolio: ${folioCreado}`, 'success');
+        Swal.fire('Éxito', `Reporte registrado correctamente.\nFolio: ${folioCreado}`, 'success')
 
         setFormData({
-          jefe_turno: '', estacion_id: '', crucero_id: '', tipo_falla_id: '',
-          descripcion_otro: '', hora_dano: '', descripcion: '', evidencia: null
+          jefe_turno: '',
+          origen: '',
+          crucero_id: '',
+          tipo_falla_id: '',
+          descripcion_otro: '',
+          fecha_dano: obtenerFechaHoy(),
+          hora_dano: obtenerHoraActual(),
+          descripcion: '',
+          evidencia: null
         })
+        setBusquedaCrucero('')
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
         }
@@ -286,11 +357,11 @@ export default function FormSemaforos({ usuarioActual }) {
         setErrores({})
         setValido({})
       } else {
-        Swal.fire('Error', resultado.error || resultado.mensaje || 'Error desconocido', 'error');
+        Swal.fire('Error', resultado.error || resultado.mensaje || 'Error desconocido', 'error')
         console.error('Detalles del error:', resultado)
       }
     } catch (error) {
-      Swal.fire('Error', `Sin conexión: ${error.message}`, 'error');
+      Swal.fire('Error', `Sin conexión: ${error.message}`, 'error')
       console.error('Error completo:', error)
     }
 
@@ -373,21 +444,21 @@ export default function FormSemaforos({ usuarioActual }) {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                gap: '1.15rem'
+                gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                gap: '1.25rem'
               }}
             >
-              {/* Jefe de Turno */}
+              {/* Nombre de quien reporta */}
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
-                  Jefe de Turno<span style={{ color: '#EF4444' }}>*</span>
+                  Nombre de quien reporta <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="Nombre de quien reporta"
+                  placeholder="Nombre y apellido de quien reporta"
                   value={formData.jefe_turno}
                   onChange={(e) => {
-                    const v = soloLetras(e.target.value)
+                    const v = soloLetrasYNombres(e.target.value)
                     setFormData({ ...formData, jefe_turno: v })
                     validarCampo('jefe_turno', v)
                   }}
@@ -399,59 +470,208 @@ export default function FormSemaforos({ usuarioActual }) {
                 {errores.jefe_turno && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.jefe_turno}</span>}
               </div>
 
-              {/* Estación */}
+              {/* Casilla de Origen / Procedencia del Reporte */}
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
-                  Estación <span style={{ color: '#EF4444' }}>*</span>
+                  Origen del Reporte <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <select
-                  value={formData.estacion_id}
+                  value={formData.origen}
                   onChange={(e) => {
                     const v = e.target.value
-                    setFormData({ ...formData, estacion_id: v, crucero_id: '' })
-                    validarCampo('estacion_id', v)
+                    setFormData({ ...formData, origen: v })
+                    validarCampo('origen', v)
                   }}
                   className="premium-select"
                   style={{
-                    border: `1.5px solid ${getBorderColor('estacion_id')}`
+                    border: `1.5px solid ${getBorderColor('origen')}`
                   }}
                 >
-                  <option value="">Seleccione estación</option>
-                  {listaEstaciones.map((est, i) => (
-                    <option key={i} value={est.id}>{est.nombre}</option>
-                  ))}
+                  <option value="">Seleccione procedencia...</option>
+                  <option value="Municipio">Municipio</option>
+                  <option value="Conductores">Conductores</option>
+                  <option value="Redes Sociales">Redes Sociales</option>
+
                 </select>
-                {errores.estacion_id && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.estacion_id}</span>}
+                {errores.origen && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.origen}</span>}
               </div>
 
-              {/* Crucero */}
-              <div>
+              {/* Crucero Afectado con Buscador */}
+              <div ref={cruceroDropdownRef} style={{ position: 'relative' }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
                   Crucero Afectado <span style={{ color: '#EF4444' }}>*</span>
                 </label>
-                <select
-                  value={formData.crucero_id}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    setFormData({ ...formData, crucero_id: v })
-                    validarCampo('crucero_id', v)
-                  }}
-                  className="premium-select"
+
+                {/* Botón trigger del Selector Buscable */}
+                <div
+                  onClick={() => setDropdownCruceroAbierto(!dropdownCruceroAbierto)}
                   style={{
-                    border: `1.5px solid ${getBorderColor('crucero_id')}`
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    minHeight: '44px',
+                    padding: '0.55rem 0.85rem',
+                    backgroundColor: '#FAFAFA',
+                    border: `1.5px solid ${getBorderColor('crucero_id')}`,
+                    borderRadius: '10px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                    color: cruceroSeleccionado ? '#111827' : '#9CA3AF',
+                    transition: 'all 0.2s ease',
+                    boxShadow: dropdownCruceroAbierto ? '0 0 0 3px rgba(188, 149, 91, 0.15)' : 'none'
                   }}
                 >
-                  <option value="">Seleccione crucero</option>
-                  {crucerosFiltrados.map((c, i) => (
-                    <option key={i} value={c.id}>{c.ubicacion || c.nombre || `Crucero #${c.id}`}</option>
-                  ))}
-                </select>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <FaTrafficLight style={{ color: cruceroSeleccionado ? '#BC955B' : '#9CA3AF', flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: cruceroSeleccionado ? '600' : 'normal' }}>
+                      {cruceroSeleccionado ? cruceroSeleccionado.nombre || cruceroSeleccionado.ubicacion : 'Seleccione o busque un crucero...'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    {cruceroSeleccionado && (
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setFormData({ ...formData, crucero_id: '' })
+                          setBusquedaCrucero('')
+                          validarCampo('crucero_id', '')
+                        }}
+                        style={{
+                          color: '#9CA3AF',
+                          cursor: 'pointer',
+                          padding: '2px 4px',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem'
+                        }}
+                        title="Quitar selección"
+                      >
+                        <FaTimes />
+                      </span>
+                    )}
+                    <FaChevronDown style={{ fontSize: '0.75rem', color: '#6B7280', transform: dropdownCruceroAbierto ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+                  </div>
+                </div>
+
+                {/* Dropdown flotante con buscador */}
+                {dropdownCruceroAbierto && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 4px)',
+                      left: 0,
+                      right: 0,
+                      zIndex: 50,
+                      backgroundColor: 'white',
+                      borderRadius: '12px',
+                      boxShadow: '0 12px 28px -4px rgba(0, 0, 0, 0.18), 0 4px 10px rgba(0,0,0,0.08)',
+                      border: '1px solid #E5E7EB',
+                      overflow: 'hidden',
+                      animation: 'fadeIn 0.15s ease-out'
+                    }}
+                  >
+                    {/* Barra de búsqueda interna */}
+                    <div style={{ padding: '0.65rem', borderBottom: '1px solid #F3F4F6', backgroundColor: '#F9FAFB' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          backgroundColor: 'white',
+                          border: '1px solid #D1D5DB',
+                          borderRadius: '8px',
+                          padding: '0.45rem 0.65rem'
+                        }}
+                      >
+                        <FaSearch style={{ color: '#9CA3AF', fontSize: '0.85rem' }} />
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="Escribe el nombre de la avenida o crucero..."
+                          value={busquedaCrucero}
+                          onChange={(e) => setBusquedaCrucero(e.target.value)}
+                          style={{
+                            border: 'none',
+                            outline: 'none',
+                            width: '100%',
+                            fontSize: '0.85rem',
+                            color: '#111827',
+                            backgroundColor: 'transparent'
+                          }}
+                        />
+                        {busquedaCrucero && (
+                          <FaTimes
+                            style={{ color: '#9CA3AF', cursor: 'pointer', fontSize: '0.8rem' }}
+                            onClick={() => setBusquedaCrucero('')}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Lista de resultados */}
+                    <div style={{ maxHeight: '230px', overflowY: 'auto' }}>
+                      {crucerosFiltrados.length === 0 ? (
+                        <div style={{ padding: '1.25rem', textAlign: 'center', color: '#6B7280', fontSize: '0.85rem' }}>
+                          No se encontraron cruceros que coincidan con &quot;<strong>{busquedaCrucero}</strong>&quot;
+                        </div>
+                      ) : (
+                        crucerosFiltrados.map((c) => {
+                          const estaSeleccionado = String(formData.crucero_id) === String(c.id)
+                          const label = c.nombre || c.ubicacion || `Crucero #${c.id}`
+
+                          return (
+                            <div
+                              key={c.id}
+                              onClick={() => {
+                                setFormData({ ...formData, crucero_id: String(c.id) })
+                                validarCampo('crucero_id', String(c.id))
+                                setDropdownCruceroAbierto(false)
+                                setBusquedaCrucero('')
+                              }}
+                              style={{
+                                padding: '0.65rem 0.9rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                backgroundColor: estaSeleccionado ? '#FEF3C7' : 'transparent',
+                                borderBottom: '1px solid #F9FAFB',
+                                transition: 'background-color 0.15s ease',
+                                fontSize: '0.875rem',
+                                color: estaSeleccionado ? '#92400E' : '#1F2937'
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!estaSeleccionado) e.currentTarget.style.backgroundColor = '#F3F4F6'
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!estaSeleccionado) e.currentTarget.style.backgroundColor = 'transparent'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{ fontWeight: estaSeleccionado ? '700' : '500' }}>
+                                  {label}
+                                </span>
+                              </div>
+                              {estaSeleccionado && <FaCheck style={{ color: '#B45309', fontSize: '0.8rem' }} />}
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+
+                    {/* Footer informativo */}
+                    <div style={{ padding: '0.4rem 0.75rem', backgroundColor: '#F9FAFB', borderTop: '1px solid #F3F4F6', fontSize: '0.75rem', color: '#6B7280', textAlign: 'right' }}>
+                      {crucerosFiltrados.length} crucero(s) disponible(s)
+                    </div>
+                  </div>
+                )}
+
                 {errores.crucero_id && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.crucero_id}</span>}
               </div>
             </div>
           </div>
 
-          {/* SECCIÓN 2: TIPO DE FALLA Y HORA */}
+          {/* SECCIÓN 2: DETALLES DEL DAÑO E INCIDENCIA */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem', borderBottom: '2px solid #F3F4F6', paddingBottom: '0.65rem' }}>
               <span style={{ backgroundColor: 'rgba(188, 149, 91, 0.15)', color: '#B45309', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.85rem' }}>2</span>
@@ -464,7 +684,7 @@ export default function FormSemaforos({ usuarioActual }) {
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                gap: '1.15rem'
+                gap: '1.25rem'
               }}
             >
               {/* Tipo de Falla */}
@@ -499,8 +719,9 @@ export default function FormSemaforos({ usuarioActual }) {
                       type="text"
                       placeholder="Especifique cuál es la falla observada..."
                       value={formData.descripcion_otro}
+                      maxLength={150}
                       onChange={(e) => {
-                        const v = soloLetras(e.target.value)
+                        const v = e.target.value
                         setFormData({ ...formData, descripcion_otro: v })
                         validarCampo('descripcion_otro', v)
                       }}
@@ -514,7 +735,28 @@ export default function FormSemaforos({ usuarioActual }) {
                 )}
               </div>
 
-              {/* Hora del Daño */}
+              {/* Fecha del Siniestro */}
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                  Fecha del Siniestro <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <input
+                  type="date"
+                  value={formData.fecha_dano}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setFormData({ ...formData, fecha_dano: v })
+                    validarCampo('fecha_dano', v)
+                  }}
+                  className="premium-input"
+                  style={{
+                    border: `1.5px solid ${getBorderColor('fecha_dano')}`
+                  }}
+                />
+                {errores.fecha_dano && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.fecha_dano}</span>}
+              </div>
+
+              {/* Hora del Siniestro */}
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
                   Hora del Siniestro <span style={{ color: '#EF4444' }}>*</span>
@@ -536,25 +778,28 @@ export default function FormSemaforos({ usuarioActual }) {
               </div>
             </div>
 
-            {/* Notas / Descripción */}
-            <div style={{ marginTop: '1.15rem' }}>
+            {/* Notas / Observaciones */}
+            <div style={{ marginTop: '1.25rem' }}>
               <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
                 Observaciones o Notas Adicionales <span style={{ color: '#6B7280', fontWeight: 'normal' }}>(Opcional)</span>
               </label>
               <textarea
-                placeholder="Indique detalles de tráfico, si hubo impacto de vehículo, gabinete afectado o notas de seguridad..."
+                placeholder="Indique detalles de tráfico, si hubo impacto de vehículo #123, gabinete afectado, números o notas de seguridad..."
                 value={formData.descripcion}
+                maxLength={250}
                 onChange={(e) => {
-                  const v = soloLetras(e.target.value)
+                  const v = e.target.value
                   setFormData({ ...formData, descripcion: v })
+                  validarCampo('descripcion', v)
                 }}
                 className="premium-textarea"
                 style={{
                   minHeight: '100px',
                   resize: 'vertical',
-                  border: '1.5px solid #D1D5DB'
+                  border: `1.5px solid ${getBorderColor('descripcion')}`
                 }}
               />
+              {errores.descripcion && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.descripcion}</span>}
             </div>
           </div>
 
@@ -657,7 +902,7 @@ export default function FormSemaforos({ usuarioActual }) {
           <div
             style={{
               display: 'flex',
-              justify: 'flex-end',
+              justifyContent: 'flex-end',
               gap: '1rem',
               borderTop: '1px solid #F3F4F6',
               paddingTop: '1.25rem',

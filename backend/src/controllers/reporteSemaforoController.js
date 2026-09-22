@@ -13,16 +13,21 @@ const { exportarReportesSemaforo } = require('../services/excelService');
 
 const crearSchema = z.object({
   jefe_turno: z.string().min(1),
-  estacion_id: z.coerce.number().int().positive(),
+  origen: z.string().optional().nullable(),
+  estacion_id: z.coerce.number().int().positive().optional().nullable(),
   crucero_id: z.coerce.number().int().positive(),
   tipo_falla_id: z.coerce.number().int().positive(),
   hora_dano: z.string().min(1),
-  descripcion: z.string().optional(),
+  descripcion: z.string().max(250).optional().nullable(),
 });
 
 const estadoSchema = z.object({
   estado: z.enum(['abierto', 'en_proceso', 'resuelto']),
   comentario: z.string().optional(),
+  tecnico_atendio: z.string().optional().nullable(),
+  firma_satisfaccion: z.string().optional().nullable(),
+  diagnostico_solucion: z.string().optional().nullable(),
+  fecha_resolucion: z.string().optional().nullable(),
 });
 
 const includeDetalle = {
@@ -45,15 +50,24 @@ async function crear(req, res) {
   const data = parsed.data;
   const folio = await generarFolio('semaforo');
 
+  let resolvedEstacionId = data.estacion_id || null;
+  if (!resolvedEstacionId && data.crucero_id) {
+    const ec = await prisma.estacionCrucero.findFirst({
+      where: { cruceroId: data.crucero_id },
+    });
+    if (ec) resolvedEstacionId = ec.estacionId;
+  }
+
   const reporte = await prisma.reporteSemaforo.create({
     data: {
       folio,
       jefeTurno: data.jefe_turno,
-      estacionId: data.estacion_id,
+      origen: data.origen || null,
+      estacionId: resolvedEstacionId,
       cruceroId: data.crucero_id,
       tipoFallaId: data.tipo_falla_id,
       horaDano: new Date(data.hora_dano),
-      descripcion: data.descripcion,
+      descripcion: data.descripcion || null,
       prioridad: 'alta',
     },
   });
@@ -106,34 +120,61 @@ async function resumen(req, res) {
     prisma.reporteSemaforo.count({ where: { estado: 'resuelto' } }),
   ]);
 
-  ok(res, { total, abiertos, en_proceso: enProceso, resueltos });
+  const [porCrucero, porFalla] = await Promise.all([
+    prisma.reporteSemaforo.groupBy({
+      by: ['cruceroId'],
+      _count: { id: true },
+      orderBy: { _count: { id: 'desc' } },
+      take: 5,
+    }),
+    prisma.reporteSemaforo.groupBy({
+      by: ['tipoFallaId'],
+      _count: { id: true },
+      orderBy: { _count: { id: 'desc' } },
+      take: 5,
+    }),
+  ]);
+
+  ok(res, {
+    total,
+    abiertos,
+    enProceso,
+    resueltos,
+    topCruceros: porCrucero,
+    topFallas: porFalla,
+  });
 }
 
 async function listar(req, res) {
+  const { page, limit, skip } = parsePagination(req.query);
   const { keyword, where } = buildReporteFilters(req.query);
   const whereFinal = applyKeywordSemaforo(where, keyword);
-  const { page, limit, skip } = parsePagination(req.query);
-
   const ordenParam = req.query.orden === 'asc' ? 'asc' : 'desc';
 
-  const [items, total] = await Promise.all([
+  const [total, reportes] = await Promise.all([
+    prisma.reporteSemaforo.count({ where: whereFinal }),
     prisma.reporteSemaforo.findMany({
       where: whereFinal,
-      include: {
-        estacion: true,
-        crucero: true,
-        tipoFalla: true,
-        evidencias: true,
-        piezasAsignadas: { include: { componente: true } },
-      },
-      orderBy: { id: ordenParam },
+      include: includeDetalle,
       skip,
       take: limit,
+      orderBy: { id: ordenParam },
     }),
-    prisma.reporteSemaforo.count({ where: whereFinal }),
   ]);
 
-  ok(res, { items, total, page, limit });
+  ok(res, {
+    items: reportes,
+    reportes,
+    total,
+    page,
+    limit,
+    paginacion: {
+      total,
+      pagina: page,
+      limite: limit,
+      totalPaginas: Math.ceil(total / limit),
+    },
+  });
 }
 
 async function obtener(req, res) {
@@ -142,7 +183,6 @@ async function obtener(req, res) {
     where: { id },
     include: includeDetalle,
   });
-
   if (!reporte) return fail(res, 'Reporte no encontrado', 404);
 
   const historial = await obtenerHistorial('semaforo', id);
@@ -154,20 +194,53 @@ async function cambiarEstado(req, res) {
   const parsed = estadoSchema.safeParse(req.body);
   if (!parsed.success) return fail(res, parsed.error.errors[0].message);
 
-  const actual = await prisma.reporteSemaforo.findUnique({ where: { id } });
+  const actual = await prisma.reporteSemaforo.findUnique({
+    where: { id },
+    include: { evidencias: true }
+  });
   if (!actual) return fail(res, 'Reporte no encontrado', 404);
 
-  const { estado, comentario } = parsed.data;
+  const { estado, comentario, tecnico_atendio, firma_satisfaccion, diagnostico_solucion, fecha_resolucion } = parsed.data;
+
+  // Si se intenta cerrar como resuelto, verificar que exista al menos una evidencia fotográfica
+  if (estado === 'resuelto') {
+    const tieneEvidenciaPrevia = actual.evidencias && actual.evidencias.length > 0;
+    const tieneNuevaEvidencia = !!req.file;
+    if (!tieneEvidenciaPrevia && !tieneNuevaEvidencia) {
+      return fail(res, 'Para cerrar el reporte es obligatorio adjuntar al menos una evidencia fotográfica', 400);
+    }
+  }
+
+  // Si se subió un nuevo archivo de evidencia al resolver
+  if (req.file) {
+    await prisma.evidencia.create({
+      data: {
+        reporteSemaforoId: id,
+        filename: req.file.originalname,
+        filepath: req.file.filename,
+        mimetype: req.file.mimetype,
+        sizeBytes: req.file.size,
+      },
+    });
+  }
+
   const data = {
     estado,
     atendidoPorId: req.usuario.id,
   };
 
+  if (tecnico_atendio !== undefined) data.tecnicoAtendio = tecnico_atendio;
+  if (firma_satisfaccion !== undefined) data.firmaSatisfaccion = firma_satisfaccion;
+  if (diagnostico_solucion !== undefined) data.diagnosticoSolucion = diagnostico_solucion;
   if (estado === 'resuelto') {
-    data.fechaResolucion = new Date();
+    data.fechaResolucion = fecha_resolucion ? new Date(fecha_resolucion) : new Date();
   }
 
-  const reporte = await prisma.reporteSemaforo.update({ where: { id }, data });
+  const reporte = await prisma.reporteSemaforo.update({
+    where: { id },
+    data,
+    include: includeDetalle
+  });
 
   if (actual.estado !== estado) {
     await registrarHistorial({
@@ -176,7 +249,7 @@ async function cambiarEstado(req, res) {
       reporteId: id,
       estadoAnterior: actual.estado,
       estadoNuevo: estado,
-      comentario,
+      comentario: comentario || diagnostico_solucion || 'Estado actualizado',
     });
   }
 
