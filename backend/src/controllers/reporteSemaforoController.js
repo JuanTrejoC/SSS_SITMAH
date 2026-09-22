@@ -207,24 +207,28 @@ async function cambiarEstado(req, res) {
 
   const { estado, comentario, tecnico_atendio, firma_satisfaccion, diagnostico_solucion, fecha_resolucion } = parsed.data;
 
+  const files = req.files
+    ? (Array.isArray(req.files) ? req.files : Object.values(req.files).flat())
+    : (req.file ? [req.file] : []);
+
   // Si se intenta cerrar como resuelto, verificar que exista al menos una evidencia fotográfica
   if (estado === 'resuelto') {
     const tieneEvidenciaPrevia = actual.evidencias && actual.evidencias.length > 0;
-    const tieneNuevaEvidencia = !!req.file;
+    const tieneNuevaEvidencia = files.length > 0;
     if (!tieneEvidenciaPrevia && !tieneNuevaEvidencia) {
       return fail(res, 'Para cerrar el reporte es obligatorio adjuntar al menos una evidencia fotográfica', 400);
     }
   }
 
-  // Si se subió un nuevo archivo de evidencia al resolver
-  if (req.file) {
+  // Si se subieron nuevos archivos de evidencia al resolver
+  for (const file of files) {
     await prisma.evidencia.create({
       data: {
         reporteSemaforoId: id,
-        filename: req.file.originalname,
-        filepath: req.file.filename,
-        mimetype: req.file.mimetype,
-        sizeBytes: req.file.size,
+        filename: file.originalname,
+        filepath: file.filename,
+        mimetype: file.mimetype,
+        sizeBytes: file.size,
         tipo: 'solucion',
       },
     });
@@ -289,7 +293,7 @@ async function exportar(req, res) {
 
 const asignarPiezaSchema = z.object({
   componente_id: z.coerce.number().int().positive(),
-  cantidad: z.coerce.number().int().positive(),
+  cantidad: z.coerce.number().int().positive().max(1, 'Solo se puede asignar 1 pieza').optional().default(1),
 });
 
 async function asignarPieza(req, res) {
@@ -297,11 +301,23 @@ async function asignarPieza(req, res) {
   const parsed = asignarPiezaSchema.safeParse(req.body);
   if (!parsed.success) return fail(res, parsed.error.errors[0].message);
 
-  const { componente_id, cantidad } = parsed.data;
+  const { componente_id } = parsed.data;
+  const cantidad = 1; // Solo 1 pieza para el reemplazo
 
   // Verify report exists
   const reporte = await prisma.reporteSemaforo.findUnique({ where: { id: reporteId } });
   if (!reporte) return fail(res, 'Reporte no encontrado', 404);
+
+  // Check if component already assigned to this report
+  const yaAsignada = await prisma.reporteSemaforoPieza.findFirst({
+    where: {
+      reporteSemaforoId: reporteId,
+      componenteId: componente_id
+    }
+  });
+  if (yaAsignada) {
+    return fail(res, 'Esta pieza o refacción ya fue asignada a este reporte. No se pueden asignar refacciones duplicadas en el mismo reporte.', 400);
+  }
 
   // Verify component stock
   const componente = await prisma.existenciaComponente.findUnique({ where: { id: componente_id } });
@@ -334,7 +350,7 @@ async function asignarPieza(req, res) {
     });
   });
 
-  ok(res, result, 210); // Custom code or just 201
+  ok(res, result, 201);
 }
 
 async function desasignarPieza(req, res) {

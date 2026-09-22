@@ -86,18 +86,28 @@ export default function DashboardSemaforos() {
   }, [user, mesFiltro, anioFiltro])
 
   const asignarPieza = async () => {
-    if (!componenteSeleccionado || cantidadAsignar < 1) {
-      Swal.fire('Atención', 'Seleccione un componente e ingrese cantidad válida', 'warning');
+    if (!componenteSeleccionado) {
+      Swal.fire('Atención', 'Seleccione un componente o refacción', 'warning');
+      return;
+    }
+
+    // Validar que no se asigne la misma pieza 2 veces al mismo reporte
+    const yaAsignada = verDetalle?.piezasAsignadas?.some(
+      p => p.componenteId === Number(componenteSeleccionado) || p.componente?.id === Number(componenteSeleccionado)
+    );
+    if (yaAsignada) {
+      Swal.fire('Pieza duplicada', 'Esta refacción ya fue asignada a este reporte. Solo se puede asignar 1 pieza por solicitud y no se permiten duplicados.', 'warning');
       return;
     }
 
     const result = await Swal.fire({
-        title: '¿Confirmar?',
-        text: `¿Confirmas asignar ${cantidadAsignar} piezas de este componente?`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, asignar',
-        cancelButtonText: 'Cancelar'
+      title: '¿Confirmar asignación?',
+      text: 'Se asignará 1 unidad de esta refacción para el reemplazo en este reporte.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, asignar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#691B31'
     });
     if (!result.isConfirmed) return;
 
@@ -109,11 +119,11 @@ export default function DashboardSemaforos() {
           'Authorization': `Bearer ${user.token}`
         },
         body: JSON.stringify({
-          componente_id: componenteSeleccionado,
-          cantidad: cantidadAsignar
+          componente_id: Number(componenteSeleccionado),
+          cantidad: 1
         })
-      })
-      const json = await response.json()
+      });
+      const json = await response.json();
       if (response.ok && json.ok) {
         const nuevaPieza = json.data;
         setVerDetalle({
@@ -127,16 +137,58 @@ export default function DashboardSemaforos() {
               : rep
           )
         );
-        setComponenteSeleccionado('')
-        setCantidadAsignar(1)
-        cargarInventario()
+        setComponenteSeleccionado('');
+        setCantidadAsignar(1);
+        cargarInventario();
+        Swal.fire('Asignada', 'Refacción asignada correctamente al reporte.', 'success');
       } else {
         Swal.fire('Error', json.error || 'Desconocido', 'error');
       }
     } catch {
-      Swal.fire('Error', 'Error de red', 'error');
+      Swal.fire('Error', 'Error de red al asignar pieza', 'error');
     }
-  }
+  };
+
+  const desasignarPieza = async (piezaId, nombrePieza) => {
+    const result = await Swal.fire({
+      title: '¿Desasignar pieza?',
+      text: `¿Deseas remover "${nombrePieza || 'la pieza'}" de este reporte? La pieza será devuelta al stock disponible.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#EF4444',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Sí, desasignar',
+      cancelButtonText: 'Cancelar'
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/reportes/semaforo/${verDetalle.id}/piezas/${piezaId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      });
+      const json = await response.json();
+      if (response.ok && json.ok) {
+        setVerDetalle({
+          ...verDetalle,
+          piezasAsignadas: (verDetalle.piezasAsignadas || []).filter(p => p.id !== piezaId)
+        });
+        setReportes(prevReportes =>
+          prevReportes.map(rep =>
+            rep.id === verDetalle.id
+              ? { ...rep, piezasAsignadas: (rep.piezasAsignadas || []).filter(p => p.id !== piezaId) }
+              : rep
+          )
+        );
+        cargarInventario();
+        Swal.fire('Removida', 'Pieza desasignada y stock devuelto exitosamente.', 'success');
+      } else {
+        Swal.fire('Error', json.error || 'No se pudo desasignar la pieza', 'error');
+      }
+    } catch {
+      Swal.fire('Error', 'Error de red al desasignar pieza', 'error');
+    }
+  };
 
   const cambiarEstado = async (id, nuevoEstado) => {
     if (!user?.token) return
@@ -653,33 +705,31 @@ export default function DashboardSemaforos() {
                   
                   {mostrarInventario && (
                     <div style={{ backgroundColor: '#F8FAFC', padding: '1rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid #E5E7EB' }}>
-                      <h4 style={{ margin: '0 0 0.65rem 0', fontSize: '0.85rem', color: '#4B5563', fontWeight: '700' }}>Seleccionar del Inventario de Existencias</h4>
+                      <h4 style={{ margin: '0 0 0.65rem 0', fontSize: '0.85rem', color: '#4B5563', fontWeight: '700' }}>Seleccionar del Inventario de Existencias (1 pieza por reemplazo)</h4>
                       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                         <div style={{ flex: '1', minWidth: '180px' }}>
                           <CustomInventorySelect
                             value={componenteSeleccionado}
                             onChange={setComponenteSeleccionado}
                             inventario={inventario}
+                            piezasAsignadas={verDetalle.piezasAsignadas || []}
                           />
                         </div>
-                        <input
-                          type="number"
-                          min="1"
-                          value={cantidadAsignar}
-                          onChange={(e) => setCantidadAsignar(Number(e.target.value))}
-                          style={{ width: '70px', padding: '0.6rem 0.5rem', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '0.85rem' }}
-                        />
+                        <span style={{ backgroundColor: '#E2E8F0', padding: '0.65rem 0.85rem', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '700', color: '#334155', whiteSpace: 'nowrap' }}>
+                          Cant: 1 pieza
+                        </span>
                         <button
                           onClick={asignarPieza}
                           style={{
                             padding: '0.65rem 1.25rem',
-                            backgroundColor: '#2563EB',
+                            backgroundColor: '#691B31',
                             color: 'white',
                             border: 'none',
                             borderRadius: '8px',
                             cursor: 'pointer',
                             fontWeight: '700',
-                            fontSize: '0.875rem'
+                            fontSize: '0.875rem',
+                            boxShadow: '0 2px 4px rgba(105,27,49,0.2)'
                           }}
                         >
                           Asignar
@@ -689,38 +739,66 @@ export default function DashboardSemaforos() {
                   )}
 
                   {verDetalle.piezasAsignadas && verDetalle.piezasAsignadas.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}>
                       {verDetalle.piezasAsignadas.map((p, idx) => (
                         <div key={idx} style={{ 
-                          padding: '0.85rem', 
+                          padding: '0.85rem 1rem', 
                           backgroundColor: 'white', 
                           border: '1px solid #E5E7EB', 
                           borderRadius: '12px', 
                           display: 'flex', 
                           alignItems: 'center', 
-                          gap: '0.85rem',
+                          justifyContent: 'space-between',
+                          gap: '0.75rem',
                           boxShadow: '0 2px 8px -2px rgba(0,0,0,0.05)',
-                          transition: 'transform 0.2s, box-shadow 0.2s'
+                          transition: 'transform 0.2s, box-shadow 0.2s',
+                          position: 'relative'
                         }}
                         onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px -2px rgba(0,0,0,0.08)' }}
                         onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px -2px rgba(0,0,0,0.05)' }}
                         >
-                          <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: '#FEF3C7', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
-                            <i className="fa-solid fa-microchip"></i>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                            <span style={{ fontWeight: '700', fontSize: '0.9rem', color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {p.componente?.nombre || 'Pieza'}
-                            </span>
-                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.75rem', color: '#6B7280' }}>
-                              <span style={{ backgroundColor: '#F3F4F6', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600', color: '#374151' }}>
-                                Cant: {p.cantidad}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', minWidth: 0, flex: 1 }}>
+                            <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: '#FEF3C7', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
+                              <i className="fa-solid fa-microchip"></i>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                              <span style={{ fontWeight: '700', fontSize: '0.9rem', color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {p.componente?.nombre || 'Pieza'}
                               </span>
-                              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {p.componente?.marca} {p.componente?.modelo}
-                              </span>
+                              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', fontSize: '0.75rem', color: '#6B7280', flexWrap: 'wrap' }}>
+                                <span style={{ backgroundColor: '#F3F4F6', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600', color: '#374151' }}>
+                                  Cant: {p.cantidad}
+                                </span>
+                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {p.componente?.marca} {p.componente?.modelo}
+                                </span>
+                              </div>
                             </div>
                           </div>
+
+                          {/* Botón para remover/desasignar pieza */}
+                          <button
+                            type="button"
+                            onClick={() => desasignarPieza(p.id, p.componente?.nombre)}
+                            title="Desasignar y devolver al stock"
+                            style={{
+                              backgroundColor: '#FEE2E2',
+                              border: 'none',
+                              color: '#DC2626',
+                              cursor: 'pointer',
+                              padding: '0.45rem',
+                              borderRadius: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#FECACA'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#FEE2E2'}
+                          >
+                            <FaTrashAlt size={13} />
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -793,7 +871,7 @@ export default function DashboardSemaforos() {
 }
 
 // Componente Customizado para el Inventario
-const CustomInventorySelect = ({ value, onChange, inventario }) => {
+const CustomInventorySelect = ({ value, onChange, inventario, piezasAsignadas = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [hoveredCategory, setHoveredCategory] = useState(null);
@@ -812,6 +890,10 @@ const CustomInventorySelect = ({ value, onChange, inventario }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen]);
+
+  const assignedIds = new Set(
+    piezasAsignadas.map(p => Number(p.componenteId || p.componente?.id)).filter(Boolean)
+  );
 
   const selectedOption = inventario.find(o => o.id === Number(value));
 
@@ -872,21 +954,48 @@ const CustomInventorySelect = ({ value, onChange, inventario }) => {
           <div style={{ display: 'flex', height: '240px' }}>
             {search ? (
               <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto' }}>
-                {filteredOptions.length > 0 ? filteredOptions.map(opcion => (
-                  <div
-                    key={opcion.id}
-                    onClick={() => { onChange(opcion.id); setIsOpen(false); setSearch(''); }}
-                    style={{ padding: '0.65rem 0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', backgroundColor: value === opcion.id ? '#FEF3C7' : 'transparent' }}
-                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#FFFBEB'}
-                    onMouseOut={e => e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF3C7' : 'transparent'}
-                  >
-                    <FaCogs color="#BC955B" size={16} />
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontWeight: '600', color: '#111827' }}>{opcion.nombre || opcion.descripcion}</span>
-                      <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>Disp: {opcion.cantidad ?? 'N/A'} | {opcion.marca || ''} {opcion.modelo || ''}</span>
+                {filteredOptions.length > 0 ? filteredOptions.map(opcion => {
+                  const yaAsignada = assignedIds.has(opcion.id);
+                  const sinStock = Number(opcion.cantidad) <= 0;
+                  const deshabilitada = yaAsignada || sinStock;
+
+                  return (
+                    <div
+                      key={opcion.id}
+                      onClick={() => {
+                        if (deshabilitada) return;
+                        onChange(opcion.id);
+                        setIsOpen(false);
+                        setSearch('');
+                      }}
+                      style={{
+                        padding: '0.65rem 0.85rem',
+                        cursor: deshabilitada ? 'not-allowed' : 'pointer',
+                        opacity: deshabilitada ? 0.6 : 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        borderRadius: '8px',
+                        backgroundColor: value === opcion.id ? '#FEF3C7' : 'transparent'
+                      }}
+                      onMouseOver={e => { if (!deshabilitada) e.currentTarget.style.backgroundColor = '#FFFBEB'; }}
+                      onMouseOut={e => { e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF3C7' : 'transparent'; }}
+                    >
+                      <FaCogs color="#BC955B" size={16} />
+                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontWeight: '600', color: '#111827' }}>{opcion.nombre || opcion.descripcion}</span>
+                          {yaAsignada && (
+                            <span style={{ fontSize: '0.7rem', color: '#B91C1C', backgroundColor: '#FEE2E2', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: '700' }}>
+                              Ya asignada
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>Disp: {opcion.cantidad ?? 'N/A'} | {opcion.marca || ''} {opcion.modelo || ''}</span>
+                      </div>
                     </div>
-                  </div>
-                )) : (
+                  );
+                }) : (
                   <div style={{ padding: '2rem', color: '#6B7280', textAlign: 'center', fontSize: '0.85rem' }}>
                     No se encontraron piezas para "{search}"
                   </div>
@@ -919,25 +1028,52 @@ const CustomInventorySelect = ({ value, onChange, inventario }) => {
                 <div style={{ width: '55%', overflowY: 'auto', padding: '0.4rem', backgroundColor: '#F8FAFC' }}>
                   {hoveredCategory ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                      {gruposOpciones[hoveredCategory].map(opcion => (
-                        <div
-                          key={opcion.id}
-                          onClick={() => { onChange(opcion.id); setIsOpen(false); setSearch(''); }}
-                          style={{ padding: '0.6rem 0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.65rem', borderRadius: '8px', backgroundColor: value === opcion.id ? '#FEF3C7' : 'transparent' }}
-                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#FEF9C3'}
-                          onMouseOut={e => e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF3C7' : 'transparent'}
-                        >
-                          <FaCogs color={value === opcion.id ? '#BC955B' : '#6B7280'} size={14} />
-                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: value === opcion.id ? '#BC955B' : '#374151' }}>
-                              {opcion.nombre || opcion.descripcion}
-                            </span>
-                            <span style={{ fontSize: '0.725rem', color: '#6B7280' }}>
-                              Disp: {opcion.cantidad ?? 'N/A'}
-                            </span>
+                      {gruposOpciones[hoveredCategory].map(opcion => {
+                        const yaAsignada = assignedIds.has(opcion.id);
+                        const sinStock = Number(opcion.cantidad) <= 0;
+                        const deshabilitada = yaAsignada || sinStock;
+
+                        return (
+                          <div
+                            key={opcion.id}
+                            onClick={() => {
+                              if (deshabilitada) return;
+                              onChange(opcion.id);
+                              setIsOpen(false);
+                              setSearch('');
+                            }}
+                            style={{
+                              padding: '0.6rem 0.75rem',
+                              cursor: deshabilitada ? 'not-allowed' : 'pointer',
+                              opacity: deshabilitada ? 0.6 : 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              borderRadius: '8px',
+                              backgroundColor: value === opcion.id ? '#FEF3C7' : 'transparent'
+                            }}
+                            onMouseOver={e => { if (!deshabilitada) e.currentTarget.style.backgroundColor = '#FEF9C3'; }}
+                            onMouseOut={e => { e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF3C7' : 'transparent'; }}
+                          >
+                            <FaCogs color={value === opcion.id ? '#BC955B' : '#6B7280'} size={14} />
+                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.85rem', fontWeight: '600', color: value === opcion.id ? '#BC955B' : '#374151' }}>
+                                  {opcion.nombre || opcion.descripcion}
+                                </span>
+                                {yaAsignada && (
+                                  <span style={{ fontSize: '0.65rem', color: '#B91C1C', backgroundColor: '#FEE2E2', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: '700' }}>
+                                    Ya asignada
+                                  </span>
+                                )}
+                              </div>
+                              <span style={{ fontSize: '0.725rem', color: '#6B7280' }}>
+                                Disp: {opcion.cantidad ?? 'N/A'}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#9CA3AF', fontSize: '0.8rem' }}>

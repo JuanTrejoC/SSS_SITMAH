@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
@@ -8,7 +9,9 @@ import {
   FaLaptop, FaPlus, FaEdit, FaTrashAlt,
   FaChevronLeft, FaChevronRight, FaTimes, FaDesktop, FaMobileAlt, FaNetworkWired,
   FaServer, FaShieldAlt, FaWifi, FaVideo, FaHdd, FaBroadcastTower, FaPrint, FaTv,
-  FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone, FaFilePdf, FaPlug, FaTabletAlt
+  FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone, FaFilePdf, FaPlug, FaTabletAlt,
+  FaCogs, FaBoxes, FaTools, FaWrench, FaCheckCircle, FaExclamationTriangle, FaExclamationCircle,
+  FaMapMarkerAlt, FaSearch
 } from 'react-icons/fa';
 
 const TIPOS_EQUIPO = [
@@ -39,6 +42,7 @@ const TIPOS_EQUIPO = [
 
 export default function InventarioTecnologico() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const [equipos, setEquipos] = useState([]);
   const [cargando, setCargando] = useState(false);
@@ -101,6 +105,267 @@ export default function InventarioTecnologico() {
       .filter(p => typeof p === 'string' && p.trim() !== '');
     return [...new Set(todos)].sort();
   }, [todosLosEquipos]);
+
+  // Refacciones y Piezas de Repuesto State
+  const [modalRefaccionesAbierto, setModalRefaccionesAbierto] = useState(false);
+  const [refacciones, setRefacciones] = useState([]);
+  const [cargandoRefacciones, setCargandoRefacciones] = useState(false);
+  const [busquedaRefaccion, setBusquedaRefaccion] = useState('');
+  const [filtroEstadoRefaccion, setFiltroEstadoRefaccion] = useState('');
+  const [filtroUbicacionRefaccion, setFiltroUbicacionRefaccion] = useState('');
+  const [modalFormRefaccionAbierto, setModalFormRefaccionAbierto] = useState(false);
+  const [editandoRefaccionId, setEditandoRefaccionId] = useState(null);
+  const [refaccionOrigen, setRefaccionOrigen] = useState('equipo');
+  const [formRefaccion, setFormRefaccion] = useState({
+    nombre: '',
+    categoria: 'Componente Interno',
+    cantidad: 1,
+    estadoFisico: 'Buen Estado',
+    areaUbicacion: 'Almacén de Sistemas',
+    marca: '',
+    modelo: '',
+    numeroSerie: '',
+    numeroInventario: '',
+    observaciones: ''
+  });
+
+  const cargarRefacciones = async () => {
+    if (!user?.token) return;
+    setCargandoRefacciones(true);
+    try {
+      const resEquipos = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?limit=1000&tipo=refaccion`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      });
+      let itemsEquipos = [];
+      if (resEquipos.ok) {
+        const jsonEquipos = await resEquipos.json();
+        if (jsonEquipos.ok && Array.isArray(jsonEquipos.data)) {
+          itemsEquipos = jsonEquipos.data.map(item => {
+            let estFisico = item.estatus || item.detalles?.estadoFisico || 'Buen Estado';
+            if (estFisico === 'Regular' || estFisico === 'En Reparación' || estFisico === 'Por Reparar') {
+              estFisico = 'Por Reparar';
+            } else if (estFisico === 'Dañada' || estFisico === 'Dañado' || estFisico === 'Baja') {
+              estFisico = 'Dañada';
+            } else {
+              estFisico = 'Buen Estado';
+            }
+
+            return {
+              id: item.id,
+              origen: 'equipo',
+              nombre: item.detalles?.nombre || `${item.marca || ''} ${item.modelo || ''}`.trim() || 'Refacción Tecnológica',
+              categoria: item.detalles?.categoria || 'Componente Interno',
+              cantidad: item.detalles?.cantidad !== undefined ? item.detalles.cantidad : 1,
+              estadoFisico: estFisico,
+              areaUbicacion: item.areaUbicacion || item.detalles?.areaUbicacion || 'Almacén de Sistemas',
+              marca: item.marca || '',
+              modelo: item.modelo || '',
+              numeroSerie: item.numeroSerie || '',
+              numeroInventario: item.numeroInventario || '',
+              observaciones: item.detalles?.observaciones || ''
+            };
+          });
+        }
+      }
+
+      const resExis = await fetch(`${API_BASE_URL}/api/inventario/existencias?tipoInventario=tecnologico`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      });
+      let itemsExis = [];
+      if (resExis.ok) {
+        const jsonExis = await resExis.json();
+        if (jsonExis.ok && Array.isArray(jsonExis.data)) {
+          itemsExis = jsonExis.data.map(ex => {
+            let estFisicoEx = ex.estadoFisico || (ex.cantidad > 0 ? 'Buen Estado' : 'Dañada');
+            if (estFisicoEx === 'Regular' || estFisicoEx === 'En Reparación' || estFisicoEx === 'Por Reparar') {
+              estFisicoEx = 'Por Reparar';
+            } else if (estFisicoEx === 'Dañada' || estFisicoEx === 'Dañado' || estFisicoEx === 'Baja') {
+              estFisicoEx = 'Dañada';
+            } else {
+              estFisicoEx = 'Buen Estado';
+            }
+
+            return {
+              id: ex.id,
+              origen: 'existencia',
+              nombre: ex.nombre,
+              categoria: ex.categoria || 'Accesorio / Componente',
+              cantidad: ex.cantidad || 0,
+              estadoFisico: estFisicoEx,
+              areaUbicacion: ex.areaUbicacion || 'Almacén de Sistemas',
+              marca: ex.marca || '',
+              modelo: ex.modelo || '',
+              numeroSerie: ex.numeroSerie || '',
+              numeroInventario: ex.numeroInventario || '',
+              observaciones: ex.observaciones || ''
+            };
+          });
+        }
+      }
+
+      setRefacciones([...itemsEquipos, ...itemsExis]);
+    } catch (err) {
+      console.error('Error al cargar refacciones:', err);
+    } finally {
+      setCargandoRefacciones(false);
+    }
+  };
+
+  const abrirFormRefaccion = (item = null) => {
+    if (item) {
+      setEditandoRefaccionId(item.id);
+      setRefaccionOrigen(item.origen || 'equipo');
+      setFormRefaccion({
+        nombre: item.nombre || '',
+        categoria: item.categoria || 'Componente Interno',
+        cantidad: item.cantidad !== undefined ? item.cantidad : 1,
+        estadoFisico: item.estadoFisico || 'Buen Estado',
+        areaUbicacion: item.areaUbicacion || 'Almacén de Sistemas',
+        marca: item.marca || '',
+        modelo: item.modelo || '',
+        numeroSerie: item.numeroSerie || '',
+        numeroInventario: item.numeroInventario || '',
+        observaciones: item.observaciones || ''
+      });
+    } else {
+      setEditandoRefaccionId(null);
+      setRefaccionOrigen('equipo');
+      setFormRefaccion({
+        nombre: '',
+        categoria: 'Componente Interno',
+        cantidad: 1,
+        estadoFisico: 'Buen Estado',
+        areaUbicacion: 'Almacén de Sistemas',
+        marca: '',
+        modelo: '',
+        numeroSerie: '',
+        numeroInventario: '',
+        observaciones: ''
+      });
+    }
+    setModalFormRefaccionAbierto(true);
+  };
+
+  const guardarRefaccion = async (e) => {
+    e.preventDefault();
+    if (!formRefaccion.nombre.trim()) {
+      Swal.fire({ icon: 'warning', title: 'Campo Requerido', text: 'El nombre de la refacción es obligatorio.' });
+      return;
+    }
+
+    try {
+      if (editandoRefaccionId && refaccionOrigen === 'existencia') {
+        const res = await fetch(`${API_BASE_URL}/api/inventario/existencias/${editandoRefaccionId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${user.token}`
+          },
+          body: JSON.stringify({
+            nombre: formRefaccion.nombre,
+            categoria: formRefaccion.categoria,
+            cantidad: Number(formRefaccion.cantidad),
+            marca: formRefaccion.marca || undefined,
+            modelo: formRefaccion.modelo || undefined,
+            numeroSerie: formRefaccion.numeroSerie || undefined,
+            numeroInventario: formRefaccion.numeroInventario || undefined,
+            tipoInventario: 'tecnologico'
+          })
+        });
+        const json = await res.json();
+        if (res.ok && json.ok) {
+          Swal.fire({ icon: 'success', title: '¡Guardado!', text: 'Refacción actualizada exitosamente.' });
+          setModalFormRefaccionAbierto(false);
+          cargarRefacciones();
+        } else {
+          Swal.fire({ icon: 'error', title: 'Error', text: json.error || 'No se pudo actualizar la refacción.' });
+        }
+      } else {
+        const payload = {
+          tipo: 'refaccion',
+          marca: formRefaccion.marca || null,
+          modelo: formRefaccion.modelo || null,
+          numeroSerie: formRefaccion.numeroSerie || null,
+          numeroInventario: formRefaccion.numeroInventario || null,
+          areaUbicacion: formRefaccion.areaUbicacion || 'Almacén de Sistemas',
+          estatus: formRefaccion.estadoFisico,
+          responsable: 'Área Tecnológica (Refacciones)',
+          detalles: {
+            nombre: formRefaccion.nombre,
+            categoria: formRefaccion.categoria,
+            cantidad: Number(formRefaccion.cantidad),
+            estadoFisico: formRefaccion.estadoFisico,
+            areaUbicacion: formRefaccion.areaUbicacion,
+            observaciones: formRefaccion.observaciones
+          }
+        };
+
+        const url = editandoRefaccionId
+          ? `${API_BASE_URL}/api/inventario-tecnologico/${editandoRefaccionId}`
+          : `${API_BASE_URL}/api/inventario-tecnologico`;
+        const method = editandoRefaccionId ? 'PUT' : 'POST';
+
+        const res = await fetch(url, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${user.token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (res.ok && json.ok) {
+          Swal.fire({
+            icon: 'success',
+            title: '¡Guardado!',
+            text: editandoRefaccionId ? 'Refacción actualizada con éxito.' : 'Refacción registrada con éxito.'
+          });
+          setModalFormRefaccionAbierto(false);
+          cargarRefacciones();
+        } else {
+          Swal.fire({ icon: 'error', title: 'Error', text: json.error || 'No se pudo guardar la refacción.' });
+        }
+      }
+    } catch (err) {
+      console.error('Error al guardar refacción:', err);
+      Swal.fire({ icon: 'error', title: 'Error', text: 'Ocurrió un error inesperado al guardar la refacción.' });
+    }
+  };
+
+  const eliminarRefaccion = async (item) => {
+    const result = await Swal.fire({
+      title: '¿Eliminar refacción?',
+      text: `¿Seguro que deseas eliminar "${item.nombre}"?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#e11d48',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const url = item.origen === 'existencia'
+          ? `${API_BASE_URL}/api/inventario/existencias/${item.id}`
+          : `${API_BASE_URL}/api/inventario-tecnologico/${item.id}`;
+        const res = await fetch(url, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${user.token}` }
+        });
+        const json = await res.json();
+        if (res.ok && json.ok) {
+          Swal.fire({ icon: 'success', title: 'Eliminado', text: 'Refacción eliminada correctamente.' });
+          cargarRefacciones();
+        } else {
+          Swal.fire({ icon: 'error', title: 'Error', text: json.error || 'No se pudo eliminar la refacción.' });
+        }
+      } catch (err) {
+        console.error('Error al eliminar refacción:', err);
+        Swal.fire({ icon: 'error', title: 'Error', text: 'Ocurrió un fallo al intentar eliminar.' });
+      }
+    }
+  };
 
   const cargarTodosLosEquipos = async () => {
     try {
@@ -393,10 +658,20 @@ export default function InventarioTecnologico() {
             drawCard(startX + cardW + gap, 26, cardW, 18, 'OPERANDO', operando, iOp);
             drawCard(startX + 2 * (cardW + gap), 26, cardW, 18, 'EN REFACCIONES', refacciones, iRef);
             drawCard(startX + 3 * (cardW + gap), 26, cardW, 18, 'UBICACIONES', ubicaciones, iUbi);
+          } else {
+            // Encabezado compacto para páginas 2 en adelante
+            if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 6, 22, 7);
+            doc.setTextColor(105, 27, 49);
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'bold');
+            doc.text('INVENTARIO TECNOLÓGICO (Continuación)', pageWidth / 2, 11, { align: 'center' });
+            doc.setTextColor(184, 134, 11);
+            doc.setFontSize(8);
+            doc.text('SISTEMA DE TRANSPORTE METROPOLITANO DE HIDALGO', pageWidth / 2, 15, { align: 'center' });
           }
           
           if (logoSitmah) {
-             doc.addImage(logoSitmah, 'PNG', pageWidth / 2 - 15, pageHeight - 25, 30, 10);
+             doc.addImage(logoSitmah, 'PNG', pageWidth / 2 - 15, pageHeight - 25, 30, 9);
           }
           doc.setTextColor(105, 27, 49);
           doc.setFontSize(7);
@@ -428,8 +703,16 @@ export default function InventarioTecnologico() {
           head: [tableColumn],
           body: tableRows,
           startY: 50,
+          margin: {
+            top: 18,
+            bottom: 28,
+            left: 14,
+            right: 14
+          },
+          showHead: 'everyPage',
+          pageBreak: 'auto',
           theme: 'grid',
-          styles: { fontSize: 7, cellPadding: 3, halign: 'center', valign: 'middle', lineColor: [230, 230, 230] },
+          styles: { fontSize: 7, cellPadding: 2.5, halign: 'center', valign: 'middle', lineColor: [230, 230, 230], overflow: 'linebreak' },
           headStyles: { fillColor: [105, 27, 49], textColor: [255, 255, 255], fontStyle: 'bold', cellPadding: { top: 3, right: 3, bottom: 3, left: 8 } },
           alternateRowStyles: { fillColor: [255, 251, 240] },
           didDrawPage: drawHeaderFooter,
@@ -802,7 +1085,20 @@ export default function InventarioTecnologico() {
             Gestione el stock de todos los equipos tecnológicos e infraestructura.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => navigate('/inventario-existencias')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#334155', color: 'white',
+              border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
+              boxShadow: '0 4px 6px rgba(51,65,85,0.2)', transition: 'background-color 0.2s', fontSize: '1rem'
+            }}
+            onMouseOver={e => e.currentTarget.style.backgroundColor = '#1e293b'}
+            onMouseOut={e => e.currentTarget.style.backgroundColor = '#334155'}
+            title="Ir a Inventario de Existencias / Stock"
+          >
+            <FaBoxes /> Stock
+          </button>
           <button
             onClick={exportarAExcel}
             style={{
@@ -1705,6 +2001,639 @@ export default function InventarioTecnologico() {
                 <button type="button" onClick={() => setModalAbierto(false)} style={{ padding: '0.75rem 2rem', border: 'none', backgroundColor: '#e2e8f0', color: '#475569', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '1rem', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#cbd5e1'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}>Cancelar</button>
                 <button type="submit" disabled={!form.tipo} style={{ padding: '0.75rem 2.5rem', border: 'none', backgroundColor: form.tipo ? '#691B31' : '#cbd5e1', color: 'white', borderRadius: '8px', cursor: form.tipo ? 'pointer' : 'not-allowed', fontWeight: '600', fontSize: '1rem', boxShadow: form.tipo ? '0 4px 6px rgba(105,27,49,0.2)' : 'none', transition: 'background-color 0.2s' }} onMouseOver={e => { if (form.tipo) e.currentTarget.style.backgroundColor = '#8a2441' }} onMouseOut={e => { if (form.tipo) e.currentTarget.style.backgroundColor = '#691B31' }}>Guardar Equipo</button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL PRINCIPAL DE REFACCIONES ================= */}
+      {modalRefaccionesAbierto && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '1.5rem'
+        }}>
+          <div style={{
+            backgroundColor: 'white', borderRadius: '16px', width: '95%', maxWidth: '1250px',
+            maxHeight: '92vh', display: 'flex', flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)', overflow: 'hidden'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.25rem 1.75rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{
+                  backgroundColor: '#691B31', color: 'white', padding: '0.75rem',
+                  borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 4px 6px rgba(105,27,49,0.2)'
+                }}>
+                  <FaCogs size={24} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#1e293b', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    Refacciones y Componentes Disponibles
+                    <span style={{ fontSize: '0.8rem', backgroundColor: '#e2e8f0', color: '#475569', padding: '0.2rem 0.6rem', borderRadius: '12px', fontWeight: '600' }}>
+                      Área Tecnológica
+                    </span>
+                  </h2>
+                  <p style={{ margin: '0.2rem 0 0', fontSize: '0.9rem', color: '#64748b' }}>
+                    Consulta de stock, estado físico (buen estado, por reparar o dañada) y ubicación de refacciones de esta área.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setModalRefaccionesAbierto(false)}
+                style={{
+                  background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '38px', height: '38px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  color: '#64748b', transition: 'all 0.2s'
+                }}
+                onMouseOver={e => { e.currentTarget.style.backgroundColor = '#e2e8f0'; e.currentTarget.style.color = '#1e293b'; }}
+                onMouseOut={e => { e.currentTarget.style.backgroundColor = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
+                title="Cerrar"
+              >
+                <FaTimes size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.5rem 1.75rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* KPI Summary Cards */}
+              {(() => {
+                const totalStock = refacciones.reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
+                const totalBuenEstado = refacciones.filter(r => r.estadoFisico === 'Buen Estado').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
+                const totalPorReparar = refacciones.filter(r => r.estadoFisico === 'Por Reparar').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
+                const totalDanadas = refacciones.filter(r => r.estadoFisico === 'Dañada').reduce((acc, curr) => acc + (Number(curr.cantidad) || 0), 0);
+                const ubicacionesUnicas = Array.from(new Set(refacciones.map(r => r.areaUbicacion).filter(Boolean)));
+
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                    <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '10px', backgroundColor: '#e2e8f0', color: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
+                        <FaBoxes />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Total Refacciones</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b' }}>{totalStock} <span style={{ fontSize: '0.85rem', fontWeight: '500', color: '#64748b' }}>piezas</span></div>
+                      </div>
+                    </div>
+
+                    <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '10px', backgroundColor: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
+                        <FaCheckCircle />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '600', textTransform: 'uppercase' }}>Buen Estado</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#15803d' }}>{totalBuenEstado} <span style={{ fontSize: '0.85rem', fontWeight: '500', color: '#166534' }}>piezas</span></div>
+                      </div>
+                    </div>
+
+                    <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: '12px', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '10px', backgroundColor: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
+                        <FaTools />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.8rem', color: '#92400e', fontWeight: '600', textTransform: 'uppercase' }}>Por Reparar</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#b45309' }}>{totalPorReparar} <span style={{ fontSize: '0.85rem', fontWeight: '500', color: '#92400e' }}>piezas</span></div>
+                      </div>
+                    </div>
+
+                    <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '10px', backgroundColor: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
+                        <FaExclamationTriangle />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.8rem', color: '#991b1b', fontWeight: '600', textTransform: 'uppercase' }}>Dañada</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#b91c1c' }}>{totalDanadas} <span style={{ fontSize: '0.85rem', fontWeight: '500', color: '#991b1b' }}>piezas</span></div>
+                      </div>
+                    </div>
+
+                    <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <div style={{ width: '44px', height: '44px', borderRadius: '10px', backgroundColor: '#dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem' }}>
+                        <FaMapMarkerAlt />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.8rem', color: '#1e40af', fontWeight: '600', textTransform: 'uppercase' }}>Ubicaciones</div>
+                        <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1d4ed8' }}>{ubicacionesUnicas.length} <span style={{ fontSize: '0.85rem', fontWeight: '500', color: '#1e40af' }}>sitios</span></div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Toolbar: Search, Filters & Actions */}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                gap: '1rem', flexWrap: 'wrap', backgroundColor: '#f8fafc', padding: '1rem',
+                borderRadius: '12px', border: '1px solid #e2e8f0'
+              }}>
+                <div style={{ display: 'flex', gap: '0.75rem', flex: 1, minWidth: '300px', flexWrap: 'wrap' }}>
+                  {/* Search bar */}
+                  <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+                    <FaSearch style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <input
+                      type="text"
+                      placeholder="Buscar refacción, marca, modelo, ubicación o serie..."
+                      value={busquedaRefaccion}
+                      onChange={e => setBusquedaRefaccion(e.target.value)}
+                      style={{
+                        width: '100%', padding: '0.65rem 1rem 0.65rem 2.5rem', borderRadius: '8px',
+                        border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', backgroundColor: 'white'
+                      }}
+                    />
+                  </div>
+
+                  {/* Filter by condition */}
+                  <select
+                    value={filtroEstadoRefaccion}
+                    onChange={e => setFiltroEstadoRefaccion(e.target.value)}
+                    style={{
+                      padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1',
+                      fontSize: '0.9rem', outline: 'none', backgroundColor: 'white', color: '#334155', fontWeight: '500'
+                    }}
+                  >
+                    <option value="">-- Todos los estados --</option>
+                    <option value="Buen Estado">🟢 Buen Estado</option>
+                    <option value="Por Reparar">🟡 Por Reparar</option>
+                    <option value="Dañada">🔴 Dañada</option>
+                  </select>
+
+                  {/* Filter by location */}
+                  <select
+                    value={filtroUbicacionRefaccion}
+                    onChange={e => setFiltroUbicacionRefaccion(e.target.value)}
+                    style={{
+                      padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1',
+                      fontSize: '0.9rem', outline: 'none', backgroundColor: 'white', color: '#334155', fontWeight: '500'
+                    }}
+                  >
+                    <option value="">-- Todas las ubicaciones --</option>
+                    {Array.from(new Set(refacciones.map(r => r.areaUbicacion).filter(Boolean))).map(ubic => (
+                      <option key={ubic} value={ubic}>📍 {ubic}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Add spare part button */}
+                <button
+                  onClick={() => abrirFormRefaccion()}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    backgroundColor: '#691B31', color: 'white', border: 'none',
+                    padding: '0.65rem 1.25rem', borderRadius: '8px', fontWeight: '600',
+                    cursor: 'pointer', fontSize: '0.9rem', boxShadow: '0 2px 4px rgba(105,27,49,0.2)',
+                    transition: 'background-color 0.2s', whiteSpace: 'nowrap'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#8a2441'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#691B31'}
+                >
+                  <FaPlus /> Registrar Refacción
+                </button>
+              </div>
+
+              {/* Table of Refacciones */}
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                {cargandoRefacciones ? (
+                  <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                    <div style={{ display: 'inline-block', width: '32px', height: '32px', border: '3px solid #e2e8f0', borderTopColor: '#691B31', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                    <p style={{ marginTop: '0.75rem', fontWeight: '500' }}>Cargando refacciones disponibles...</p>
+                  </div>
+                ) : (() => {
+                  const itemsFiltrados = refacciones.filter(item => {
+                    const texto = busquedaRefaccion.toLowerCase();
+                    const cumpleBusqueda = busquedaRefaccion === '' ||
+                      (item.nombre && item.nombre.toLowerCase().includes(texto)) ||
+                      (item.categoria && item.categoria.toLowerCase().includes(texto)) ||
+                      (item.marca && item.marca.toLowerCase().includes(texto)) ||
+                      (item.modelo && item.modelo.toLowerCase().includes(texto)) ||
+                      (item.areaUbicacion && item.areaUbicacion.toLowerCase().includes(texto)) ||
+                      (item.numeroSerie && item.numeroSerie.toLowerCase().includes(texto)) ||
+                      (item.numeroInventario && item.numeroInventario.toLowerCase().includes(texto)) ||
+                      (item.observaciones && item.observaciones.toLowerCase().includes(texto));
+
+                    const cumpleEstado = filtroEstadoRefaccion === '' ||
+                      (filtroEstadoRefaccion === 'Dañada' ? (item.estadoFisico === 'Dañada' || item.estadoFisico === 'Dañado') : item.estadoFisico === filtroEstadoRefaccion);
+                    const cumpleUbicacion = filtroUbicacionRefaccion === '' || item.areaUbicacion === filtroUbicacionRefaccion;
+
+                    return cumpleBusqueda && cumpleEstado && cumpleUbicacion;
+                  });
+
+                  if (itemsFiltrados.length === 0) {
+                    return (
+                      <div style={{ padding: '3.5rem 1.5rem', textAlign: 'center', color: '#94a3b8' }}>
+                        <FaCogs size={48} style={{ color: '#cbd5e1', marginBottom: '1rem' }} />
+                        <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#475569', fontWeight: '600' }}>No se encontraron refacciones</h3>
+                        <p style={{ margin: '0.5rem 0 1.25rem', fontSize: '0.9rem' }}>No hay refacciones registradas o no coinciden con los filtros aplicados.</p>
+                        <button
+                          onClick={() => abrirFormRefaccion()}
+                          style={{
+                            backgroundColor: '#691B31', color: 'white', border: 'none',
+                            padding: '0.6rem 1.25rem', borderRadius: '8px', fontWeight: '600',
+                            cursor: 'pointer', fontSize: '0.9rem'
+                          }}
+                        >
+                          <FaPlus style={{ marginRight: '0.4rem' }} /> Registrar Primera Refacción
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #cbd5e1', color: '#475569', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            <th style={{ padding: '0.85rem 1.25rem', fontWeight: '700' }}>Refacción / Pieza</th>
+                            <th style={{ padding: '0.85rem 1rem', fontWeight: '700' }}>Categoría</th>
+                            <th style={{ padding: '0.85rem 1rem', fontWeight: '700' }}>Marca / Modelo</th>
+                            <th style={{ padding: '0.85rem 1rem', fontWeight: '700', textAlign: 'center' }}>Estado Físico</th>
+                            <th style={{ padding: '0.85rem 1rem', fontWeight: '700' }}>Ubicación</th>
+                            <th style={{ padding: '0.85rem 1rem', fontWeight: '700', textAlign: 'center' }}>Stock</th>
+                            <th style={{ padding: '0.85rem 1rem', fontWeight: '700' }}>Identificación</th>
+                            <th style={{ padding: '0.85rem 1rem', fontWeight: '700' }}>Observaciones</th>
+                            <th style={{ padding: '0.85rem 1.25rem', fontWeight: '700', textAlign: 'center' }}>Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {itemsFiltrados.map((item, idx) => {
+                            const esBuenEstado = item.estadoFisico === 'Buen Estado';
+                            const esPorReparar = item.estadoFisico === 'Por Reparar';
+                            const esDanada = item.estadoFisico === 'Dañada';
+
+                            return (
+                              <tr
+                                key={`${item.origen}-${item.id}-${idx}`}
+                                style={{
+                                  borderBottom: '1px solid #f1f5f9',
+                                  backgroundColor: idx % 2 === 0 ? 'white' : '#fafafa',
+                                  transition: 'background-color 0.15s'
+                                }}
+                                onMouseOver={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                                onMouseOut={e => e.currentTarget.style.backgroundColor = idx % 2 === 0 ? 'white' : '#fafafa'}
+                              >
+                                {/* Nombre */}
+                                <td style={{ padding: '0.85rem 1.25rem', fontWeight: '600', color: '#1e293b' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: esBuenEstado ? '#10b981' : (esPorReparar ? '#f59e0b' : '#ef4444') }} />
+                                    {item.nombre}
+                                  </div>
+                                </td>
+
+                                {/* Categoría */}
+                                <td style={{ padding: '0.85rem 1rem', color: '#475569' }}>
+                                  <span style={{ backgroundColor: '#f1f5f9', padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '500', border: '1px solid #e2e8f0' }}>
+                                    {item.categoria || 'General'}
+                                  </span>
+                                </td>
+
+                                {/* Marca / Modelo */}
+                                <td style={{ padding: '0.85rem 1rem', color: '#334155' }}>
+                                  <div style={{ fontWeight: '500' }}>{item.marca || 'S/M'}</div>
+                                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{item.modelo || 'S/M'}</div>
+                                </td>
+
+                                {/* Estado Físico */}
+                                <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
+                                  {esBuenEstado && (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #bbf7d0', padding: '0.3rem 0.75rem', borderRadius: '20px', fontWeight: '700', fontSize: '0.8rem' }}>
+                                      <FaCheckCircle color="#16a34a" /> Buen Estado
+                                    </span>
+                                  )}
+                                  {esPorReparar && (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', padding: '0.3rem 0.75rem', borderRadius: '20px', fontWeight: '700', fontSize: '0.8rem' }}>
+                                      <FaTools color="#d97706" /> Por Reparar
+                                    </span>
+                                  )}
+                                  {esDanada && (
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca', padding: '0.3rem 0.75rem', borderRadius: '20px', fontWeight: '700', fontSize: '0.8rem' }}>
+                                      <FaExclamationTriangle color="#dc2626" /> Dañada
+                                    </span>
+                                  )}
+                                </td>
+
+                                {/* Ubicación */}
+                                <td style={{ padding: '0.85rem 1rem' }}>
+                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: '#1e293b', fontWeight: '600' }}>
+                                    <FaMapMarkerAlt color="#691B31" />
+                                    <span>{item.areaUbicacion || 'Almacén de Sistemas'}</span>
+                                  </div>
+                                </td>
+
+                                {/* Stock / Cantidad */}
+                                <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
+                                  <span style={{
+                                    display: 'inline-block', minWidth: '36px', padding: '0.3rem 0.6rem',
+                                    borderRadius: '8px', backgroundColor: Number(item.cantidad) > 0 ? '#f1f5f9' : '#fee2e2',
+                                    color: Number(item.cantidad) > 0 ? '#1e293b' : '#991b1b', fontWeight: '700',
+                                    border: '1px solid #cbd5e1'
+                                  }}>
+                                    {item.cantidad}
+                                  </span>
+                                </td>
+
+                                {/* Identificación */}
+                                <td style={{ padding: '0.85rem 1rem', fontSize: '0.8rem', color: '#64748b' }}>
+                                  {item.numeroInventario && <div>Inv: <span style={{ color: '#1e293b', fontWeight: '600' }}>{item.numeroInventario}</span></div>}
+                                  {item.numeroSerie && <div>S/N: <span style={{ color: '#1e293b', fontWeight: '500' }}>{item.numeroSerie}</span></div>}
+                                  {!item.numeroInventario && !item.numeroSerie && <span style={{ color: '#94a3b8' }}>—</span>}
+                                </td>
+
+                                {/* Observaciones */}
+                                <td style={{ padding: '0.85rem 1rem', color: '#64748b', fontSize: '0.85rem', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={item.observaciones || ''}>
+                                  {item.observaciones || <span style={{ color: '#cbd5e1' }}>Sin notas</span>}
+                                </td>
+
+                                {/* Acciones */}
+                                <td style={{ padding: '0.85rem 1.25rem', textAlign: 'center' }}>
+                                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                                    <button
+                                      onClick={() => abrirFormRefaccion(item)}
+                                      style={{
+                                        backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe',
+                                        borderRadius: '6px', padding: '0.4rem 0.6rem', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', transition: 'all 0.15s'
+                                      }}
+                                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#dbeafe'}
+                                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#eff6ff'}
+                                      title="Editar Refacción"
+                                    >
+                                      <FaEdit size={14} />
+                                    </button>
+                                    <button
+                                      onClick={() => eliminarRefaccion(item)}
+                                      style={{
+                                        backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca',
+                                        borderRadius: '6px', padding: '0.4rem 0.6rem', cursor: 'pointer',
+                                        display: 'flex', alignItems: 'center', transition: 'all 0.15s'
+                                      }}
+                                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#fee2e2'}
+                                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef2f2'}
+                                      title="Eliminar Refacción"
+                                    >
+                                      <FaTrashAlt size={14} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '1rem 1.75rem', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0',
+              display: 'flex', justifyContent: 'flex-end', gap: '0.75rem'
+            }}>
+              <button
+                onClick={() => setModalRefaccionesAbierto(false)}
+                style={{
+                  padding: '0.65rem 1.5rem', backgroundColor: '#e2e8f0', color: '#334155',
+                  border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
+                  fontSize: '0.95rem', transition: 'background-color 0.2s'
+                }}
+                onMouseOver={e => e.currentTarget.style.backgroundColor = '#cbd5e1'}
+                onMouseOut={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= SUB-MODAL REGISTRAR / EDITAR REFACCIÓN ================= */}
+      {modalFormRefaccionAbierto && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(5px)',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100, padding: '1.5rem'
+        }}>
+          <div style={{
+            backgroundColor: 'white', borderRadius: '16px', width: '95%', maxWidth: '750px',
+            maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.3)', overflow: 'hidden'
+          }}>
+            {/* Submodal Header */}
+            <div style={{
+              padding: '1.25rem 1.5rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{
+                  backgroundColor: '#691B31', color: 'white', padding: '0.6rem',
+                  borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <FaTools size={18} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: '700', color: '#1e293b' }}>
+                    {editandoRefaccionId ? 'Editar Refacción / Componente' : 'Registrar Nueva Refacción'}
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>
+                    Área Tecnológica - Ingrese los detalles de la pieza y su estado físico.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalFormRefaccionAbierto(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: '1.25rem' }}
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            {/* Submodal Form */}
+            <form onSubmit={guardarRefaccion} style={{ padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              
+              {/* Nombre de la Refacción */}
+              <div>
+                <label style={labelStyle}>Nombre de la Refacción / Pieza *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Memoria RAM 16GB DDR4, Disco SSD 500GB, Fuente de Poder 500W..."
+                  value={formRefaccion.nombre}
+                  onChange={e => setFormRefaccion({ ...formRefaccion, nombre: e.target.value })}
+                  style={inputStyle}
+                />
+              </div>
+
+              {/* Categoría & Cantidad */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                <div>
+                  <label style={labelStyle}>Categoría / Tipo de Pieza *</label>
+                  <select
+                    value={formRefaccion.categoria}
+                    onChange={e => setFormRefaccion({ ...formRefaccion, categoria: e.target.value })}
+                    style={inputStyle}
+                  >
+                    <option value="Componente Interno">Componente Interno (Placa, Procesador)</option>
+                    <option value="Memoria RAM">Memoria RAM</option>
+                    <option value="Almacenamiento">Almacenamiento (SSD / HDD / NVMe)</option>
+                    <option value="Redes y Conectividad">Redes y Conectividad (Switch, Tarjeta, Patch cord)</option>
+                    <option value="Fuente de Poder / Energía">Fuente de Poder / Energía / UPS</option>
+                    <option value="Periférico">Periférico (Teclado, Mouse, Lector)</option>
+                    <option value="Accesorio / Cableado">Accesorio / Cableado (HDMI, DP, Adaptador)</option>
+                    <option value="Pantalla / Display">Pantalla / Display / Panel</option>
+                    <option value="Herramienta Tecnológica">Herramienta Tecnológica</option>
+                    <option value="Otro">Otro Componente</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Cantidad Disponible (Stock) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={formRefaccion.cantidad}
+                    onChange={e => setFormRefaccion({ ...formRefaccion, cantidad: e.target.value })}
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              {/* Estado Físico & Ubicación */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                <div>
+                  <label style={labelStyle}>Estado Físico / Condición *</label>
+                  <select
+                    value={formRefaccion.estadoFisico}
+                    onChange={e => setFormRefaccion({ ...formRefaccion, estadoFisico: e.target.value })}
+                    style={{
+                      ...inputStyle,
+                      fontWeight: '700',
+                      color: formRefaccion.estadoFisico === 'Buen Estado' ? '#15803d' : (formRefaccion.estadoFisico === 'Por Reparar' ? '#b45309' : '#b91c1c')
+                    }}
+                  >
+                    <option value="Buen Estado">🟢 Buen Estado</option>
+                    <option value="Por Reparar">🟡 Por Reparar</option>
+                    <option value="Dañada">🔴 Dañada</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Ubicación donde está resguardada *</label>
+                  <input
+                    type="text"
+                    required
+                    list="ubicaciones-sugeridas"
+                    placeholder="Ej. Almacén de Sistemas - Estante A, Taller..."
+                    value={formRefaccion.areaUbicacion}
+                    onChange={e => setFormRefaccion({ ...formRefaccion, areaUbicacion: e.target.value })}
+                    style={inputStyle}
+                  />
+                  <datalist id="ubicaciones-sugeridas">
+                    <option value="Almacén de Sistemas - Estante 1" />
+                    <option value="Almacén de Sistemas - Estante 2" />
+                    <option value="Taller de Soporte Técnico" />
+                    <option value="Site Central - Rack de Refacciones" />
+                    <option value="Bodega General de Tecnologías" />
+                    <option value="Estación Central - Caseta" />
+                  </datalist>
+                </div>
+              </div>
+
+              {/* Marca y Modelo */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                <div>
+                  <label style={labelStyle}>Marca</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Kingston, Crucial, TP-Link, HP, Dell..."
+                    value={formRefaccion.marca}
+                    onChange={e => setFormRefaccion({ ...formRefaccion, marca: e.target.value })}
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Modelo</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. DDR4 3200MHz, BX500, LS1005G..."
+                    value={formRefaccion.modelo}
+                    onChange={e => setFormRefaccion({ ...formRefaccion, modelo: e.target.value })}
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              {/* No. Serie y No. Inventario */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                <div>
+                  <label style={labelStyle}>No. de Serie (Opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Número de serie si cuenta con él"
+                    value={formRefaccion.numeroSerie}
+                    onChange={e => setFormRefaccion({ ...formRefaccion, numeroSerie: e.target.value })}
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>No. de Inventario (Opcional)</label>
+                  <input
+                    type="text"
+                    placeholder="Número de inventario o etiqueta"
+                    value={formRefaccion.numeroInventario}
+                    onChange={e => setFormRefaccion({ ...formRefaccion, numeroInventario: e.target.value })}
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              {/* Observaciones */}
+              <div>
+                <label style={labelStyle}>Observaciones / Detalle del Estado Físico</label>
+                <textarea
+                  rows="3"
+                  placeholder="Detalles del daño, procedencia de equipo anterior, pruebas realizadas, etc."
+                  value={formRefaccion.observaciones}
+                  onChange={e => setFormRefaccion({ ...formRefaccion, observaciones: e.target.value })}
+                  style={{ ...inputStyle, resize: 'vertical' }}
+                />
+              </div>
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '0.5rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
+                <button
+                  type="button"
+                  onClick={() => setModalFormRefaccionAbierto(false)}
+                  style={{
+                    padding: '0.75rem 1.5rem', border: 'none', backgroundColor: '#e2e8f0',
+                    color: '#475569', borderRadius: '8px', cursor: 'pointer', fontWeight: '600'
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '0.75rem 2rem', border: 'none', backgroundColor: '#691B31',
+                    color: 'white', borderRadius: '8px', cursor: 'pointer', fontWeight: '600',
+                    boxShadow: '0 4px 6px rgba(105,27,49,0.2)'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#8a2441'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#691B31'}
+                >
+                  {editandoRefaccionId ? 'Guardar Cambios' : 'Registrar Refacción'}
+                </button>
+              </div>
+
             </form>
           </div>
         </div>
