@@ -293,7 +293,7 @@ async function exportar(req, res) {
 
 const asignarPiezaSchema = z.object({
   componente_id: z.coerce.number().int().positive(),
-  cantidad: z.coerce.number().int().positive(),
+  cantidad: z.coerce.number().int().positive().max(1, 'Solo se puede asignar 1 pieza').optional().default(1),
 });
 
 async function asignarPieza(req, res) {
@@ -301,11 +301,23 @@ async function asignarPieza(req, res) {
   const parsed = asignarPiezaSchema.safeParse(req.body);
   if (!parsed.success) return fail(res, parsed.error.errors[0].message);
 
-  const { componente_id, cantidad } = parsed.data;
+  const { componente_id } = parsed.data;
+  const cantidad = 1; // Solo 1 pieza para el reemplazo
 
   // Verify report exists
   const reporte = await prisma.reporteSemaforo.findUnique({ where: { id: reporteId } });
   if (!reporte) return fail(res, 'Reporte no encontrado', 404);
+
+  // Check if component already assigned to this report
+  const yaAsignada = await prisma.reporteSemaforoPieza.findFirst({
+    where: {
+      reporteSemaforoId: reporteId,
+      componenteId: componente_id
+    }
+  });
+  if (yaAsignada) {
+    return fail(res, 'Esta pieza o refacción ya fue asignada a este reporte. No se pueden asignar refacciones duplicadas en el mismo reporte.', 400);
+  }
 
   // Verify component stock
   const componente = await prisma.existenciaComponente.findUnique({ where: { id: componente_id } });
@@ -338,7 +350,7 @@ async function asignarPieza(req, res) {
     });
   });
 
-  ok(res, result, 210); // Custom code or just 201
+  ok(res, result, 201);
 }
 
 async function desasignarPieza(req, res) {

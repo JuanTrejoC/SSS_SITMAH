@@ -288,7 +288,7 @@ async function exportar(req, res) {
 
 const asignarPiezaSchema = z.object({
   componente_id: z.coerce.number().int().positive(),
-  cantidad: z.coerce.number().int().positive(),
+  cantidad: z.coerce.number().int().positive().max(1, 'Solo se puede asignar 1 pieza por solicitud').optional().default(1),
 });
 
 async function asignarPieza(req, res) {
@@ -296,11 +296,23 @@ async function asignarPieza(req, res) {
   const parsed = asignarPiezaSchema.safeParse(req.body);
   if (!parsed.success) return fail(res, parsed.error.errors[0].message);
 
-  const { componente_id, cantidad } = parsed.data;
+  const { componente_id } = parsed.data;
+  const cantidad = 1; // Solo se puede asignar 1 pieza que es la que se cambia
 
   // Verificar que el reporte existe
   const reporte = await prisma.reporteOficina.findUnique({ where: { id: reporteId } });
   if (!reporte) return fail(res, 'Reporte no encontrado', 404);
+
+  // Verificar si la pieza ya fue asignada a este reporte
+  const yaAsignada = await prisma.reporteOficinaPieza.findFirst({
+    where: {
+      reporteOficinaId: reporteId,
+      componenteId: componente_id
+    }
+  });
+  if (yaAsignada) {
+    return fail(res, 'Esta pieza o componente ya fue asignado a este reporte. No se pueden asignar piezas duplicadas a una misma persona.', 400);
+  }
 
   // Verificar que el componente existe y tiene stock
   const componente = await prisma.existenciaComponente.findUnique({ where: { id: componente_id } });

@@ -32,11 +32,11 @@ const obtenerEquipos = async (req, res) => {
     if (tipo === 'herramientas') {
       where.tipo = { in: ['herramienta_tec', 'herramienta_infra'] };
     } else if (tipo === 'tecnologico') {
-      where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra'] };
+      where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra', 'refaccion'] };
     } else if (tipo) {
       where.tipo = tipo;
     } else {
-      where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra'] };
+      where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra', 'refaccion'] };
     }
 
 

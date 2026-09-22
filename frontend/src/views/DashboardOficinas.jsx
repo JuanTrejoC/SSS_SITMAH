@@ -96,17 +96,24 @@ export default function DashboardOficinas() {
       Swal.fire('Atención', 'Seleccione un componente', 'warning');
       return;
     }
-    if (!cantidadSeleccionada || cantidadSeleccionada < 1) {
-      Swal.fire('Atención', 'Ingrese una cantidad válida', 'warning');
+
+    // Validar que no se asigne la misma pieza 2 veces al mismo reporte
+    const yaAsignada = verDetalle?.piezasAsignadas?.some(
+      p => p.componenteId === Number(componenteSeleccionado) || p.componente?.id === Number(componenteSeleccionado)
+    );
+    if (yaAsignada) {
+      Swal.fire('Pieza duplicada', 'Esta pieza ya fue asignada a este reporte. Solo se puede asignar 1 pieza por solicitud y no se permiten piezas duplicadas para una misma persona.', 'warning');
       return;
     }
+
     const result = await Swal.fire({
-        title: '¿Confirmar?',
-        text: `¿Confirmas asignar ${cantidadSeleccionada} piezas de este componente?`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, asignar',
-        cancelButtonText: 'Cancelar'
+      title: '¿Confirmar asignación?',
+      text: 'Se asignará 1 unidad de este componente para el cambio/reemplazo en este reporte.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, asignar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#691B31'
     });
     if (!result.isConfirmed) return;
 
@@ -118,8 +125,8 @@ export default function DashboardOficinas() {
           'Authorization': `Bearer ${user.token}`
         },
         body: JSON.stringify({
-          componente_id: componenteSeleccionado,
-          cantidad: cantidadSeleccionada
+          componente_id: Number(componenteSeleccionado),
+          cantidad: 1
         })
       });
       const json = await response.json();
@@ -139,11 +146,53 @@ export default function DashboardOficinas() {
         setComponenteSeleccionado('');
         setCantidadSeleccionada(1);
         cargarInventario();
+        Swal.fire('Asignada', 'Pieza asignada correctamente al reporte.', 'success');
       } else {
         Swal.fire('Error', json.error || 'Desconocido', 'error');
       }
     } catch {
-      Swal.fire('Error', 'Error de red', 'error');
+      Swal.fire('Error', 'Error de red al asignar pieza', 'error');
+    }
+  };
+
+  const desasignarPieza = async (piezaId, nombrePieza) => {
+    const result = await Swal.fire({
+      title: '¿Desasignar pieza?',
+      text: `¿Deseas remover "${nombrePieza || 'la pieza'}" de este reporte? La pieza será devuelta al stock disponible.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#EF4444',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Sí, desasignar',
+      cancelButtonText: 'Cancelar'
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/reportes/oficina/${verDetalle.id}/piezas/${piezaId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      });
+      const json = await response.json();
+      if (response.ok && json.ok) {
+        setVerDetalle({
+          ...verDetalle,
+          piezasAsignadas: (verDetalle.piezasAsignadas || []).filter(p => p.id !== piezaId)
+        });
+        setReportes(prevReportes =>
+          prevReportes.map(rep =>
+            rep.id === verDetalle.id
+              ? { ...rep, piezasAsignadas: (rep.piezasAsignadas || []).filter(p => p.id !== piezaId) }
+              : rep
+          )
+        );
+        cargarInventario();
+        Swal.fire('Removida', 'Pieza desasignada y stock devuelto exitosamente.', 'success');
+      } else {
+        Swal.fire('Error', json.error || 'No se pudo desasignar la pieza', 'error');
+      }
+    } catch {
+      Swal.fire('Error', 'Error de red al desasignar pieza', 'error');
     }
   };
 
@@ -745,33 +794,31 @@ export default function DashboardOficinas() {
                   
                   {mostrarInventario && (
                     <div style={{ backgroundColor: '#F8FAFC', padding: '1rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid #E5E7EB' }}>
-                      <h4 style={{ margin: '0 0 0.65rem 0', fontSize: '0.85rem', color: '#4B5563', fontWeight: '700' }}>Seleccionar del Inventario Tecnológico</h4>
+                      <h4 style={{ margin: '0 0 0.65rem 0', fontSize: '0.85rem', color: '#4B5563', fontWeight: '700' }}>Seleccionar del Inventario Tecnológico (1 pieza por reemplazo)</h4>
                       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                         <div style={{ flex: '1', minWidth: '200px' }}>
                           <CustomInventorySelect 
                             value={componenteSeleccionado}
                             onChange={setComponenteSeleccionado}
                             inventario={inventario}
+                            piezasAsignadas={verDetalle.piezasAsignadas || []}
                           />
                         </div>
-                        <input
-                          type="number"
-                          min="1"
-                          value={cantidadSeleccionada}
-                          onChange={(e) => setCantidadSeleccionada(Number(e.target.value))}
-                          style={{ width: '80px', padding: '0.65rem', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '0.9rem' }}
-                        />
+                        <span style={{ backgroundColor: '#E2E8F0', padding: '0.65rem 0.85rem', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '700', color: '#334155', whiteSpace: 'nowrap' }}>
+                          Cant: 1 pieza
+                        </span>
                         <button
                           onClick={asignarPieza}
                           style={{
                             padding: '0.65rem 1.25rem',
-                            backgroundColor: '#2563EB',
+                            backgroundColor: '#691B31',
                             color: 'white',
                             border: 'none',
                             borderRadius: '8px',
                             cursor: 'pointer',
                             fontWeight: '700',
-                            fontSize: '0.875rem'
+                            fontSize: '0.875rem',
+                            boxShadow: '0 2px 4px rgba(105,27,49,0.2)'
                           }}
                         >
                           Asignar
@@ -781,41 +828,69 @@ export default function DashboardOficinas() {
                   )}
 
                   {verDetalle.piezasAsignadas && verDetalle.piezasAsignadas.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}>
                       {verDetalle.piezasAsignadas.map((asignacion, idx) => (
                         <div key={idx} style={{ 
-                          padding: '0.85rem', 
+                          padding: '0.85rem 1rem', 
                           backgroundColor: 'white', 
                           border: '1px solid #E5E7EB', 
                           borderRadius: '12px', 
                           display: 'flex', 
                           alignItems: 'center', 
-                          gap: '0.85rem',
+                          justifyContent: 'space-between',
+                          gap: '0.75rem',
                           boxShadow: '0 2px 8px -2px rgba(0,0,0,0.05)',
-                          transition: 'transform 0.2s, box-shadow 0.2s'
+                          transition: 'transform 0.2s, box-shadow 0.2s',
+                          position: 'relative'
                         }}
                         onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px -2px rgba(0,0,0,0.08)' }}
                         onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px -2px rgba(0,0,0,0.05)' }}
                         >
-                          <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: 'rgba(105,27,49,0.08)', color: '#691B31', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
-                            <i className="fa-solid fa-box-open"></i>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                            <span style={{ fontWeight: '700', fontSize: '0.9rem', color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {asignacion.componente?.nombre || 'Componente'}
-                            </span>
-                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.75rem', color: '#6B7280', flexWrap: 'wrap' }}>
-                              <span style={{ backgroundColor: '#F3F4F6', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600', color: '#374151' }}>
-                                Cant: {asignacion.cantidad}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', minWidth: 0, flex: 1 }}>
+                            <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: 'rgba(105,27,49,0.08)', color: '#691B31', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
+                              <i className="fa-solid fa-box-open"></i>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                              <span style={{ fontWeight: '700', fontSize: '0.9rem', color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {asignacion.componente?.nombre || 'Componente'}
                               </span>
-                              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {asignacion.componente?.marca} {asignacion.componente?.modelo}
-                              </span>
-                              <span style={{ color: '#9CA3AF' }}>
-                                • Inv: {asignacion.componente?.numeroInventario || 'S/N'}
-                              </span>
+                              <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', fontSize: '0.75rem', color: '#6B7280', flexWrap: 'wrap' }}>
+                                <span style={{ backgroundColor: '#F3F4F6', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600', color: '#374151' }}>
+                                  Cant: {asignacion.cantidad}
+                                </span>
+                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {asignacion.componente?.marca} {asignacion.componente?.modelo}
+                                </span>
+                                <span style={{ color: '#9CA3AF' }}>
+                                  • Inv: {asignacion.componente?.numeroInventario || 'S/N'}
+                                </span>
+                              </div>
                             </div>
                           </div>
+
+                          {/* Botón para remover/desasignar pieza */}
+                          <button
+                            type="button"
+                            onClick={() => desasignarPieza(asignacion.id, asignacion.componente?.nombre)}
+                            title="Desasignar y devolver al stock"
+                            style={{
+                              backgroundColor: '#FEE2E2',
+                              border: 'none',
+                              color: '#DC2626',
+                              cursor: 'pointer',
+                              padding: '0.45rem',
+                              borderRadius: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#FECACA'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#FEE2E2'}
+                          >
+                            <FaTrashAlt size={13} />
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -888,7 +963,7 @@ export default function DashboardOficinas() {
 }
 
 // Componente Customizado para el Inventario
-const CustomInventorySelect = ({ value, onChange, inventario }) => {
+const CustomInventorySelect = ({ value, onChange, inventario, piezasAsignadas = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [hoveredCategory, setHoveredCategory] = useState(null);
@@ -907,6 +982,10 @@ const CustomInventorySelect = ({ value, onChange, inventario }) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isOpen]);
+
+  const assignedIds = new Set(
+    piezasAsignadas.map(p => Number(p.componenteId || p.componente?.id)).filter(Boolean)
+  );
 
   const selectedOption = inventario.find(o => o.id === Number(value));
 
@@ -967,21 +1046,48 @@ const CustomInventorySelect = ({ value, onChange, inventario }) => {
           <div style={{ display: 'flex', height: '240px' }}>
             {search ? (
               <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto' }}>
-                {filteredOptions.length > 0 ? filteredOptions.map(opcion => (
-                  <div
-                    key={opcion.id}
-                    onClick={() => { onChange(opcion.id); setIsOpen(false); setSearch(''); }}
-                    style={{ padding: '0.65rem 0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', backgroundColor: value === opcion.id ? '#FEF2F2' : 'transparent' }}
-                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#F1F5F9'}
-                    onMouseOut={e => e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF2F2' : 'transparent'}
-                  >
-                    <FaCogs color="#691B31" size={14} />
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontWeight: '600', color: '#111827', fontSize: '0.85rem' }}>{opcion.nombre}</span>
-                      <span style={{ fontSize: '0.7rem', color: '#6B7280' }}>Inv: {opcion.numeroInventario || 'S/N'} | Stock: {opcion.cantidad}</span>
+                {filteredOptions.length > 0 ? filteredOptions.map(opcion => {
+                  const yaAsignada = assignedIds.has(opcion.id);
+                  const sinStock = Number(opcion.cantidad) <= 0;
+                  const deshabilitada = yaAsignada || sinStock;
+
+                  return (
+                    <div
+                      key={opcion.id}
+                      onClick={() => {
+                        if (deshabilitada) return;
+                        onChange(opcion.id);
+                        setIsOpen(false);
+                        setSearch('');
+                      }}
+                      style={{
+                        padding: '0.65rem 0.85rem',
+                        cursor: deshabilitada ? 'not-allowed' : 'pointer',
+                        opacity: deshabilitada ? 0.6 : 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        borderRadius: '8px',
+                        backgroundColor: value === opcion.id ? '#FEF2F2' : 'transparent'
+                      }}
+                      onMouseOver={e => { if (!deshabilitada) e.currentTarget.style.backgroundColor = '#F1F5F9'; }}
+                      onMouseOut={e => { e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF2F2' : 'transparent'; }}
+                    >
+                      <FaCogs color="#691B31" size={14} />
+                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontWeight: '600', color: '#111827', fontSize: '0.85rem' }}>{opcion.nombre}</span>
+                          {yaAsignada && (
+                            <span style={{ fontSize: '0.7rem', color: '#B91C1C', backgroundColor: '#FEE2E2', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: '700' }}>
+                              Ya asignada
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '0.7rem', color: '#6B7280' }}>Inv: {opcion.numeroInventario || 'S/N'} | Stock: {opcion.cantidad}</span>
+                      </div>
                     </div>
-                  </div>
-                )) : (
+                  );
+                }) : (
                   <div style={{ padding: '2rem', color: '#6B7280', textAlign: 'center', fontSize: '0.85rem' }}>
                     No se encontraron componentes para "{search}"
                   </div>
@@ -1014,25 +1120,52 @@ const CustomInventorySelect = ({ value, onChange, inventario }) => {
                 <div style={{ width: '55%', overflowY: 'auto', padding: '0.4rem', backgroundColor: '#F8FAFC' }}>
                   {hoveredCategory ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                      {gruposOpciones[hoveredCategory].map(opcion => (
-                        <div
-                          key={opcion.id}
-                          onClick={() => { onChange(opcion.id); setIsOpen(false); setSearch(''); }}
-                          style={{ padding: '0.6rem 0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.65rem', borderRadius: '8px', backgroundColor: value === opcion.id ? '#FEF2F2' : 'transparent' }}
-                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#E2E8F0'}
-                          onMouseOut={e => e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF2F2' : 'transparent'}
-                        >
-                          <FaCogs color={value === opcion.id ? '#691B31' : '#6B7280'} size={14} />
-                          <div style={{ display: 'flex', flexDirection: 'column' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: value === opcion.id ? '#691B31' : '#374151' }}>
-                              {opcion.nombre || opcion.descripcion}
-                            </span>
-                            <span style={{ fontSize: '0.725rem', color: '#6B7280' }}>
-                              Disp: {opcion.cantidad ?? 'N/A'} | Inv: {opcion.numeroInventario || 'S/N'}
-                            </span>
+                      {gruposOpciones[hoveredCategory].map(opcion => {
+                        const yaAsignada = assignedIds.has(opcion.id);
+                        const sinStock = Number(opcion.cantidad) <= 0;
+                        const deshabilitada = yaAsignada || sinStock;
+
+                        return (
+                          <div
+                            key={opcion.id}
+                            onClick={() => {
+                              if (deshabilitada) return;
+                              onChange(opcion.id);
+                              setIsOpen(false);
+                              setSearch('');
+                            }}
+                            style={{
+                              padding: '0.6rem 0.75rem',
+                              cursor: deshabilitada ? 'not-allowed' : 'pointer',
+                              opacity: deshabilitada ? 0.6 : 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.65rem',
+                              borderRadius: '8px',
+                              backgroundColor: value === opcion.id ? '#FEF2F2' : 'transparent'
+                            }}
+                            onMouseOver={e => { if (!deshabilitada) e.currentTarget.style.backgroundColor = '#E2E8F0'; }}
+                            onMouseOut={e => { e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF2F2' : 'transparent'; }}
+                          >
+                            <FaCogs color={value === opcion.id ? '#691B31' : '#6B7280'} size={14} />
+                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.85rem', fontWeight: '600', color: value === opcion.id ? '#691B31' : '#374151' }}>
+                                  {opcion.nombre || opcion.descripcion}
+                                </span>
+                                {yaAsignada && (
+                                  <span style={{ fontSize: '0.65rem', color: '#B91C1C', backgroundColor: '#FEE2E2', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: '700' }}>
+                                    Ya asignada
+                                  </span>
+                                )}
+                              </div>
+                              <span style={{ fontSize: '0.725rem', color: '#6B7280' }}>
+                                Disp: {opcion.cantidad ?? 'N/A'} | Inv: {opcion.numeroInventario || 'S/N'}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#9CA3AF', fontSize: '0.8rem' }}>

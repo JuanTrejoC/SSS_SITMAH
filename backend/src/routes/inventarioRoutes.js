@@ -49,6 +49,7 @@ router.get('/existencias', asyncHandler(inventario.listarExistencias));
 router.post('/existencias', asyncHandler(inventario.ingresarExistencia));
 router.get('/existencias/:id/historial', asyncHandler(inventario.obtenerHistorialExistencia));
 router.put('/existencias/:id', asyncHandler(inventario.actualizarExistencia));
+router.delete('/existencias/:id', asyncHandler(inventario.eliminarExistencia));
 router.get('/existencias/export', asyncHandler(inventario.exportarExistenciasExcel));
 
 // Mobiliario Routes
