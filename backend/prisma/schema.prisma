@@ -323,6 +323,7 @@ model ExistenciaComponente {
   nombre           String                 @db.VarChar(150)
   categoria        String                 @db.VarChar(50) // e.g. componente, accesorio, periferico, equipo, herramienta
   cantidad         Int                    @default(0)
+  estadoFisico     String?                @default("Buen Estado") @map("estado_fisico") @db.VarChar(50)
   marca            String?                @db.VarChar(100)
   modelo           String?                @db.VarChar(100)
   numeroSerie      String?                @map("numero_serie") @db.VarChar(100)
@@ -338,11 +339,13 @@ model ExistenciaComponente {
 }
 
 model ReporteSemaforoPieza {
-  id                Int                  @id @default(autoincrement())
-  reporteSemaforoId Int                  @map("reporte_semaforo_id")
-  componenteId      Int                  @map("componente_id")
-  cantidad          Int
-  createdAt         DateTime             @default(now()) @map("created_at")
+  id                          Int                  @id @default(autoincrement())
+  reporteSemaforoId           Int                  @map("reporte_semaforo_id")
+  componenteId                Int                  @map("componente_id")
+  cantidad                    Int
+  estadoPiezaReemplazada      String?              @default("reparacion") @map("estado_pieza_reemplazada") @db.VarChar(50)
+  piezaReemplazadaExistenciaId Int?                 @map("pieza_reemplazada_existencia_id")
+  createdAt                   DateTime             @default(now()) @map("created_at")
 
   reporteSemaforo   ReporteSemaforo      @relation(fields: [reporteSemaforoId], references: [id], onDelete: Cascade)
   componente        ExistenciaComponente @relation(fields: [componenteId], references: [id])
@@ -351,11 +354,13 @@ model ReporteSemaforoPieza {
 }
 
 model ReporteOficinaPieza {
-  id                Int                  @id @default(autoincrement())
-  reporteOficinaId  Int                  @map("reporte_oficina_id")
-  componenteId      Int                  @map("componente_id")
-  cantidad          Int
-  createdAt         DateTime             @default(now()) @map("created_at")
+  id                          Int                  @id @default(autoincrement())
+  reporteOficinaId            Int                  @map("reporte_oficina_id")
+  componenteId                Int                  @map("componente_id")
+  cantidad                    Int
+  estadoPiezaReemplazada      String?              @default("reparacion") @map("estado_pieza_reemplazada") @db.VarChar(50)
+  piezaReemplazadaExistenciaId Int?                 @map("pieza_reemplazada_existencia_id")
+  createdAt                   DateTime             @default(now()) @map("created_at")
 
   reporteOficina    ReporteOficina       @relation(fields: [reporteOficinaId], references: [id], onDelete: Cascade)
   componente        ExistenciaComponente @relation(fields: [componenteId], references: [id])

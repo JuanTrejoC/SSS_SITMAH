@@ -289,6 +289,11 @@ async function exportar(req, res) {
 const asignarPiezaSchema = z.object({
   componente_id: z.coerce.number().int().positive(),
   cantidad: z.coerce.number().int().positive().max(1, 'Solo se puede asignar 1 pieza por solicitud').optional().default(1),
+  estado_pieza_reemplazada: z.enum(['reparacion', 'danada']).optional().default('reparacion'),
+});
+
+const actualizarEstadoPiezaSchema = z.object({
+  estado_pieza_reemplazada: z.enum(['reparacion', 'danada']),
 });
 
 async function asignarPieza(req, res) {
@@ -296,7 +301,7 @@ async function asignarPieza(req, res) {
   const parsed = asignarPiezaSchema.safeParse(req.body);
   if (!parsed.success) return fail(res, parsed.error.errors[0].message);
 
-  const { componente_id } = parsed.data;
+  const { componente_id, estado_pieza_reemplazada } = parsed.data;
   const cantidad = 1; // Solo se puede asignar 1 pieza que es la que se cambia
 
   // Verificar que el reporte existe
@@ -330,12 +335,30 @@ async function asignarPieza(req, res) {
       data: { cantidad: { decrement: cantidad } }
     });
 
+    const estadoFisicoVieja = estado_pieza_reemplazada === 'danada' ? 'Dañado' : 'Por Reparar';
+
+    // Registrar la pieza retirada/vieja en ExistenciaComponente para que figure en el inventario
+    const piezaViejaExistencia = await tx.existenciaComponente.create({
+      data: {
+        nombre: `${componente.nombre} (Pieza Reemplazada)`,
+        categoria: componente.categoria || 'componente',
+        cantidad: 1,
+        estadoFisico: estadoFisicoVieja,
+        marca: componente.marca || null,
+        modelo: componente.modelo || null,
+        numeroInventario: componente.numeroInventario ? `${componente.numeroInventario}-RET` : null,
+        tipoInventario: 'tecnologico',
+      }
+    });
+
     // Crear asignación
     return tx.reporteOficinaPieza.create({
       data: {
         reporteOficinaId: reporteId,
         componenteId: componente_id,
         cantidad,
+        estadoPiezaReemplazada: estado_pieza_reemplazada || 'reparacion',
+        piezaReemplazadaExistenciaId: piezaViejaExistencia.id,
       },
       include: {
         componente: true
@@ -362,6 +385,13 @@ async function desasignarPieza(req, res) {
       data: { cantidad: { increment: asignacion.cantidad } }
     });
 
+    // Si se creó el registro de la pieza reemplazada en existencias, eliminarlo
+    if (asignacion.piezaReemplazadaExistenciaId) {
+      await tx.existenciaComponente.deleteMany({
+        where: { id: asignacion.piezaReemplazadaExistenciaId }
+      });
+    }
+
     // Eliminar asignación
     await tx.reporteOficinaPieza.delete({
       where: { id: piezaId }
@@ -369,6 +399,39 @@ async function desasignarPieza(req, res) {
   });
 
   ok(res, { message: 'Pieza desasignada y stock restaurado' });
+}
+
+async function actualizarEstadoPiezaReemplazada(req, res) {
+  const piezaId = Number(req.params.piezaId);
+  const parsed = actualizarEstadoPiezaSchema.safeParse(req.body);
+  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+
+  const asignacion = await prisma.reporteOficinaPieza.findUnique({
+    where: { id: piezaId }
+  });
+  if (!asignacion) return fail(res, 'Asignación no encontrada', 404);
+
+  const estadoFisicoNuevo = parsed.data.estado_pieza_reemplazada === 'danada' ? 'Dañado' : 'Por Reparar';
+
+  const actualizada = await prisma.reporteOficinaPieza.update({
+    where: { id: piezaId },
+    data: {
+      estadoPiezaReemplazada: parsed.data.estado_pieza_reemplazada
+    },
+    include: {
+      componente: true
+    }
+  });
+
+  // Si existe el registro en existenciaComponente, actualizar su estado físico
+  if (asignacion.piezaReemplazadaExistenciaId) {
+    await prisma.existenciaComponente.updateMany({
+      where: { id: asignacion.piezaReemplazadaExistenciaId },
+      data: { estadoFisico: estadoFisicoNuevo }
+    });
+  }
+
+  ok(res, actualizada);
 }
 
 module.exports = {
@@ -381,4 +444,5 @@ module.exports = {
   exportar,
   asignarPieza,
   desasignarPieza,
+  actualizarEstadoPiezaReemplazada,
 };

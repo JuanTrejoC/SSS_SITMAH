@@ -540,6 +540,229 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
   return workbook.xlsx.writeBuffer();
 }
 
+async function exportarHerramientasExcel(herramientas, tipo = 'herramienta_infra', incluirImagenes = true) {
+  const workbook = new ExcelJS.Workbook();
+  const esInfra = tipo === 'herramienta_infra';
+  const nombreHoja = esInfra ? 'Herramientas Infraestructura' : 'Herramientas Tecnológicas';
+  const sheet = workbook.addWorksheet(nombreHoja);
+
+  sheet.views = [{ showGridLines: true }];
+
+  if (esInfra) {
+    // Encabezado institucional estilo SITMAH
+    sheet.mergeCells('B1:G1');
+    const titleCell1 = sheet.getCell('B1');
+    titleCell1.value = 'SISTEMA INTEGRADO DE TRANSPORTE MASIVO DE HIDALGO (SITMAH)';
+    titleCell1.font = { name: 'Segoe UI', size: 12, bold: true, color: { argb: 'FF000000' } };
+    titleCell1.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    sheet.mergeCells('B2:G2');
+    const titleCell2 = sheet.getCell('B2');
+    titleCell2.value = 'FORMATO DE INVENTARIO DE EQUIPOS';
+    titleCell2.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF000000' } };
+    titleCell2.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    sheet.mergeCells('B3:C3');
+    const depLabel = sheet.getCell('B3');
+    depLabel.value = 'Departamento: Infraestructura';
+    depLabel.font = { name: 'Segoe UI', size: 10, bold: true };
+    depLabel.alignment = { vertical: 'middle', horizontal: 'left' };
+
+    sheet.mergeCells('E3:G3');
+    const fechaLabel = sheet.getCell('E3');
+    const hoy = new Date();
+    const dia = String(hoy.getDate()).padStart(2, '0');
+    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+    const anio = hoy.getFullYear();
+    fechaLabel.value = `Fecha de actualización: ${dia}/${mes}/${anio}`;
+    fechaLabel.font = { name: 'Segoe UI', size: 10, bold: true };
+    fechaLabel.alignment = { vertical: 'middle', horizontal: 'right' };
+
+    // Fila 5: Cabeceras de columnas
+    const headerRow = sheet.getRow(5);
+    headerRow.values = [
+      '',
+      'No. Inventario',
+      'Equipo',
+      'Cantidad',
+      'Marca',
+      'Modelo',
+      'Estado Físico',
+      'Imagen'
+    ];
+    headerRow.height = 28;
+
+    headerRow.eachCell((cell, colNumber) => {
+      if (colNumber > 1) {
+        cell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF000000' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = {
+          top: { style: 'medium', color: { argb: 'FF000000' } },
+          bottom: { style: 'medium', color: { argb: 'FF000000' } },
+          left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+          right: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+        };
+      }
+    });
+
+    sheet.getColumn(1).width = 4;
+    sheet.getColumn(2).width = 20; // No. Inventario
+    sheet.getColumn(3).width = 38; // Equipo
+    sheet.getColumn(4).width = 14; // Cantidad
+    sheet.getColumn(5).width = 20; // Marca
+    sheet.getColumn(6).width = 20; // Modelo
+    sheet.getColumn(7).width = 16; // Estado Físico
+    sheet.getColumn(8).width = 32; // Imagen
+
+    let currentRow = 6;
+    for (let i = 0; i < herramientas.length; i++) {
+      const item = herramientas[i];
+      const detalles = item.detalles || {};
+      const equipoNombre = detalles.equipo || item.modelo || 'Sin nombre';
+      const modeloTec = detalles.modeloTecnico || (detalles.equipo ? item.modelo : '-');
+      const cantidad = detalles.cantidad !== undefined ? detalles.cantidad : 1;
+      const estadoFisico = detalles.estadoFisico || item.estatus || 'Bueno';
+      const imagenes = detalles.imagenes?.length
+        ? detalles.imagenes
+        : detalles.imagen
+        ? [detalles.imagen]
+        : [];
+
+      const row = sheet.getRow(currentRow);
+      row.values = [
+        '',
+        item.numeroInventario || 'INF-S/N',
+        equipoNombre,
+        cantidad,
+        item.marca || '-',
+        modeloTec || '-',
+        estadoFisico,
+        ''
+      ];
+      row.height = imagenes.length > 0 && incluirImagenes ? 75 : 35;
+
+      row.eachCell((cell, colNumber) => {
+        if (colNumber > 1) {
+          cell.font = { name: 'Segoe UI', size: 9.5, color: { argb: 'FF1E293B' } };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          };
+          cell.alignment = {
+            vertical: 'middle',
+            horizontal: [2, 4, 7].includes(colNumber) ? 'center' : 'left',
+            wrapText: true
+          };
+        }
+      });
+
+      if (incluirImagenes && imagenes.length > 0) {
+        for (let imgIdx = 0; imgIdx < Math.min(imagenes.length, 3); imgIdx++) {
+          const imgSrc = imagenes[imgIdx];
+          if (imgSrc && typeof imgSrc === 'string' && imgSrc.startsWith('data:image/')) {
+            try {
+              const parts = imgSrc.split(';base64,');
+              if (parts.length === 2 && parts[1]) {
+                const mime = parts[0].replace('data:image/', '').toLowerCase();
+                const ext = mime.includes('png') ? 'png' : 'jpeg';
+                const imageId = workbook.addImage({
+                  base64: parts[1],
+                  extension: ext
+                });
+
+                sheet.addImage(imageId, {
+                  tl: { col: 7.05 + (imgIdx * 0.32), row: currentRow - 1 + 0.08 },
+                  ext: { width: 55, height: 65 },
+                  editAs: 'oneCell'
+                });
+              }
+            } catch (err) {
+              console.error('Error insertando imagen base64 en Excel:', err.message);
+            }
+          }
+        }
+      }
+
+      currentRow++;
+    }
+  } else {
+    // Para Herramientas Tecnológicas
+    sheet.columns = [
+      { header: 'Tipo', key: 'tipo', width: 22 },
+      { header: 'No. Inventario', key: 'numeroInventario', width: 20 },
+      { header: 'No. Serie', key: 'numeroSerie', width: 20 },
+      { header: 'Nombre / Modelo', key: 'modelo', width: 30 },
+      { header: 'Marca', key: 'marca', width: 18 },
+      { header: 'Cantidad', key: 'cantidad', width: 12 },
+      { header: 'Ubicación', key: 'areaUbicacion', width: 22 },
+      { header: 'Estado Físico', key: 'estatus', width: 16 },
+      { header: 'Imagen', key: 'imagen', width: 28 },
+    ];
+
+    aplicarEstiloTabla(sheet);
+
+    for (let i = 0; i < herramientas.length; i++) {
+      const item = herramientas[i];
+      const detalles = item.detalles || {};
+      const equipoNombre = detalles.equipo || item.modelo || 'Sin nombre';
+      const cantidad = detalles.cantidad !== undefined ? detalles.cantidad : 1;
+      const estadoFisico = detalles.estadoFisico || item.estatus || 'Bueno';
+      const imagenes = detalles.imagenes?.length
+        ? detalles.imagenes
+        : detalles.imagen
+        ? [detalles.imagen]
+        : [];
+
+      const row = sheet.addRow({
+        tipo: 'Herramienta Tecnológica',
+        numeroInventario: item.numeroInventario || 'TEC-S/N',
+        numeroSerie: item.numeroSerie || '-',
+        modelo: equipoNombre,
+        marca: item.marca || '-',
+        cantidad: cantidad,
+        areaUbicacion: item.areaUbicacion || 'Mantenimiento',
+        estatus: estadoFisico,
+        imagen: ''
+      });
+
+      const rowNumber = row.number;
+      row.height = imagenes.length > 0 && incluirImagenes ? 75 : 35;
+
+      if (incluirImagenes && imagenes.length > 0) {
+        for (let imgIdx = 0; imgIdx < Math.min(imagenes.length, 3); imgIdx++) {
+          const imgSrc = imagenes[imgIdx];
+          if (imgSrc && typeof imgSrc === 'string' && imgSrc.startsWith('data:image/')) {
+            try {
+              const parts = imgSrc.split(';base64,');
+              if (parts.length === 2 && parts[1]) {
+                const mime = parts[0].replace('data:image/', '').toLowerCase();
+                const ext = mime.includes('png') ? 'png' : 'jpeg';
+                const imageId = workbook.addImage({
+                  base64: parts[1],
+                  extension: ext
+                });
+
+                sheet.addImage(imageId, {
+                  tl: { col: 8.05 + (imgIdx * 0.32), row: rowNumber - 1 + 0.08 },
+                  ext: { width: 55, height: 65 },
+                  editAs: 'oneCell'
+                });
+              }
+            } catch (err) {
+              console.error('Error insertando imagen base64 en Excel:', err.message);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return workbook.xlsx.writeBuffer();
+}
+
 async function exportarInventarioMobiliario(mobiliario) {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Inventario Mobiliario');
@@ -578,5 +801,13 @@ async function exportarInventarioMobiliario(mobiliario) {
   return workbook.xlsx.writeBuffer();
 }
 
-module.exports = { exportarReportesOficina, exportarReportesSemaforo, exportarInventarioExistencias, exportarInventarioMobiliario };
+module.exports = {
+  exportarReportesOficina,
+  exportarReportesSemaforo,
+  exportarInventarioExistencias,
+  exportarInventarioMobiliario,
+  exportarHerramientasExcel
+};
+
+
 

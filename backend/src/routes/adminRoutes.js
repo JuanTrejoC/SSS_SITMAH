@@ -40,6 +40,7 @@ router.get('/reportes/oficina/:id', asyncHandler(reporteOficina.obtener));
 router.patch('/reportes/oficina/:id/estado', upload.array('evidencia', 10), asyncHandler(reporteOficina.cambiarEstado));
 router.delete('/reportes/oficina/:id', asyncHandler(reporteOficina.eliminar));
 router.post('/reportes/oficina/:id/piezas', asyncHandler(reporteOficina.asignarPieza));
+router.patch('/reportes/oficina/:id/piezas/:piezaId/estado-reemplazo', asyncHandler(reporteOficina.actualizarEstadoPiezaReemplazada));
 router.delete('/reportes/oficina/:id/piezas/:piezaId', asyncHandler(reporteOficina.desasignarPieza));
 
 router.get('/reportes/semaforo/resumen', asyncHandler(reporteSemaforo.resumen));
@@ -49,6 +50,7 @@ router.get('/reportes/semaforo/:id', asyncHandler(reporteSemaforo.obtener));
 router.patch('/reportes/semaforo/:id/estado', upload.array('evidencia', 10), asyncHandler(reporteSemaforo.cambiarEstado));
 router.delete('/reportes/semaforo/:id', asyncHandler(reporteSemaforo.eliminar));
 router.post('/reportes/semaforo/:id/piezas', asyncHandler(reporteSemaforo.asignarPieza));
+router.patch('/reportes/semaforo/:id/piezas/:piezaId/estado-reemplazo', asyncHandler(reporteSemaforo.actualizarEstadoPiezaReemplazada));
 router.delete('/reportes/semaforo/:id/piezas/:piezaId', asyncHandler(reporteSemaforo.desasignarPieza));
 
 router.get('/estadisticas', asyncHandler(estadisticas.listar));

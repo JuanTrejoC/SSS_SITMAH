@@ -2,7 +2,7 @@ const { z } = require('zod');
 const prisma = require('../config/db');
 const { ok, fail } = require('../utils/response');
 const { parsePagination } = require('../utils/filters');
-const { exportarInventarioExistencias, exportarInventarioMobiliario } = require('../services/excelService');
+const { exportarInventarioExistencias, exportarInventarioMobiliario, exportarHerramientasExcel } = require('../services/excelService');
 
 // Schema validation for mobiliario
 const mobiliarioSchema = z.object({
@@ -367,10 +367,28 @@ async function descargarProgramacion(req, res) {
 // ==========================================
 
 async function listarExistencias(req, res) {
-  const { categoria, tipoInventario } = req.query;
+  const { categoria, tipoInventario, estadoFisico, soloBuenEstado } = req.query;
   const where = {};
   if (categoria) where.categoria = categoria;
   if (tipoInventario) where.tipoInventario = tipoInventario;
+  if (estadoFisico) {
+    where.estadoFisico = estadoFisico;
+  } else if (soloBuenEstado === 'true') {
+    where.AND = [
+      {
+        OR: [
+          { estadoFisico: 'Buen Estado' },
+          { estadoFisico: null },
+        ]
+      },
+      {
+        NOT: [
+          { nombre: { contains: 'Reemplazada' } },
+          { nombre: { contains: 'Retirada' } }
+        ]
+      }
+    ];
+  }
 
   const existencias = await prisma.existenciaComponente.findMany({
     where,
@@ -550,13 +568,20 @@ async function exportarEquipoTecnologicoExcel(req, res) {
     orderBy: { id: order === 'desc' ? 'desc' : 'asc' },
   });
 
-  const buffer = await exportarInventarioExistencias(equipos, includeImages === 'true');
+  const tipoFinal = where.tipo === 'herramienta_infra' ? 'herramienta_infra' : (where.tipo === 'herramienta_tec' ? 'herramienta_tec' : (tipo || 'tecnologico'));
+
+  let buffer;
+  if (tipoFinal === 'herramienta_infra' || tipoFinal === 'herramienta_tec') {
+    buffer = await exportarHerramientasExcel(equipos, tipoFinal, includeImages === 'true');
+  } else {
+    buffer = await exportarInventarioExistencias(equipos, includeImages === 'true');
+  }
 
   res.setHeader(
     'Content-Type',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   );
-  res.setHeader('Content-Disposition', 'attachment; filename="inventario_herramientas.xlsx"');
+  res.setHeader('Content-Disposition', `attachment; filename="inventario_${tipoFinal}.xlsx"`);
   res.send(buffer);
 }
 

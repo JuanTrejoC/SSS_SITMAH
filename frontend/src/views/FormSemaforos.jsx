@@ -16,7 +16,8 @@ export default function FormSemaforos({ usuarioActual }) {
 
   const [formData, setFormData] = useState({
     jefe_turno: '',
-    origen: '',            // 'Municipio', 'Conductores', 'Redes Sociales', etc.
+    origen: '',            // 'Municipio', 'Conductores', 'Redes Sociales', 'Otro'
+    origen_otro: '',       // Texto cuando se selecciona 'Otro'
     crucero_id: '',        // ID numérico
     tipo_falla_id: '',     // ID numérico
     descripcion_otro: '',
@@ -108,12 +109,17 @@ export default function FormSemaforos({ usuarioActual }) {
 
     switch (nombre) {
       case 'jefe_turno':
-        if (!valorLimpio) mensajeError = 'Indique el jefe de turno'
+        if (!valorLimpio) mensajeError = 'Indique el nombre de quien reporta'
         else esValido = true
         break
 
       case 'origen':
         if (!valorLimpio) mensajeError = 'Seleccione el origen del reporte'
+        else esValido = true
+        break
+
+      case 'origen_otro':
+        if (formData.origen === 'Otro' && !valorLimpio) mensajeError = 'Especifique el origen del reporte'
         else esValido = true
         break
 
@@ -313,6 +319,9 @@ export default function FormSemaforos({ usuarioActual }) {
     // Validar campos requeridos
     validarCampo('jefe_turno', formData.jefe_turno)
     validarCampo('origen', formData.origen)
+    if (formData.origen === 'Otro') {
+      validarCampo('origen_otro', formData.origen_otro)
+    }
     validarCampo('crucero_id', formData.crucero_id)
     validarCampo('tipo_falla_id', formData.tipo_falla_id)
     validarCampo('fecha_dano', formData.fecha_dano)
@@ -324,6 +333,7 @@ export default function FormSemaforos({ usuarioActual }) {
     if (
       !formData.jefe_turno.trim() ||
       !formData.origen ||
+      (formData.origen === 'Otro' && !formData.origen_otro?.trim()) ||
       !formData.crucero_id ||
       !formData.tipo_falla_id ||
       !formData.fecha_dano ||
@@ -350,9 +360,11 @@ export default function FormSemaforos({ usuarioActual }) {
         descripcionFinal = descripcionFinal.substring(0, 250)
       }
 
+      const origenFinal = formData.origen === 'Otro' ? formData.origen_otro.trim() : formData.origen
+
       const datosAEnviar = new FormData()
       datosAEnviar.append('jefe_turno', formData.jefe_turno.trim())
-      datosAEnviar.append('origen', formData.origen)
+      datosAEnviar.append('origen', origenFinal)
       datosAEnviar.append('crucero_id', Number(formData.crucero_id))
       datosAEnviar.append('tipo_falla_id', Number(formData.tipo_falla_id))
       datosAEnviar.append('descripcion', descripcionFinal)
@@ -385,6 +397,7 @@ export default function FormSemaforos({ usuarioActual }) {
         setFormData({
           jefe_turno: '',
           origen: '',
+          origen_otro: '',
           crucero_id: '',
           tipo_falla_id: '',
           descripcion_otro: '',
@@ -492,14 +505,14 @@ export default function FormSemaforos({ usuarioActual }) {
                 gap: '1.25rem'
               }}
             >
-              {/* Jefe de Turno */}
+              {/* Nombre de quien reporta */}
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
-                  Jefe de Turno <span style={{ color: '#EF4444' }}>*</span>
+                  Nombre de quien reporta <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="Nombre del jefe de turno"
+                  placeholder="Nombre completo de quien reporta"
                   value={formData.jefe_turno}
                   onChange={(e) => {
                     const v = soloLetrasYNombres(e.target.value)
@@ -523,8 +536,11 @@ export default function FormSemaforos({ usuarioActual }) {
                   value={formData.origen}
                   onChange={(e) => {
                     const v = e.target.value
-                    setFormData({ ...formData, origen: v })
+                    setFormData({ ...formData, origen: v, origen_otro: v === 'Otro' ? formData.origen_otro : '' })
                     validarCampo('origen', v)
+                    if (v === 'Otro') {
+                      validarCampo('origen_otro', formData.origen_otro)
+                    }
                   }}
                   className="premium-select"
                   style={{
@@ -535,9 +551,30 @@ export default function FormSemaforos({ usuarioActual }) {
                   <option value="Municipio">Municipio</option>
                   <option value="Conductores">Conductores</option>
                   <option value="Redes Sociales">Redes Sociales</option>
-
+                  <option value="Otro">Otro</option>
                 </select>
                 {errores.origen && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.origen}</span>}
+
+                {formData.origen === 'Otro' && (
+                  <div style={{ marginTop: '0.65rem', animation: 'fadeIn 0.2s ease-in-out' }}>
+                    <input
+                      type="text"
+                      placeholder="Escriba la procedencia u origen..."
+                      value={formData.origen_otro}
+                      maxLength={50}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        setFormData({ ...formData, origen_otro: v })
+                        validarCampo('origen_otro', v)
+                      }}
+                      className="premium-input"
+                      style={{
+                        border: `1.5px solid ${errores.origen_otro ? '#EF4444' : '#D1D5DB'}`
+                      }}
+                    />
+                    {errores.origen_otro && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.origen_otro}</span>}
+                  </div>
+                )}
               </div>
 
               {/* Crucero Afectado con Buscador */}

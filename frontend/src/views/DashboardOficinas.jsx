@@ -27,6 +27,7 @@ export default function DashboardOficinas() {
   const [mostrarInventario, setMostrarInventario] = useState(false)
   const [componenteSeleccionado, setComponenteSeleccionado] = useState('')
   const [cantidadSeleccionada, setCantidadSeleccionada] = useState(1)
+  const [estadoPiezaReemplazada, setEstadoPiezaReemplazada] = useState('reparacion')
 
   useEffect(() => {
     if (verDetalle || confirmResuelto.visible) {
@@ -73,12 +74,17 @@ export default function DashboardOficinas() {
   const cargarInventario = async () => {
     if (!user?.token) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/inventario/existencias?tipoInventario=tecnologico&limit=1000`, {
+      const response = await fetch(`${API_BASE_URL}/api/inventario/existencias?tipoInventario=tecnologico&soloBuenEstado=true&limit=1000`, {
         headers: { 'Authorization': `Bearer ${user.token}` }
       });
       const json = await response.json();
       if (response.ok && json.ok) {
-        setInventario(json.data || []);
+        const soloDisponibles = (json.data || []).filter(item => {
+          const estado = item.estadoFisico || 'Buen Estado';
+          const esBuenEstado = estado === 'Buen Estado' || (!item.estadoFisico && !item.nombre?.includes('Reemplazada'));
+          return esBuenEstado && Number(item.cantidad) > 0 && !item.nombre?.includes('Reemplazada') && !item.nombre?.includes('Retirada');
+        });
+        setInventario(soloDisponibles);
       }
     } catch (err) {
       console.error('Error al cargar inventario', err);
@@ -106,9 +112,10 @@ export default function DashboardOficinas() {
       return;
     }
 
+    const estadoTexto = estadoPiezaReemplazada === 'reparacion' ? 'En Reparación' : 'Dañada / Para baja';
     const result = await Swal.fire({
       title: '¿Confirmar asignación?',
-      text: 'Se asignará 1 unidad de este componente para el cambio/reemplazo en este reporte.',
+      html: `Se asignará 1 unidad de este componente nuevo para el reemplazo.<br><br><strong>Destino de la pieza reemplazada:</strong> <span style="color: ${estadoPiezaReemplazada === 'reparacion' ? '#2563EB' : '#DC2626'}">${estadoTexto}</span>`,
       icon: 'question',
       showCancelButton: true,
       confirmButtonText: 'Sí, asignar',
@@ -126,7 +133,8 @@ export default function DashboardOficinas() {
         },
         body: JSON.stringify({
           componente_id: Number(componenteSeleccionado),
-          cantidad: 1
+          cantidad: 1,
+          estado_pieza_reemplazada: estadoPiezaReemplazada
         })
       });
       const json = await response.json();
@@ -145,6 +153,7 @@ export default function DashboardOficinas() {
         );
         setComponenteSeleccionado('');
         setCantidadSeleccionada(1);
+        setEstadoPiezaReemplazada('reparacion');
         cargarInventario();
         Swal.fire('Asignada', 'Pieza asignada correctamente al reporte.', 'success');
       } else {
@@ -152,6 +161,39 @@ export default function DashboardOficinas() {
       }
     } catch {
       Swal.fire('Error', 'Error de red al asignar pieza', 'error');
+    }
+  };
+
+  const cambiarEstadoPiezaReemplazada = async (piezaId, nuevoEstado) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/reportes/oficina/${verDetalle.id}/piezas/${piezaId}/estado-reemplazo`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
+        body: JSON.stringify({
+          estado_pieza_reemplazada: nuevoEstado
+        })
+      });
+      const json = await response.json();
+      if (response.ok && json.ok) {
+        setVerDetalle(prev => ({
+          ...prev,
+          piezasAsignadas: (prev.piezasAsignadas || []).map(p => p.id === piezaId ? { ...p, estadoPiezaReemplazada: nuevoEstado } : p)
+        }));
+        setReportes(prevReportes => 
+          prevReportes.map(rep => 
+            rep.id === verDetalle.id 
+              ? { ...rep, piezasAsignadas: (rep.piezasAsignadas || []).map(p => p.id === piezaId ? { ...p, estadoPiezaReemplazada: nuevoEstado } : p) } 
+              : rep
+          )
+        );
+      } else {
+        Swal.fire('Error', json.error || 'No se pudo actualizar el estado de la pieza', 'error');
+      }
+    } catch {
+      Swal.fire('Error', 'Error de red al actualizar estado de la pieza', 'error');
     }
   };
 
@@ -795,7 +837,7 @@ export default function DashboardOficinas() {
                   {mostrarInventario && (
                     <div style={{ backgroundColor: '#F8FAFC', padding: '1rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid #E5E7EB' }}>
                       <h4 style={{ margin: '0 0 0.65rem 0', fontSize: '0.85rem', color: '#4B5563', fontWeight: '700' }}>Seleccionar del Inventario Tecnológico (1 pieza por reemplazo)</h4>
-                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
                         <div style={{ flex: '1', minWidth: '200px' }}>
                           <CustomInventorySelect 
                             value={componenteSeleccionado}
@@ -824,11 +866,60 @@ export default function DashboardOficinas() {
                           Asignar
                         </button>
                       </div>
+
+                      {/* Selector de estado/destino de la pieza reemplazada */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap', paddingTop: '0.6rem', borderTop: '1px dashed #D1D5DB' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#4B5563' }}>
+                          Destino de la pieza reemplazada:
+                        </span>
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => setEstadoPiezaReemplazada('reparacion')}
+                            style={{
+                              padding: '0.3rem 0.65rem',
+                              borderRadius: '6px',
+                              border: estadoPiezaReemplazada === 'reparacion' ? '1.5px solid #2563EB' : '1px solid #D1D5DB',
+                              backgroundColor: estadoPiezaReemplazada === 'reparacion' ? '#EFF6FF' : 'white',
+                              color: estadoPiezaReemplazada === 'reparacion' ? '#1D4ED8' : '#6B7280',
+                              fontSize: '0.78rem',
+                              fontWeight: estadoPiezaReemplazada === 'reparacion' ? '700' : '500',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              transition: 'all 0.15s'
+                            }}
+                          >
+                            <span>🔧</span> A Reparación
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEstadoPiezaReemplazada('danada')}
+                            style={{
+                              padding: '0.3rem 0.65rem',
+                              borderRadius: '6px',
+                              border: estadoPiezaReemplazada === 'danada' ? '1.5px solid #DC2626' : '1px solid #D1D5DB',
+                              backgroundColor: estadoPiezaReemplazada === 'danada' ? '#FEF2F2' : 'white',
+                              color: estadoPiezaReemplazada === 'danada' ? '#B91C1C' : '#6B7280',
+                              fontSize: '0.78rem',
+                              fontWeight: estadoPiezaReemplazada === 'danada' ? '700' : '500',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              transition: 'all 0.15s'
+                            }}
+                          >
+                            <span>⚠️</span> Dañada / Para baja
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
 
                   {verDetalle.piezasAsignadas && verDetalle.piezasAsignadas.length > 0 ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem' }}>
                       {verDetalle.piezasAsignadas.map((asignacion, idx) => (
                         <div key={idx} style={{ 
                           padding: '0.85rem 1rem', 
@@ -896,6 +987,107 @@ export default function DashboardOficinas() {
                     </div>
                   ) : (
                     <div style={{ fontSize: '0.85rem', color: '#9CA3AF', fontStyle: 'italic' }}>No hay componentes asignados a este reporte.</div>
+                  )}
+
+                  {/* SECCIÓN APARTE: PIEZAS REEMPLAZADAS */}
+                  {verDetalle.piezasAsignadas && verDetalle.piezasAsignadas.length > 0 && (
+                    <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #E5E7EB' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.65rem' }}>
+                        <strong style={{ fontSize: '0.95rem', color: '#111827', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span>🔄</span> Pieza Reemplazada:
+                        </strong>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem' }}>
+                        {verDetalle.piezasAsignadas.map((asignacion, idx) => {
+                          const estadoPieza = asignacion.estadoPiezaReemplazada || 'reparacion';
+                          const esReparacion = estadoPieza === 'reparacion';
+
+                          return (
+                            <div key={`reemplazada-${idx}`} style={{
+                              padding: '0.85rem 1rem',
+                              backgroundColor: 'white',
+                              border: '1px solid #E5E7EB',
+                              borderRadius: '12px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '0.65rem',
+                              boxShadow: '0 2px 8px -2px rgba(0,0,0,0.05)',
+                              transition: 'transform 0.2s, box-shadow 0.2s'
+                            }}
+                            onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px -2px rgba(0,0,0,0.08)' }}
+                            onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px -2px rgba(0,0,0,0.05)' }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                <div style={{ 
+                                  width: '38px', 
+                                  height: '38px', 
+                                  borderRadius: '10px', 
+                                  backgroundColor: esReparacion ? '#EFF6FF' : '#FEF2F2', 
+                                  color: esReparacion ? '#2563EB' : '#DC2626', 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'center', 
+                                  fontSize: '1.05rem', 
+                                  flexShrink: 0 
+                                }}>
+                                  <i className="fa-solid fa-wrench"></i>
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#1E293B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {asignacion.componente?.nombre || 'Pieza'} (Pieza Reemplazada)
+                                  </div>
+                                  <div style={{ fontSize: '0.75rem', color: esReparacion ? '#0284C7' : '#DC2626', fontWeight: '600', marginTop: '0.1rem' }}>
+                                    Estado actual: {esReparacion ? 'En Reparación' : 'Dañada / Para baja'}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Botones de cambio de estado */}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '0.5rem', borderTop: '1px solid #F3F4F6', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: '600' }}>Destino:</span>
+                                <div style={{ display: 'flex', gap: '0.35rem' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => cambiarEstadoPiezaReemplazada(asignacion.id, 'reparacion')}
+                                    style={{
+                                      padding: '0.28rem 0.65rem',
+                                      fontSize: '0.75rem',
+                                      fontWeight: '700',
+                                      borderRadius: '6px',
+                                      border: esReparacion ? '1.5px solid #0284C7' : '1px solid #D1D5DB',
+                                      backgroundColor: esReparacion ? '#0284C7' : 'white',
+                                      color: esReparacion ? 'white' : '#475569',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s'
+                                    }}
+                                  >
+                                    🔧 Reparación
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => cambiarEstadoPiezaReemplazada(asignacion.id, 'danada')}
+                                    style={{
+                                      padding: '0.28rem 0.65rem',
+                                      fontSize: '0.75rem',
+                                      fontWeight: '700',
+                                      borderRadius: '6px',
+                                      border: !esReparacion ? '1.5px solid #DC2626' : '1px solid #D1D5DB',
+                                      backgroundColor: !esReparacion ? '#DC2626' : 'white',
+                                      color: !esReparacion ? 'white' : '#475569',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s'
+                                    }}
+                                  >
+                                    ⚠️ Dañada
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </div>
 
