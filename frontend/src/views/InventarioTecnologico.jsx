@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { API_BASE_URL } from '../config';
@@ -63,6 +63,48 @@ export default function InventarioTecnologico() {
   const [cargosList, setCargosList] = useState([]);
   const [areasList, setAreasList] = useState([]);
   const [estacionesList, setEstacionesList] = useState([]);
+
+  const procesadoresUnicos = useMemo(() => {
+    const todos = todosLosEquipos
+      .map(eq => eq.detalles?.procesador)
+      .filter(p => typeof p === 'string' && p.trim() !== '');
+    return [...new Set(todos)].sort();
+  }, [todosLosEquipos]);
+
+  const graficasUnicas = useMemo(() => {
+    const todos = todosLosEquipos
+      .map(eq => eq.detalles?.tarjetaGrafica)
+      .filter(p => typeof p === 'string' && p.trim() !== '');
+    return [...new Set(todos)].sort();
+  }, [todosLosEquipos]);
+
+  const marcasUnicas = useMemo(() => {
+    const todos = todosLosEquipos
+      .map(eq => eq.marca)
+      .filter(p => typeof p === 'string' && p.trim() !== '');
+    return [...new Set(todos)].sort();
+  }, [todosLosEquipos]);
+
+  const modelosUnicos = useMemo(() => {
+    const todos = todosLosEquipos
+      .map(eq => eq.modelo)
+      .filter(p => typeof p === 'string' && p.trim() !== '');
+    return [...new Set(todos)].sort();
+  }, [todosLosEquipos]);
+
+  const seriesUnicas = useMemo(() => {
+    const todos = todosLosEquipos
+      .map(eq => eq.numeroSerie)
+      .filter(p => typeof p === 'string' && p.trim() !== '');
+    return [...new Set(todos)].sort();
+  }, [todosLosEquipos]);
+
+  const inventariosUnicos = useMemo(() => {
+    const todos = todosLosEquipos
+      .map(eq => eq.numeroInventario)
+      .filter(p => typeof p === 'string' && p.trim() !== '');
+    return [...new Set(todos)].sort();
+  }, [todosLosEquipos]);
 
   // Refacciones y Piezas de Repuesto State
   const [modalRefaccionesAbierto, setModalRefaccionesAbierto] = useState(false);
@@ -1458,13 +1500,37 @@ export default function InventarioTecnologico() {
                 <>
                   <div className="inventario-grid-2col">
                     {/* Campos Base */}
-                    <div><label style={labelStyle}>Marca</label><input type="text" value={form.marca} onChange={e => setForm({ ...form, marca: e.target.value })} style={inputStyle} /></div>
-                    <div><label style={labelStyle}>Modelo</label><input type="text" value={form.modelo} onChange={e => setForm({ ...form, modelo: e.target.value })} style={inputStyle} /></div>
+                    <div>
+                      <label style={labelStyle}>Marca</label>
+                      <input type="text" value={form.marca} onChange={e => setForm({ ...form, marca: e.target.value })} style={inputStyle} list="marcas-list" />
+                      <datalist id="marcas-list">
+                        {marcasUnicas.filter(m => m.toLowerCase().includes(form.marca?.toLowerCase() || '')).slice(0, 5).map(m => <option key={m} value={m} />)}
+                      </datalist>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Modelo</label>
+                      <input type="text" value={form.modelo} onChange={e => setForm({ ...form, modelo: e.target.value })} style={inputStyle} list="modelos-list" />
+                      <datalist id="modelos-list">
+                        {modelosUnicos.filter(m => m.toLowerCase().includes(form.modelo?.toLowerCase() || '')).slice(0, 5).map(m => <option key={m} value={m} />)}
+                      </datalist>
+                    </div>
 
                     {!sinInventario && (
-                      <div><label style={labelStyle}>No. Inventario {form.tipo === 'router' ? '*' : ''}</label><input type="text" value={form.numeroInventario} onChange={e => setForm({ ...form, numeroInventario: e.target.value })} style={inputStyle} required={form.tipo === 'router'} /></div>
+                      <div>
+                        <label style={labelStyle}>No. Inventario {form.tipo === 'router' ? '*' : ''}</label>
+                        <input type="text" value={form.numeroInventario} onChange={e => setForm({ ...form, numeroInventario: e.target.value })} style={inputStyle} required={form.tipo === 'router'} list="inventarios-list" />
+                        <datalist id="inventarios-list">
+                          {inventariosUnicos.filter(i => i.toLowerCase().includes(form.numeroInventario?.toLowerCase() || '')).slice(0, 5).map(i => <option key={i} value={i} />)}
+                        </datalist>
+                      </div>
                     )}
-                    <div><label style={labelStyle}>No. Serie</label><input type="text" value={form.numeroSerie} onChange={e => setForm({ ...form, numeroSerie: e.target.value })} style={inputStyle} /></div>
+                    <div>
+                      <label style={labelStyle}>No. Serie</label>
+                      <input type="text" value={form.numeroSerie} onChange={e => setForm({ ...form, numeroSerie: e.target.value })} style={inputStyle} list="series-list" />
+                      <datalist id="series-list">
+                        {seriesUnicas.filter(s => s.toLowerCase().includes(form.numeroSerie?.toLowerCase() || '')).slice(0, 5).map(s => <option key={s} value={s} />)}
+                      </datalist>
+                    </div>
 
                     <div>
                       <label style={labelStyle}>Área *</label>
@@ -1621,7 +1687,7 @@ export default function InventarioTecnologico() {
                           <CustomSpecSelect
                             label="Almacenamiento (Capacidad)"
                             value={form.detalles.almacenamiento || ''}
-                            options={['120GB', '240GB', '480GB', '512GB', '1TB', '2TB']}
+                            options={['64GB', '128GB', '256GB', '512GB', '1TB', '2TB']}
                             onChange={val => handleDetalleChange('almacenamiento', val)}
                             placeholder="Ej: 500GB SSD"
                           />
@@ -1645,13 +1711,20 @@ export default function InventarioTecnologico() {
                       )}
 
                       {tieneProcesador && (
-                        <CustomSpecSelect
-                          label="Procesador"
-                          value={form.detalles.procesador || ''}
-                          options={['Intel Core i3', 'Intel Core i5', 'Intel Core i7', 'Intel Core i9', 'Intel Xeon', 'AMD Ryzen 3', 'AMD Ryzen 5', 'AMD Ryzen 7', 'AMD Ryzen 9']}
-                          onChange={val => handleDetalleChange('procesador', val)}
-                          placeholder="Ej: Intel Core i5 11va Gen"
-                        />
+                        <div>
+                          <label style={labelStyle}>Procesador</label>
+                          <input 
+                            type="text" 
+                            value={form.detalles.procesador || ''} 
+                            onChange={e => handleDetalleChange('procesador', e.target.value)} 
+                            style={inputStyle} 
+                            placeholder="Ej: Intel Core i7-13620H" 
+                            list="procesadores-list"
+                          />
+                          <datalist id="procesadores-list">
+                            {procesadoresUnicos.filter(p => p.toLowerCase().includes(form.detalles?.procesador?.toLowerCase() || '')).slice(0, 5).map(p => <option key={p} value={p} />)}
+                          </datalist>
+                        </div>
                       )}
 
                       {['escritorio', 'laptop', 'celular', 'tableta'].includes(form.tipo) && (
@@ -1666,13 +1739,20 @@ export default function InventarioTecnologico() {
 
                       {['escritorio', 'laptop'].includes(form.tipo) && (
                         <>
-                          <CustomSpecSelect
-                            label="Tarjeta Gráfica"
-                            value={form.detalles.tarjetaGrafica || ''}
-                            options={['Integrada', 'NVIDIA GeForce GTX 1650', 'NVIDIA GeForce RTX 3060', 'NVIDIA GeForce RTX 4060', 'AMD Radeon RX 6600']}
-                            onChange={val => handleDetalleChange('tarjetaGrafica', val)}
-                            placeholder="Ej: Intel Iris Xe"
-                          />
+                          <div>
+                            <label style={labelStyle}>Tarjeta Gráfica</label>
+                            <input 
+                              type="text" 
+                              value={form.detalles.tarjetaGrafica || ''} 
+                              onChange={e => handleDetalleChange('tarjetaGrafica', e.target.value)} 
+                              style={inputStyle} 
+                              placeholder="Ej: NVIDIA GeForce RTX 4060" 
+                              list="graficas-list"
+                            />
+                            <datalist id="graficas-list">
+                              {graficasUnicas.filter(g => g.toLowerCase().includes(form.detalles?.tarjetaGrafica?.toLowerCase() || '')).slice(0, 5).map(g => <option key={g} value={g} />)}
+                            </datalist>
+                          </div>
                           <div><label style={labelStyle}>Conectividad de Red</label>
                             <select value={form.detalles.red || ''} onChange={e => handleDetalleChange('red', e.target.value)} style={inputStyle}>
                               <option value="">-- Seleccionar --</option>
@@ -2848,11 +2928,11 @@ const CustomSpecSelect = ({ label, value, options, onChange, placeholder }) => {
 
   useEffect(() => {
     if (value) {
-      if (options.includes(value)) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
+      // Solo regresar al modo de selección si coinciden las opciones y no estábamos ya escribiendo otra cosa
+      if (options.includes(value) && !esOtro) {
         setEsOtro(false);
         setCustomVal('');
-      } else {
+      } else if (!options.includes(value)) {
         setEsOtro(true);
         setCustomVal(value);
       }

@@ -66,6 +66,40 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user]);
 
+  // Temporizador de inactividad (15 minutos)
+  useEffect(() => {
+    let timeoutId;
+
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      if (user) {
+        timeoutId = setTimeout(() => {
+          logout();
+        }, 15 * 60 * 1000); // 15 minutos en milisegundos
+      }
+    };
+
+    if (user) {
+      // Iniciar el temporizador al detectar un usuario activo
+      resetTimer();
+      
+      // Eventos que reinician el temporizador de inactividad
+      window.addEventListener('mousemove', resetTimer);
+      window.addEventListener('keydown', resetTimer);
+      window.addEventListener('click', resetTimer);
+      window.addEventListener('scroll', resetTimer);
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('mousemove', resetTimer);
+      window.removeEventListener('keydown', resetTimer);
+      window.removeEventListener('click', resetTimer);
+      window.removeEventListener('scroll', resetTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   // ✅ CONEXIÓN CON EL BACKEND PARA INICIO DE SESIÓN
   const loginAdmin = async (datos) => {
     try {
