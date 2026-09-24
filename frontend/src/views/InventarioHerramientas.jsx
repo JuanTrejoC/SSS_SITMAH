@@ -63,6 +63,7 @@ export default function InventarioHerramientas() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [form, setForm] = useState(getInitialForm());
+  const [errores, setErrores] = useState({});
   const [sedesList, setSedesList] = useState(['CCGO', 'CETRAM', 'Oficinas Téllez', 'Oficinas Patio Téllez', 'Mantenimiento']);
 
   // Modal para ver imagen ampliada (Lightbox con soporte para hasta 3 imágenes)
@@ -74,6 +75,146 @@ export default function InventarioHerramientas() {
   });
 
   const fileInputRef = useRef(null);
+
+  // Validación de campos en tiempo real
+  const validarCampo = (campo, valor, tipoActual = form.tipo) => {
+    let error = '';
+    const v = typeof valor === 'string' ? valor.trim() : valor;
+
+    switch (campo) {
+      case 'equipo': {
+        if (!v) {
+          error = 'El nombre del equipo o herramienta es obligatorio.';
+        } else if (v.length < 3) {
+          error = 'Debe tener al menos 3 caracteres.';
+        } else if (!/[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(v)) {
+          error = 'Debe incluir una descripción real (no solo números o símbolos).';
+        } else if (/(.)\1{4,}/.test(v)) {
+          error = 'Ingrese un nombre válido y descriptivo.';
+        }
+        break;
+      }
+      case 'cantidad': {
+        const num = Number(valor);
+        if (valor === '' || valor === null || valor === undefined || isNaN(num)) {
+          error = 'La cantidad es obligatoria.';
+        } else if (!Number.isInteger(num) || num < 1) {
+          error = 'La cantidad debe ser un número entero mayor a 0.';
+        } else if (num > 10000) {
+          error = 'La cantidad no puede superar las 10,000 unidades.';
+        }
+        break;
+      }
+      case 'marca': {
+        if (v && v.length < 2) {
+          error = 'La marca debe tener al menos 2 caracteres si se especifica.';
+        } else if (v && !/[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]/.test(v)) {
+          error = 'Ingrese una marca válida.';
+        }
+        break;
+      }
+      case 'modeloTecnico': {
+        if (v && v.length < 2) {
+          error = 'El modelo debe tener al menos 2 caracteres si se especifica.';
+        }
+        break;
+      }
+      case 'numeroInventario': {
+        if (v && v.length < 2) {
+          error = 'El número de inventario debe tener al menos 2 caracteres.';
+        } else if (v && !/[a-zA-Z0-9]/.test(v)) {
+          error = 'Ingrese un número de inventario con caracteres válidos.';
+        }
+        break;
+      }
+      case 'numeroSerie': {
+        if (tipoActual === 'herramienta_tec' && v) {
+          if (v.length < 2) {
+            error = 'El número de serie debe tener al menos 2 caracteres si se especifica.';
+          } else if (!/[a-zA-Z0-9]/.test(v)) {
+            error = 'Ingrese un número de serie válido.';
+          }
+        }
+        break;
+      }
+      default:
+        break;
+    }
+
+    setErrores((prev) => {
+      const next = { ...prev };
+      if (error) {
+        next[campo] = error;
+      } else {
+        delete next[campo];
+      }
+      return next;
+    });
+
+    return error;
+  };
+
+  const validarFormularioCompleto = () => {
+    const errs = {};
+    const nombreEquipo = (form.detalles?.equipo || form.modelo || '').trim();
+    const cant = form.detalles?.cantidad;
+    const marca = (form.marca || '').trim();
+    const modeloTec = (form.detalles?.modeloTecnico || '').trim();
+    const numInv = (form.numeroInventario || '').trim();
+    const numSerie = (form.numeroSerie || '').trim();
+
+    // 1. Equipo
+    if (!nombreEquipo) {
+      errs.equipo = 'El nombre del equipo o herramienta es obligatorio.';
+    } else if (nombreEquipo.length < 3) {
+      errs.equipo = 'Debe tener al menos 3 caracteres.';
+    } else if (!/[a-zA-ZáéíóúÁÉÍÓÚñÑ]/.test(nombreEquipo)) {
+      errs.equipo = 'Debe incluir una descripción real (no solo números o símbolos).';
+    } else if (/(.)\1{4,}/.test(nombreEquipo)) {
+      errs.equipo = 'Ingrese un nombre válido y descriptivo.';
+    }
+
+    // 2. Cantidad
+    const num = Number(cant);
+    if (cant === '' || cant === null || cant === undefined || isNaN(num)) {
+      errs.cantidad = 'La cantidad es obligatoria.';
+    } else if (!Number.isInteger(num) || num < 1) {
+      errs.cantidad = 'La cantidad debe ser un número entero mayor a 0.';
+    } else if (num > 10000) {
+      errs.cantidad = 'La cantidad no puede superar las 10,000 unidades.';
+    }
+
+    // 3. Marca (opcional)
+    if (marca && marca.length < 2) {
+      errs.marca = 'La marca debe tener al menos 2 caracteres si se especifica.';
+    } else if (marca && !/[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ]/.test(marca)) {
+      errs.marca = 'Ingrese una marca válida.';
+    }
+
+    // 4. Modelo (opcional)
+    if (modeloTec && modeloTec.length < 2) {
+      errs.modeloTecnico = 'El modelo debe tener al menos 2 caracteres si se especifica.';
+    }
+
+    // 5. No. Inventario (opcional)
+    if (numInv && numInv.length < 2) {
+      errs.numeroInventario = 'El número de inventario debe tener al menos 2 caracteres.';
+    } else if (numInv && !/[a-zA-Z0-9]/.test(numInv)) {
+      errs.numeroInventario = 'Ingrese un número de inventario con caracteres válidos.';
+    }
+
+    // 6. No. Serie (para tecnológica, opcional)
+    if (form.tipo === 'herramienta_tec' && numSerie) {
+      if (numSerie.length < 2) {
+        errs.numeroSerie = 'El número de serie debe tener al menos 2 caracteres si se especifica.';
+      } else if (!/[a-zA-Z0-9]/.test(numSerie)) {
+        errs.numeroSerie = 'Ingrese un número de serie válido.';
+      }
+    }
+
+    setErrores(errs);
+    return errs;
+  };
 
   useEffect(() => {
     const cargarSedes = async () => {
@@ -340,19 +481,21 @@ export default function InventarioHerramientas() {
   const handleGuardar = async (e) => {
     e.preventDefault();
 
-    const nombreEquipo = form.detalles?.equipo || form.modelo || '';
-    if (!nombreEquipo.trim()) {
-      Swal.fire('Campo requerido', 'El nombre del equipo / herramienta es obligatorio.', 'warning');
+    const errs = validarFormularioCompleto();
+    if (Object.keys(errs).length > 0) {
+      const primerError = Object.values(errs)[0];
+      Swal.fire({
+        icon: 'warning',
+        title: 'Verifique los datos',
+        text: primerError || 'Por favor, complete todos los campos obligatorios con información válida y real.',
+        confirmButtonColor: '#691B31'
+      });
       return;
     }
 
+    const nombreEquipo = (form.detalles?.equipo || form.modelo || '').trim();
     const isInfra = form.tipo === 'herramienta_infra';
-    const areaFinal = isInfra ? (form.areaUbicacion || 'Infraestructura') : form.areaUbicacion;
-
-    if (!isInfra && (!areaFinal || !areaFinal.trim())) {
-      Swal.fire('Campo requerido', 'La ubicación (área) es obligatoria.', 'warning');
-      return;
-    }
+    const areaFinal = form.areaUbicacion || (isInfra ? 'Infraestructura' : 'Tecnologías');
 
     const imagenesArray = form.detalles?.imagenes?.length
       ? form.detalles.imagenes
@@ -363,18 +506,18 @@ export default function InventarioHerramientas() {
     // Normalizar datos para compatibilidad
     const payload = {
       tipo: form.tipo,
-      numeroInventario: form.numeroInventario || null,
-      numeroSerie: isInfra ? null : (form.numeroSerie || null),
-      marca: form.marca || null,
+      numeroInventario: form.numeroInventario?.trim() || null,
+      numeroSerie: isInfra ? null : (form.numeroSerie?.trim() || null),
+      marca: form.marca?.trim() || null,
       modelo: nombreEquipo, // Guardamos el nombre en modelo para compatibilidad
-      responsable: form.responsable || null,
-      cargoResponsable: form.cargoResponsable || null,
+      responsable: form.responsable?.trim() || null,
+      cargoResponsable: form.cargoResponsable?.trim() || null,
       areaUbicacion: areaFinal,
       estatus: form.detalles?.estadoFisico || 'Bueno',
       detalles: {
         equipo: nombreEquipo,
-        modeloTecnico: form.detalles?.modeloTecnico || '',
-        cantidad: parseInt(form.detalles?.cantidad, 10) || 1,
+        modeloTecnico: (form.detalles?.modeloTecnico || '').trim(),
+        cantidad: Math.max(1, parseInt(form.detalles?.cantidad, 10) || 1),
         estadoFisico: form.detalles?.estadoFisico || 'Bueno',
         imagen: imagenesArray[0] || '',
         imagenes: imagenesArray
@@ -400,6 +543,7 @@ export default function InventarioHerramientas() {
       if (res.ok && json.ok) {
         Swal.fire('Éxito', editandoId ? 'Herramienta actualizada' : 'Herramienta registrada exitosamente', 'success');
         setModalAbierto(false);
+        setErrores({});
         cargarHerramientas();
         cargarContadores();
       } else {
@@ -413,6 +557,7 @@ export default function InventarioHerramientas() {
 
   const handleEditar = (item) => {
     setEditandoId(item.id);
+    setErrores({});
     const itemDetalles = item.detalles || {};
     const itemTipo = item.tipo || tabActiva;
 
@@ -1155,10 +1300,10 @@ export default function InventarioHerramientas() {
                 <tr>
                   <th style={{ width: '150px' }}>Tipo</th>
                   <th style={{ width: '160px' }}>No. Inventario / Serie</th>
-                  <th>Nombre / Modelo</th>
+                  <th>Nombre / Herramienta</th>
                   <th>Marca</th>
+                  <th>Modelo</th>
                   <th style={{ textAlign: 'center', width: '90px' }}>Cantidad</th>
-                  <th>Ubicación</th>
                   <th style={{ textAlign: 'center', width: '120px' }}>Estado Físico</th>
                   <th style={{ textAlign: 'center', width: '140px' }}>Imagen</th>
                   <th style={{ textAlign: 'center', width: '110px' }}>Acciones</th>
@@ -1175,6 +1320,7 @@ export default function InventarioHerramientas() {
                   herramientas.map((item) => {
                     const detalles = item.detalles || {};
                     const equipoNombre = detalles.equipo || item.modelo || 'Sin nombre';
+                    const modeloTec = detalles.modeloTecnico || '-';
                     const cantidad = detalles.cantidad !== undefined ? detalles.cantidad : 1;
                     const estadoFisico = detalles.estadoFisico || item.estatus || 'Bueno';
                     const badge = getBadgeEstadoFisico(estadoFisico);
@@ -1216,7 +1362,7 @@ export default function InventarioHerramientas() {
                           </div>
                         </td>
 
-                        {/* NOMBRE / MODELO */}
+                        {/* NOMBRE / HERRAMIENTA */}
                         <td>
                           <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '0.95rem' }}>
                             {equipoNombre}
@@ -1227,6 +1373,13 @@ export default function InventarioHerramientas() {
                         <td>
                           <div style={{ fontWeight: '600', color: '#334155' }}>
                             {item.marca || '-'}
+                          </div>
+                        </td>
+
+                        {/* MODELO */}
+                        <td>
+                          <div style={{ fontWeight: '500', color: '#475569' }}>
+                            {modeloTec}
                           </div>
                         </td>
 
@@ -1245,13 +1398,6 @@ export default function InventarioHerramientas() {
                           >
                             {cantidad}
                           </span>
-                        </td>
-
-                        {/* UBICACIÓN */}
-                        <td>
-                          <div style={{ fontWeight: '600', color: '#334155' }}>
-                            {item.areaUbicacion || 'Mantenimiento'}
-                          </div>
                         </td>
 
                         {/* ESTADO FÍSICO */}
@@ -1511,17 +1657,28 @@ export default function InventarioHerramientas() {
                     <input
                       type="text"
                       value={form.detalles?.equipo || form.modelo || ''}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const val = e.target.value;
                         setForm((prev) => ({
                           ...prev,
-                          modelo: e.target.value,
-                          detalles: { ...prev.detalles, equipo: e.target.value }
-                        }))
-                      }
-                      placeholder="Ej: Planta de generadora de energía eléctrica, Hidrolavadora de alta presión..."
-                      style={inputStyle}
+                          modelo: val,
+                          detalles: { ...prev.detalles, equipo: val }
+                        }));
+                        validarCampo('equipo', val, 'herramienta_infra');
+                      }}
+                      onBlur={(e) => validarCampo('equipo', e.target.value, 'herramienta_infra')}
+                      placeholder="Ej: Planta generadora de energía eléctrica, Hidrolavadora de alta presión..."
+                      style={{
+                        ...inputStyle,
+                        border: errores.equipo ? '1.5px solid #EF4444' : '1px solid #CBD5E1'
+                      }}
                       required
                     />
+                    {errores.equipo && (
+                      <span style={{ color: '#EF4444', fontSize: '0.78rem', marginTop: '0.25rem', display: 'block' }}>
+                        {errores.equipo}
+                      </span>
+                    )}
                   </div>
 
                   {/* CANTIDAD */}
@@ -1530,16 +1687,28 @@ export default function InventarioHerramientas() {
                     <input
                       type="number"
                       min="1"
+                      max="10000"
                       value={form.detalles?.cantidad !== undefined ? form.detalles.cantidad : 1}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
                         setForm((prev) => ({
                           ...prev,
-                          detalles: { ...prev.detalles, cantidad: parseInt(e.target.value, 10) || 1 }
-                        }))
-                      }
-                      style={inputStyle}
+                          detalles: { ...prev.detalles, cantidad: isNaN(val) ? '' : val }
+                        }));
+                        validarCampo('cantidad', e.target.value, 'herramienta_infra');
+                      }}
+                      onBlur={(e) => validarCampo('cantidad', e.target.value, 'herramienta_infra')}
+                      style={{
+                        ...inputStyle,
+                        border: errores.cantidad ? '1.5px solid #EF4444' : '1px solid #CBD5E1'
+                      }}
                       required
                     />
+                    {errores.cantidad && (
+                      <span style={{ color: '#EF4444', fontSize: '0.78rem', marginTop: '0.25rem', display: 'block' }}>
+                        {errores.cantidad}
+                      </span>
+                    )}
                   </div>
 
                   {/* ESTADO FÍSICO */}
@@ -1547,12 +1716,14 @@ export default function InventarioHerramientas() {
                     <label style={labelStyle}>Estado Físico *</label>
                     <select
                       value={form.detalles?.estadoFisico || 'Bueno'}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const val = e.target.value;
                         setForm((prev) => ({
                           ...prev,
-                          detalles: { ...prev.detalles, estadoFisico: e.target.value }
-                        }))
-                      }
+                          detalles: { ...prev.detalles, estadoFisico: val }
+                        }));
+                        validarCampo('estadoFisico', val, 'herramienta_infra');
+                      }}
                       style={{ ...inputStyle, cursor: 'pointer' }}
                     >
                       <option value="Bueno">Bueno</option>
@@ -1564,43 +1735,80 @@ export default function InventarioHerramientas() {
 
                   {/* MARCA */}
                   <div>
-                    <label style={labelStyle}>Marca</label>
+                    <label style={labelStyle}>Marca (Opcional)</label>
                     <input
                       type="text"
                       value={form.marca || ''}
-                      onChange={(e) => setForm({ ...form, marca: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm((prev) => ({ ...prev, marca: val }));
+                        validarCampo('marca', val, 'herramienta_infra');
+                      }}
+                      onBlur={(e) => validarCampo('marca', e.target.value, 'herramienta_infra')}
                       placeholder="Ej: ENERWELL, POWERMATE, Karcher, DEWALT"
-                      style={inputStyle}
+                      style={{
+                        ...inputStyle,
+                        border: errores.marca ? '1.5px solid #EF4444' : '1px solid #CBD5E1'
+                      }}
                     />
+                    {errores.marca && (
+                      <span style={{ color: '#EF4444', fontSize: '0.78rem', marginTop: '0.25rem', display: 'block' }}>
+                        {errores.marca}
+                      </span>
+                    )}
                   </div>
 
                   {/* MODELO */}
                   <div>
-                    <label style={labelStyle}>Modelo</label>
+                    <label style={labelStyle}>Modelo (Opcional)</label>
                     <input
                       type="text"
                       value={form.detalles?.modeloTecnico || ''}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const val = e.target.value;
                         setForm((prev) => ({
                           ...prev,
-                          detalles: { ...prev.detalles, modeloTecnico: e.target.value }
-                        }))
-                      }
+                          detalles: { ...prev.detalles, modeloTecnico: val }
+                        }));
+                        validarCampo('modeloTecnico', val, 'herramienta_infra');
+                      }}
+                      onBlur={(e) => validarCampo('modeloTecnico', e.target.value, 'herramienta_infra')}
                       placeholder="Ej: G8000, PM8010, HD 8/23 G, DW3017"
-                      style={inputStyle}
+                      style={{
+                        ...inputStyle,
+                        border: errores.modeloTecnico ? '1.5px solid #EF4444' : '1px solid #CBD5E1'
+                      }}
                     />
+                    {errores.modeloTecnico && (
+                      <span style={{ color: '#EF4444', fontSize: '0.78rem', marginTop: '0.25rem', display: 'block' }}>
+                        {errores.modeloTecnico}
+                      </span>
+                    )}
                   </div>
 
                   {/* NO. INVENTARIO */}
                   <div style={{ gridColumn: 'span 2' }}>
-                    <label style={labelStyle}>No. Inventario</label>
+                    <label style={labelStyle}>No. Inventario (Opcional)</label>
                     <input
                       type="text"
                       value={form.numeroInventario || ''}
-                      onChange={(e) => setForm({ ...form, numeroInventario: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm((prev) => ({ ...prev, numeroInventario: val }));
+                        validarCampo('numeroInventario', val, 'herramienta_infra');
+                      }}
+                      onBlur={(e) => validarCampo('numeroInventario', e.target.value, 'herramienta_infra')}
                       placeholder="Ej: INF-01-001"
-                      style={inputStyle}
+                      style={{
+                        ...inputStyle,
+                        border: errores.numeroInventario ? '1.5px solid #EF4444' : '1px solid #CBD5E1'
+                      }}
                     />
+                    {errores.numeroInventario && (
+                      <span style={{ color: '#EF4444', fontSize: '0.78rem', marginTop: '0.25rem', display: 'block' }}>
+                        {errores.numeroInventario}
+                      </span>
+                    )}
                   </div>
 
                   {/* FOTOGRAFÍAS (MÁXIMO 3) */}
@@ -1745,17 +1953,28 @@ export default function InventarioHerramientas() {
                     <input
                       type="text"
                       value={form.detalles?.equipo || form.modelo || ''}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const val = e.target.value;
                         setForm((prev) => ({
                           ...prev,
-                          modelo: e.target.value,
-                          detalles: { ...prev.detalles, equipo: e.target.value }
-                        }))
-                      }
+                          modelo: val,
+                          detalles: { ...prev.detalles, equipo: val }
+                        }));
+                        validarCampo('equipo', val, 'herramienta_tec');
+                      }}
+                      onBlur={(e) => validarCampo('equipo', e.target.value, 'herramienta_tec')}
                       placeholder="Ej: Ponchadora de impacto RJ45, Multímetro digital, Tester de red"
-                      style={inputStyle}
+                      style={{
+                        ...inputStyle,
+                        border: errores.equipo ? '1.5px solid #EF4444' : '1px solid #CBD5E1'
+                      }}
                       required
                     />
+                    {errores.equipo && (
+                      <span style={{ color: '#EF4444', fontSize: '0.78rem', marginTop: '0.25rem', display: 'block' }}>
+                        {errores.equipo}
+                      </span>
+                    )}
                   </div>
 
                   {/* CANTIDAD */}
@@ -1764,16 +1983,28 @@ export default function InventarioHerramientas() {
                     <input
                       type="number"
                       min="1"
+                      max="10000"
                       value={form.detalles?.cantidad !== undefined ? form.detalles.cantidad : 1}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
                         setForm((prev) => ({
                           ...prev,
-                          detalles: { ...prev.detalles, cantidad: parseInt(e.target.value, 10) || 1 }
-                        }))
-                      }
-                      style={inputStyle}
+                          detalles: { ...prev.detalles, cantidad: isNaN(val) ? '' : val }
+                        }));
+                        validarCampo('cantidad', e.target.value, 'herramienta_tec');
+                      }}
+                      onBlur={(e) => validarCampo('cantidad', e.target.value, 'herramienta_tec')}
+                      style={{
+                        ...inputStyle,
+                        border: errores.cantidad ? '1.5px solid #EF4444' : '1px solid #CBD5E1'
+                      }}
                       required
                     />
+                    {errores.cantidad && (
+                      <span style={{ color: '#EF4444', fontSize: '0.78rem', marginTop: '0.25rem', display: 'block' }}>
+                        {errores.cantidad}
+                      </span>
+                    )}
                   </div>
 
                   {/* ESTADO FÍSICO */}
@@ -1781,12 +2012,14 @@ export default function InventarioHerramientas() {
                     <label style={labelStyle}>Estado Físico *</label>
                     <select
                       value={form.detalles?.estadoFisico || 'Bueno'}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const val = e.target.value;
                         setForm((prev) => ({
                           ...prev,
-                          detalles: { ...prev.detalles, estadoFisico: e.target.value }
-                        }))
-                      }
+                          detalles: { ...prev.detalles, estadoFisico: val }
+                        }));
+                        validarCampo('estadoFisico', val, 'herramienta_tec');
+                      }}
                       style={{ ...inputStyle, cursor: 'pointer' }}
                     >
                       <option value="Bueno">Bueno</option>
@@ -1798,73 +2031,105 @@ export default function InventarioHerramientas() {
 
                   {/* MARCA */}
                   <div>
-                    <label style={labelStyle}>Marca</label>
+                    <label style={labelStyle}>Marca (Opcional)</label>
                     <input
                       type="text"
                       value={form.marca || ''}
-                      onChange={(e) => setForm({ ...form, marca: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm((prev) => ({ ...prev, marca: val }));
+                        validarCampo('marca', val, 'herramienta_tec');
+                      }}
+                      onBlur={(e) => validarCampo('marca', e.target.value, 'herramienta_tec')}
                       placeholder="Ej: Fluke, Truper, Klein Tools"
-                      style={inputStyle}
+                      style={{
+                        ...inputStyle,
+                        border: errores.marca ? '1.5px solid #EF4444' : '1px solid #CBD5E1'
+                      }}
                     />
+                    {errores.marca && (
+                      <span style={{ color: '#EF4444', fontSize: '0.78rem', marginTop: '0.25rem', display: 'block' }}>
+                        {errores.marca}
+                      </span>
+                    )}
                   </div>
 
                   {/* MODELO */}
                   <div>
-                    <label style={labelStyle}>Modelo</label>
+                    <label style={labelStyle}>Modelo (Opcional)</label>
                     <input
                       type="text"
                       value={form.detalles?.modeloTecnico || ''}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const val = e.target.value;
                         setForm((prev) => ({
                           ...prev,
-                          detalles: { ...prev.detalles, modeloTecnico: e.target.value }
-                        }))
-                      }
+                          detalles: { ...prev.detalles, modeloTecnico: val }
+                        }));
+                        validarCampo('modeloTecnico', val, 'herramienta_tec');
+                      }}
+                      onBlur={(e) => validarCampo('modeloTecnico', e.target.value, 'herramienta_tec')}
                       placeholder="Ej: 117 Electrician, TL-828"
-                      style={inputStyle}
+                      style={{
+                        ...inputStyle,
+                        border: errores.modeloTecnico ? '1.5px solid #EF4444' : '1px solid #CBD5E1'
+                      }}
                     />
+                    {errores.modeloTecnico && (
+                      <span style={{ color: '#EF4444', fontSize: '0.78rem', marginTop: '0.25rem', display: 'block' }}>
+                        {errores.modeloTecnico}
+                      </span>
+                    )}
                   </div>
 
                   {/* NO. INVENTARIO */}
                   <div>
-                    <label style={labelStyle}>No. Inventario</label>
+                    <label style={labelStyle}>No. Inventario (Opcional)</label>
                     <input
                       type="text"
                       value={form.numeroInventario || ''}
-                      onChange={(e) => setForm({ ...form, numeroInventario: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm((prev) => ({ ...prev, numeroInventario: val }));
+                        validarCampo('numeroInventario', val, 'herramienta_tec');
+                      }}
+                      onBlur={(e) => validarCampo('numeroInventario', e.target.value, 'herramienta_tec')}
                       placeholder="Ej: TEC-HER-001"
-                      style={inputStyle}
+                      style={{
+                        ...inputStyle,
+                        border: errores.numeroInventario ? '1.5px solid #EF4444' : '1px solid #CBD5E1'
+                      }}
                     />
+                    {errores.numeroInventario && (
+                      <span style={{ color: '#EF4444', fontSize: '0.78rem', marginTop: '0.25rem', display: 'block' }}>
+                        {errores.numeroInventario}
+                      </span>
+                    )}
                   </div>
 
                   {/* NO. SERIE */}
                   <div>
-                    <label style={labelStyle}>No. Serie</label>
+                    <label style={labelStyle}>No. Serie (Opcional)</label>
                     <input
                       type="text"
                       value={form.numeroSerie || ''}
-                      onChange={(e) => setForm({ ...form, numeroSerie: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm((prev) => ({ ...prev, numeroSerie: val }));
+                        validarCampo('numeroSerie', val, 'herramienta_tec');
+                      }}
+                      onBlur={(e) => validarCampo('numeroSerie', e.target.value, 'herramienta_tec')}
                       placeholder="Ej: SN-495832"
-                      style={inputStyle}
+                      style={{
+                        ...inputStyle,
+                        border: errores.numeroSerie ? '1.5px solid #EF4444' : '1px solid #CBD5E1'
+                      }}
                     />
-                  </div>
-
-                  {/* UBICACIÓN */}
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <label style={labelStyle}>Ubicación (Área / Sede) *</label>
-                    <select
-                      value={form.areaUbicacion}
-                      onChange={(e) => setForm({ ...form, areaUbicacion: e.target.value })}
-                      style={{ ...inputStyle, cursor: 'pointer' }}
-                      required
-                    >
-                      <option value="">-- Seleccionar Ubicación --</option>
-                      {sedesList.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
+                    {errores.numeroSerie && (
+                      <span style={{ color: '#EF4444', fontSize: '0.78rem', marginTop: '0.25rem', display: 'block' }}>
+                        {errores.numeroSerie}
+                      </span>
+                    )}
                   </div>
 
                   {/* FOTOGRAFÍAS (MÁXIMO 3) */}

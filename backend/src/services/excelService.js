@@ -694,12 +694,12 @@ async function exportarHerramientasExcel(herramientas, tipo = 'herramienta_infra
       { header: 'Tipo', key: 'tipo', width: 22 },
       { header: 'No. Inventario', key: 'numeroInventario', width: 20 },
       { header: 'No. Serie', key: 'numeroSerie', width: 20 },
-      { header: 'Nombre / Modelo', key: 'modelo', width: 30 },
+      { header: 'Nombre / Herramienta', key: 'modelo', width: 32 },
       { header: 'Marca', key: 'marca', width: 18 },
+      { header: 'Modelo', key: 'modeloTecnico', width: 18 },
       { header: 'Cantidad', key: 'cantidad', width: 12 },
-      { header: 'Ubicación', key: 'areaUbicacion', width: 22 },
       { header: 'Estado Físico', key: 'estatus', width: 16 },
-      { header: 'Imagen', key: 'imagen', width: 28 },
+      { header: 'Imagen', key: 'imagen', width: 32 },
     ];
 
     aplicarEstiloTabla(sheet);
@@ -708,6 +708,7 @@ async function exportarHerramientasExcel(herramientas, tipo = 'herramienta_infra
       const item = herramientas[i];
       const detalles = item.detalles || {};
       const equipoNombre = detalles.equipo || item.modelo || 'Sin nombre';
+      const modeloTec = detalles.modeloTecnico || '-';
       const cantidad = detalles.cantidad !== undefined ? detalles.cantidad : 1;
       const estadoFisico = detalles.estadoFisico || item.estatus || 'Bueno';
       const imagenes = detalles.imagenes?.length
@@ -722,8 +723,8 @@ async function exportarHerramientasExcel(herramientas, tipo = 'herramienta_infra
         numeroSerie: item.numeroSerie || '-',
         modelo: equipoNombre,
         marca: item.marca || '-',
+        modeloTecnico: modeloTec,
         cantidad: cantidad,
-        areaUbicacion: item.areaUbicacion || 'Mantenimiento',
         estatus: estadoFisico,
         imagen: ''
       });
