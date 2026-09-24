@@ -50,7 +50,21 @@ if [ ! -f "$FRONTEND_DIR/.env" ] && [ -f "$FRONTEND_DIR/.env.example" ]; then
     cp "$FRONTEND_DIR/.env.example" "$FRONTEND_DIR/.env"
 fi
 
-# Aviso informativo si MySQL no responde en el puerto 3306
+# Verificar si MySQL / MariaDB responde en el puerto 3306
+if ! (echo > /dev/tcp/localhost/3306) 2>/dev/null; then
+    if [ -x "$HOME/.local/mariadb/run_mariadb.sh" ]; then
+        echo -e "${YELLOW}[DATABASE] Iniciando servicio MariaDB local...${NC}"
+        nohup "$HOME/.local/mariadb/run_mariadb.sh" > /dev/null 2>&1 &
+        for i in {1..10}; do
+            if (echo > /dev/tcp/localhost/3306) 2>/dev/null; then
+                echo -e "${GREEN}[DATABASE] MariaDB iniciado correctamente.${NC}"
+                break
+            fi
+            sleep 1
+        done
+    fi
+fi
+
 if ! (echo > /dev/tcp/localhost/3306) 2>/dev/null; then
     echo -e "${YELLOW}[AVISO] No se detecta conexión a MySQL en localhost:3306.${NC}"
     echo -e "${YELLOW}        Asegúrate de que el servicio de MySQL/MariaDB esté iniciado.${NC}"
