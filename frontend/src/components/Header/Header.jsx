@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { FaExclamationCircle, FaCheckCircle, FaBars, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 import Swal from 'sweetalert2';
+import NotificationCenter from './NotificationCenter';
 import './Header.css';
 
 export default function Header({ toggleSidebar, hideLogos, hideBackButton = false }) {
@@ -159,7 +160,9 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
           )}
 
           {user && (
-            <div className="app-header__profile" ref={profileRef}>
+            <>
+              <NotificationCenter />
+              <div className="app-header__profile" ref={profileRef}>
               <button 
                 className="app-header__profile-btn"
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -183,6 +186,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
                 </div>
               )}
             </div>
+            </>
           )}
         </div>
         

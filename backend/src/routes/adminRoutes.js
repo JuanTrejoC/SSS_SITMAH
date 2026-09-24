@@ -6,6 +6,7 @@ const usuario = require('../controllers/usuarioController');
 const reporteOficina = require('../controllers/reporteOficinaController');
 const reporteSemaforo = require('../controllers/reporteSemaforoController');
 const estadisticas = require('../controllers/estadisticasController');
+const notificacion = require('../controllers/notificacionController');
 
 const router = express.Router();
 
@@ -54,5 +55,6 @@ router.patch('/reportes/semaforo/:id/piezas/:piezaId/estado-reemplazo', asyncHan
 router.delete('/reportes/semaforo/:id/piezas/:piezaId', asyncHandler(reporteSemaforo.desasignarPieza));
 
 router.get('/estadisticas', asyncHandler(estadisticas.listar));
+router.get('/notificaciones', asyncHandler(notificacion.obtenerNotificaciones));
 
 module.exports = router;

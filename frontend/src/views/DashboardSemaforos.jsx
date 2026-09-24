@@ -4,13 +4,14 @@ import { FaEye, FaTrashAlt, FaChevronRight, FaCogs, FaFileExcel } from 'react-ic
 import Swal from 'sweetalert2'
 import { useAuth } from '../context/AuthContext'
 import { formatFolio } from '../utils/formatFolio'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { API_BASE_URL } from '../config'
 import AtencionReporte from '../components/AtencionReporte'
 
 export default function DashboardSemaforos() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [reportes, setReportes] = useState([])
   const [busqueda, setBusqueda] = useState('')
   const [estadoFiltro, setEstadoFiltro] = useState('Pendiente')
@@ -36,6 +37,41 @@ export default function DashboardSemaforos() {
     }
     return () => { document.body.style.overflow = '' }
   }, [verDetalle, confirmResuelto.visible])
+
+  // Abrir reporte automáticamente si se accede desde el centro de notificaciones (?id=...)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const reportId = params.get('id')
+    const folioParam = params.get('folio')
+    if (!reportId && !folioParam) return
+
+    if (reportes.length > 0) {
+      const encontrado = reportes.find(r => 
+        (reportId && String(r.id) === String(reportId)) ||
+        (folioParam && String(r.folio).toLowerCase() === folioParam.toLowerCase())
+      )
+      if (encontrado) {
+        setVerDetalle(encontrado)
+        setEstadoFiltro('Todos')
+        return
+      }
+    }
+
+    // Si aún no está en la lista actual, consultar directamente al backend
+    if (reportId && user?.token) {
+      fetch(`${API_BASE_URL}/api/admin/reportes/semaforo/${reportId}`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      })
+      .then(res => res.json())
+      .then(json => {
+        if (json.ok && json.data) {
+          setVerDetalle(json.data)
+          setEstadoFiltro('Todos')
+        }
+      })
+      .catch(err => console.error('Error al cargar reporte de semáforo por URL:', err))
+    }
+  }, [location.search, reportes, user?.token])
 
   // CARGAR DATOS DESDE EL BACKEND
   const cargarReportes = async () => {
