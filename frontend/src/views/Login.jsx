@@ -38,7 +38,7 @@ export default function Login() {
     setCargando(false)
     if (res.ok) {
       if (res.user?.rol === 'infraestructura') {
-        window.location.href = '/inventario-herramientas'
+        window.location.href = '/dashboard-infraestructura'
       } else if (res.user?.rol === 'administrador') {
         window.location.href = '/dashboard'
       } else {
@@ -251,28 +251,46 @@ export default function Login() {
 
           {/* Enlaces a formularios públicos */}
           <div style={{
-            padding: '1.2rem',
+            padding: '1.25rem',
             borderTop: '1px solid #e2e8f0',
             background: '#f8fafc',
             textAlign: 'center'
           }}>
-            <p style={{ fontSize: '0.8rem', color: '#6b7280', margin: '0 0 0.8rem 0', fontWeight: '500' }}>
+            <p style={{ fontSize: '0.8rem', color: '#6b7280', margin: '0 0 0.85rem 0', fontWeight: '500' }}>
               ¿Deseas registrar una incidencia?
             </p>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-              <a
-                href="/crear-oficinas"
-                style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.3rem 0.5rem' }}
-              >
-                Reporte Tecnológico
-              </a>
-              <span style={{ color: '#cbd5e1', display: 'flex', alignItems: 'center' }}>|</span>
-              <a
-                href="/crear-semaforos"
-                style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.3rem 0.5rem' }}
-              >
-                Reporte de Semáforos
-              </a>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <a
+                  href="/crear-oficinas"
+                  style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.2rem 0.4rem', transition: 'color 0.2s' }}
+                  onMouseOver={(e) => e.currentTarget.style.color = '#691B31'}
+                  onMouseOut={(e) => e.currentTarget.style.color = '#BC955B'}
+                >
+                  Reporte Tecnológico
+                </a>
+                <span style={{ color: '#cbd5e1' }}>|</span>
+                <a
+                  href="/crear-semaforos"
+                  style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.2rem 0.4rem', transition: 'color 0.2s' }}
+                  onMouseOver={(e) => e.currentTarget.style.color = '#691B31'}
+                  onMouseOut={(e) => e.currentTarget.style.color = '#BC955B'}
+                >
+                  Reporte de Semáforos
+                </a>
+              </div>
+
+              {/* Solicitud de Reporte de Infraestructura debajo con el mismo diseño */}
+              <div>
+                <a
+                  href="/crear-infraestructura"
+                  style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.2rem 0.4rem', transition: 'color 0.2s' }}
+                  onMouseOver={(e) => e.currentTarget.style.color = '#691B31'}
+                  onMouseOut={(e) => e.currentTarget.style.color = '#BC955B'}
+                >
+                  Reporte de Infraestructura
+                </a>
+              </div>
             </div>
           </div>
         </div>

@@ -400,17 +400,17 @@ export default function DashboardSemaforos() {
           </div>
 
           {/* Switcher Tabs */}
-          <div style={{ display: 'flex', gap: '0.35rem', backgroundColor: '#E2E8F0', padding: '0.35rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', gap: '0.35rem', backgroundColor: '#E2E8F0', padding: '0.35rem', borderRadius: '12px', flexWrap: 'wrap' }}>
             <button
               onClick={() => navigate('/dashboard-oficinas')}
               style={{
-                padding: '0.55rem 1.25rem',
+                padding: '0.55rem 1.15rem',
                 borderRadius: '9px',
                 border: 'none',
                 backgroundColor: 'transparent',
                 color: '#4B5563',
                 fontWeight: '600',
-                fontSize: '0.875rem',
+                fontSize: '0.85rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -420,18 +420,18 @@ export default function DashboardSemaforos() {
               onMouseOver={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#691B31' }}
               onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#4B5563' }}
             >
-              <i className="fa-solid fa-building"></i> Reportes Tecnológicos
+              <i className="fa-solid fa-building"></i> Tecnológicos
             </button>
 
             <button
               style={{
-                padding: '0.55rem 1.25rem',
+                padding: '0.55rem 1.15rem',
                 borderRadius: '9px',
                 border: 'none',
                 backgroundColor: '#BC955B',
                 color: 'white',
                 fontWeight: '700',
-                fontSize: '0.875rem',
+                fontSize: '0.85rem',
                 cursor: 'default',
                 display: 'flex',
                 alignItems: 'center',
@@ -439,7 +439,7 @@ export default function DashboardSemaforos() {
                 boxShadow: '0 2px 6px rgba(188, 149, 91, 0.3)'
               }}
             >
-              <i className="fa-solid fa-traffic-light"></i> Reportes Semafóricos
+              <i className="fa-solid fa-traffic-light"></i> Semafóricos
             </button>
           </div>
         </div>
@@ -535,7 +535,7 @@ export default function DashboardSemaforos() {
                   boxShadow: '0 2px 4px rgba(188, 149, 91, 0.2)'
                 }}
               >
-                <FaFileExcel /> Exportar Reportes Excel
+                <FaFileExcel /> Exportar a Excel
               </button>
             </div>
           </div>

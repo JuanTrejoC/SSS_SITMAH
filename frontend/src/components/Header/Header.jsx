@@ -51,7 +51,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
     if (user.rol === 'administrador') {
       navigate('/dashboard');
     } else if (user.rol === 'infraestructura') {
-      navigate('/inventario-herramientas');
+      navigate('/dashboard-infraestructura');
     } else {
       navigate('/crear-oficinas');
     }
@@ -74,7 +74,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
     if (res.ok) {
       setMostrarLogin(false);
       if (res.user?.rol === 'infraestructura') {
-        navigate('/inventario-herramientas');
+        navigate('/dashboard-infraestructura');
       } else {
         navigate('/dashboard');
       }
@@ -161,7 +161,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
 
           {user && (
             <>
-              <NotificationCenter />
+              {user.rol === 'administrador' && <NotificationCenter />}
               <div className="app-header__profile" ref={profileRef}>
               <button 
                 className="app-header__profile-btn"

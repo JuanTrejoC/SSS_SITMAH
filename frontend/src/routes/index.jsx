@@ -1,5 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom'
-import { RutaSoloAdmin, RutaSoloSolicitante, RutaAdminOrInfra } from './RutasProtegidas'
+import { RutaSoloAdmin, RutaSoloSolicitante, RutaSoloInfra, RutaAdminOrInfra } from './RutasProtegidas'
 import InicioRedirect from './InicioRedirect'
 import Layout from '../components/Layout'
 
@@ -8,10 +8,12 @@ import Dashboard from '../views/Dashboard'
 import Estadisticas from '../views/Estadisticas'
 import FormOficinas from '../views/FormOficinas'
 import FormSemaforos from '../views/FormSemaforos'
+import FormInfraestructura from '../views/FormInfraestructura'
 import ConfigAdmin from '../views/ConfigAdmin'
 
 import DashboardOficinas from '../views/DashboardOficinas'
 import DashboardSemaforos from '../views/DashboardSemaforos'
+import DashboardInfraestructura from '../views/DashboardInfraestructura'
 import InventarioSemaforos from '../views/InventarioSemaforos'
 import InventarioTecnologico from '../views/InventarioTecnologico'
 import InventarioExistencias from '../views/InventarioExistencias'
@@ -25,16 +27,17 @@ const router = createBrowserRouter([
   {
     element: <Layout />, // ESTE LAYOUT DEBE TENER <Outlet />
     children: [
-      // SOLICITANTE: admin es redirigido al dashboard
+      // SOLICITANTE: admin o infra es redirigido a su panel
       {
         element: <RutaSoloSolicitante />,
         children: [
           { path: '/crear-oficinas', element: <FormOficinas /> },
-          { path: '/crear-semaforos', element: <FormSemaforos /> }
+          { path: '/crear-semaforos', element: <FormSemaforos /> },
+          { path: '/crear-infraestructura', element: <FormInfraestructura /> }
         ]
       },
 
-      // ADMIN: PROTEGIDO
+      // ADMIN (Tecnológico / Semáforos): PROTEGIDO
       {
         element: <RutaSoloAdmin />,
         children: [
@@ -51,7 +54,15 @@ const router = createBrowserRouter([
         ]
       },
 
-      // ADMIN OR INFRA: Protegido
+      // SOLO INFRAESTRUCTURA: Panel independiente
+      {
+        element: <RutaSoloInfra />,
+        children: [
+          { path: '/dashboard-infraestructura', element: <DashboardInfraestructura /> }
+        ]
+      },
+
+      // ADMIN O INFRA: Protegido
       {
         element: <RutaAdminOrInfra />,
         children: [

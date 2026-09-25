@@ -75,61 +75,104 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         </a>
       </div>
 
-      {/* SECCIÓN: GENERAL */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <p className="sidebar-section-label">General</p>
+      {/* SECCIÓN: GENERAL — solo admin y solicitante */}
+      {user?.rol !== 'infraestructura' && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <p className="sidebar-section-label">General</p>
 
-        {/* Dashboard — solo admin */}
-        {user?.rol === 'administrador' && (
+          {/* Dashboard — solo admin */}
+          {user?.rol === 'administrador' && (
+            <Link
+              to="/dashboard"
+              style={linkStyle('/dashboard')}
+              onMouseOver={linkHover('/dashboard').over}
+              onMouseOut={linkHover('/dashboard').out}
+              onClick={closeSidebar}
+            >
+              <FaTachometerAlt size={15} />
+              Dashboard
+            </Link>
+          )}
+
+          {/* Crear Reporte Oficinas — solo solicitante */}
+          {user?.rol !== 'administrador' && (
+            <Link
+              to="/crear-oficinas"
+              style={linkStyle('/crear-oficinas')}
+              onMouseOver={linkHover('/crear-oficinas').over}
+              onMouseOut={linkHover('/crear-oficinas').out}
+              onClick={closeSidebar}
+            >
+              <FaFileAlt size={15} />
+              Crear Reporte Tecnológico
+            </Link>
+          )}
+
+          {/* Crear Reporte Semáforos — solo solicitante */}
+          {user?.rol !== 'administrador' && (
+            <Link
+              to="/crear-semaforos"
+              style={linkStyle('/crear-semaforos')}
+              onMouseOver={linkHover('/crear-semaforos').over}
+              onMouseOut={linkHover('/crear-semaforos').out}
+              onClick={closeSidebar}
+            >
+              <FaRoad size={15} />
+              Crear Reporte Semafórico
+            </Link>
+          )}
+
+          {/* Crear Reporte Infraestructura — solo solicitante */}
+          {user?.rol !== 'administrador' && (
+            <Link
+              to="/crear-infraestructura"
+              style={linkStyle('/crear-infraestructura')}
+              onMouseOver={linkHover('/crear-infraestructura').over}
+              onMouseOut={linkHover('/crear-infraestructura').out}
+              onClick={closeSidebar}
+            >
+              <FaWrench size={15} />
+              Crear Reporte de Infraestructura
+            </Link>
+          )}
+        </div>
+      )}
+
+      {/* SECCIÓN: INFRAESTRUCTURA — solo usuario de infraestructura */}
+      {user?.rol === 'infraestructura' && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <p className="sidebar-section-label">Infraestructura</p>
+
           <Link
-            to="/dashboard"
-            style={linkStyle('/dashboard')}
-            onMouseOver={linkHover('/dashboard').over}
-            onMouseOut={linkHover('/dashboard').out}
+            to="/dashboard-infraestructura"
+            style={linkStyle('/dashboard-infraestructura')}
+            onMouseOver={linkHover('/dashboard-infraestructura').over}
+            onMouseOut={linkHover('/dashboard-infraestructura').out}
             onClick={closeSidebar}
           >
-            <FaTachometerAlt size={15} />
-            Dashboard
+            <FaWrench size={15} />
+            Panel de Infraestructura
           </Link>
-        )}
 
-        {/* Crear Reporte Oficinas — solo solicitante */}
-        {user?.rol !== 'administrador' && user?.rol !== 'infraestructura' && (
           <Link
-            to="/crear-oficinas"
-            style={linkStyle('/crear-oficinas')}
-            onMouseOver={linkHover('/crear-oficinas').over}
-            onMouseOut={linkHover('/crear-oficinas').out}
+            to="/inventario-herramientas"
+            style={linkStyle('/inventario-herramientas')}
+            onMouseOver={linkHover('/inventario-herramientas').over}
+            onMouseOut={linkHover('/inventario-herramientas').out}
             onClick={closeSidebar}
           >
-            <FaFileAlt size={15} />
-            Crear Reporte Tecnológico
+            <FaBoxes size={15} />
+            Inventario de Herramientas
           </Link>
-        )}
+        </div>
+      )}
 
-        {/* Crear Reporte Semáforos — solo solicitante */}
-        {user?.rol !== 'administrador' && user?.rol !== 'infraestructura' && (
-          <Link
-            to="/crear-semaforos"
-            style={linkStyle('/crear-semaforos')}
-            onMouseOver={linkHover('/crear-semaforos').over}
-            onMouseOut={linkHover('/crear-semaforos').out}
-            onClick={closeSidebar}
-          >
-            <FaRoad size={15} />
-            Crear Reporte Semafórico
-          </Link>
-        )}
-      </div>
-
-      {/* SECCIÓN: ADMINISTRACIÓN — admin e infraestructura */}
-      {(user?.rol === 'administrador' || user?.rol === 'infraestructura') && (
+      {/* SECCIÓN: ADMINISTRACIÓN — solo administrador */}
+      {user?.rol === 'administrador' && (
         <div style={{ marginBottom: '1.5rem' }}>
           <p className="sidebar-section-label">Administración</p>
 
-          {user?.rol === 'administrador' && (
-            <>
-              <Link
+          <Link
             to="/estadisticas"
             style={linkStyle('/estadisticas')}
             onMouseOver={linkHover('/estadisticas').over}
@@ -180,11 +223,9 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             onMouseOut={linkHover('/inventario-existencias').out}
             onClick={closeSidebar}
           >
-              <FaBoxes size={15} />
-              Inventario de Existencias
-            </Link>
-            </>
-          )}
+            <FaBoxes size={15} />
+            Inventario de Existencias
+          </Link>
 
           <Link
             to="/inventario-herramientas"
@@ -197,31 +238,27 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             Inventario de Herramientas
           </Link>
 
-          {user?.rol === 'administrador' && (
-            <Link
-              to="/inventario-mobiliario"
-              style={linkStyle('/inventario-mobiliario')}
-              onMouseOver={linkHover('/inventario-mobiliario').over}
-              onMouseOut={linkHover('/inventario-mobiliario').out}
-              onClick={closeSidebar}
-            >
-              <FaChair size={15} />
-              Mobiliario
-            </Link>
-          )}
+          <Link
+            to="/inventario-mobiliario"
+            style={linkStyle('/inventario-mobiliario')}
+            onMouseOver={linkHover('/inventario-mobiliario').over}
+            onMouseOut={linkHover('/inventario-mobiliario').out}
+            onClick={closeSidebar}
+          >
+            <FaChair size={15} />
+            Mobiliario
+          </Link>
 
-          {user?.rol === 'administrador' && (
-            <Link
-              to="/resguardos"
-              style={linkStyle('/resguardos')}
-              onMouseOver={linkHover('/resguardos').over}
-              onMouseOut={linkHover('/resguardos').out}
-              onClick={closeSidebar}
-            >
-              <FaClipboardCheck size={15} />
-              Resguardos
-            </Link>
-          )}
+          <Link
+            to="/resguardos"
+            style={linkStyle('/resguardos')}
+            onMouseOver={linkHover('/resguardos').over}
+            onMouseOut={linkHover('/resguardos').out}
+            onClick={closeSidebar}
+          >
+            <FaClipboardCheck size={15} />
+            Resguardos
+          </Link>
         </div>
       )}
 

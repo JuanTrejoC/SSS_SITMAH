@@ -344,12 +344,80 @@ async function exportarReportesOficina(reportes, incluirImagenes = false) {
     const row = sheet.addRow(rowData);
     const rowNumber = row.number;
 
-    // Si tiene imágenes, ajustar altura y poner imagen
     if (tieneImagenes && r.evidencias && r.evidencias.length > 0) {
       const imgEv = r.evidencias.find(ev => ev.mimetype?.startsWith('image/'));
       if (imgEv) {
         row.height = 90; // Altura para mostrar miniatura
         const colIndex = 10; // columna 'evidencia' (0-based = 10)
+        await insertarImagenEvidencia(workbook, sheet, rowNumber - 1, colIndex, r.evidencias);
+      }
+    }
+  }
+
+  aplicarEstiloTabla(sheet);
+
+  return workbook.xlsx.writeBuffer();
+}
+
+async function exportarReportesInfraestructura(reportes, incluirImagenes = false) {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Reportes Infraestructura');
+
+  const tieneImagenes = incluirImagenes && reportes.some(r => r.evidencias && r.evidencias.some(ev => ev.mimetype?.startsWith('image/')));
+
+  sheet.columns = [
+    { header: 'ID', key: 'id', width: 8 },
+    { header: 'Folio', key: 'folio', width: 18 },
+    { header: 'Solicitante', key: 'solicitante', width: 25 },
+    { header: 'Cargo', key: 'cargo', width: 22 },
+    { header: 'Área / Dirección', key: 'area', width: 25 },
+    { header: 'Sede / Instalación', key: 'sede', width: 22 },
+    { header: 'Elemento / Falla', key: 'equipo', width: 22 },
+    { header: 'No. Serie / Ref', key: 'numeroSerie', width: 18 },
+    { header: 'Categoría', key: 'categoria', width: 20 },
+    { header: 'Prioridad', key: 'prioridad', width: 14 },
+    { header: 'Estado', key: 'estado', width: 14 },
+    { header: 'Descripción', key: 'descripcion', width: 35 },
+    { header: 'Diagnóstico / Solución', key: 'diagnosticoSolucion', width: 35 },
+    { header: 'Técnico Atendió', key: 'tecnicoAtendio', width: 25 },
+    { header: 'Fecha Reporte', key: 'fecha', width: 22 },
+    { header: 'Fecha Resolución', key: 'fechaResolucion', width: 22 },
+    ...(tieneImagenes ? [{ header: 'Evidencia', key: 'evidencia', width: 22 }] : []),
+  ];
+
+  for (let i = 0; i < reportes.length; i++) {
+    const r = reportes[i];
+    const rowData = {
+      id: r.id,
+      folio: r.folio,
+      solicitante: r.solicitante,
+      cargo: r.cargo?.nombre || 'General',
+      area: r.area?.nombre || 'N/A',
+      sede: r.sede?.nombre || 'N/A',
+      equipo: r.equipo || 'Infraestructura General',
+      numeroSerie: r.numeroSerie || 'S/N',
+      categoria: r.categoria?.nombre || 'Infraestructura',
+      prioridad: r.prioridad,
+      estado: r.estado,
+      descripcion: r.descripcion || '',
+      diagnosticoSolucion: r.diagnosticoSolucion || 'Pendiente',
+      tecnicoAtendio: r.tecnicoAtendio || (r.atendidoPor?.nombre || 'No asignado'),
+      fecha: r.createdAt?.toISOString(),
+      fechaResolucion: r.fechaResolucion?.toISOString() || 'Pendiente',
+    };
+
+    if (tieneImagenes) {
+      rowData.evidencia = '';
+    }
+
+    const row = sheet.addRow(rowData);
+    const rowNumber = row.number;
+
+    if (tieneImagenes && r.evidencias && r.evidencias.length > 0) {
+      const imgEv = r.evidencias.find(ev => ev.mimetype?.startsWith('image/'));
+      if (imgEv) {
+        row.height = 90;
+        const colIndex = 16; // columna 'evidencia'
         await insertarImagenEvidencia(workbook, sheet, rowNumber - 1, colIndex, r.evidencias);
       }
     }
@@ -804,11 +872,13 @@ async function exportarInventarioMobiliario(mobiliario) {
 
 module.exports = {
   exportarReportesOficina,
+  exportarReportesInfraestructura,
   exportarReportesSemaforo,
   exportarInventarioExistencias,
   exportarInventarioMobiliario,
   exportarHerramientasExcel
 };
+
 
 
 

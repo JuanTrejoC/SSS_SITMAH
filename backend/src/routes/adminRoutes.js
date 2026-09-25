@@ -4,6 +4,7 @@ const authAdmin = require('../middleware/authAdmin');
 const adminCatalogo = require('../controllers/adminCatalogoController');
 const usuario = require('../controllers/usuarioController');
 const reporteOficina = require('../controllers/reporteOficinaController');
+const reporteInfraestructura = require('../controllers/reporteInfraestructuraController');
 const reporteSemaforo = require('../controllers/reporteSemaforoController');
 const estadisticas = require('../controllers/estadisticasController');
 const notificacion = require('../controllers/notificacionController');
@@ -43,6 +44,16 @@ router.delete('/reportes/oficina/:id', asyncHandler(reporteOficina.eliminar));
 router.post('/reportes/oficina/:id/piezas', asyncHandler(reporteOficina.asignarPieza));
 router.patch('/reportes/oficina/:id/piezas/:piezaId/estado-reemplazo', asyncHandler(reporteOficina.actualizarEstadoPiezaReemplazada));
 router.delete('/reportes/oficina/:id/piezas/:piezaId', asyncHandler(reporteOficina.desasignarPieza));
+
+router.get('/reportes/infraestructura/resumen', asyncHandler(reporteInfraestructura.resumen));
+router.get('/reportes/infraestructura/export', asyncHandler(reporteInfraestructura.exportar));
+router.get('/reportes/infraestructura', asyncHandler(reporteInfraestructura.listar));
+router.get('/reportes/infraestructura/:id', asyncHandler(reporteInfraestructura.obtener));
+router.patch('/reportes/infraestructura/:id/estado', upload.array('evidencia', 10), asyncHandler(reporteInfraestructura.cambiarEstado));
+router.delete('/reportes/infraestructura/:id', asyncHandler(reporteInfraestructura.eliminar));
+router.post('/reportes/infraestructura/:id/piezas', asyncHandler(reporteInfraestructura.asignarPieza));
+router.patch('/reportes/infraestructura/:id/piezas/:piezaId/estado-reemplazo', asyncHandler(reporteInfraestructura.actualizarEstadoPiezaReemplazada));
+router.delete('/reportes/infraestructura/:id/piezas/:piezaId', asyncHandler(reporteInfraestructura.desasignarPieza));
 
 router.get('/reportes/semaforo/resumen', asyncHandler(reporteSemaforo.resumen));
 router.get('/reportes/semaforo/export', asyncHandler(reporteSemaforo.exportar));

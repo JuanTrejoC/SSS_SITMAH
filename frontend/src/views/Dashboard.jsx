@@ -81,7 +81,6 @@ export default function Dashboard() {
             overflow: 'hidden'
           }}
         >
-          {/* Adorno decorativo de fondo */}
           <div
             style={{
               position: 'absolute',
@@ -105,12 +104,11 @@ export default function Dashboard() {
                 ¡Bienvenido{(user?.nombre || user?.username) ? `, ${user.nombre || user.username}` : ''}!
               </h1>
               <p style={{ color: '#E5E7EB', margin: '0.5rem 0 0 0', fontSize: 'clamp(0.875rem, 2vw, 1.05rem)', maxWidth: '650px', opacity: 0.9 }}>
-                Panel general del Sistema de Transporte Masivo de Hidalgo (SITMAH). Gestiona y monitorea incidencias operativas y de infraestructura en tiempo real.
+                Panel general del Sistema de Transporte Masivo de Hidalgo (SITMAH). Gestiona y monitorea incidencias operativas, semafóricas y de infraestructura en tiempo real.
               </p>
             </div>
 
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-
               <Link
                 to="/estadisticas"
                 className="btn-responsive-general"
@@ -152,92 +150,90 @@ export default function Dashboard() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
               gap: '1.15rem'
             }}
           >
-            {/* Card 1: Total Reportes Oficinas */}
+            {/* Card 1: Total Reportes Tecnológicos */}
             <div
               style={{
                 backgroundColor: 'white',
                 borderRadius: '14px',
-                padding: '1.35rem',
+                padding: '1.25rem',
                 border: '1px solid #E5E7EB',
                 boxShadow: '0 4px 15px -3px rgba(0,0,0,0.05)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '1.15rem',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+                gap: '1rem'
               }}
             >
               <div
                 style={{
-                  width: '54px',
-                  height: '54px',
+                  width: '50px',
+                  height: '50px',
                   borderRadius: '12px',
                   backgroundColor: '#FEF3C7',
                   color: '#D97706',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '1.4rem',
+                  fontSize: '1.35rem',
                   flexShrink: 0
                 }}
               >
                 <i className="fa-solid fa-building"></i>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ fontSize: '0.825rem', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Reportes tecnológicos · Totales
+                <span style={{ fontSize: '0.78rem', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Tecnológicos · Totales
                 </span>
-                <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#111827', lineHeight: 1.1, marginTop: '0.2rem' }}>
+                <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#111827', lineHeight: 1.1, marginTop: '0.15rem' }}>
                   {totalOficinas}
                 </div>
-                <span style={{ fontSize: '0.775rem', color: '#059669', fontWeight: '600', display: 'inline-block', marginTop: '0.25rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: '600', display: 'inline-block', marginTop: '0.2rem' }}>
                   <i className="fa-solid fa-circle-check"></i> {atendidosOficinas} atendidos ({pctOficinas}%)
                 </span>
               </div>
             </div>
 
-            {/* Card 2: Pendientes Oficinas */}
+            {/* Card 2: Pendientes Tecnológicos */}
             <div
               style={{
                 backgroundColor: 'white',
                 borderRadius: '14px',
-                padding: '1.35rem',
+                padding: '1.25rem',
                 border: '1px solid #E5E7EB',
                 boxShadow: '0 4px 15px -3px rgba(0,0,0,0.05)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '1.15rem',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+                gap: '1rem'
               }}
             >
               <div
                 style={{
-                  width: '54px',
-                  height: '54px',
+                  width: '50px',
+                  height: '50px',
                   borderRadius: '12px',
                   backgroundColor: '#FEE2E2',
                   color: '#DC2626',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '1.4rem',
+                  fontSize: '1.35rem',
                   flexShrink: 0
                 }}
               >
                 <i className="fa-solid fa-clock"></i>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ fontSize: '0.825rem', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Reportes tecnológicos · Pendientes
+                <span style={{ fontSize: '0.78rem', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Tecnológicos · Pendientes
                 </span>
-                <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#111827', lineHeight: 1.1, marginTop: '0.2rem' }}>
+                <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#111827', lineHeight: 1.1, marginTop: '0.15rem' }}>
                   {pendientesOficinas}
                 </div>
-                <span style={{ fontSize: '0.775rem', color: pendientesOficinas > 0 ? '#DC2626' : '#6B7280', fontWeight: '600', display: 'inline-block', marginTop: '0.25rem' }}>
-                  {pendientesOficinas > 0 ? ' Requieren atención' : ' Al día'}
+                <span style={{ fontSize: '0.75rem', color: pendientesOficinas > 0 ? '#DC2626' : '#6B7280', fontWeight: '600', display: 'inline-block', marginTop: '0.2rem' }}>
+                  {pendientesOficinas > 0 ? 'Requieren atención' : 'Al día'}
                 </span>
               </div>
             </div>
@@ -247,39 +243,38 @@ export default function Dashboard() {
               style={{
                 backgroundColor: 'white',
                 borderRadius: '14px',
-                padding: '1.35rem',
+                padding: '1.25rem',
                 border: '1px solid #E5E7EB',
                 boxShadow: '0 4px 15px -3px rgba(0,0,0,0.05)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '1.15rem',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+                gap: '1rem'
               }}
             >
               <div
                 style={{
-                  width: '54px',
-                  height: '54px',
+                  width: '50px',
+                  height: '50px',
                   borderRadius: '12px',
                   backgroundColor: '#E0E7FF',
                   color: '#4F46E5',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '1.4rem',
+                  fontSize: '1.35rem',
                   flexShrink: 0
                 }}
               >
                 <i className="fa-solid fa-traffic-light"></i>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ fontSize: '0.825rem', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Reportes semafóricos · Totales
+                <span style={{ fontSize: '0.78rem', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Semafóricos · Totales
                 </span>
-                <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#111827', lineHeight: 1.1, marginTop: '0.2rem' }}>
+                <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#111827', lineHeight: 1.1, marginTop: '0.15rem' }}>
                   {totalSemaforos}
                 </div>
-                <span style={{ fontSize: '0.775rem', color: '#059669', fontWeight: '600', display: 'inline-block', marginTop: '0.25rem' }}>
+                <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: '600', display: 'inline-block', marginTop: '0.2rem' }}>
                   <i className="fa-solid fa-circle-check"></i> {atendidosSemaforos} atendidos ({pctSemaforos}%)
                 </span>
               </div>
@@ -290,40 +285,39 @@ export default function Dashboard() {
               style={{
                 backgroundColor: 'white',
                 borderRadius: '14px',
-                padding: '1.35rem',
+                padding: '1.25rem',
                 border: '1px solid #E5E7EB',
                 boxShadow: '0 4px 15px -3px rgba(0,0,0,0.05)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '1.15rem',
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+                gap: '1rem'
               }}
             >
               <div
                 style={{
-                  width: '54px',
-                  height: '54px',
+                  width: '50px',
+                  height: '50px',
                   borderRadius: '12px',
                   backgroundColor: '#FEF3C7',
                   color: '#B45309',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '1.4rem',
+                  fontSize: '1.35rem',
                   flexShrink: 0
                 }}
               >
                 <i className="fa-solid fa-triangle-exclamation"></i>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ fontSize: '0.825rem', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Reportes semafóricos · Pendientes
+                <span style={{ fontSize: '0.78rem', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Semafóricos · Pendientes
                 </span>
-                <div style={{ fontSize: '1.85rem', fontWeight: '800', color: '#111827', lineHeight: 1.1, marginTop: '0.2rem' }}>
+                <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#111827', lineHeight: 1.1, marginTop: '0.15rem' }}>
                   {pendientesSemaforos}
                 </div>
-                <span style={{ fontSize: '0.775rem', color: pendientesSemaforos > 0 ? '#B45309' : '#6B7280', fontWeight: '600', display: 'inline-block', marginTop: '0.25rem' }}>
-                  {pendientesSemaforos > 0 ? ' En revisión' : ' Sin pendientes'}
+                <span style={{ fontSize: '0.75rem', color: pendientesSemaforos > 0 ? '#B45309' : '#6B7280', fontWeight: '600', display: 'inline-block', marginTop: '0.2rem' }}>
+                  {pendientesSemaforos > 0 ? 'En revisión' : 'Sin pendientes'}
                 </span>
               </div>
             </div>
@@ -343,7 +337,7 @@ export default function Dashboard() {
               gap: '1.25rem'
             }}
           >
-            {/* Módulo: Panel de Oficinas */}
+            {/* Módulo: Panel de Oficinas / Tecnológico */}
             <Link
               to="/dashboard-oficinas"
               style={{

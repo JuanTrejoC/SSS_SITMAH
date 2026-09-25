@@ -13,7 +13,7 @@ export default function InicioRedirect() {
   }
 
   if (user?.rol === 'infraestructura') {
-    return <Navigate to="/inventario-herramientas" replace />
+    return <Navigate to="/dashboard-infraestructura" replace />
   }
 
   return <Navigate to="/crear-oficinas" replace />

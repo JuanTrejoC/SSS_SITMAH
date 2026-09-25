@@ -12,7 +12,7 @@ const {
   applyKeywordOficina,
   parsePagination,
 } = require('../utils/filters');
-const { exportarReportesOficina } = require('../services/excelService');
+const { exportarReportesInfraestructura } = require('../services/excelService');
 
 const crearSchema = z.object({
   solicitante: z.string().min(1),
@@ -23,7 +23,7 @@ const crearSchema = z.object({
   sede_id: z.coerce.number().int().positive(),
   equipo: z.string().optional(),
   numero_serie: z.string().optional(),
-  categoria_id: z.coerce.number().int().positive(),
+  categoria_id: z.coerce.number().int().positive().optional(),
   prioridad: z.enum(['baja', 'media', 'alta']),
   descripcion: z.string().optional(),
 });
@@ -47,12 +47,36 @@ const includeDetalle = {
   piezasAsignadas: { include: { componente: true } },
 };
 
+const filtroSoloInfra = {
+  OR: [
+    { folio: { startsWith: 'RI' } },
+    { categoria: { nombre: { contains: 'Infraestructura' } } }
+  ]
+};
+
+async function obtenerCategoriaInfraId(categoriaIdPropuesto) {
+  if (categoriaIdPropuesto) {
+    const catExiste = await prisma.categoria.findUnique({ where: { id: Number(categoriaIdPropuesto) } });
+    if (catExiste) return catExiste.id;
+  }
+  let catInfra = await prisma.categoria.findFirst({
+    where: { nombre: { contains: 'Infraestructura' } }
+  });
+  if (!catInfra) {
+    catInfra = await prisma.categoria.create({
+      data: { nombre: 'Infraestructura' }
+    });
+  }
+  return catInfra.id;
+}
+
 async function crear(req, res) {
   const parsed = crearSchema.safeParse(req.body);
   if (!parsed.success) return fail(res, parsed.error.errors[0].message);
 
   const data = parsed.data;
-  const folio = await generarFolio('oficina');
+  const folio = await generarFolio('infraestructura');
+  const categoriaId = await obtenerCategoriaInfraId(data.categoria_id);
 
   let cargoId = null;
   if (data.cargo) {
@@ -76,9 +100,9 @@ async function crear(req, res) {
       email: data.email,
       telefono: data.telefono,
       sedeId: data.sede_id,
-      equipo: data.equipo,
+      equipo: data.equipo || 'Infraestructura General',
       numeroSerie: data.numero_serie,
-      categoriaId: data.categoria_id,
+      categoriaId: categoriaId,
       prioridad: data.prioridad,
       descripcion: data.descripcion,
     },
@@ -107,15 +131,15 @@ async function crear(req, res) {
   });
 
   const categoria = await prisma.categoria.findUnique({
-    where: { id: data.categoria_id },
+    where: { id: categoriaId },
     select: { nombre: true },
   });
-  const categoriaNombre = categoria ? categoria.nombre : 'General';
+  const categoriaNombre = categoria ? categoria.nombre : 'Infraestructura';
 
   const datosReporteCorreo = {
     folio,
     fecha: new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' }),
-    tipo: 'oficina',
+    tipo: 'infraestructura',
     solicitante: data.solicitante,
     email: data.email,
     categoria: categoriaNombre,
@@ -134,21 +158,12 @@ async function crear(req, res) {
   ok(res, reporte, 201);
 }
 
-const filtroExcluirInfra = {
-  NOT: {
-    OR: [
-      { folio: { startsWith: 'RI' } },
-      { categoria: { nombre: { contains: 'Infraestructura' } } }
-    ]
-  }
-};
-
 async function resumen(req, res) {
   const [total, abiertos, enProceso, resueltos] = await Promise.all([
-    prisma.reporteOficina.count({ where: filtroExcluirInfra }),
-    prisma.reporteOficina.count({ where: { ...filtroExcluirInfra, estado: 'abierto' } }),
-    prisma.reporteOficina.count({ where: { ...filtroExcluirInfra, estado: 'en_proceso' } }),
-    prisma.reporteOficina.count({ where: { ...filtroExcluirInfra, estado: 'resuelto' } }),
+    prisma.reporteOficina.count({ where: filtroSoloInfra }),
+    prisma.reporteOficina.count({ where: { ...filtroSoloInfra, estado: 'abierto' } }),
+    prisma.reporteOficina.count({ where: { ...filtroSoloInfra, estado: 'en_proceso' } }),
+    prisma.reporteOficina.count({ where: { ...filtroSoloInfra, estado: 'resuelto' } }),
   ]);
 
   ok(res, { total, abiertos, enProceso, resueltos });
@@ -159,7 +174,7 @@ async function listar(req, res) {
   const { keyword, where } = buildReporteFilters(req.query);
   const whereFinal = {
     ...applyKeywordOficina(where, keyword),
-    ...filtroExcluirInfra
+    ...filtroSoloInfra
   };
   const ordenParam = req.query.orden === 'asc' ? 'asc' : 'desc';
 
@@ -191,11 +206,11 @@ async function listar(req, res) {
 
 async function obtener(req, res) {
   const id = Number(req.params.id);
-  const reporte = await prisma.reporteOficina.findUnique({
-    where: { id },
+  const reporte = await prisma.reporteOficina.findFirst({
+    where: { id, ...filtroSoloInfra },
     include: includeDetalle,
   });
-  if (!reporte) return fail(res, 'Reporte no encontrado', 404);
+  if (!reporte) return fail(res, 'Reporte de infraestructura no encontrado', 404);
 
   const historial = await obtenerHistorial('oficina', id);
   ok(res, { ...reporte, historial });
@@ -206,11 +221,11 @@ async function cambiarEstado(req, res) {
   const parsed = estadoSchema.safeParse(req.body);
   if (!parsed.success) return fail(res, parsed.error.errors[0].message);
 
-  const actual = await prisma.reporteOficina.findUnique({
-    where: { id },
+  const actual = await prisma.reporteOficina.findFirst({
+    where: { id, ...filtroSoloInfra },
     include: { evidencias: true },
   });
-  if (!actual) return fail(res, 'Reporte no encontrado', 404);
+  if (!actual) return fail(res, 'Reporte de infraestructura no encontrado', 404);
 
   const { estado, comentario, tecnico_atendio, firma_satisfaccion, diagnostico_solucion, fecha_resolucion } = parsed.data;
 
@@ -218,7 +233,6 @@ async function cambiarEstado(req, res) {
     ? (Array.isArray(req.files) ? req.files : Object.values(req.files).flat())
     : (req.file ? [req.file] : []);
 
-  // Si se intenta cerrar como resuelto, verificar que exista al menos una evidencia fotográfica
   if (estado === 'resuelto') {
     const tieneEvidenciaPrevia = actual.evidencias && actual.evidencias.length > 0;
     const tieneNuevaEvidencia = files.length > 0;
@@ -227,7 +241,6 @@ async function cambiarEstado(req, res) {
     }
   }
 
-  // Si se subieron nuevos archivos de evidencia al resolver
   for (const file of files) {
     await prisma.evidencia.create({
       data: {
@@ -275,6 +288,11 @@ async function cambiarEstado(req, res) {
 
 async function eliminar(req, res) {
   const id = Number(req.params.id);
+  const reporte = await prisma.reporteOficina.findFirst({
+    where: { id, ...filtroSoloInfra }
+  });
+  if (!reporte) return fail(res, 'Reporte de infraestructura no encontrado', 404);
+
   await prisma.reporteOficina.delete({ where: { id } });
   ok(res, { message: 'Reporte eliminado' });
 }
@@ -283,21 +301,21 @@ async function exportar(req, res) {
   const { keyword, where } = buildReporteFilters(req.query);
   const whereFinal = {
     ...applyKeywordOficina(where, keyword),
-    ...filtroExcluirInfra
+    ...filtroSoloInfra
   };
   const incluirImagenes = req.query.incluirImagenes === 'true';
   const ordenParam = req.query.orden === 'asc' ? 'asc' : 'desc';
 
   const reportes = await prisma.reporteOficina.findMany({
     where: whereFinal,
-    include: { area: true, sede: true, categoria: true, evidencias: true },
+    include: { area: true, sede: true, categoria: true, cargo: true, atendidoPor: true, evidencias: true },
     orderBy: { id: ordenParam },
   });
 
-  const buffer = await exportarReportesOficina(reportes, incluirImagenes);
+  const buffer = await exportarReportesInfraestructura(reportes, incluirImagenes);
 
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename=reportes-oficina.xlsx');
+  res.setHeader('Content-Disposition', 'attachment; filename=reportes-infraestructura.xlsx');
   res.send(buffer);
 }
 
@@ -317,13 +335,13 @@ async function asignarPieza(req, res) {
   if (!parsed.success) return fail(res, parsed.error.errors[0].message);
 
   const { componente_id, estado_pieza_reemplazada } = parsed.data;
-  const cantidad = 1; // Solo se puede asignar 1 pieza que es la que se cambia
+  const cantidad = 1;
 
-  // Verificar que el reporte existe
-  const reporte = await prisma.reporteOficina.findUnique({ where: { id: reporteId } });
+  const reporte = await prisma.reporteOficina.findFirst({
+    where: { id: reporteId, ...filtroSoloInfra }
+  });
   if (!reporte) return fail(res, 'Reporte no encontrado', 404);
 
-  // Verificar si la pieza ya fue asignada a este reporte
   const yaAsignada = await prisma.reporteOficinaPieza.findFirst({
     where: {
       reporteOficinaId: reporteId,
@@ -331,10 +349,9 @@ async function asignarPieza(req, res) {
     }
   });
   if (yaAsignada) {
-    return fail(res, 'Esta pieza o componente ya fue asignado a este reporte. No se pueden asignar piezas duplicadas a una misma persona.', 400);
+    return fail(res, 'Esta pieza o componente ya fue asignado a este reporte.', 400);
   }
 
-  // Verificar que el componente existe y tiene stock
   const componente = await prisma.existenciaComponente.findUnique({ where: { id: componente_id } });
   if (!componente) return fail(res, 'Componente no encontrado', 404);
 
@@ -342,9 +359,7 @@ async function asignarPieza(req, res) {
     return fail(res, `Stock insuficiente. Disponible: ${componente.cantidad}, Solicitado: ${cantidad}`);
   }
 
-  // Transacción para descontar stock y asignar pieza
   const result = await prisma.$transaction(async (tx) => {
-    // Descontar stock
     await tx.existenciaComponente.update({
       where: { id: componente_id },
       data: { cantidad: { decrement: cantidad } }
@@ -352,21 +367,19 @@ async function asignarPieza(req, res) {
 
     const estadoFisicoVieja = estado_pieza_reemplazada === 'danada' ? 'Dañado' : 'Por Reparar';
 
-    // Registrar la pieza retirada/vieja en ExistenciaComponente para que figure en el inventario
     const piezaViejaExistencia = await tx.existenciaComponente.create({
       data: {
         nombre: `${componente.nombre} (Pieza Reemplazada)`,
-        categoria: componente.categoria || 'componente',
+        categoria: componente.categoria || 'herramienta',
         cantidad: 1,
         estadoFisico: estadoFisicoVieja,
         marca: componente.marca || null,
         modelo: componente.modelo || null,
         numeroInventario: componente.numeroInventario ? `${componente.numeroInventario}-RET` : null,
-        tipoInventario: 'tecnologico',
+        tipoInventario: 'infraestructura',
       }
     });
 
-    // Crear asignación
     return tx.reporteOficinaPieza.create({
       data: {
         reporteOficinaId: reporteId,
@@ -392,22 +405,18 @@ async function desasignarPieza(req, res) {
   });
   if (!asignacion) return fail(res, 'Asignación no encontrada', 404);
 
-  // Transacción para restaurar stock y eliminar asignación
   await prisma.$transaction(async (tx) => {
-    // Restaurar stock
     await tx.existenciaComponente.update({
       where: { id: asignacion.componenteId },
       data: { cantidad: { increment: asignacion.cantidad } }
     });
 
-    // Si se creó el registro de la pieza reemplazada en existencias, eliminarlo
     if (asignacion.piezaReemplazadaExistenciaId) {
       await tx.existenciaComponente.deleteMany({
         where: { id: asignacion.piezaReemplazadaExistenciaId }
       });
     }
 
-    // Eliminar asignación
     await tx.reporteOficinaPieza.delete({
       where: { id: piezaId }
     });
@@ -438,7 +447,6 @@ async function actualizarEstadoPiezaReemplazada(req, res) {
     }
   });
 
-  // Si existe el registro en existenciaComponente, actualizar su estado físico
   if (asignacion.piezaReemplazadaExistenciaId) {
     await prisma.existenciaComponente.updateMany({
       where: { id: asignacion.piezaReemplazadaExistenciaId },

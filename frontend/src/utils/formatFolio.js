@@ -6,8 +6,8 @@ export function formatFolio(folio, fallbackId) {
   // Clean whitespace and convert to uppercase
   const clean = String(folio).replace(/\s+/g, '').toUpperCase();
 
-  // Format 1: PREFIX-NUMBER-YEAR (e.g. RT-03-2026 or RS-01-2026)
-  const match1 = clean.match(/^(RT|RS|RO)-(\d+)-(\d{2,4})$/);
+  // Format 1: PREFIX-NUMBER-YEAR (e.g. RT-03-2026, RS-01-2026, or RI-01-2026)
+  const match1 = clean.match(/^(RT|RS|RI|RO)-(\d+)-(\d{2,4})$/);
   if (match1) {
     let prefijo = match1[1];
     if (prefijo === 'RO') prefijo = 'RT';
@@ -16,11 +16,13 @@ export function formatFolio(folio, fallbackId) {
     return `${prefijo}-${numero}-${anio}`;
   }
 
-  // Format 2: Legacy PREFIX-YEAR-NUMBER (e.g. OF-2026-0003 or SM-2026-0001)
-  const match2 = clean.match(/^(OF|SM)-(\d{4})-(\d+)$/);
+  // Format 2: Legacy PREFIX-YEAR-NUMBER (e.g. OF-2026-0003, SM-2026-0001, INF-2026-0001)
+  const match2 = clean.match(/^(OF|SM|INF)-(\d{4})-(\d+)$/);
   if (match2) {
     const originalPrefijo = match2[1];
-    const prefijo = originalPrefijo === 'OF' ? 'RT' : 'RS';
+    let prefijo = 'RS';
+    if (originalPrefijo === 'OF') prefijo = 'RT';
+    else if (originalPrefijo === 'INF') prefijo = 'RI';
     const anio = match2[2];
     const numero = String(parseInt(match2[3], 10)).padStart(2, '0');
     return `${prefijo}-${numero}-${anio}`;

@@ -429,16 +429,16 @@ export default function DashboardOficinas() {
           </div>
 
           {/* Switcher Tabs */}
-          <div style={{ display: 'flex', gap: '0.35rem', backgroundColor: '#E2E8F0', padding: '0.35rem', borderRadius: '12px' }}>
+          <div style={{ display: 'flex', gap: '0.35rem', backgroundColor: '#E2E8F0', padding: '0.35rem', borderRadius: '12px', flexWrap: 'wrap' }}>
             <button
               style={{
-                padding: '0.55rem 1.25rem',
+                padding: '0.55rem 1.15rem',
                 borderRadius: '9px',
                 border: 'none',
                 backgroundColor: '#691B31',
                 color: 'white',
                 fontWeight: '700',
-                fontSize: '0.875rem',
+                fontSize: '0.85rem',
                 cursor: 'default',
                 display: 'flex',
                 alignItems: 'center',
@@ -446,28 +446,28 @@ export default function DashboardOficinas() {
                 boxShadow: '0 2px 6px rgba(105,27,49,0.25)'
               }}
             >
-              <i className="fa-solid fa-building"></i> Reportes Tecnológicos
+              <i className="fa-solid fa-building"></i> Tecnológicos
             </button>
             <button
               onClick={() => navigate('/dashboard-semaforos')}
               style={{
-                padding: '0.55rem 1.25rem',
+                padding: '0.55rem 1.15rem',
                 borderRadius: '9px',
                 border: 'none',
                 backgroundColor: 'transparent',
                 color: '#4B5563',
                 fontWeight: '600',
-                fontSize: '0.875rem',
+                fontSize: '0.85rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.45rem',
                 transition: 'all 0.2s ease'
               }}
-              onMouseOver={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#691B31' }}
+              onMouseOver={e => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#BC955B' }}
               onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#4B5563' }}
             >
-              <i className="fa-solid fa-traffic-light"></i> Reportes Semafóricos
+              <i className="fa-solid fa-traffic-light"></i> Semafóricos
             </button>
           </div>
         </div>

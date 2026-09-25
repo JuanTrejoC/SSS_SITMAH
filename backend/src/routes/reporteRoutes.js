@@ -3,6 +3,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const upload = require('../middleware/upload');
 const { reporteLimiter } = require('../middleware/rateLimit');
 const reporteOficina = require('../controllers/reporteOficinaController');
+const reporteInfraestructura = require('../controllers/reporteInfraestructuraController');
 const reporteSemaforo = require('../controllers/reporteSemaforoController');
 
 const router = express.Router();
@@ -12,6 +13,13 @@ router.post(
   reporteLimiter,
   upload.array('evidencia', 10),
   asyncHandler(reporteOficina.crear)
+);
+
+router.post(
+  '/infraestructura',
+  reporteLimiter,
+  upload.array('evidencia', 10),
+  asyncHandler(reporteInfraestructura.crear)
 );
 
 router.post(
