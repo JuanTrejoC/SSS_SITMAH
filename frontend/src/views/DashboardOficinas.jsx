@@ -7,6 +7,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { API_BASE_URL } from '../config'
 import Swal from 'sweetalert2'
 import AtencionReporte from '../components/AtencionReporte'
+import ModalReemplazoPeriferico from '../components/ModalReemplazoPeriferico'
 
 export default function DashboardOficinas() {
   const { user } = useAuth()
@@ -23,6 +24,7 @@ export default function DashboardOficinas() {
   const [incluirImagenes, setIncluirImagenes] = useState(false)
   const [ordenAscendente, setOrdenAscendente] = useState(false)
   const [confirmResuelto, setConfirmResuelto] = useState({ visible: false, id: null })
+  const [modalReemplazoAbierto, setModalReemplazoAbierto] = useState(false)
   
   const [inventario, setInventario] = useState([])
   const [mostrarInventario, setMostrarInventario] = useState(false)
@@ -854,6 +856,23 @@ export default function DashboardOficinas() {
                     <strong style={{ fontSize: '0.95rem', color: '#111827' }}>Equipos Asignados:</strong>
                     <button
                       type="button"
+                      onClick={() => setModalReemplazoAbierto(true)}
+                      style={{
+                        backgroundColor: '#FFFBEB',
+                        color: '#D97706',
+                        border: '1px solid #FDE68A',
+                        padding: '0.35rem 0.75rem',
+                        borderRadius: '8px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        marginRight: '0.5rem'
+                      }}
+                    >
+                      <FaCogs style={{ marginRight: '0.25rem' }}/> Reemplazar Periférico (Mayor)
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setMostrarInventario(!mostrarInventario)}
                       style={{
                         backgroundColor: mostrarInventario ? '#691B31' : '#F3F4F6',
@@ -866,7 +885,7 @@ export default function DashboardOficinas() {
                         cursor: 'pointer'
                       }}
                     >
-                      {mostrarInventario ? 'Ocultar Inventario' : '+ Asignar Equipo'}
+                      {mostrarInventario ? 'Ocultar Inventario (Menor)' : '+ Asignar Pieza / Componente (Menor)'}
                     </button>
                   </div>
                   
@@ -1186,6 +1205,16 @@ export default function DashboardOficinas() {
         )}
 
       </div>
+
+      <ModalReemplazoPeriferico 
+        isOpen={modalReemplazoAbierto}
+        onClose={() => setModalReemplazoAbierto(false)}
+        user={user}
+        onSuccess={() => {
+          cargarInventario();
+          cargarReportes();
+        }}
+      />
     </div>
   )
 }

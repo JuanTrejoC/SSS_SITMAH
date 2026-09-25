@@ -124,6 +124,7 @@ async function listarEquipoTecnologico(req, res) {
   const [items, total] = await Promise.all([
     prisma.equipoTecnologico.findMany({
       where,
+      include: { componentes: true },
       skip,
       take: limit,
       orderBy: { id: 'desc' },
@@ -132,6 +133,125 @@ async function listarEquipoTecnologico(req, res) {
   ]);
 
   ok(res, { items, total, page, limit });
+}
+
+async function procesarPerifericosDeDetalles(detalles, equipoPrincipalId, responsable, cargoResponsable, areaUbicacion, direccion, procedencia) {
+  const fs = require('fs');
+  const logFile = 'debug_perifericos.log';
+  fs.appendFileSync(logFile, `\n\n[${new Date().toISOString()}] Procesando periféricos para PC ID: ${equipoPrincipalId}\n`);
+  fs.appendFileSync(logFile, `Detalles originales: ${JSON.stringify(detalles)}\n`);
+
+  if (!detalles || typeof detalles !== 'object') {
+    fs.appendFileSync(logFile, `Detalles no es un objeto válido. Tipo: ${typeof detalles}\n`);
+    return detalles;
+  }
+
+  const nuevosDetalles = { ...detalles };
+  const perifericosAcrear = [];
+
+  // 1. Procesar periféricos planos (Teclado, Mouse, Cargador, Diadema, Candado, Regulador, No break, Antena)
+  const mapeoPlanos = [
+    { tipo: 'Teclado', sufijo: 'Teclado' },
+    { tipo: 'Mouse', sufijo: 'Mouse' },
+    { tipo: 'Cargador', sufijo: 'Cargador' },
+    { tipo: 'Diadema', sufijo: 'Diadema' },
+    { tipo: 'Candado', sufijo: 'Candado' },
+    { tipo: 'Regulador', sufijo: 'Regulador' },
+    { tipo: 'No break', sufijo: 'Nobreak' },
+    { tipo: 'Antena Wi-Fi', sufijo: 'Antena' }
+  ];
+
+  for (const p of mapeoPlanos) {
+    const { tipo, sufijo } = p;
+    const marca = detalles[`marca${sufijo}`];
+    const modelo = detalles[`modelo${sufijo}`];
+    const serie = detalles[`serie${sufijo}`];
+    let inventario = detalles[`numeroInventario${sufijo}`] ? String(detalles[`numeroInventario${sufijo}`]) : null;
+
+    if (marca || modelo || serie || inventario) {
+      perifericosAcrear.push({ tipo, marca, modelo, serie, inventario });
+      fs.appendFileSync(logFile, `Encontrado periférico plano: ${tipo} - ${marca} - ${inventario}\n`);
+    }
+    
+    // Limpiar JSON
+    delete nuevosDetalles[`marca${sufijo}`];
+    delete nuevosDetalles[`modelo${sufijo}`];
+    delete nuevosDetalles[`serie${sufijo}`];
+    delete nuevosDetalles[`numeroInventario${sufijo}`];
+    delete nuevosDetalles[`tiene${sufijo}`];
+    delete nuevosDetalles[`cantidad${sufijo}`];
+  }
+
+  // 2. Procesar arreglos de periféricos (como monitores)
+  if (Array.isArray(detalles.monitores)) {
+    fs.appendFileSync(logFile, `Encontrado arreglo de monitores: ${detalles.monitores.length} monitores\n`);
+    for (const monitor of detalles.monitores) {
+      if (monitor.marca || monitor.modelo || monitor.serie || monitor.numeroInventario) {
+        perifericosAcrear.push({
+          tipo: 'Monitor',
+          marca: monitor.marca,
+          modelo: monitor.modelo,
+          serie: monitor.serie,
+          inventario: monitor.numeroInventario ? String(monitor.numeroInventario) : null
+        });
+      }
+    }
+    delete nuevosDetalles.monitores;
+    delete nuevosDetalles.tieneMonitores;
+    delete nuevosDetalles.cantidadMonitores;
+    delete nuevosDetalles.marcaMonitores;
+    delete nuevosDetalles.modeloMonitores;
+    delete nuevosDetalles.serieMonitores;
+    delete nuevosDetalles.numeroInventarioMonitores;
+  }
+
+  fs.appendFileSync(logFile, `Periféricos a crear (${perifericosAcrear.length}): ${JSON.stringify(perifericosAcrear)}\n`);
+
+  // 3. Crear en BD
+  for (const p of perifericosAcrear) {
+    try {
+      let finalInventario = p.inventario && p.inventario.trim() !== '' ? p.inventario.trim() : null;
+      if (finalInventario) {
+        let count = 0;
+        let newInventario = finalInventario;
+        while (true) {
+          const existe = await prisma.equipoTecnologico.findUnique({
+            where: { numeroInventario: newInventario }
+          });
+          if (!existe) break;
+          count++;
+          newInventario = `${finalInventario}-${count}`;
+        }
+        finalInventario = newInventario;
+      }
+
+      fs.appendFileSync(logFile, `Creando en BD: ${p.tipo} con inventario ${finalInventario}\n`);
+      await prisma.equipoTecnologico.create({
+        data: {
+          tipo: p.tipo,
+          marca: p.marca && p.marca.trim() !== '' ? String(p.marca) : null,
+          modelo: p.modelo && p.modelo.trim() !== '' ? String(p.modelo) : null,
+          numeroSerie: p.serie && p.serie.trim() !== '' ? String(p.serie) : null,
+          numeroInventario: finalInventario,
+          responsable: responsable || null,
+          cargoResponsable: cargoResponsable || null,
+          areaUbicacion: areaUbicacion || null,
+          direccion: direccion || null,
+          procedencia: procedencia || null,
+          estatus: 'Activo',
+          equipoPrincipalId,
+          detalles: {}
+        }
+      });
+      fs.appendFileSync(logFile, `Creado exitosamente: ${p.tipo}\n`);
+    } catch (error) {
+      fs.appendFileSync(logFile, `ERROR al crear ${p.tipo}: ${error.message}\n`);
+      throw error; // Re-throw to ensure we know it failed
+    }
+  }
+
+  fs.appendFileSync(logFile, `Detalles limpios devueltos: ${JSON.stringify(nuevosDetalles)}\n`);
+  return nuevosDetalles;
 }
 
 async function crearEquipoTecnologico(req, res) {
@@ -153,7 +273,7 @@ async function crearEquipoTecnologico(req, res) {
     }
   }
 
-  const equipo = await prisma.equipoTecnologico.create({
+  let equipo = await prisma.equipoTecnologico.create({
     data: {
       tipo: data.tipo,
       numeroInventario: data.numeroInventario || null,
@@ -169,7 +289,66 @@ async function crearEquipoTecnologico(req, res) {
     },
   });
 
+  const detallesLimpios = await procesarPerifericosDeDetalles(
+    data.detalles, 
+    equipo.id, 
+    data.responsable, 
+    data.cargoResponsable, 
+    data.areaUbicacion, 
+    data.direccion, 
+    data.procedencia
+  );
+
+  if (JSON.stringify(data.detalles || {}) !== JSON.stringify(detallesLimpios)) {
+    equipo = await prisma.equipoTecnologico.update({
+      where: { id: equipo.id },
+      data: { detalles: detallesLimpios },
+      include: { componentes: true }
+    });
+  }
+
   ok(res, equipo, 201);
+}
+
+async function reemplazarPeriferico(req, res) {
+  const { equipoPrincipalId, perifericoViejoId, perifericoNuevoId, nuevoEstadoViejo } = req.body;
+  if (!equipoPrincipalId || !perifericoViejoId || !perifericoNuevoId || !nuevoEstadoViejo) {
+    return fail(res, 'Faltan parámetros requeridos', 400);
+  }
+
+  // Verificar que el equipo principal existe
+  const principal = await prisma.equipoTecnologico.findUnique({ where: { id: Number(equipoPrincipalId) } });
+  if (!principal) return fail(res, 'Equipo principal no encontrado', 404);
+
+  // Verificar periférico nuevo
+  const nuevo = await prisma.equipoTecnologico.findUnique({ where: { id: Number(perifericoNuevoId) } });
+  if (!nuevo) return fail(res, 'Periférico nuevo no encontrado', 404);
+  if (nuevo.estatus !== 'Stock') return fail(res, 'El periférico nuevo debe estar en Stock', 400);
+
+  // Verificar periférico viejo
+  const viejo = await prisma.equipoTecnologico.findUnique({ where: { id: Number(perifericoViejoId) } });
+  if (!viejo) return fail(res, 'Periférico viejo no encontrado', 404);
+  if (viejo.equipoPrincipalId !== principal.id) return fail(res, 'El periférico viejo no está asignado a este equipo principal', 400);
+
+  // Ejecutar transacción
+  const result = await prisma.$transaction([
+    prisma.equipoTecnologico.update({
+      where: { id: viejo.id },
+      data: {
+        equipoPrincipalId: null,
+        estatus: nuevoEstadoViejo // Baja o Mantenimiento
+      }
+    }),
+    prisma.equipoTecnologico.update({
+      where: { id: nuevo.id },
+      data: {
+        equipoPrincipalId: principal.id,
+        estatus: 'Activo'
+      }
+    })
+  ]);
+
+  ok(res, { message: 'Periférico reemplazado correctamente', result });
 }
 
 async function obtenerEquipoTecnologico(req, res) {
@@ -205,7 +384,7 @@ async function actualizarEquipoTecnologico(req, res) {
     }
   }
 
-  const equipo = await prisma.equipoTecnologico.update({
+  let equipo = await prisma.equipoTecnologico.update({
     where: { id },
     data: {
       tipo: data.tipo,
@@ -221,6 +400,24 @@ async function actualizarEquipoTecnologico(req, res) {
       detalles: data.detalles || {},
     },
   });
+
+  const detallesLimpios = await procesarPerifericosDeDetalles(
+    data.detalles, 
+    equipo.id, 
+    data.responsable, 
+    data.cargoResponsable, 
+    data.areaUbicacion, 
+    data.direccion, 
+    data.procedencia
+  );
+
+  if (JSON.stringify(data.detalles || {}) !== JSON.stringify(detallesLimpios)) {
+    equipo = await prisma.equipoTecnologico.update({
+      where: { id: equipo.id },
+      data: { detalles: detallesLimpios },
+      include: { componentes: true }
+    });
+  }
 
   ok(res, equipo);
 }
@@ -738,6 +935,7 @@ async function exportarMobiliarioExcel(req, res) {
 module.exports = {
   listarEquipoTecnologico,
   crearEquipoTecnologico,
+  reemplazarPeriferico,
   obtenerEquipoTecnologico,
   actualizarEquipoTecnologico,
   eliminarEquipoTecnologico,

@@ -52,8 +52,9 @@ export default function InventarioExistencias() {
   const [existencias, setExistencias] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
+  const [expandedGroups, setExpandedGroups] = useState({});
   const [filtroCategoria, setFiltroCategoria] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState(''); // '' | 'Buen Estado' | 'Por Reparar' | 'Dañado'
+  const [filtroEstado, setFiltroEstado] = useState(''); // '' | 'Stock' | 'Refacciones' | 'Baja'
   const [filtroOrigen, setFiltroOrigen] = useState(''); // '' | 'reemplazadas' | 'almacen'
   const [menuExportarAbierto, setMenuExportarAbierto] = useState(false);
   const exportDropdownRef = useRef(null);
@@ -67,7 +68,7 @@ export default function InventarioExistencias() {
     nombre: '',
     categoria: 'componente',
     cantidad: 1,
-    estadoFisico: 'Buen Estado',
+    estadoFisico: 'Stock',
     areaUbicacion: 'Almacén de Sistemas',
     marca: '',
     modelo: '',
@@ -80,43 +81,8 @@ export default function InventarioExistencias() {
     if (!user?.token) return;
     setCargando(true);
     try {
-      // 1. Fetch existencias
-      let url = `${API_BASE_URL}/api/inventario/existencias?tipoInventario=tecnologico`;
-      if (filtroCategoria) {
-        url += `&categoria=${filtroCategoria}`;
-      }
-      const res = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${user.token}` }
-      });
-      let exisItems = [];
-      if (res.ok) {
-        const json = await res.json();
-        if (json.ok && Array.isArray(json.data)) {
-          exisItems = json.data.map(ex => {
-            let est = ex.estadoFisico || (Number(ex.cantidad) > 0 ? 'Buen Estado' : 'Dañado');
-            if (est === 'Regular' || est === 'Por Reparar' || est === 'En Reparación') est = 'Por Reparar';
-            else if (est === 'Dañada' || est === 'Dañado' || est === 'Baja') est = 'Dañado';
-            else est = 'Buen Estado';
-
-            return {
-              id: ex.id,
-              origen: 'existencia',
-              nombre: ex.nombre,
-              categoria: ex.categoria || 'componente',
-              cantidad: Number(ex.cantidad) || 0,
-              estadoFisico: est,
-              areaUbicacion: ex.areaUbicacion || 'Almacén de Sistemas',
-              marca: ex.marca || '',
-              modelo: ex.modelo || '',
-              numeroSerie: ex.numeroSerie || '',
-              numeroInventario: ex.numeroInventario || ''
-            };
-          });
-        }
-      }
-
-      // 2. Fetch refacciones from equipoTecnologico
-      const resEq = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?limit=1000&tipo=refaccion`, {
+      // Fetch all non-active technological equipment
+      const resEq = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?limit=2000&estatusNot=Activo`, {
         headers: { 'Authorization': `Bearer ${user.token}` }
       });
       let eqItems = [];
@@ -124,29 +90,25 @@ export default function InventarioExistencias() {
         const jsonEq = await resEq.json();
         if (jsonEq.ok && Array.isArray(jsonEq.data)) {
           eqItems = jsonEq.data.map(item => {
-            let est = item.estatus || item.detalles?.estadoFisico || 'Buen Estado';
-            if (est === 'Regular' || est === 'Por Reparar' || est === 'En Reparación') est = 'Por Reparar';
-            else if (est === 'Dañada' || est === 'Dañado' || est === 'Baja') est = 'Dañado';
-            else est = 'Buen Estado';
-
             return {
               id: item.id,
               origen: 'equipo',
-              nombre: item.detalles?.nombre || `${item.marca || ''} ${item.modelo || ''}`.trim() || 'Refacción',
-              categoria: item.detalles?.categoria || 'componente',
-              cantidad: item.detalles?.cantidad !== undefined ? Number(item.detalles.cantidad) : 1,
-              estadoFisico: est,
+              nombre: item.detalles?.nombre || `${item.marca || ''} ${item.modelo || ''}`.trim() || item.tipo,
+              categoria: item.detalles?.categoria || item.tipo,
+              cantidad: 1,
+              estadoFisico: item.estatus || 'Stock', // Mapear a estatus
               areaUbicacion: item.areaUbicacion || item.detalles?.areaUbicacion || 'Almacén de Sistemas',
               marca: item.marca || '',
               modelo: item.modelo || '',
               numeroSerie: item.numeroSerie || '',
-              numeroInventario: item.numeroInventario || ''
+              numeroInventario: item.numeroInventario || '',
+              equipoOriginal: item
             };
           });
         }
       }
 
-      setExistencias([...exisItems, ...eqItems]);
+      setExistencias(eqItems);
     } catch (err) {
       console.error('Error al cargar existencias:', err);
     } finally {
@@ -262,7 +224,7 @@ export default function InventarioExistencias() {
       nombre: item.nombre || '',
       categoria: item.categoria || 'componente',
       cantidad: item.cantidad !== undefined ? item.cantidad : 0,
-      estadoFisico: item.estadoFisico || 'Buen Estado',
+      estadoFisico: item.estadoFisico || 'Stock',
       areaUbicacion: item.areaUbicacion || 'Almacén de Sistemas',
       marca: item.marca || '',
       modelo: item.modelo || '',
@@ -316,7 +278,7 @@ export default function InventarioExistencias() {
       nombre: '',
       categoria: 'componente',
       cantidad: '',
-      estadoFisico: 'Buen Estado',
+      estadoFisico: 'Stock',
       areaUbicacion: 'Almacén de Sistemas',
       marca: '',
       modelo: '',
@@ -399,15 +361,15 @@ export default function InventarioExistencias() {
       let subtituloDoc = 'REPORTE GENERAL DE STOCK Y REFACCIONES';
 
       if (tipo === 'buen_estado') {
-        registros = existencias.filter(i => i.estadoFisico === 'Buen Estado');
+        registros = existencias.filter(i => i.estadoFisico === 'Stock');
         tituloDoc = 'REPORTE DE PIEZAS EN BUEN ESTADO';
         subtituloDoc = 'Componentes, accesorios y equipos operativos en stock';
       } else if (tipo === 'por_reparar') {
-        registros = existencias.filter(i => i.estadoFisico === 'Por Reparar');
+        registros = existencias.filter(i => i.estadoFisico === 'Refacciones');
         tituloDoc = 'REPORTE DE PIEZAS POR REPARAR';
         subtituloDoc = 'Piezas y refacciones en proceso de revisión o mantenimiento';
       } else if (tipo === 'danado') {
-        registros = existencias.filter(i => i.estadoFisico === 'Dañado');
+        registros = existencias.filter(i => i.estadoFisico === 'Baja');
         tituloDoc = 'REPORTE DE PIEZAS DAÑADAS / BAJA';
         subtituloDoc = 'Piezas no operativas o descartadas tras reemplazo';
       } else {
@@ -423,11 +385,15 @@ export default function InventarioExistencias() {
           );
           const coincideEstado = !filtroEstado || item.estadoFisico === filtroEstado;
           const coincideOrigen = !filtroOrigen || (
-            filtroOrigen === 'reemplazadas'
-              ? (item.nombre?.includes('Reemplazada') || item.nombre?.includes('Retirada') || item.numeroInventario?.includes('-RET'))
-              : (!item.nombre?.includes('Reemplazada') && !item.nombre?.includes('Retirada') && !item.numeroInventario?.includes('-RET'))
-          );
-          return coincideTexto && coincideEstado && coincideOrigen;
+              filtroOrigen === 'reemplazadas'
+                ? (item.nombre?.includes('Reemplazada') || item.nombre?.includes('Retirada') || item.numeroInventario?.includes('-RET'))
+                : (!item.nombre?.includes('Reemplazada') && !item.nombre?.includes('Retirada') && !item.numeroInventario?.includes('-RET'))
+            );
+            const normalizar = str => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/s$/, '');
+            const catFiltro = normalizar(filtroCategoria);
+            const catItem = normalizar(item.categoria || item.tipo || 'componente');
+            const coincideCategoria = !filtroCategoria || catItem.includes(catFiltro);
+            return coincideTexto && coincideEstado && coincideOrigen && coincideCategoria;
         });
 
         if (filtroEstado) {
@@ -474,9 +440,9 @@ export default function InventarioExistencias() {
       const logoSitmah = await loadImg('/images/sistema de tm.webp');
 
       const totalPiezas = registros.reduce((acc, r) => acc + (Number(r.cantidad) || 0), 0);
-      const countBuen = registros.filter(r => r.estadoFisico === 'Buen Estado').reduce((a, r) => a + (Number(r.cantidad) || 0), 0);
-      const countRep = registros.filter(r => r.estadoFisico === 'Por Reparar').reduce((a, r) => a + (Number(r.cantidad) || 0), 0);
-      const countDan = registros.filter(r => r.estadoFisico === 'Dañado').reduce((a, r) => a + (Number(r.cantidad) || 0), 0);
+      const countBuen = registros.filter(r => r.estadoFisico === 'Stock').reduce((a, r) => a + (Number(r.cantidad) || 0), 0);
+      const countRep = registros.filter(r => r.estadoFisico === 'Refacciones').reduce((a, r) => a + (Number(r.cantidad) || 0), 0);
+      const countDan = registros.filter(r => r.estadoFisico === 'Baja').reduce((a, r) => a + (Number(r.cantidad) || 0), 0);
 
       const drawHeaderFooter = (data) => {
         // Franja superior institucional
@@ -580,7 +546,7 @@ export default function InventarioExistencias() {
           item.numeroSerie || '—',
           item.areaUbicacion || 'Almacén de Sistemas',
           origenTexto,
-          (item.estadoFisico || 'Buen Estado').toUpperCase()
+          (item.estadoFisico || 'Stock').toUpperCase()
         ];
       });
 
@@ -734,12 +700,12 @@ export default function InventarioExistencias() {
               </div>
 
               <div style={{ padding: '0.4rem' }}>
-                {/* 1. Buen Estado */}
+                {/* 1. Stock */}
                 <button
                   type="button"
                   onClick={() => {
                     setMenuExportarAbierto(false);
-                    exportarReportePDF('buen_estado');
+                    exportarReportePDF('Stock');
                   }}
                   style={{
                     width: '100%',
@@ -761,17 +727,17 @@ export default function InventarioExistencias() {
                     <FaCheckCircle size={13} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#065F46' }}>1. Piezas en Buen Estado</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#065F46' }}>1. Piezas en Stock</div>
                     <div style={{ fontSize: '0.72rem', color: '#6B7280' }}>Stock operativo disponible</div>
                   </div>
                 </button>
 
-                {/* 2. Por Reparar */}
+                {/* 2. Refacciones */}
                 <button
                   type="button"
                   onClick={() => {
                     setMenuExportarAbierto(false);
-                    exportarReportePDF('por_reparar');
+                    exportarReportePDF('Refacciones');
                   }}
                   style={{
                     width: '100%',
@@ -793,7 +759,7 @@ export default function InventarioExistencias() {
                     <FaTools size={13} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#92400E' }}>2. Piezas Por Reparar</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#92400E' }}>2. Piezas Refacciones</div>
                     <div style={{ fontSize: '0.72rem', color: '#6B7280' }}>En revisión o mantenimiento</div>
                   </div>
                 </button>
@@ -803,7 +769,7 @@ export default function InventarioExistencias() {
                   type="button"
                   onClick={() => {
                     setMenuExportarAbierto(false);
-                    exportarReportePDF('danado');
+                    exportarReportePDF('Baja');
                   }}
                   style={{
                     width: '100%',
@@ -876,14 +842,14 @@ export default function InventarioExistencias() {
         gap: '1.25rem',
         marginBottom: '2rem'
       }}>
-        {/* Cuadri: Buen Estado */}
+        {/* Cuadri: Stock */}
         {(() => {
-          const countBuenEstado = existencias.filter(i => i.estadoFisico === 'Buen Estado').reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
-          const totalArticulos = existencias.filter(i => i.estadoFisico === 'Buen Estado').length;
-          const isActive = filtroEstado === 'Buen Estado';
+          const countBuenEstado = existencias.filter(i => i.estadoFisico === 'Stock').reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
+          const totalArticulos = existencias.filter(i => i.estadoFisico === 'Stock').length;
+          const isActive = filtroEstado === 'Stock';
           return (
             <div
-              onClick={() => setFiltroEstado(isActive ? '' : 'Buen Estado')}
+              onClick={() => setFiltroEstado(isActive ? '' : 'Stock')}
               style={{
                 backgroundColor: isActive ? '#ecfdf5' : '#ffffff',
                 border: isActive ? '2px solid #10b981' : '1px solid #e2e8f0',
@@ -918,7 +884,7 @@ export default function InventarioExistencias() {
                     width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block'
                   }}></span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Buen Estado
+                    Stock
                   </span>
                 </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#064e3b', lineHeight: 1.1 }}>
@@ -933,9 +899,9 @@ export default function InventarioExistencias() {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    exportarReportePDF('buen_estado');
+                    exportarReportePDF('Stock');
                   }}
-                  title="Descargar Reporte PDF de Buen Estado"
+                  title="Descargar Reporte PDF de Stock"
                   style={{
                     marginTop: '0.75rem',
                     padding: '0.3rem 0.65rem',
@@ -954,7 +920,7 @@ export default function InventarioExistencias() {
                   onMouseOver={e => e.currentTarget.style.backgroundColor = '#BBF7D0'}
                   onMouseOut={e => e.currentTarget.style.backgroundColor = '#DCFCE7'}
                 >
-                  <FaDownload size={10} /> PDF Buen Estado
+                  <FaDownload size={10} /> PDF Stock
                 </button>
               </div>
 
@@ -976,14 +942,14 @@ export default function InventarioExistencias() {
           );
         })()}
 
-        {/* Cuadri: Por Reparar */}
+        {/* Cuadri: Refacciones */}
         {(() => {
-          const countPorReparar = existencias.filter(i => i.estadoFisico === 'Por Reparar').reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
-          const totalArticulos = existencias.filter(i => i.estadoFisico === 'Por Reparar').length;
-          const isActive = filtroEstado === 'Por Reparar';
+          const countPorReparar = existencias.filter(i => i.estadoFisico === 'Refacciones').reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
+          const totalArticulos = existencias.filter(i => i.estadoFisico === 'Refacciones').length;
+          const isActive = filtroEstado === 'Refacciones';
           return (
             <div
-              onClick={() => setFiltroEstado(isActive ? '' : 'Por Reparar')}
+              onClick={() => setFiltroEstado(isActive ? '' : 'Refacciones')}
               style={{
                 backgroundColor: isActive ? '#fffbeb' : '#ffffff',
                 border: isActive ? '2px solid #f59e0b' : '1px solid #e2e8f0',
@@ -1018,7 +984,7 @@ export default function InventarioExistencias() {
                     width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#f59e0b', display: 'inline-block'
                   }}></span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Por Reparar
+                    Refacciones
                   </span>
                 </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#78350f', lineHeight: 1.1 }}>
@@ -1033,9 +999,9 @@ export default function InventarioExistencias() {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    exportarReportePDF('por_reparar');
+                    exportarReportePDF('Refacciones');
                   }}
-                  title="Descargar Reporte PDF de Por Reparar"
+                  title="Descargar Reporte PDF de Refacciones"
                   style={{
                     marginTop: '0.75rem',
                     padding: '0.3rem 0.65rem',
@@ -1054,7 +1020,7 @@ export default function InventarioExistencias() {
                   onMouseOver={e => e.currentTarget.style.backgroundColor = '#FDE68A'}
                   onMouseOut={e => e.currentTarget.style.backgroundColor = '#FEF3C7'}
                 >
-                  <FaDownload size={10} /> PDF Por Reparar
+                  <FaDownload size={10} /> PDF Refacciones
                 </button>
               </div>
 
@@ -1076,14 +1042,114 @@ export default function InventarioExistencias() {
           );
         })()}
 
-        {/* Cuadri: Dañado */}
+        {/* Cuadri: Mantenimiento */}
         {(() => {
-          const countDanado = existencias.filter(i => i.estadoFisico === 'Dañado').reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
-          const totalArticulos = existencias.filter(i => i.estadoFisico === 'Dañado').length;
-          const isActive = filtroEstado === 'Dañado';
+          const countMantenimiento = existencias.filter(i => i.estadoFisico === 'Mantenimiento').reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
+          const totalArticulos = existencias.filter(i => i.estadoFisico === 'Mantenimiento').length;
+          const isActive = filtroEstado === 'Mantenimiento';
           return (
             <div
-              onClick={() => setFiltroEstado(isActive ? '' : 'Dañado')}
+              onClick={() => setFiltroEstado(isActive ? '' : 'Mantenimiento')}
+              style={{
+                backgroundColor: isActive ? '#fef3c7' : '#ffffff',
+                border: isActive ? '2px solid #d97706' : '1px solid #e2e8f0',
+                borderRadius: '16px',
+                padding: '1.25rem 1.5rem',
+                cursor: 'pointer',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                boxShadow: isActive ? '0 8px 16px rgba(217, 119, 6, 0.15)' : '0 2px 4px rgba(0,0,0,0.02)',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onMouseOver={e => {
+                if (!isActive) {
+                  e.currentTarget.style.borderColor = '#d97706';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }
+              }}
+              onMouseOut={e => {
+                if (!isActive) {
+                  e.currentTarget.style.borderColor = '#e2e8f0';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }
+              }}
+            >
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '6px', height: '100%', backgroundColor: '#d97706' }}></div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                  <span style={{
+                    width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#d97706', display: 'inline-block'
+                  }}></span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Mantenimiento
+                  </span>
+                </div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#78350f', lineHeight: 1.1 }}>
+                  {countMantenimiento} <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#b45309' }}>piezas</span>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
+                  {totalArticulos} {totalArticulos === 1 ? 'artículo' : 'artículos'}
+                </div>
+
+                {/* Botón rápido de PDF en la tarjeta */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    exportarReportePDF('Mantenimiento');
+                  }}
+                  title="Descargar Reporte PDF de Mantenimiento"
+                  style={{
+                    marginTop: '0.75rem',
+                    padding: '0.3rem 0.65rem',
+                    backgroundColor: '#FEF3C7',
+                    color: '#B45309',
+                    border: '1px solid #FDE68A',
+                    borderRadius: '6px',
+                    fontSize: '0.75rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#FDE68A'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#FEF3C7'}
+                >
+                  <FaDownload size={10} /> PDF Mant...
+                </button>
+              </div>
+
+              <div style={{
+                backgroundColor: isActive ? '#d97706' : '#fef3c7',
+                color: isActive ? '#ffffff' : '#b45309',
+                width: '46px',
+                height: '46px',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.3rem',
+                flexShrink: 0
+              }}>
+                <FaTools />
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Cuadri: Baja */}
+        {(() => {
+          const countDanado = existencias.filter(i => i.estadoFisico === 'Baja').reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
+          const totalArticulos = existencias.filter(i => i.estadoFisico === 'Baja').length;
+          const isActive = filtroEstado === 'Baja';
+          return (
+            <div
+              onClick={() => setFiltroEstado(isActive ? '' : 'Baja')}
               style={{
                 backgroundColor: isActive ? '#fef2f2' : '#ffffff',
                 border: isActive ? '2px solid #ef4444' : '1px solid #e2e8f0',
@@ -1118,14 +1184,14 @@ export default function InventarioExistencias() {
                     width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#ef4444', display: 'inline-block'
                   }}></span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#b91c1c', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Dañado / Baja
+                    Baja / Baja
                   </span>
                 </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#7f1d1d', lineHeight: 1.1 }}>
                   {countDanado} <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#dc2626' }}>piezas</span>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
-                  {totalArticulos} {totalArticulos === 1 ? 'artículo dañado' : 'artículos dañados'}
+                  {totalArticulos} {totalArticulos === 1 ? 'artículo baja' : 'artículos bajas'}
                 </div>
 
                 {/* Botón rápido de PDF en la tarjeta */}
@@ -1133,9 +1199,9 @@ export default function InventarioExistencias() {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    exportarReportePDF('danado');
+                    exportarReportePDF('Baja');
                   }}
-                  title="Descargar Reporte PDF de Dañados"
+                  title="Descargar Reporte PDF de Bajas"
                   style={{
                     marginTop: '0.75rem',
                     padding: '0.3rem 0.65rem',
@@ -1154,7 +1220,7 @@ export default function InventarioExistencias() {
                   onMouseOver={e => e.currentTarget.style.backgroundColor = '#FECACA'}
                   onMouseOut={e => e.currentTarget.style.backgroundColor = '#FEE2E2'}
                 >
-                  <FaDownload size={10} /> PDF Dañados
+                  <FaDownload size={10} /> PDF Bajas
                 </button>
               </div>
 
@@ -1183,12 +1249,12 @@ export default function InventarioExistencias() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          backgroundColor: filtroEstado === 'Buen Estado' ? '#ecfdf5' : filtroEstado === 'Por Reparar' ? '#fffbeb' : filtroEstado === 'Dañado' ? '#fef2f2' : '#f1f5f9',
-          border: `1px solid ${filtroEstado === 'Buen Estado' ? '#a7f3d0' : filtroEstado === 'Por Reparar' ? '#fde68a' : filtroEstado === 'Dañado' ? '#fecaca' : '#cbd5e1'}`,
+          backgroundColor: filtroEstado === 'Stock' ? '#ecfdf5' : filtroEstado === 'Refacciones' ? '#fffbeb' : filtroEstado === 'Baja' ? '#fef2f2' : '#f1f5f9',
+          border: `1px solid ${filtroEstado === 'Stock' ? '#a7f3d0' : filtroEstado === 'Refacciones' ? '#fde68a' : filtroEstado === 'Baja' ? '#fecaca' : '#cbd5e1'}`,
           borderRadius: '10px',
           padding: '0.65rem 1.25rem',
           marginBottom: '1.5rem',
-          color: filtroEstado === 'Buen Estado' ? '#065f46' : filtroEstado === 'Por Reparar' ? '#92400e' : filtroEstado === 'Dañado' ? '#991b1b' : '#334155',
+          color: filtroEstado === 'Stock' ? '#065f46' : filtroEstado === 'Refacciones' ? '#92400e' : filtroEstado === 'Baja' ? '#991b1b' : '#334155',
           fontWeight: '600',
           fontSize: '0.9rem',
           flexWrap: 'wrap',
@@ -1322,7 +1388,11 @@ export default function InventarioExistencias() {
                 ? (item.nombre?.includes('Reemplazada') || item.nombre?.includes('Retirada') || item.numeroInventario?.includes('-RET'))
                 : (!item.nombre?.includes('Reemplazada') && !item.nombre?.includes('Retirada') && !item.numeroInventario?.includes('-RET'))
             );
-            return coincideTexto && coincideEstado && coincideOrigen;
+            const normalizar = str => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/s$/, '');
+            const catFiltro = normalizar(filtroCategoria);
+            const catItem = normalizar(item.categoria || item.tipo || 'componente');
+            const coincideCategoria = !filtroCategoria || catItem.includes(catFiltro);
+            return coincideTexto && coincideEstado && coincideOrigen && coincideCategoria;
           });
 
           if (itemsFiltrados.length === 0) {
@@ -1360,175 +1430,237 @@ export default function InventarioExistencias() {
           }
 
           return (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
-              {itemsFiltrados.map(item => {
-                const bgCat = getCategoriaBg(item.categoria);
-                const textCat = getCategoriaTextColor(item.categoria);
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+              {(() => {
+                // AGRUPAR itemsFiltrados por nombre, marca y modelo
+                const gruposObj = {};
+                itemsFiltrados.forEach(item => {
+                  const key = `${item.nombre || ''}-${item.marca || ''}-${item.modelo || ''}`;
+                  if (!gruposObj[key]) {
+                    gruposObj[key] = {
+                      key,
+                      nombre: item.nombre,
+                      marca: item.marca,
+                      modelo: item.modelo,
+                      categoria: item.categoria,
+                      estadoFisico: item.estadoFisico,
+                      cantidadTotal: 0,
+                      items: []
+                    };
+                  }
+                  gruposObj[key].items.push(item);
+                  gruposObj[key].cantidadTotal += (Number(item.cantidad) || 1);
+                });
+                
+                return Object.values(gruposObj).map(grupo => {
+                  const isExpanded = !!expandedGroups[grupo.key];
+                  const toggleExpand = () => setExpandedGroups(prev => ({...prev, [grupo.key]: !prev[grupo.key]}));
+                  
+                  const bgCat = getCategoriaBg(grupo.categoria);
+                  const textCat = getCategoriaTextColor(grupo.categoria);
 
-                const statusColor = item.estadoFisico === 'Buen Estado'
-                  ? { bg: '#ecfdf5', text: '#047857', border: '#a7f3d0' }
-                  : item.estadoFisico === 'Por Reparar'
-                  ? { bg: '#fffbeb', text: '#b45309', border: '#fde68a' }
-                  : { bg: '#fef2f2', text: '#b91c1c', border: '#fecaca' };
-
-                return (
-                  <div
-                    key={`${item.origen}-${item.id}`}
-                    style={{
-                      backgroundColor: 'white',
-                      borderRadius: '16px',
-                      padding: '1.5rem',
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.02), 0 10px 15px -3px rgba(0,0,0,0.03)',
-                      border: '1px solid #e2e8f0',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      transition: 'all 0.2s',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}
-                    onMouseOver={e => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = '0 12px 20px rgba(0,0,0,0.06)';
-                    }}
-                    onMouseOut={e => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.02)';
-                    }}
-                  >
-                    {/* Left vertical accent bar */}
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', backgroundColor: '#691B31' }}></div>
-                    
-                    <div>
-                      {/* Top bar: Category badge + Edit button */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  return (
+                    <div
+                      key={grupo.key}
+                      style={{
+                        backgroundColor: 'white',
+                        borderRadius: '12px',
+                        padding: '1.25rem',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+                        border: '1px solid #e2e8f0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        transition: 'all 0.2s',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                      onMouseOver={e => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.08)';
+                      }}
+                      onMouseOut={e => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.04)';
+                      }}
+                    >
+                      {/* Left accent bar (similar to original image) */}
+                      <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', backgroundColor: '#691B31' }}></div>
+                      
+                      {/* Top Row: Category and Action icons */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingLeft: '0.5rem' }}>
                         <span style={{
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '0.4rem',
-                          fontSize: '0.75rem',
+                          fontSize: '0.7rem',
                           fontWeight: '800',
-                          color: textCat,
+                          color: '#475569',
                           textTransform: 'uppercase',
                           letterSpacing: '0.05em',
-                          backgroundColor: bgCat,
-                          padding: '0.3rem 0.65rem',
+                          backgroundColor: '#f1f5f9',
+                          padding: '0.25rem 0.6rem',
                           borderRadius: '6px'
                         }}>
-                          {getCategoriaIcon(item.categoria)}
-                          {getCategoriaLabel(item.categoria)}
+                          {getCategoriaIcon(grupo.categoria)}
+                          {getCategoriaLabel(grupo.categoria)}
                         </span>
 
-                        <button
-                          onClick={() => handleEditar(item)}
-                          title="Editar artículo"
-                          style={{
-                            backgroundColor: '#fef3c7',
-                            border: 'none',
-                            color: '#d97706',
-                            cursor: 'pointer',
-                            padding: '0.45rem',
-                            borderRadius: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'background-color 0.2s'
-                          }}
-                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
-                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
-                        >
-                          <FaEdit size={14} />
-                        </button>
-                      </div>
-
-                      {/* Main Title */}
-                      <h3 style={{
-                        fontSize: '1.25rem',
-                        margin: '0.5rem 0 0.25rem',
-                        fontWeight: '800',
-                        color: '#0f172a',
-                        textTransform: 'capitalize'
-                      }}>
-                        {item.nombre}
-                      </h3>
-
-                      {/* Brand and Model */}
-                      {(item.marca || item.modelo) && (
-                        <div style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: '500', marginBottom: '0.5rem' }}>
-                          {item.marca && <span>{item.marca}</span>}
-                          {item.marca && item.modelo && ' - '}
-                          {item.modelo && <span>{item.modelo}</span>}
+                        {/* Top right buttons placeholder to match image aesthetics */}
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <button 
+                            onClick={toggleExpand}
+                            title={isExpanded ? "Ocultar piezas" : "Ver piezas"}
+                            style={{
+                              backgroundColor: '#e0f2fe',
+                              border: 'none',
+                              color: '#0284c7',
+                              cursor: 'pointer',
+                              padding: '0.4rem',
+                              borderRadius: '6px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'background-color 0.2s',
+                              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
+                            }}
+                          >
+                            ▼
+                          </button>
                         </div>
-                      )}
-
-                      {/* Serial Number & Inventory Number */}
-                      <div style={{ fontSize: '0.82rem', color: '#94a3b8', display: 'flex', flexDirection: 'column', gap: '0.15rem', marginTop: '0.35rem' }}>
-                        {item.numeroSerie && <span>S/N: {item.numeroSerie}</span>}
-                        {item.numeroInventario && <span>Inv: {item.numeroInventario}</span>}
                       </div>
 
-                      {/* Estado Físico & Ubicación Tags */}
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.75rem' }}>
-                        <span style={{
-                          fontSize: '0.75rem',
-                          fontWeight: '700',
-                          color: statusColor.text,
-                          backgroundColor: statusColor.bg,
-                          border: `1px solid ${statusColor.border}`,
-                          padding: '0.2rem 0.55rem',
-                          borderRadius: '6px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.3rem'
+                      {/* Middle: Title */}
+                      <div style={{ paddingLeft: '0.5rem', flex: 1, minHeight: '60px' }}>
+                        <h3 style={{
+                          fontSize: '1.15rem',
+                          margin: '0 0 0.25rem 0',
+                          fontWeight: '800',
+                          color: '#0f172a',
+                          textTransform: 'capitalize'
                         }}>
-                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: statusColor.text }}></span>
-                          {item.estadoFisico}
-                        </span>
-
-                        {item.areaUbicacion && (
-                          <span style={{
-                            fontSize: '0.75rem',
-                            color: '#475569',
-                            backgroundColor: '#f1f5f9',
-                            padding: '0.2rem 0.55rem',
-                            borderRadius: '6px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.3rem'
-                          }}>
-                            <FaMapMarkerAlt size={10} color="#94a3b8" />
-                            {item.areaUbicacion}
-                          </span>
+                          {grupo.nombre}
+                        </h3>
+                        {(grupo.marca || grupo.modelo) && (
+                          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '500' }}>
+                            {grupo.marca} {grupo.modelo}
+                          </div>
                         )}
                       </div>
-                    </div>
 
-                    {/* Stock Footer */}
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      borderTop: '1px solid #f1f5f9',
-                      paddingTop: '1rem',
-                      marginTop: '1.25rem'
-                    }}>
-                      <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: '600' }}>Stock Disponible:</span>
-                      <span style={{
-                        fontSize: '1.4rem',
-                        fontWeight: '800',
-                        color: item.cantidad > 5 ? '#047857' : item.cantidad > 0 ? '#b45309' : '#b91c1c',
-                        backgroundColor: item.cantidad > 5 ? '#dcfce7' : item.cantidad > 0 ? '#fef3c7' : '#fee2e2',
-                        padding: '0.15rem 0.85rem',
-                        borderRadius: '8px',
-                        minWidth: '2.5rem',
-                        textAlign: 'center'
+                      {/* Bottom Row: Adjust Stock & Quantity */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-end',
+                        paddingLeft: '0.5rem',
+                        marginTop: '1rem'
                       }}>
-                        {item.cantidad}
-                      </span>
+                        <button 
+                          onClick={toggleExpand}
+                          style={{
+                            padding: '0.3rem 0.65rem',
+                            backgroundColor: '#f1f5f9',
+                            border: 'none',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            color: '#9f1239',
+                            fontWeight: '700',
+                            fontSize: '0.75rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                        >
+                          Ver Piezas
+                        </button>
+                        
+                        <span style={{
+                          fontSize: '1.4rem',
+                          fontWeight: '800',
+                          color: '#047857',
+                          backgroundColor: '#ecfdf5',
+                          padding: '0.2rem 0.8rem',
+                          borderRadius: '8px',
+                          minWidth: '2.5rem',
+                          textAlign: 'center',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                        }}>
+                          {grupo.cantidadTotal}
+                        </span>
+                      </div>
+
+                      {/* Expanded View */}
+                      {isExpanded && (
+                        <div style={{ 
+                          marginTop: '1.5rem', 
+                          paddingTop: '1rem', 
+                          borderTop: '1px solid #e2e8f0',
+                          paddingLeft: '0.5rem'
+                        }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            {grupo.items.map((item, idx) => (
+                              <div key={item.id || idx} style={{
+                                backgroundColor: '#f8fafc', 
+                                border: '1px solid #e2e8f0', 
+                                borderRadius: '8px', 
+                                padding: '0.75rem',
+                                position: 'relative'
+                              }}>
+                                <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                                  {item.numeroSerie && <span><strong style={{color:'#64748b'}}>S/N:</strong> {item.numeroSerie}</span>}
+                                  {item.numeroInventario && <span><strong style={{color:'#64748b'}}>Inv:</strong> {item.numeroInventario}</span>}
+                                </div>
+
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
+                                  <span style={{
+                                    backgroundColor: item.estadoFisico === 'Stock' ? '#ecfdf5' : item.estadoFisico === 'Refacciones' ? '#fffbeb' : '#fef2f2',
+                                    color: item.estadoFisico === 'Stock' ? '#047857' : item.estadoFisico === 'Refacciones' ? '#b45309' : '#b91c1c',
+                                    padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold'
+                                  }}>
+                                    {item.estadoFisico}
+                                  </span>
+
+                                  {(item.areaUbicacion || item.equipoOriginal?.responsable) && (
+                                    <span style={{ fontSize: '0.7rem', color: '#475569', backgroundColor: '#e2e8f0', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                                      {item.equipoOriginal?.responsable ? item.equipoOriginal.responsable : item.areaUbicacion}
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                <button
+                                  onClick={() => handleEditar(item)}
+                                  title="Editar pieza"
+                                  style={{
+                                    position: 'absolute',
+                                    top: '0.5rem',
+                                    right: '0.5rem',
+                                    backgroundColor: '#fef3c7',
+                                    border: 'none',
+                                    color: '#d97706',
+                                    cursor: 'pointer',
+                                    padding: '0.35rem',
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'background-color 0.2s'
+                                  }}
+                                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
+                                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
+                                >
+                                  <FaEdit size={12} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           );
         })()
@@ -1591,9 +1723,10 @@ export default function InventarioExistencias() {
                     onChange={e => setForm({ ...form, estadoFisico: e.target.value })}
                     style={{ ...inputStyle, cursor: 'pointer', fontWeight: '600' }}
                   >
-                    <option value="Buen Estado">🟢 Buen Estado</option>
-                    <option value="Por Reparar">🟡 Por Reparar</option>
-                    <option value="Dañado">🔴 Dañado / Baja</option>
+                    <option value="Stock">🟢 Stock</option>
+                    <option value="Refacciones">🟡 Refacciones</option>
+                    <option value="Mantenimiento">🟠 Mantenimiento</option>
+                    <option value="Baja">🔴 Baja / Baja</option>
                   </select>
                 </div>
               </div>

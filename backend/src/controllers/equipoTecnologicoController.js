@@ -8,10 +8,18 @@ const obtenerEquipos = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const search = req.query.search || '';
     const tipo = req.query.tipo || '';
+    const estatus = req.query.estatus || '';
+    const estatusNot = req.query.estatusNot || '';
     
     const skip = (page - 1) * limit;
 
     const where = {};
+    
+    if (estatus) {
+      where.estatus = estatus;
+    } else if (estatusNot) {
+      where.estatus = { not: estatusNot };
+    }
     
     if (search) {
       where.OR = [
@@ -133,6 +141,24 @@ const crearEquipo = async (req, res) => {
       }
     });
 
+    let detallesLimpios = await procesarPerifericosDeDetalles(
+      detalles || {},
+      nuevoEquipo.id,
+      responsable,
+      cargoResponsable,
+      areaUbicacion,
+      direccion,
+      procedencia
+    );
+
+    if (JSON.stringify(detalles || {}) !== JSON.stringify(detallesLimpios)) {
+      const eqActualizado = await prisma.equipoTecnologico.update({
+        where: { id: nuevoEquipo.id },
+        data: { detalles: detallesLimpios }
+      });
+      return res.status(201).json({ ok: true, data: eqActualizado });
+    }
+
     res.status(201).json({ ok: true, data: nuevoEquipo });
   } catch (error) {
     console.error('Error al crear equipo:', error);
@@ -156,7 +182,8 @@ const actualizarEquipo = async (req, res) => {
       direccion,
       procedencia,
       estatus,
-      detalles
+      detalles,
+      equipoPrincipalId
     } = req.body;
 
     // Verificar si el equipo existe
@@ -217,6 +244,24 @@ const actualizarEquipo = async (req, res) => {
       }
     });
 
+    let detallesLimpios = await procesarPerifericosDeDetalles(
+      detalles || {},
+      equipoActualizado.id,
+      responsable,
+      cargoResponsable,
+      areaUbicacion,
+      direccion,
+      procedencia
+    );
+
+    if (JSON.stringify(detalles || {}) !== JSON.stringify(detallesLimpios)) {
+      const eqAc2 = await prisma.equipoTecnologico.update({
+        where: { id: equipoActualizado.id },
+        data: { detalles: detallesLimpios }
+      });
+      return res.json({ ok: true, data: eqAc2 });
+    }
+
     res.json({ ok: true, data: equipoActualizado });
   } catch (error) {
     console.error('Error al actualizar equipo:', error);
@@ -247,6 +292,105 @@ const eliminarEquipo = async (req, res) => {
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };
+
+async function procesarPerifericosDeDetalles(detalles, equipoPrincipalId, responsable, cargoResponsable, areaUbicacion, direccion, procedencia) {
+  if (!detalles || typeof detalles !== 'object') return detalles;
+
+  const nuevosDetalles = { ...detalles };
+  const perifericosAcrear = [];
+
+  // 1. Procesar periféricos planos (Teclado, Mouse, Cargador, Diadema, Candado, Regulador, No break, Antena)
+  const mapeoPlanos = [
+    { tipo: 'Teclado', sufijo: 'Teclado' },
+    { tipo: 'Mouse', sufijo: 'Mouse' },
+    { tipo: 'Cargador', sufijo: 'Cargador' },
+    { tipo: 'Diadema', sufijo: 'Diadema' },
+    { tipo: 'Candado', sufijo: 'Candado' },
+    { tipo: 'Regulador', sufijo: 'Regulador' },
+    { tipo: 'No break', sufijo: 'Nobreak' },
+    { tipo: 'Antena Wi-Fi', sufijo: 'Antena' }
+  ];
+
+  for (const p of mapeoPlanos) {
+    const { tipo, sufijo } = p;
+    const marca = detalles[`marca${sufijo}`];
+    const modelo = detalles[`modelo${sufijo}`];
+    const serie = detalles[`serie${sufijo}`];
+    let inventario = detalles[`numeroInventario${sufijo}`] ? String(detalles[`numeroInventario${sufijo}`]) : null;
+
+    if (marca || modelo || serie || inventario) {
+      perifericosAcrear.push({ tipo, marca, modelo, serie, inventario });
+    }
+    
+    // Limpiar JSON
+    delete nuevosDetalles[`marca${sufijo}`];
+    delete nuevosDetalles[`modelo${sufijo}`];
+    delete nuevosDetalles[`serie${sufijo}`];
+    delete nuevosDetalles[`numeroInventario${sufijo}`];
+    delete nuevosDetalles[`tiene${sufijo}`];
+    delete nuevosDetalles[`cantidad${sufijo}`];
+  }
+
+  // 2. Procesar arreglos de periféricos (como monitores)
+  if (Array.isArray(detalles.monitores)) {
+    for (const monitor of detalles.monitores) {
+      if (monitor.marca || monitor.modelo || monitor.serie || monitor.numeroInventario) {
+        perifericosAcrear.push({
+          tipo: 'Monitor',
+          marca: monitor.marca,
+          modelo: monitor.modelo,
+          serie: monitor.serie,
+          inventario: monitor.numeroInventario ? String(monitor.numeroInventario) : null
+        });
+      }
+    }
+    delete nuevosDetalles.monitores;
+    delete nuevosDetalles.tieneMonitores;
+    delete nuevosDetalles.cantidadMonitores;
+    delete nuevosDetalles.marcaMonitores;
+    delete nuevosDetalles.modeloMonitores;
+    delete nuevosDetalles.serieMonitores;
+    delete nuevosDetalles.numeroInventarioMonitores;
+  }
+
+  // 3. Crear en BD
+  for (const p of perifericosAcrear) {
+    let finalInventario = p.inventario && p.inventario.trim() !== '' ? p.inventario.trim() : null;
+    if (finalInventario) {
+      let count = 0;
+      let newInventario = finalInventario;
+      while (true) {
+        const existe = await prisma.equipoTecnologico.findUnique({
+          where: { numeroInventario: newInventario }
+        });
+        if (!existe) break;
+        count++;
+        newInventario = `${finalInventario}-${count}`;
+      }
+      finalInventario = newInventario;
+    }
+
+    await prisma.equipoTecnologico.create({
+      data: {
+        tipo: p.tipo,
+        marca: p.marca && p.marca.trim() !== '' ? String(p.marca) : null,
+        modelo: p.modelo && p.modelo.trim() !== '' ? String(p.modelo) : null,
+        numeroSerie: p.serie && p.serie.trim() !== '' ? String(p.serie) : null,
+        numeroInventario: finalInventario,
+        responsable: responsable || null,
+        cargoResponsable: cargoResponsable || null,
+        areaUbicacion: areaUbicacion || null,
+        direccion: direccion || null,
+        procedencia: procedencia || null,
+        estatus: 'Activo',
+        equipoPrincipalId,
+        detalles: {}
+      }
+    });
+  }
+
+  return nuevosDetalles;
+}
 
 module.exports = {
   obtenerEquipos,

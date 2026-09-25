@@ -282,6 +282,9 @@ model EquipoTecnologico {
   procedencia      String?  @db.VarChar(50)
   estatus          String?  @default("Activo") @db.VarChar(50)
   detalles         Json?    // Stores type-specific dynamic attributes
+  equipoPrincipalId Int?    @map("equipo_principal_id")
+  equipoPrincipal   EquipoTecnologico? @relation("EquipoComponentes", fields: [equipoPrincipalId], references: [id])
+  componentes       EquipoTecnologico[] @relation("EquipoComponentes")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
   resguardos       Resguardo[]
