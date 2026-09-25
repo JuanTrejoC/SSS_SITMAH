@@ -6,9 +6,9 @@ import { useAuth } from '../context/AuthContext';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
-  FaLaptop, FaPlus, FaEdit, FaTrashAlt,
+  FaLaptop, FaPlus, FaEdit, FaTrashAlt, FaLink, FaUnlink,
   FaChevronLeft, FaChevronRight, FaTimes, FaDesktop, FaMobileAlt, FaNetworkWired,
-  FaServer, FaShieldAlt, FaWifi, FaVideo, FaHdd, FaBroadcastTower, FaPrint, FaTv,
+  FaServer, FaShieldAlt, FaWifi, FaVideo, FaHdd, FaBroadcastTower, FaPrint, FaTv, FaMemory,
   FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone, FaFilePdf, FaPlug, FaTabletAlt,
   FaCogs, FaBoxes, FaTools, FaWrench, FaCheckCircle, FaExclamationTriangle, FaExclamationCircle,
   FaMapMarkerAlt, FaSearch
@@ -19,6 +19,8 @@ const TIPOS_EQUIPO = [
   { value: 'laptop', label: 'Laptop', icon: FaLaptop, group: 'Computadoras' },
   { value: 'tableta', label: 'Tableta', icon: FaTabletAlt, group: 'Computadoras' },
   { value: 'servidor', label: 'Servidor', icon: FaServer, group: 'Computadoras' },
+  { value: 'teclado', label: 'Teclado', icon: FaCogs, group: 'Periféricos y Accesorios' },
+  { value: 'mouse', label: 'Mouse', icon: FaCogs, group: 'Periféricos y Accesorios' },
   { value: 'router', label: 'Router', icon: FaNetworkWired, group: 'Redes y Conectividad' },
   { value: 'switch', label: 'Switch', icon: FaNetworkWired, group: 'Redes y Conectividad' },
   { value: 'firewall', label: 'Firewall', icon: FaShieldAlt, group: 'Redes y Conectividad' },
@@ -30,14 +32,21 @@ const TIPOS_EQUIPO = [
   { value: 'impresora', label: 'Impresora', icon: FaPrint, group: 'Impresión y Escaneo' },
   { value: 'plotter', label: 'Plotter', icon: FaPrint, group: 'Impresión y Escaneo' },
   { value: 'pantalla', label: 'Pantallas', icon: FaTv, group: 'Visualización' },
+  { value: 'monitor', label: 'Monitor', icon: FaDesktop, group: 'Visualización' },
   { value: 'videowall', label: 'Controlador de Videowall', icon: FaThLarge, group: 'Visualización' },
   { value: 'celular', label: 'Celular', icon: FaMobileAlt, group: 'Comunicación' },
   { value: 'telefono', label: 'Teléfono', icon: FaPhone, group: 'Comunicación' },
   { value: 'radio', label: 'Radio', icon: FaMicrophone, group: 'Comunicación' },
   { value: 'aire', label: 'Aire Acondicionado', icon: FaFan, group: 'Infraestructura' },
   { value: 'no_break', label: 'No Break (UPS)', icon: FaPlug, group: 'Infraestructura' },
+  { value: 'regulador', label: 'Regulador', icon: FaPlug, group: 'Infraestructura' },
   { value: 'lectora_tags', label: 'Lectora de Tags', icon: FaBroadcastTower, group: 'Peaje y Control' },
   { value: 'controladora', label: 'Controladora', icon: FaShieldAlt, group: 'Peaje y Control' },
+  { value: 'ram', label: 'Memoria RAM', icon: FaMemory, group: 'Componentes' },
+  { value: 'almacenamiento', label: 'Disco Duro / SSD', icon: FaHdd, group: 'Componentes' },
+  { value: 'antena_wifi', label: 'Antena WiFi', icon: FaWifi, group: 'Componentes' },
+  { value: 'cabezal', label: 'Cabezal de Impresión', icon: FaPrint, group: 'Componentes' },
+  { value: 'otro', label: 'Otro', icon: FaBoxes, group: 'Otros' },
 ];
 
 export default function InventarioTecnologico() {
@@ -832,6 +841,10 @@ export default function InventarioTecnologico() {
   };
 
   const handleEditar = (item) => {
+    if (item.equipoPrincipalId) {
+      Swal.fire('Equipo Vinculado', 'Este equipo está vinculado a otro equipo principal. Para editarlo, primero debes desvincularlo usando el botón de "Desvincular".', 'warning');
+      return;
+    }
     setEditandoId(item.id);
     setForm({
       tipo: item.tipo || '',
@@ -848,6 +861,91 @@ export default function InventarioTecnologico() {
       detalles: item.detalles || {}
     });
     setModalAbierto(true);
+  };
+
+  const handleDesvincular = async (item) => {
+    const result = await Swal.fire({
+      title: '¿Desvincular equipo?',
+      text: `¿Estás seguro que deseas desvincular este equipo del equipo principal?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#4f46e5',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Sí, desvincular',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/inventario-tecnologico/${item.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token}` },
+          body: JSON.stringify({ ...item, equipoPrincipalId: null })
+        });
+
+        if (res.ok) {
+          Swal.fire('¡Desvinculado!', 'El equipo ahora es independiente.', 'success');
+          fetchEquipos();
+        } else {
+          const data = await res.json();
+          Swal.fire('Error', data.error || 'No se pudo desvincular el equipo', 'error');
+        }
+      } catch (error) {
+        Swal.fire('Error', 'Ocurrió un error al intentar desvincular el equipo', 'error');
+      }
+    }
+  };
+
+  const handleVincular = async (item) => {
+    const { value: invPadre } = await Swal.fire({
+      title: 'Vincular a equipo',
+      text: 'Ingresa el Número de Inventario del equipo principal (PC, Laptop, etc.):',
+      input: 'text',
+      inputPlaceholder: 'Ej: EC-9081-106',
+      showCancelButton: true,
+      confirmButtonText: 'Buscar y Vincular',
+      cancelButtonText: 'Cancelar',
+      inputValidator: (value) => {
+        if (!value) return 'Debes ingresar un número de inventario';
+      }
+    });
+
+    if (invPadre) {
+      try {
+        const resBusqueda = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?search=${invPadre}&limit=10`, {
+          headers: { 'Authorization': `Bearer ${user.token}` }
+        });
+        const dataBusqueda = await resBusqueda.json();
+        const padre = dataBusqueda.items?.find(i => i.numeroInventario?.toLowerCase() === invPadre.trim().toLowerCase());
+
+        if (!padre) {
+          return Swal.fire('No encontrado', `No se encontró ningún equipo con inventario "${invPadre}". Verifica el número.`, 'error');
+        }
+
+        const res = await fetch(`${API_BASE_URL}/api/inventario-tecnologico/${item.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token}` },
+          body: JSON.stringify({ 
+            ...item, 
+            equipoPrincipalId: padre.id,
+            responsable: padre.responsable,
+            cargoResponsable: padre.cargoResponsable,
+            areaUbicacion: padre.areaUbicacion,
+            direccion: padre.direccion
+          })
+        });
+
+        if (res.ok) {
+          Swal.fire('¡Vinculado!', 'El equipo fue vinculado y su ubicación actualizada.', 'success');
+          fetchEquipos();
+        } else {
+          const data = await res.json();
+          Swal.fire('Error', data.error || 'No se pudo vincular el equipo', 'error');
+        }
+      } catch (error) {
+        Swal.fire('Error', 'Ocurrió un error al intentar vincular el equipo', 'error');
+      }
+    }
   };
 
   const handleEliminar = async (id) => {
@@ -1402,19 +1500,15 @@ export default function InventarioTecnologico() {
                       </span>
                     </td>
                     <td style={{ padding: '1.25rem' }}>
-                      {['escritorio', 'laptop', 'radio'].includes(item.tipo) ? (
-                        <div>
-                          <div style={{ fontWeight: '600', color: '#1e293b' }}>{item.responsable || 'N/A'}</div>
-                          {(item.tipo === 'escritorio' || item.tipo === 'laptop') && item.cargoResponsable && (
-                            <div style={{ fontSize: '0.9rem', color: '#64748b' }}>{item.cargoResponsable}</div>
-                          )}
-                        </div>
-                      ) : (
-                        <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>N/A</span>
-                      )}
+                      <div>
+                        <div style={{ fontWeight: '600', color: '#1e293b' }}>{item.responsable || 'N/A'}</div>
+                        {item.cargoResponsable && (
+                          <div style={{ fontSize: '0.9rem', color: '#64748b' }}>{item.cargoResponsable}</div>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '1.25rem' }}>
-                      {!['internet', 'aire'].includes(item.tipo) && <div style={{ fontWeight: '600', color: '#1e293b' }}>Inv: {item.numeroInventario || 'N/A'}</div>}
+                      <div style={{ fontWeight: '600', color: '#1e293b' }}>Inv: {item.numeroInventario || 'N/A'}</div>
                       <div style={{ fontSize: '0.9rem', color: '#64748b' }}>Serie: {item.numeroSerie || 'N/A'}</div>
                     </td>
                     <td style={{ padding: '1.25rem' }}>
@@ -1434,19 +1528,30 @@ export default function InventarioTecnologico() {
                         borderRadius: '9999px',
                         fontSize: '0.85rem',
                         fontWeight: '600',
-                        backgroundColor: item.estatus === 'Refacciones' ? '#fee2e2' : item.estatus === 'Stock' ? '#fef3c7' : '#dcfce7',
-                        color: item.estatus === 'Refacciones' ? '#991b1b' : item.estatus === 'Stock' ? '#92400e' : '#166534'
+                        backgroundColor: item.estatus === 'Refacciones' ? '#fee2e2' : item.estatus === 'Stock' ? '#fef3c7' : item.estatus === 'Baja' ? '#f1f5f9' : item.estatus === 'Mantenimiento' ? '#e0f2fe' : '#dcfce7',
+                        color: item.estatus === 'Refacciones' ? '#991b1b' : item.estatus === 'Stock' ? '#92400e' : item.estatus === 'Baja' ? '#475569' : item.estatus === 'Mantenimiento' ? '#0369a1' : '#166534'
                       }}>
                         {item.estatus || 'Activo'}
                       </span>
                     </td>
                     <td style={{ padding: '1.25rem', textAlign: 'center' }}>
-                      <button onClick={() => handleEditar(item)} style={{ backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', marginRight: '0.5rem', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}>
-                        <FaEdit size={16} />
-                      </button>
-                      <button onClick={() => handleEliminar(item.id)} style={{ backgroundColor: '#fee2e2', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#fecaca'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#fee2e2'}>
-                        <FaTrashAlt size={16} />
-                      </button>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
+                        {item.equipoPrincipalId ? (
+                          <button onClick={() => handleDesvincular(item)} title="Desvincular de equipo principal" style={{ backgroundColor: '#e0e7ff', border: 'none', color: '#4338ca', cursor: 'pointer', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }}>
+                            <FaUnlink size={16} />
+                          </button>
+                        ) : (
+                          <button onClick={() => handleVincular(item)} title="Vincular a equipo principal" style={{ backgroundColor: '#dcfce7', border: 'none', color: '#16a34a', cursor: 'pointer', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }}>
+                            <FaLink size={16} />
+                          </button>
+                        )}
+                        <button onClick={() => handleEditar(item)} title="Editar" style={{ backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }}>
+                          <FaEdit size={16} />
+                        </button>
+                        <button onClick={() => handleEliminar(item.id)} title="Eliminar" style={{ backgroundColor: '#fee2e2', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }}>
+                          <FaTrashAlt size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -1587,6 +1692,8 @@ export default function InventarioTecnologico() {
                         <option value="Activo">Activo</option>
                         <option value="Stock">Stock</option>
                         <option value="Refacciones">Refacciones</option>
+                        <option value="Baja">Baja</option>
+                        <option value="Mantenimiento">Mantenimiento</option>
                       </select>
                     </div>
 
@@ -1634,27 +1741,24 @@ export default function InventarioTecnologico() {
                       </>
                     )}
 
-                    {/* Campos Responsable */}
-                    {requiereResponsable && (
-                      <>
-                        <div><label style={labelStyle}>Responsable del equipo</label><input type="text" value={form.responsable} onChange={e => setForm({ ...form, responsable: e.target.value })} style={inputStyle} /></div>
-                        {(form.tipo === 'escritorio' || form.tipo === 'laptop') && (
-                          <div>
-                            <label style={labelStyle}>Cargo del responsable</label>
-                            <select
-                              value={form.cargoResponsable}
-                              onChange={e => setForm({ ...form, cargoResponsable: e.target.value })}
-                              style={{ ...inputStyle, cursor: 'pointer' }}
-                            >
-                              <option value="">-- Seleccionar Cargo --</option>
-                              {cargosList.map(c => (
-                                <option key={c} value={c}>{c}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-                      </>
-                    )}
+                    {/* Campos Responsable (Para todos los equipos) */}
+                    <div>
+                      <label style={labelStyle}>Responsable del equipo</label>
+                      <input type="text" value={form.responsable} onChange={e => setForm({ ...form, responsable: e.target.value })} style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Cargo del responsable</label>
+                      <select
+                        value={form.cargoResponsable}
+                        onChange={e => setForm({ ...form, cargoResponsable: e.target.value })}
+                        style={{ ...inputStyle, cursor: 'pointer' }}
+                      >
+                        <option value="">-- Seleccionar Cargo --</option>
+                        {cargosList.map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   {/* Detalles Técnicos Dinámicos */}
@@ -1842,6 +1946,88 @@ export default function InventarioTecnologico() {
 
                       {form.tipo === 'aire' && (
                         <div><label style={labelStyle}>Tonelaje</label><input type="text" value={form.detalles.tonelaje || ''} onChange={e => handleDetalleChange('tonelaje', e.target.value)} style={inputStyle} /></div>
+                      )}
+
+                      {form.tipo === 'ram' && (
+                        <>
+                          <div>
+                            <label style={labelStyle}>Para equipo</label>
+                            <input type="text" value={form.detalles.paraEquipo || ''} onChange={e => handleDetalleChange('paraEquipo', e.target.value)} style={inputStyle} list="para-equipo-list" placeholder="Ej: Escritorio, Laptop, Mac..." />
+                            <datalist id="para-equipo-list">
+                              <option value="Escritorio" />
+                              <option value="Laptop" />
+                              <option value="Mac" />
+                            </datalist>
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Tipo de Memoria</label>
+                            <input type="text" value={form.detalles.tipoDDR || ''} onChange={e => handleDetalleChange('tipoDDR', e.target.value)} style={inputStyle} list="tipo-ddr-list" placeholder="Ej: DDR4, DDR5..." />
+                            <datalist id="tipo-ddr-list">
+                              <option value="DDR3" />
+                              <option value="DDR4" />
+                              <option value="DDR5" />
+                            </datalist>
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Capacidad</label>
+                            <input type="text" value={form.detalles.capacidad || ''} onChange={e => handleDetalleChange('capacidad', e.target.value)} style={inputStyle} list="capacidad-ram-list" placeholder="Ej: 8 GB, 16 GB..." />
+                            <datalist id="capacidad-ram-list">
+                              <option value="1 GB" />
+                              <option value="2 GB" />
+                              <option value="4 GB" />
+                              <option value="8 GB" />
+                              <option value="16 GB" />
+                              <option value="32 GB" />
+                            </datalist>
+                          </div>
+                        </>
+                      )}
+
+                      {form.tipo === 'almacenamiento' && (
+                        <>
+                          <div>
+                            <label style={labelStyle}>Tipo de Almacenamiento</label>
+                            <input type="text" value={form.detalles.tipoDisco || ''} onChange={e => handleDetalleChange('tipoDisco', e.target.value)} style={inputStyle} list="tipo-disco-list" placeholder="Ej: SSD, HDD, M.2..." />
+                            <datalist id="tipo-disco-list">
+                              <option value="SSD" />
+                              <option value="HDD" />
+                              <option value="M.2" />
+                              <option value="NVMe" />
+                            </datalist>
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Para equipo</label>
+                            <input type="text" value={form.detalles.paraEquipo || ''} onChange={e => handleDetalleChange('paraEquipo', e.target.value)} style={inputStyle} list="para-equipo-list" placeholder="Ej: Escritorio, Laptop, Mac..." />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Capacidad</label>
+                            <input type="text" value={form.detalles.capacidad || ''} onChange={e => handleDetalleChange('capacidad', e.target.value)} style={inputStyle} list="capacidad-almacenamiento-list" placeholder="Ej: 500 GB, 1 TB..." />
+                            <datalist id="capacidad-almacenamiento-list">
+                              <option value="256 GB" />
+                              <option value="512 GB" />
+                              <option value="1 TB" />
+                              <option value="2 TB" />
+                            </datalist>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: '0.5rem' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                              <input type="checkbox" checked={form.detalles.esExterno || false} onChange={e => handleDetalleChange('esExterno', e.target.checked)} style={{ width: '1.2rem', height: '1.2rem', accentColor: '#0f766e' }} />
+                              <span style={{ fontWeight: '500', color: '#334155' }}>¿Es un disco externo?</span>
+                            </label>
+                          </div>
+                        </>
+                      )}
+
+                      {['otro', 'antena_wifi', 'monitor', 'cabezal'].includes(form.tipo) && (
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <label style={labelStyle}>Detalles / Descripción Adicional</label>
+                          <textarea
+                            value={form.detalles.descripcionOtro || ''}
+                            onChange={e => handleDetalleChange('descripcionOtro', e.target.value)}
+                            style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
+                            placeholder="Escribe detalles o características adicionales..."
+                          />
+                        </div>
                       )}
 
                     </div>

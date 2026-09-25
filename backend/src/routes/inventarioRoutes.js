@@ -28,6 +28,7 @@ const router = express.Router();
 // Technological Equipment Routes (Herramientas & Tecnologico)
 router.get('/tecnologico', authAdminOrInfra, asyncHandler(inventario.listarEquipoTecnologico));
 router.post('/tecnologico', authAdminOrInfra, asyncHandler(inventario.crearEquipoTecnologico));
+router.post('/tecnologico/reemplazar-periferico', authAdminOrInfra, asyncHandler(inventario.reemplazarPeriferico));
 router.get('/tecnologico/export', authAdminOrInfra, asyncHandler(inventario.exportarEquipoTecnologicoExcel));
 router.get('/tecnologico/:id', authAdminOrInfra, asyncHandler(inventario.obtenerEquipoTecnologico));
 router.put('/tecnologico/:id', authAdminOrInfra, asyncHandler(inventario.actualizarEquipoTecnologico));
