@@ -443,12 +443,110 @@ async function actualizarEstadoPiezaReemplazada(req, res) {
   ok(res, actualizada);
 }
 
+const modificarResueltoSchema = z.object({
+  jefe_turno: z.string().min(1).optional(),
+  origen: z.string().optional(),
+  crucero_id: z.coerce.number().int().positive().optional(),
+  tipo_falla_id: z.coerce.number().int().positive().optional(),
+  descripcion: z.string().optional(),
+  hora_dano: z.string().optional(),
+  tecnico_atendio: z.string().optional(),
+  diagnostico_solucion: z.string().optional(),
+  fecha_resolucion: z.string().optional(),
+  firma_satisfaccion: z.string().optional().nullable(),
+});
+
+async function modificarResuelto(req, res) {
+  const id = Number(req.params.id);
+  const actual = await prisma.reporteSemaforo.findUnique({
+    where: { id },
+    include: { evidencias: true }
+  });
+  if (!actual) return fail(res, 'Reporte no encontrado', 404);
+
+  if (actual.estado !== 'resuelto') {
+    return fail(res, 'Solo se pueden modificar reportes en estado resuelto.', 400);
+  }
+
+  if (actual.modificado || (actual.vecesModificado && actual.vecesModificado >= 1)) {
+    return fail(res, 'Este reporte ya fue modificado una vez. No se permite modificarlo nuevamente.', 400);
+  }
+
+  const parsed = modificarResueltoSchema.safeParse(req.body);
+  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+
+  const {
+    jefe_turno,
+    origen,
+    crucero_id,
+    tipo_falla_id,
+    descripcion,
+    hora_dano,
+    tecnico_atendio,
+    diagnostico_solucion,
+    fecha_resolucion,
+    firma_satisfaccion
+  } = parsed.data;
+
+  const files = req.files
+    ? (Array.isArray(req.files) ? req.files : Object.values(req.files).flat())
+    : (req.file ? [req.file] : []);
+
+  for (const file of files) {
+    await prisma.evidencia.create({
+      data: {
+        reporteSemaforoId: id,
+        filename: file.originalname,
+        filepath: file.filename,
+        mimetype: file.mimetype,
+        sizeBytes: file.size,
+        tipo: 'solucion',
+      },
+    });
+  }
+
+  const data = {
+    modificado: true,
+    vecesModificado: (actual.vecesModificado || 0) + 1,
+    modificadoAt: new Date(),
+  };
+
+  if (jefe_turno !== undefined) data.jefeTurno = jefe_turno;
+  if (origen !== undefined) data.origen = origen;
+  if (crucero_id !== undefined) data.cruceroId = crucero_id;
+  if (tipo_falla_id !== undefined) data.tipoFallaId = tipo_falla_id;
+  if (descripcion !== undefined) data.descripcion = descripcion;
+  if (hora_dano !== undefined) data.horaDano = new Date(hora_dano);
+  if (tecnico_atendio !== undefined) data.tecnicoAtendio = tecnico_atendio;
+  if (diagnostico_solucion !== undefined) data.diagnosticoSolucion = diagnostico_solucion;
+  if (fecha_resolucion !== undefined) data.fechaResolucion = new Date(fecha_resolucion);
+  if (firma_satisfaccion !== undefined) data.firmaSatisfaccion = firma_satisfaccion;
+
+  const reporte = await prisma.reporteSemaforo.update({
+    where: { id },
+    data,
+    include: includeDetalle
+  });
+
+  await registrarHistorial({
+    usuarioId: req.usuario.id,
+    tipoReporte: 'semaforo',
+    reporteId: id,
+    estadoAnterior: 'resuelto',
+    estadoNuevo: 'resuelto',
+    comentario: `Modificación única de reporte resuelto realizada por ${req.usuario.nombre || req.usuario.username}`,
+  });
+
+  ok(res, reporte);
+}
+
 module.exports = {
   crear,
   resumen,
   listar,
   obtener,
   cambiarEstado,
+  modificarResuelto,
   eliminar,
   exportar,
   asignarPieza,

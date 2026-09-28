@@ -172,6 +172,9 @@ model ReporteOficina {
   firmaSatisfaccion String?        @map("firma_satisfaccion") @db.LongText
   diagnosticoSolucion String?      @map("diagnostico_solucion") @db.Text
   fechaResolucion DateTime?        @map("fecha_resolucion")
+  modificado      Boolean          @default(false)
+  vecesModificado Int              @default(0) @map("veces_modificado")
+  modificadoAt    DateTime?        @map("modificado_at")
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
@@ -206,6 +209,9 @@ model ReporteSemaforo {
   firmaSatisfaccion String?         @map("firma_satisfaccion") @db.LongText
   diagnosticoSolucion String?       @map("diagnostico_solucion") @db.Text
   fechaResolucion DateTime?         @map("fecha_resolucion")
+  modificado      Boolean           @default(false)
+  vecesModificado Int               @default(0) @map("veces_modificado")
+  modificadoAt    DateTime?         @map("modificado_at")
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
 
@@ -379,9 +385,10 @@ model InventarioMobiliario {
   modelo             String?  @db.VarChar(100)
   numeroSerie        String?  @map("numero_serie") @db.VarChar(100)
   descripcion        String   @db.Text
-  direccion          String   @db.VarChar(150)
-  subdireccion       String   @db.VarChar(150)
-  area               String   @db.VarChar(150)
+  direccion          String?  @db.VarChar(150)
+  subdireccion       String?  @db.VarChar(150)
+  area               String?  @db.VarChar(150)
+  cargo              String?  @db.VarChar(150)
   nombreResguardante String   @map("nombre_resguardante") @db.VarChar(150)
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
@@ -406,7 +413,9 @@ model Resguardo {
   fechaDevolucion      DateTime? @map("fecha_devolucion")
   
   nombreResguardante   String    @map("nombre_resguardante") @db.VarChar(150)
-  area                 String    @db.VarChar(150)
+  cargo                String?   @db.VarChar(150)
+  direccion            String?   @db.VarChar(150)
+  area                 String?   @db.VarChar(150)
   estado               String    @default("Activo") @db.VarChar(50) // Activo, Devuelto
   observaciones        String?   @db.Text
 

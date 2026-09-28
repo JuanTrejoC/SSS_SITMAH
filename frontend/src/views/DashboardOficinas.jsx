@@ -701,6 +701,11 @@ export default function DashboardOficinas() {
                             <option value="en_proceso">En Proceso</option>
                             <option value="resuelto">Resuelto</option>
                           </select>
+                          {r.modificado && (
+                            <div style={{ fontSize: '0.7rem', color: '#B45309', fontWeight: '700', marginTop: '0.2rem' }}>
+                              ✏️ Modificado
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
@@ -782,7 +787,14 @@ export default function DashboardOficinas() {
                 </div>
                 <div><strong>Categoría:</strong> {verDetalle.categoria?.nombre || '—'}</div>
                 <div><strong>Prioridad:</strong> <span style={{ textTransform: 'capitalize', fontWeight: '700' }}>{verDetalle.prioridad}</span></div>
-                <div><strong>Estado:</strong> {obtenerNombreEstado(verDetalle.estado)}</div>
+                <div>
+                  <strong>Estado:</strong> {obtenerNombreEstado(verDetalle.estado)}
+                  {verDetalle.modificado && (
+                    <span style={{ marginLeft: '0.35rem', backgroundColor: '#FEF3C7', color: '#92400E', padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700', border: '1px solid #FCD34D' }}>
+                      ✏️ Modificado (1/1)
+                    </span>
+                  )}
+                </div>
                 <div style={{ gridColumn: '1 / -1' }}><strong>Fecha Registro:</strong> {new Date(verDetalle.createdAt).toLocaleString()}</div>
                 {verDetalle.fechaResolucion && (
                   <div style={{ gridColumn: '1 / -1' }}><strong>Fecha Resolución:</strong> {new Date(verDetalle.fechaResolucion).toLocaleString()}</div>

@@ -15,11 +15,21 @@ export default function InventarioMobiliario() {
   const [busqueda, setBusqueda] = useState('');
   
   const [catalogoDirecciones, setCatalogoDirecciones] = useState([]);
-  const [catalogoSubdirecciones, setCatalogoSubdirecciones] = useState([]);
-  const [catalogoAreas, setCatalogoAreas] = useState([]);
+  const [catalogoCargos, setCatalogoCargos] = useState([]);
   
+  const OPCIONES_BIENES_DEFAULT = [
+    'Mesa de trabajo',
+    'Mesa tipo L',
+    'Silla ejecutiva',
+    'Silla de visita',
+    'Escritorio',
+    'Archivero'
+  ];
+
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
+  const [seleccionBien, setSeleccionBien] = useState('Mesa de trabajo');
+  const [otroBien, setOtroBien] = useState('');
   
   const getInitialForm = () => ({
     numeroInventario: '',
@@ -28,10 +38,9 @@ export default function InventarioMobiliario() {
     modelo: '',
     numeroSerie: '',
     descripcion: '',
-    direccion: '',
-    subdireccion: '',
-    area: '',
-    nombreResguardante: ''
+    nombreResguardante: '',
+    cargo: '',
+    direccion: ''
   });
   
   const [form, setForm] = useState(getInitialForm());
@@ -64,17 +73,14 @@ export default function InventarioMobiliario() {
   useEffect(() => {
     const fetchCatalogos = async () => {
       try {
-        const [resDir, resSub, resArea] = await Promise.all([
+        const [resDir, resCargo] = await Promise.all([
           fetch(`${API_BASE_URL}/api/catalogos/areas`), // Dirección
-          fetch(`${API_BASE_URL}/api/catalogos/subdirecciones`), // Subdirección
-          fetch(`${API_BASE_URL}/api/catalogos/sedes`) // Área
+          fetch(`${API_BASE_URL}/api/catalogos/cargos`)  // Cargo
         ]);
         const jsonDir = await resDir.json();
-        const jsonSub = await resSub.json();
-        const jsonArea = await resArea.json();
+        const jsonCargo = await resCargo.json();
         if (jsonDir.ok) setCatalogoDirecciones(jsonDir.data);
-        if (jsonSub.ok) setCatalogoSubdirecciones(jsonSub.data);
-        if (jsonArea.ok) setCatalogoAreas(jsonArea.data);
+        if (jsonCargo.ok) setCatalogoCargos(jsonCargo.data);
       } catch (err) {
         console.error('Error al cargar catálogos:', err);
       }
@@ -106,8 +112,10 @@ export default function InventarioMobiliario() {
   
   const handleGuardar = async (e) => {
     e.preventDefault();
-    if (!form.numeroInventario || !form.bien || !form.descripcion || !form.direccion || !form.subdireccion || !form.area || !form.nombreResguardante) {
-      Swal.fire('Error', 'Por favor complete todos los campos obligatorios', 'warning');
+    const bienFinal = seleccionBien === 'Otro' ? otroBien.trim() : seleccionBien;
+
+    if (!form.numeroInventario || !bienFinal || !form.descripcion || !form.nombreResguardante || !form.direccion) {
+      Swal.fire('Error', (seleccionBien === 'Otro' && !bienFinal) ? 'Por favor especifique qué tipo de bien es en el campo de texto' : 'Por favor complete todos los campos obligatorios', 'warning');
       return;
     }
     
@@ -123,7 +131,7 @@ export default function InventarioMobiliario() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${user.token}`
         },
-        body: JSON.stringify(form)
+        body: JSON.stringify({ ...form, bien: bienFinal })
       });
       const json = await res.json();
       
@@ -142,6 +150,9 @@ export default function InventarioMobiliario() {
   
   const handleEditar = (item) => {
     setEditandoId(item.id);
+    const esPredefinido = OPCIONES_BIENES_DEFAULT.includes(item.bien);
+    setSeleccionBien(esPredefinido ? item.bien : 'Otro');
+    setOtroBien(esPredefinido ? '' : (item.bien || ''));
     setForm({
       numeroInventario: item.numeroInventario || '',
       bien: item.bien || '',
@@ -149,10 +160,9 @@ export default function InventarioMobiliario() {
       modelo: item.modelo || '',
       numeroSerie: item.numeroSerie || '',
       descripcion: item.descripcion || '',
-      direccion: item.direccion || '',
-      subdireccion: item.subdireccion || '',
-      area: item.area || '',
-      nombreResguardante: item.nombreResguardante || ''
+      nombreResguardante: item.nombreResguardante || '',
+      cargo: item.cargo || '',
+      direccion: item.direccion || ''
     });
     setModalAbierto(true);
   };
@@ -208,7 +218,13 @@ export default function InventarioMobiliario() {
             <FaFileExcel /> Exportar a Excel
           </button>
           <button
-            onClick={() => { setEditandoId(null); setForm(getInitialForm()); setModalAbierto(true); }}
+            onClick={() => {
+              setEditandoId(null);
+              setForm(getInitialForm());
+              setSeleccionBien('Mesa de trabajo');
+              setOtroBien('');
+              setModalAbierto(true);
+            }}
             style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#691B31', color: 'white',
               border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
@@ -238,7 +254,7 @@ export default function InventarioMobiliario() {
               <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>BIEN</th>
               <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>MARCA / MODELO</th>
               <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>DESCRIPCIÓN</th>
-              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>ÁREA / RESGUARDANTE</th>
+              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>RESGUARDANTE / DIRECCIÓN</th>
               <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600', textAlign: 'center' }}>ACCIONES</th>
             </tr>
           </thead>
@@ -258,7 +274,9 @@ export default function InventarioMobiliario() {
                   </div>
                 </td>
                 <td style={{ padding: '1rem' }}>
-                  {m.area}<br/><span style={{fontSize:'0.8rem', color:'#64748B'}}>{m.nombreResguardante}</span>
+                  <span style={{ fontWeight: '600', color: '#1E293B' }}>{m.nombreResguardante}</span>
+                  {m.cargo && <><br/><span style={{ fontSize: '0.75rem', color: '#64748B' }}>{m.cargo}</span></>}
+                  {m.direccion && <><br/><span style={{ fontSize: '0.75rem', color: '#BC955B' }}>{m.direccion}</span></>}
                 </td>
                 <td style={{ padding: '1rem', textAlign: 'center' }}>
                   <button onClick={() => handleEditar(m)} style={{ background: 'none', border: 'none', color: '#0ea5e9', cursor: 'pointer', marginRight: '0.5rem' }}>
@@ -309,7 +327,18 @@ export default function InventarioMobiliario() {
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>Bien *</label>
-                  <select required value={form.bien} onChange={e => setForm({...form, bien: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }}>
+                  <select
+                    required
+                    value={seleccionBien}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setSeleccionBien(val);
+                      if (val !== 'Otro') {
+                        setForm({ ...form, bien: val });
+                      }
+                    }}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', backgroundColor: 'white' }}
+                  >
                     <option value="Mesa de trabajo">Mesa de trabajo</option>
                     <option value="Mesa tipo L">Mesa tipo L</option>
                     <option value="Silla ejecutiva">Silla ejecutiva</option>
@@ -318,6 +347,30 @@ export default function InventarioMobiliario() {
                     <option value="Archivero">Archivero</option>
                     <option value="Otro">Otro</option>
                   </select>
+
+                  {seleccionBien === 'Otro' && (
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <input
+                        required
+                        type="text"
+                        value={otroBien}
+                        onChange={e => {
+                          setOtroBien(e.target.value);
+                          setForm({ ...form, bien: e.target.value });
+                        }}
+                        placeholder="Especifique el bien (ej. Librero, Credenza, Sillón...)"
+                        style={{
+                          width: '100%',
+                          padding: '0.65rem 0.75rem',
+                          borderRadius: '8px',
+                          border: '1.5px solid #BC955B',
+                          outlineColor: '#691B31',
+                          fontSize: '0.875rem',
+                          backgroundColor: '#FFFDF9'
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>Marca</label>
@@ -342,33 +395,31 @@ export default function InventarioMobiliario() {
                 <div style={{ gridColumn: '1 / -1' }}>
                   <h3 style={{ fontSize: '1rem', fontWeight: '700', color: '#334155', margin: '0 0 1rem 0' }}>Ubicación y Resguardo</h3>
                 </div>
+
+                {/* 1. Primero Nombre del Resguardante */}
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>Nombre del Resguardante *</label>
+                  <input required type="text" placeholder="Nombre completo del resguardante" value={form.nombreResguardante} onChange={e => setForm({...form, nombreResguardante: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }} />
+                </div>
+
+                {/* 2. Después Cargo */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>Cargo *</label>
+                  <select required value={form.cargo} onChange={e => setForm({...form, cargo: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', backgroundColor: 'white' }}>
+                    <option value="">Seleccione un cargo</option>
+                    {catalogoCargos.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+                    <option value="Otro">Otro</option>
+                  </select>
+                </div>
+
+                {/* 3. Por último Dirección */}
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>Dirección *</label>
-                  <select required value={form.direccion} onChange={e => setForm({...form, direccion: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }}>
+                  <select required value={form.direccion} onChange={e => setForm({...form, direccion: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', backgroundColor: 'white' }}>
                     <option value="">Seleccione una dirección</option>
                     <option value="S/N">S/N</option>
                     {catalogoDirecciones.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
                   </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>Subdirección *</label>
-                  <select required value={form.subdireccion} onChange={e => setForm({...form, subdireccion: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }}>
-                    <option value="">Seleccione una subdirección</option>
-                    <option value="S/N">S/N</option>
-                    {catalogoSubdirecciones.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>Área *</label>
-                  <select required value={form.area} onChange={e => setForm({...form, area: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }}>
-                    <option value="">Seleccione un área</option>
-                    <option value="S/N">S/N</option>
-                    {catalogoAreas.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>Nombre del Resguardante *</label>
-                  <input required type="text" value={form.nombreResguardante} onChange={e => setForm({...form, nombreResguardante: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }} />
                 </div>
               </div>
               

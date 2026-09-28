@@ -21,16 +21,18 @@ async function listar(req, res) {
 
 async function crear(req, res) {
   try {
-    const { tipoInventario, itemId, nombreResguardante, area, observaciones, descripcionPdf, numeroSeriePdf } = req.body;
+    const { tipoInventario, itemId, nombreResguardante, cargo, direccion, area, observaciones, descripcionPdf, numeroSeriePdf } = req.body;
     
-    if (!tipoInventario || !itemId || !nombreResguardante || !area) {
+    if (!tipoInventario || !itemId || !nombreResguardante) {
       return fail(res, 'Datos incompletos', 400);
     }
 
     const data = {
       tipoInventario,
       nombreResguardante,
-      area,
+      cargo: cargo || null,
+      direccion: direccion || null,
+      area: area || direccion || '',
       observaciones,
       descripcionPdf,
       numeroSeriePdf
@@ -39,9 +41,6 @@ async function crear(req, res) {
     if (tipoInventario === 'mobiliario') {
       data.mobiliarioId = Number(itemId);
     } else if (tipoInventario === 'tecnologico') {
-      // For TI option in frontend, itemId might refer to equipoTecnologico or existencia
-      // To differentiate, the frontend should send tipoInventario='tecnologico' for equipos and 'herramienta'/'existencia' for existencias, or use an item type prefix.
-      // Wait, in frontend we will send 'tecnologico' or 'existencia' as tipoInventario when creating it based on the item type!
       data.equipoTecnologicoId = Number(itemId);
     } else if (tipoInventario === 'herramienta' || tipoInventario === 'existencia') {
       data.existenciaId = Number(itemId);

@@ -449,12 +449,136 @@ async function actualizarEstadoPiezaReemplazada(req, res) {
   ok(res, actualizada);
 }
 
+const modificarResueltoSchema = z.object({
+  solicitante: z.string().min(1).optional(),
+  area_id: z.coerce.number().int().positive().optional(),
+  cargo_id: z.coerce.number().int().positive().optional().nullable(),
+  cargo: z.string().optional(),
+  email: z.string().email().optional(),
+  telefono: z.string().optional(),
+  sede_id: z.coerce.number().int().positive().optional(),
+  equipo: z.string().optional(),
+  numero_serie: z.string().optional(),
+  categoria_id: z.coerce.number().int().positive().optional(),
+  prioridad: z.enum(['baja', 'media', 'alta']).optional(),
+  descripcion: z.string().optional(),
+  tecnico_atendio: z.string().optional(),
+  diagnostico_solucion: z.string().optional(),
+  fecha_resolucion: z.string().optional(),
+  firma_satisfaccion: z.string().optional().nullable(),
+});
+
+async function modificarResuelto(req, res) {
+  const id = Number(req.params.id);
+  const actual = await prisma.reporteOficina.findUnique({
+    where: { id },
+    include: { evidencias: true }
+  });
+  if (!actual) return fail(res, 'Reporte no encontrado', 404);
+
+  if (actual.estado !== 'resuelto') {
+    return fail(res, 'Solo se pueden modificar reportes en estado resuelto.', 400);
+  }
+
+  if (actual.modificado || (actual.vecesModificado && actual.vecesModificado >= 1)) {
+    return fail(res, 'Este reporte ya fue modificado una vez. No se permite modificarlo nuevamente.', 400);
+  }
+
+  const parsed = modificarResueltoSchema.safeParse(req.body);
+  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+
+  const {
+    solicitante,
+    area_id,
+    cargo_id,
+    cargo,
+    email,
+    telefono,
+    sede_id,
+    equipo,
+    numero_serie,
+    categoria_id,
+    prioridad,
+    descripcion,
+    tecnico_atendio,
+    diagnostico_solucion,
+    fecha_resolucion,
+    firma_satisfaccion
+  } = parsed.data;
+
+  const files = req.files
+    ? (Array.isArray(req.files) ? req.files : Object.values(req.files).flat())
+    : (req.file ? [req.file] : []);
+
+  for (const file of files) {
+    await prisma.evidencia.create({
+      data: {
+        reporteOficinaId: id,
+        filename: file.originalname,
+        filepath: file.filename,
+        mimetype: file.mimetype,
+        sizeBytes: file.size,
+        tipo: 'solucion',
+      },
+    });
+  }
+
+  let finalCargoId = cargo_id;
+  if (cargo && !finalCargoId) {
+    let cargoDb = await prisma.cargo.findFirst({ where: { nombre: cargo.trim() } });
+    if (!cargoDb) {
+      cargoDb = await prisma.cargo.create({ data: { nombre: cargo.trim() } });
+    }
+    finalCargoId = cargoDb.id;
+  }
+
+  const data = {
+    modificado: true,
+    vecesModificado: (actual.vecesModificado || 0) + 1,
+    modificadoAt: new Date(),
+  };
+
+  if (solicitante !== undefined) data.solicitante = solicitante;
+  if (area_id !== undefined) data.areaId = area_id;
+  if (finalCargoId !== undefined) data.cargoId = finalCargoId;
+  if (email !== undefined) data.email = email;
+  if (telefono !== undefined) data.telefono = telefono;
+  if (sede_id !== undefined) data.sedeId = sede_id;
+  if (equipo !== undefined) data.equipo = equipo;
+  if (numero_serie !== undefined) data.numeroSerie = numero_serie;
+  if (categoria_id !== undefined) data.categoriaId = categoria_id;
+  if (prioridad !== undefined) data.prioridad = prioridad;
+  if (descripcion !== undefined) data.descripcion = descripcion;
+  if (tecnico_atendio !== undefined) data.tecnicoAtendio = tecnico_atendio;
+  if (diagnostico_solucion !== undefined) data.diagnosticoSolucion = diagnostico_solucion;
+  if (fecha_resolucion !== undefined) data.fechaResolucion = new Date(fecha_resolucion);
+  if (firma_satisfaccion !== undefined) data.firmaSatisfaccion = firma_satisfaccion;
+
+  const reporte = await prisma.reporteOficina.update({
+    where: { id },
+    data,
+    include: includeDetalle
+  });
+
+  await registrarHistorial({
+    usuarioId: req.usuario.id,
+    tipoReporte: 'oficina',
+    reporteId: id,
+    estadoAnterior: 'resuelto',
+    estadoNuevo: 'resuelto',
+    comentario: `Modificación única de reporte resuelto realizada por ${req.usuario.nombre || req.usuario.username}`,
+  });
+
+  ok(res, reporte);
+}
+
 module.exports = {
   crear,
   resumen,
   listar,
   obtener,
   cambiarEstado,
+  modificarResuelto,
   eliminar,
   exportar,
   asignarPieza,

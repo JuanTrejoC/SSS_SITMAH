@@ -1,5 +1,7 @@
 {
-  "query": {},
+  "query": {
+    "limit": "2000"
+  },
   "where": {
     "tipo": {
       "notIn": [

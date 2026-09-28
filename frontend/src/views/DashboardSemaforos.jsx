@@ -624,6 +624,11 @@ export default function DashboardSemaforos() {
                             <option value="en_proceso">En Proceso</option>
                             <option value="resuelto">Resuelto</option>
                           </select>
+                          {r.modificado && (
+                            <div style={{ fontSize: '0.7rem', color: '#B45309', fontWeight: '700', marginTop: '0.2rem' }}>
+                              ✏️ Modificado
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
@@ -696,7 +701,14 @@ export default function DashboardSemaforos() {
                 <div><strong>Crucero Afectado:</strong> {verDetalle.crucero?.nombre || '—'}</div>
                 <div><strong>Tipo de Falla:</strong> {verDetalle.tipoFalla?.nombre || '—'}</div>
                 <div><strong>Fecha y Hora del Siniestro:</strong> {verDetalle.horaDano ? new Date(verDetalle.horaDano).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</div>
-                <div><strong>Estado:</strong> {obtenerNombreEstado(verDetalle.estado)}</div>
+                <div>
+                  <strong>Estado:</strong> {obtenerNombreEstado(verDetalle.estado)}
+                  {verDetalle.modificado && (
+                    <span style={{ marginLeft: '0.35rem', backgroundColor: '#FEF3C7', color: '#92400E', padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700', border: '1px solid #FCD34D' }}>
+                      ✏️ Modificado (1/1)
+                    </span>
+                  )}
+                </div>
                 <div style={{ gridColumn: '1 / -1' }}><strong>Fecha Registro:</strong> {new Date(verDetalle.createdAt).toLocaleString('es-MX')}</div>
 
                 <div style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>

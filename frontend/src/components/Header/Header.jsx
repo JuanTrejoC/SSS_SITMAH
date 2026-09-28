@@ -161,7 +161,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
 
           {user && (
             <>
-              {user.rol === 'administrador' && <NotificationCenter />}
+              {(user.rol === 'administrador' || user.rol === 'infraestructura') && <NotificationCenter />}
               <div className="app-header__profile" ref={profileRef}>
               <button 
                 className="app-header__profile-btn"

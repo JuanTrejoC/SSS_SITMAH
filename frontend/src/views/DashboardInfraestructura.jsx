@@ -438,25 +438,39 @@ export default function DashboardInfraestructura() {
 
         {/* BARRA DE FILTROS Y BÚSQUEDA */}
         <div style={{ backgroundColor: 'white', padding: '1.35rem', borderRadius: '16px', border: '1px solid #E5E7EB', boxShadow: '0 4px 15px -3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            {/* Input de Búsqueda */}
-            <div style={{ position: 'relative' }}>
-              <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }}></i>
+            <div>
+              <label style={{ fontSize: '0.825rem', fontWeight: '600', color: '#4B5563', display: 'block', marginBottom: '0.35rem' }}>
+                <i className="fa-solid fa-calendar-days" style={{ marginRight: '0.35rem', color: '#BC955B' }}></i> Mes y Año
+              </label>
               <input
-                type="text"
-                placeholder="Buscar por folio, solicitante, sede o elemento..."
-                value={busqueda}
-                onChange={e => setBusqueda(e.target.value)}
-                style={{ width: '100%', padding: '0.65rem 0.85rem 0.65rem 2.25rem', borderRadius: '10px', border: '1px solid #D1D5DB', outline: 'none', fontSize: '0.875rem' }}
+                type="month"
+                id="monthFilter"
+                value={(anioFiltro && mesFiltro) ? `${anioFiltro}-${mesFiltro.padStart(2, '0')}` : ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val) {
+                    const [y, m] = val.split('-');
+                    setAnioFiltro(y);
+                    setMesFiltro(parseInt(m, 10).toString());
+                  } else {
+                    setAnioFiltro('');
+                    setMesFiltro('');
+                  }
+                }}
+                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #D1D5DB', borderRadius: '10px', backgroundColor: 'white', fontSize: '0.875rem', outline: 'none' }}
               />
             </div>
 
-            {/* Selector de Estado */}
             <div>
+              <label style={{ fontSize: '0.825rem', fontWeight: '600', color: '#4B5563', display: 'block', marginBottom: '0.35rem' }}>
+                Estado del Reporte
+              </label>
               <select
                 value={estadoFiltro}
-                onChange={e => setEstadoFiltro(e.target.value)}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1px solid #D1D5DB', outline: 'none', fontSize: '0.875rem', backgroundColor: 'white' }}
+                onChange={(e) => setEstadoFiltro(e.target.value)}
+                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #D1D5DB', borderRadius: '10px', backgroundColor: 'white', fontSize: '0.875rem', outline: 'none' }}
               >
                 <option value="Todos">Todos los Estados</option>
                 <option value="Pendiente">Pendientes</option>
@@ -464,86 +478,68 @@ export default function DashboardInfraestructura() {
                 <option value="Resuelto">Resueltos</option>
               </select>
             </div>
-
-            {/* Filtro Mes */}
-            <div>
-              <select
-                value={mesFiltro}
-                onChange={e => setMesFiltro(e.target.value)}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1px solid #D1D5DB', outline: 'none', fontSize: '0.875rem', backgroundColor: 'white' }}
-              >
-                <option value="">Todos los Meses</option>
-                <option value="1">Enero</option>
-                <option value="2">Febrero</option>
-                <option value="3">Marzo</option>
-                <option value="4">Abril</option>
-                <option value="5">Mayo</option>
-                <option value="6">Junio</option>
-                <option value="7">Julio</option>
-                <option value="8">Agosto</option>
-                <option value="9">Septiembre</option>
-                <option value="10">Octubre</option>
-                <option value="11">Noviembre</option>
-                <option value="12">Diciembre</option>
-              </select>
-            </div>
-
-            {/* Filtro Año */}
-            <div>
-              <select
-                value={anioFiltro}
-                onChange={e => setAnioFiltro(e.target.value)}
-                style={{ width: '100%', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1px solid #D1D5DB', outline: 'none', fontSize: '0.875rem', backgroundColor: 'white' }}
-              >
-                <option value="">Todos los Años</option>
-                <option value="2026">2026</option>
-                <option value="2025">2025</option>
-                <option value="2024">2024</option>
-              </select>
-            </div>
           </div>
 
-          {/* Opciones Adicionales y Exportar a Excel */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderTop: '1px solid #F3F4F6', paddingTop: '0.85rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#4B5563', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={ordenAscendente}
-                  onChange={e => setOrdenAscendente(e.target.checked)}
-                />
-                Orden cronológico más antiguo primero
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
+            <div>
+              <label style={{ fontSize: '0.825rem', fontWeight: '600', color: '#4B5563', display: 'block', marginBottom: '0.35rem' }}>
+                Buscar por Término
               </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: '#4B5563', cursor: 'pointer' }}>
+              <div style={{ position: 'relative' }}>
+                <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF', fontSize: '0.85rem' }}></i>
                 <input
-                  type="checkbox"
-                  checked={incluirImagenes}
-                  onChange={e => setIncluirImagenes(e.target.checked)}
+                  type="text"
+                  placeholder="Nombre de quien reporta, folio, sede, elemento o falla..."
+                  value={busqueda}
+                  onChange={(e) => setBusqueda(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem 0.85rem 0.6rem 2.3rem', border: '1px solid #D1D5DB', borderRadius: '10px', fontSize: '0.875rem', outline: 'none' }}
                 />
-                Incluir evidencias fotográficas en Excel
-              </label>
+              </div>
             </div>
 
-            <button
-              onClick={descargarExcel}
-              style={{
-                backgroundColor: '#059669',
-                color: 'white',
-                border: 'none',
-                padding: '0.6rem 1.25rem',
-                borderRadius: '8px',
-                fontSize: '0.875rem',
-                fontWeight: '700',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)'
-              }}
-            >
-              <FaFileExcel /> Exportar a Excel
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+                <label style={{ fontSize: '0.8rem', color: '#4B5563', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={incluirImagenes}
+                    onChange={(e) => setIncluirImagenes(e.target.checked)}
+                    style={{ accentColor: '#BC955B' }}
+                  />
+                  Incluir imágenes en Excel
+                </label>
+                <label style={{ fontSize: '0.8rem', color: '#4B5563', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={ordenAscendente}
+                    onChange={(e) => setOrdenAscendente(e.target.checked)}
+                    style={{ accentColor: '#BC955B' }}
+                  />
+                  Orden cronológico más antiguo primero
+                </label>
+              </div>
+
+              <button
+                onClick={descargarExcel}
+                style={{
+                  backgroundColor: '#BC955B',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '10px',
+                  padding: '0.6rem 1.25rem',
+                  fontWeight: '600',
+                  fontSize: '0.875rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(188, 149, 91, 0.2)'
+                }}
+              >
+                <FaFileExcel /> Exportar a Excel
+              </button>
+            </div>
           </div>
         </div>
 
@@ -654,7 +650,7 @@ export default function DashboardInfraestructura() {
                           {new Date(rep.createdAt).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </td>
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', gap: '0.45rem' }}>
+                          <div style={{ display: 'inline-flex', gap: '0.45rem', alignItems: 'center', justifyContent: 'center' }}>
                             <button
                               onClick={() => setVerDetalle(rep)}
                               title="Ver detalles completos y gestionar atención"
@@ -667,30 +663,32 @@ export default function DashboardInfraestructura() {
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center'
+                                justifyContent: 'center',
+                                width: '32px',
+                                height: '32px'
                               }}
                             >
                               <FaEye size={14} />
                             </button>
-                            {user?.rol === 'administrador' && (
-                              <button
-                                onClick={() => eliminarReporte(rep.id)}
-                                title="Eliminar reporte"
-                                style={{
-                                  backgroundColor: '#FEE2E2',
-                                  color: '#DC2626',
-                                  border: 'none',
-                                  padding: '0.45rem',
-                                  borderRadius: '7px',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center'
-                                }}
-                              >
-                                <FaTrashAlt size={14} />
-                              </button>
-                            )}
+                            <button
+                              onClick={() => eliminarReporte(rep.id)}
+                              title="Eliminar reporte"
+                              style={{
+                                backgroundColor: '#FEE2E2',
+                                color: '#DC2626',
+                                border: 'none',
+                                padding: '0.45rem',
+                                borderRadius: '7px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: '32px',
+                                height: '32px'
+                              }}
+                            >
+                              <FaTrashAlt size={14} />
+                            </button>
                           </div>
                         </td>
                       </tr>

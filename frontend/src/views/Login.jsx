@@ -259,38 +259,33 @@ export default function Login() {
             <p style={{ fontSize: '0.8rem', color: '#6b7280', margin: '0 0 0.85rem 0', fontWeight: '500' }}>
               ¿Deseas registrar una incidencia?
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', alignItems: 'center' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                <a
-                  href="/crear-oficinas"
-                  style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.2rem 0.4rem', transition: 'color 0.2s' }}
-                  onMouseOver={(e) => e.currentTarget.style.color = '#691B31'}
-                  onMouseOut={(e) => e.currentTarget.style.color = '#BC955B'}
-                >
-                  Reporte Tecnológico
-                </a>
-                <span style={{ color: '#cbd5e1' }}>|</span>
-                <a
-                  href="/crear-semaforos"
-                  style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.2rem 0.4rem', transition: 'color 0.2s' }}
-                  onMouseOver={(e) => e.currentTarget.style.color = '#691B31'}
-                  onMouseOut={(e) => e.currentTarget.style.color = '#BC955B'}
-                >
-                  Reporte de Semáforos
-                </a>
-              </div>
-
-              {/* Solicitud de Reporte de Infraestructura debajo con el mismo diseño */}
-              <div>
-                <a
-                  href="/crear-infraestructura"
-                  style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.2rem 0.4rem', transition: 'color 0.2s' }}
-                  onMouseOver={(e) => e.currentTarget.style.color = '#691B31'}
-                  onMouseOut={(e) => e.currentTarget.style.color = '#BC955B'}
-                >
-                  Reporte de Infraestructura
-                </a>
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+              <a
+                href="/crear-oficinas"
+                style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.2rem 0.35rem', transition: 'color 0.2s' }}
+                onMouseOver={(e) => e.currentTarget.style.color = '#691B31'}
+                onMouseOut={(e) => e.currentTarget.style.color = '#BC955B'}
+              >
+                Reporte Tecnológico
+              </a>
+              <span style={{ color: '#cbd5e1' }}>|</span>
+              <a
+                href="/crear-semaforos"
+                style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.2rem 0.35rem', transition: 'color 0.2s' }}
+                onMouseOver={(e) => e.currentTarget.style.color = '#691B31'}
+                onMouseOut={(e) => e.currentTarget.style.color = '#BC955B'}
+              >
+                Reporte de Semáforos
+              </a>
+              <span style={{ color: '#cbd5e1' }}>|</span>
+              <a
+                href="/crear-infraestructura"
+                style={{ color: '#BC955B', fontSize: '0.85rem', fontWeight: '600', textDecoration: 'none', padding: '0.2rem 0.35rem', transition: 'color 0.2s' }}
+                onMouseOver={(e) => e.currentTarget.style.color = '#691B31'}
+                onMouseOut={(e) => e.currentTarget.style.color = '#BC955B'}
+              >
+                Reporte de Infraestructura
+              </a>
             </div>
           </div>
         </div>

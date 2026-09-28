@@ -321,6 +321,11 @@
   color: #B45309;
 }
 
+.notification-type-badge--infraestructura {
+  background: #D1FAE5;
+  color: #059669;
+}
+
 /* Contenido de la notificación */
 .notification-content {
   flex: 1;

@@ -1,17 +1,16 @@
 import { useState, useEffect } from 'react';
-import { FaClipboardCheck, FaPlus, FaSearch, FaFilePdf, FaCheck } from 'react-icons/fa';
+import { FaClipboardCheck, FaPlus, FaSearch, FaFileWord, FaCheck } from 'react-icons/fa';
 import Swal from 'sweetalert2';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import headerLogos from '../assets/header_logos.png';
 import { useAuth } from '../context/AuthContext';
+import { generarResguardoDocx } from '../utils/resguardoDocx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 function Resguardos() {
   const { user, logout } = useAuth();
   const [resguardos, setResguardos] = useState([]);
-  const [areas, setAreas] = useState([]);
+  const [direcciones, setDirecciones] = useState([]);
+  const [cargos, setCargos] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   
@@ -22,6 +21,8 @@ function Resguardos() {
     tipoInventario: 'mobiliario', // actual type for db
     itemId: '',
     nombreResguardante: '',
+    cargo: '',
+    direccion: '',
     area: '',
     observaciones: '',
     descripcionPdf: '',
@@ -29,6 +30,41 @@ function Resguardos() {
   });
 
   const [itemsDisponibles, setItemsDisponibles] = useState([]);
+  const [personasConocidas, setPersonasConocidas] = useState([]);
+
+  // Recolectar personas conocidas a partir de resguardos e inventarios para autocompletar cargo y dirección
+  const actualizarPersonasConocidas = (listaResguardos = [], listaItems = []) => {
+    const mapa = new Map();
+
+    listaResguardos.forEach(r => {
+      if (r.nombreResguardante && r.nombreResguardante.trim()) {
+        const key = r.nombreResguardante.trim().toLowerCase();
+        if (!mapa.has(key)) {
+          mapa.set(key, {
+            nombre: r.nombreResguardante.trim(),
+            cargo: r.cargo || '',
+            direccion: r.direccion || r.area || ''
+          });
+        }
+      }
+    });
+
+    listaItems.forEach(i => {
+      const nombre = i.nombreResguardante || i.responsable;
+      if (nombre && nombre.trim()) {
+        const key = nombre.trim().toLowerCase();
+        if (!mapa.has(key)) {
+          mapa.set(key, {
+            nombre: nombre.trim(),
+            cargo: i.cargo || i.cargoResponsable || '',
+            direccion: i.direccion || i.areaUbicacion || ''
+          });
+        }
+      }
+    });
+
+    setPersonasConocidas(Array.from(mapa.values()));
+  };
 
   const cargarResguardos = async () => {
     if (!user?.token) return;
@@ -45,6 +81,7 @@ function Resguardos() {
       }
       if (data.ok) {
         setResguardos(data.data);
+        actualizarPersonasConocidas(data.data, itemsDisponibles);
       }
     } catch (err) {
       console.error('Error al cargar resguardos:', err);
@@ -60,106 +97,210 @@ function Resguardos() {
       let debugInfo = [];
 
       if (tipoOpcion === 'mobiliario') {
-        const res = await fetch(`${API_BASE_URL}/api/inventario/mobiliario`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch(`${API_BASE_URL}/api/inventario/mobiliario?limit=2000`, { headers: { 'Authorization': `Bearer ${token}` } });
         const data = await res.json();
         if (data.ok && data.data) {
           const arr = Array.isArray(data.data) ? data.data : (data.data.items || []);
-          items = arr.map(i => ({ ...i, __formTipo: 'mobiliario', label: `${i.bien} - ${i.numeroInventario || ''}`, desc: i.descripcion, sn: i.numeroSerie || 'S/S' }));
+          items = arr.map(i => {
+            const titulo = (i.bien || 'MOBILIARIO').toUpperCase();
+            const desc = i.descripcion ? `${titulo}\n\n${i.descripcion}` : titulo;
+            return {
+              ...i,
+              __formTipo: 'mobiliario',
+              label: `${i.bien}${i.numeroInventario ? ` — Inv: ${i.numeroInventario}` : ''}${i.marca ? ` (${i.marca})` : ''}`,
+              desc: desc,
+              sn: i.numeroSerie || 'S/S',
+              nombreResguardante: i.nombreResguardante || '',
+              cargo: i.cargo || '',
+              direccion: i.direccion || ''
+            };
+          });
         } else { debugInfo.push('Mobiliario not ok: ' + JSON.stringify(data)); }
       } else if (tipoOpcion === 'ti') {
         const [resTec, resExis] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/inventario/tecnologico`, { headers: { 'Authorization': `Bearer ${token}` } }),
-          fetch(`${API_BASE_URL}/api/inventario/existencias`, { headers: { 'Authorization': `Bearer ${token}` } })
+          fetch(`${API_BASE_URL}/api/inventario/tecnologico?limit=2000`, { headers: { 'Authorization': `Bearer ${token}` } }),
+          fetch(`${API_BASE_URL}/api/inventario/existencias?limit=2000`, { headers: { 'Authorization': `Bearer ${token}` } })
         ]);
         const dataTec = await resTec.json();
         const dataExis = await resExis.json();
         
         if (dataTec.ok && dataTec.data) {
           const arrTec = Array.isArray(dataTec.data) ? dataTec.data : (dataTec.data.items || []);
-          items = [...items, ...arrTec.map(i => ({ ...i, __formTipo: 'tecnologico', label: `[Tecnológico] ${i.tipo} - ${i.numeroInventario || i.marca}`, desc: `${i.tipo} MARCA ${i.marca || 'S/M'}, MODELO ${i.modelo || 'S/M'}`, sn: i.numeroSerie || 'S/S' }))];
+          items = [...items, ...arrTec.map(i => {
+            const titulo = `EQUIPO ${i.tipo || 'TECNOLÓGICO'} ${i.marca || ''} ${i.modelo || ''}`.replace(/\s+/g, ' ').trim().toUpperCase();
+            const detalle = i.observaciones || i.caracteristicas || `MARCA ${i.marca || 'S/M'}, MODELO ${i.modelo || 'S/M'}`;
+            const desc = detalle ? `${titulo}\n\n${detalle}` : titulo;
+            return {
+              ...i,
+              __formTipo: 'tecnologico',
+              label: `[Tecnológico] ${i.tipo} - ${i.numeroInventario || i.marca || ''}`,
+              desc: desc,
+              sn: i.numeroSerie || 'S/S',
+              nombreResguardante: i.responsable || '',
+              cargo: i.cargoResponsable || '',
+              direccion: i.direccion || i.areaUbicacion || ''
+            };
+          })];
         } else { debugInfo.push('Tec not ok: ' + JSON.stringify(dataTec)); }
         
         if (dataExis.ok && dataExis.data) {
           const arrExis = Array.isArray(dataExis.data) ? dataExis.data : (dataExis.data.items || []);
           const exisTi = arrExis.filter(i => i.tipoInventario !== 'semaforos' && (i.categoria === 'herramienta' || i.categoria === 'equipo' || i.categoria === 'accesorio'));
-          items = [...items, ...exisTi.map(i => ({ ...i, __formTipo: 'existencia', label: `[Existencia] ${i.nombre} - ${i.marca || ''}`, desc: `${i.nombre} MARCA ${i.marca || 'S/M'}`, sn: i.numeroSerie || 'S/S' }))];
+          items = [...items, ...exisTi.map(i => {
+            const titulo = (i.nombre || 'HERRAMIENTA / EQUIPO').toUpperCase();
+            const detalle = `MARCA ${i.marca || 'S/M'}${i.descripcion ? `, ${i.descripcion}` : ''}`;
+            return {
+              ...i,
+              __formTipo: 'existencia',
+              label: `[Existencia] ${i.nombre} - ${i.marca || ''}`,
+              desc: `${titulo}\n\n${detalle}`,
+              sn: i.numeroSerie || 'S/S',
+              nombreResguardante: i.responsable || '',
+              cargo: i.cargoResponsable || '',
+              direccion: i.areaUbicacion || ''
+            };
+          })];
         } else { debugInfo.push('Exis not ok: ' + JSON.stringify(dataExis)); }
       } else if (tipoOpcion === 'semaforos') {
-        const res = await fetch(`${API_BASE_URL}/api/inventario/controladores`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const res = await fetch(`${API_BASE_URL}/api/inventario/controladores?limit=2000`, { headers: { 'Authorization': `Bearer ${token}` } });
         const data = await res.json();
         if (data.ok && data.data) {
           const arr = Array.isArray(data.data) ? data.data : (data.data.items || []);
-          items = arr.map(i => ({ ...i, __formTipo: 'semaforos', label: `Controlador ${i.modelo} - Crucero ID ${i.cruceroId}`, desc: `CONTROLADOR SEMAFÓRICO MODELO ${i.modelo}`, sn: 'S/S' }));
+          items = arr.map(i => {
+            const titulo = `CONTROLADOR SEMAFÓRICO MODELO ${i.modelo || 'S/M'}`.toUpperCase();
+            const detalle = `CRUCERO: ${i.crucero?.nombre || (i.cruceroId ? `ID ${i.cruceroId}` : 'S/C')}`;
+            return {
+              ...i,
+              __formTipo: 'semaforos',
+              label: `[Semáforos] Controlador ${i.modelo} — Crucero: ${i.crucero?.nombre || (i.cruceroId ? `ID ${i.cruceroId}` : 'S/C')}`,
+              desc: `${titulo}\n\n${detalle}`,
+              sn: 'S/S',
+              nombreResguardante: '',
+              cargo: '',
+              direccion: 'DIRECCIÓN DE OPERACIÓN Y SUPERVISIÓN'
+            };
+          });
         } else { debugInfo.push('Semaforos not ok: ' + JSON.stringify(data)); }
       }
       
       setItemsDisponibles(items);
-      if (items.length > 0) {
-        setForm(f => ({ ...f, itemId: items[0].id, tipoInventario: items[0].__formTipo, descripcionPdf: items[0].desc, numeroSeriePdf: items[0].sn }));
-      } else {
-        setForm(f => ({ ...f, itemId: '', tipoInventario: '', descripcionPdf: '', numeroSeriePdf: '' }));
-        // Handle token expiration
-        const tokenExpired = debugInfo.some(info => info.includes('Token inválido') || info.includes('expirado'));
-        if (tokenExpired) {
-          Swal.fire('Sesión Expirada', 'Tu sesión ha expirado. Por favor, inicia sesión de nuevo.', 'warning').then(() => logout());
-        } else if (debugInfo.length > 0) {
-          console.warn('Debug Info:', debugInfo.join(' | '));
-        }
-      }
+      actualizarPersonasConocidas(resguardos, items);
     } catch (err) {
       console.error('Error al cargar items:', err);
       Swal.fire('Error', 'Fallo al cargar ítems: ' + err.message, 'error');
     }
   };
 
-  const cargarAreas = async () => {
+  const cargarCatalogos = async () => {
     if (!user?.token) return;
     try {
       const token = user.token;
-      const res = await fetch(`${API_BASE_URL}/api/catalogos/areas`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setAreas(data.data);
-      }
+      const [resDir, resCargo] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/catalogos/areas`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/catalogos/cargos`, { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
+      const jsonDir = await resDir.json();
+      const jsonCargo = await resCargo.json();
+      if (jsonDir.ok) setDirecciones(jsonDir.data);
+      if (jsonCargo.ok) setCargos(jsonCargo.data);
     } catch (err) {
-      console.error('Error al cargar áreas:', err);
+      console.error('Error al cargar catálogos:', err);
     }
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarResguardos();
-    cargarAreas();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    cargarCatalogos();
   }, []);
 
   useEffect(() => {
     if (modalAbierto) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       cargarItemsDisponibles(form.tipoOpcion);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modalAbierto, form.tipoOpcion]);
+
+  const abrirNuevoResguardo = () => {
+    setForm({
+      tipoOpcion: 'mobiliario',
+      tipoInventario: 'mobiliario',
+      itemId: '',
+      nombreResguardante: '',
+      cargo: '',
+      direccion: '',
+      area: '',
+      observaciones: '',
+      descripcionPdf: '',
+      numeroSeriePdf: ''
+    });
+    cargarItemsDisponibles('mobiliario');
+    setModalAbierto(true);
+  };
 
   const handleOpcionChange = (e) => {
     const newVal = e.target.value;
-    setForm({ ...form, tipoOpcion: newVal, itemId: '', tipoInventario: '', descripcionPdf: '', numeroSeriePdf: '' });
+    setForm({
+      ...form,
+      tipoOpcion: newVal,
+      itemId: '',
+      tipoInventario: '',
+      descripcionPdf: '',
+      numeroSeriePdf: '',
+      nombreResguardante: '',
+      cargo: '',
+      direccion: '',
+      area: ''
+    });
     cargarItemsDisponibles(newVal);
   };
 
   const handleItemChange = (e) => {
-    const id = Number(e.target.value);
+    const idVal = e.target.value;
+    if (!idVal) {
+      setForm(prev => ({
+        ...prev,
+        itemId: '',
+        tipoInventario: '',
+        descripcionPdf: '',
+        numeroSeriePdf: ''
+      }));
+      return;
+    }
+
+    const id = Number(idVal);
     const item = itemsDisponibles.find(i => i.id === id);
     if (item) {
-      setForm({ ...form, itemId: id, tipoInventario: item.__formTipo, descripcionPdf: item.desc, numeroSeriePdf: item.sn });
+      setForm(prev => ({
+        ...prev,
+        itemId: id,
+        tipoInventario: item.__formTipo,
+        descripcionPdf: item.desc || '',
+        numeroSeriePdf: item.sn || 'S/S'
+      }));
+    }
+  };
+
+  const handleNombreResguardanteChange = (valor) => {
+    const conocido = personasConocidas.find(p => p.nombre?.toLowerCase().trim() === valor.toLowerCase().trim());
+    if (conocido) {
+      setForm(prev => ({
+        ...prev,
+        nombreResguardante: valor,
+        cargo: conocido.cargo || prev.cargo,
+        direccion: conocido.direccion || prev.direccion,
+        area: conocido.direccion || prev.area
+      }));
+    } else {
+      setForm(prev => ({
+        ...prev,
+        nombreResguardante: valor
+      }));
     }
   };
 
   const handleGuardar = async (e) => {
     e.preventDefault();
     if (!form.itemId) return Swal.fire('Error', 'Seleccione un dispositivo o equipo', 'error');
+    if (!form.nombreResguardante.trim()) return Swal.fire('Error', 'El nombre del resguardante es requerido', 'warning');
     if (!user?.token) return;
 
     try {
@@ -170,13 +311,27 @@ function Resguardos() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(form)
+        body: JSON.stringify({
+          ...form,
+          area: form.direccion || form.area || 'General'
+        })
       });
       const data = await res.json();
       if (data.ok) {
         Swal.fire('Guardado', 'Resguardo registrado exitosamente', 'success');
         setModalAbierto(false);
-        setForm({ tipoOpcion: 'mobiliario', tipoInventario: 'mobiliario', itemId: '', nombreResguardante: '', area: '', observaciones: '', descripcionPdf: '', numeroSeriePdf: '' });
+        setForm({
+          tipoOpcion: 'mobiliario',
+          tipoInventario: 'mobiliario',
+          itemId: '',
+          nombreResguardante: '',
+          cargo: '',
+          direccion: '',
+          area: '',
+          observaciones: '',
+          descripcionPdf: '',
+          numeroSeriePdf: ''
+        });
         cargarItemsDisponibles('mobiliario');
         cargarResguardos();
       } else {
@@ -229,116 +384,19 @@ function Resguardos() {
     return 'Desconocido';
   };
 
-  const generarPdf = async (resguardo) => {
+  const exportarDocx = async (resguardo) => {
     try {
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      
-      const loadImage = (src) => new Promise((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = 'Anonymous';
-        img.onload = () => resolve(img);
-        img.onerror = (e) => reject(new Error('Failed to load image: ' + src));
-        img.src = src;
+      Swal.fire({
+        title: 'Generando Word...',
+        text: 'Por favor espere un momento.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
       });
-
-      try {
-        const imgHeader = await loadImage(headerLogos);
-        // Alinear totalmente a la derecha, con logos un poco más grandes
-        doc.addImage(imgHeader, 'PNG', pageWidth - 160, 10, 150, 24);
-      } catch (e) {
-        console.warn('Header logo no cargado', e);
-      }
-
-      continuarPdf(doc, resguardo, pageWidth);
-    } catch (error) {
-      console.error('Error in generarPdf:', error);
-      Swal.fire('Error PDF', error.message || 'Error al generar PDF', 'error');
-    }
-  };
-
-  const continuarPdf = (doc, resguardo, pageWidth) => {
-    try {
-      const fechaBase = new Date(resguardo.fechaPrestamo);
-      const meses = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
-      const fechaTexto = `PACHUCA DE SOTO, HIDALGO., A ${fechaBase.getDate().toString().padStart(2, '0')} DE ${meses[fechaBase.getMonth()]} DEL ${fechaBase.getFullYear()}.`;
-
-      doc.setFontSize(9);
-      doc.setTextColor(0);
-      doc.text(fechaTexto, pageWidth - 10, 38, { align: 'right' });
-
-      doc.setFontSize(16);
-      doc.setTextColor(178, 34, 34); // Red color for title
-      doc.setFont('helvetica', 'bold');
-      doc.text('RESGUARDO DE BIENES', pageWidth / 2, 60, { align: 'center' });
-
-      // Organo / Dependencia box
-      doc.setDrawColor(0);
-      doc.setLineWidth(0.5);
-      doc.roundedRect(20, 65, 170, 32, 3, 3);
-      
-      doc.setFontSize(12);
-      doc.setTextColor(0);
-      doc.setFont('helvetica', 'bold');
-      doc.text('ÓRGANO SUPERIOR', 25, 74);
-      doc.setFont('helvetica', 'normal');
-      doc.text('SECRETARÍA DE MOVILIDAD Y TRANSPORTE', 75, 78);
-      
-      doc.setFont('helvetica', 'bold');
-      doc.text('DEPENDENCIA', 25, 88);
-      doc.setFont('helvetica', 'normal');
-      doc.text('SISTEMA INTEGRADO DE TRANSPORTE MASIVO', 75, 92);
-
-      // Table for Description and Serial Number
-      autoTable(doc, {
-        startY: 105,
-        theme: 'grid',
-        headStyles: { fillColor: [255, 255, 255], textColor: 0, lineColor: 0, lineWidth: 0.5, halign: 'center', fontStyle: 'bold' },
-        bodyStyles: { textColor: 0, lineColor: 0, lineWidth: 0.5, valign: 'middle' },
-        columnStyles: {
-          0: { halign: 'left' },
-          1: { halign: 'center' }
-        },
-        head: [['DESCRIPCIÓN', 'NÚMERO DE SERIE']],
-        body: [
-          [resguardo.descripcionPdf || '', resguardo.numeroSeriePdf || '']
-        ],
-        styles: { cellPadding: 8, fontSize: 12 }
-      });
-
-      // Disclaimer text
-      const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : 150;
-      doc.setFontSize(11);
-      doc.setTextColor(80);
-      const disclaimer = 'ESTE DISPOSITIVO SE DESTINA EXCLUSIVAMENTE A ACTIVIDADES LABORALES DE ENCIERRO. EN CASO DE DAÑO, EL USUARIO SERÁ RESPONSABLE DE SU REPOSICIÓN TOTAL, CUBRIENDO EL 100% DEL COSTO.\nQUEDANDO PROHIBIDO CUALQUIER OTRO USO NO AUTORIZADO.';
-      const lines = doc.splitTextToSize(disclaimer, 170);
-      doc.text(lines, 20, finalY);
-
-      // Signature line
-      const signY = finalY + 70;
-      doc.setDrawColor(0);
-      doc.setLineWidth(0.5);
-      doc.line(60, signY, 150, signY);
-      doc.setFontSize(12);
-      doc.setTextColor(0);
-      doc.setFont('helvetica', 'bold');
-      doc.text('NOMBRE Y FIRMA DEL RESGUARDANTE', pageWidth / 2, signY + 6, { align: 'center' });
-
-      // Footer
-      doc.setFontSize(8);
-      doc.setTextColor(120);
-      doc.setFont('helvetica', 'normal');
-      const footer = 'Blvd. Felipe Angeles Km 86 + 040\nCol. Venta Prieta\nPachuca de Soto, Hgo.,\nC. P. 42083.';
-      doc.text(footer, pageWidth - 20, 270, { align: 'right' });
-
-      // Extract the first word of the item name
-      const nombreItemCompleto = getNombreItem(resguardo);
-      const primeraPalabraItem = nombreItemCompleto.split(' ')[0] || 'Bien';
-      
-      doc.save(`Resguardo_${primeraPalabraItem}.pdf`);
+      await generarResguardoDocx(resguardo);
+      Swal.close();
     } catch (err) {
-      console.error('Error in continuarPdf:', err);
-      Swal.fire('Error PDF', err.message || 'Error al generar el contenido del PDF', 'error');
+      console.error('Error al generar Word:', err);
+      Swal.fire('Error Word', err.message || 'Error al exportar a Word', 'error');
     }
   };
 
@@ -351,12 +409,12 @@ function Resguardos() {
               <FaClipboardCheck /> Resguardos
             </h1>
             <p style={{ color: '#6F7271', margin: '0.5rem 0 0', fontSize: '1rem' }}>
-              Gestión de préstamos y asignaciones de dispositivos y mobiliario.
+              Gestión de préstamos y asignaciones de dispositivos y mobiliario con exportación de documentos oficiales.
             </p>
           </div>
           <button 
-            onClick={() => setModalAbierto(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.5rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s' }}
+            onClick={abrirNuevoResguardo}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.5rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 6px -1px rgba(188, 149, 91, 0.3)' }}
             onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
             onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
           >
@@ -370,7 +428,7 @@ function Resguardos() {
               <FaSearch style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
               <input 
                 type="text" 
-                placeholder="Buscar por nombre o área..." 
+                placeholder="Buscar por nombre o dirección..." 
                 value={busqueda}
                 onChange={e => setBusqueda(e.target.value)}
                 style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', boxSizing: 'border-box' }}
@@ -384,38 +442,61 @@ function Resguardos() {
                 <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', fontSize: '0.875rem' }}>
                   <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Dispositivo/Mueble</th>
                   <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Tipo</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Resguardante</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Área</th>
+                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Nombre del Resguardante</th>
+                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Cargo</th>
+                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Dirección</th>
                   <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Fecha Préstamo</th>
                   <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Estado</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600', textAlign: 'center' }}>Acciones</th>
+                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600', textAlign: 'center' }}>Exportar / Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {resguardos.filter(r => 
                   r.nombreResguardante.toLowerCase().includes(busqueda.toLowerCase()) || 
-                  r.area.toLowerCase().includes(busqueda.toLowerCase())
+                  (r.direccion || r.area || '').toLowerCase().includes(busqueda.toLowerCase()) ||
+                  (r.cargo || '').toLowerCase().includes(busqueda.toLowerCase())
                 ).map(r => (
                   <tr key={r.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '1rem 1.5rem', color: '#1e293b' }}>{getNombreItem(r)}</td>
+                    <td style={{ padding: '1rem 1.5rem', color: '#1e293b', fontWeight: '500' }}>{getNombreItem(r)}</td>
                     <td style={{ padding: '1rem 1.5rem', color: '#1e293b', textTransform: 'capitalize' }}>{r.tipoInventario}</td>
-                    <td style={{ padding: '1rem 1.5rem', color: '#1e293b' }}>{r.nombreResguardante}</td>
-                    <td style={{ padding: '1rem 1.5rem', color: '#1e293b' }}>{r.area}</td>
-                    <td style={{ padding: '1rem 1.5rem', color: '#1e293b' }}>{new Date(r.fechaPrestamo).toLocaleDateString()}</td>
+                    <td style={{ padding: '1rem 1.5rem', color: '#1e293b', fontWeight: '600' }}>{r.nombreResguardante}</td>
+                    <td style={{ padding: '1rem 1.5rem', color: '#64748b', fontSize: '0.875rem' }}>
+                      {r.cargo ? <span style={{ fontWeight: '600', color: '#BC955B' }}>{r.cargo}</span> : '—'}
+                    </td>
+                    <td style={{ padding: '1rem 1.5rem', color: '#64748b', fontSize: '0.875rem' }}>
+                      {r.direccion || r.area || '—'}
+                    </td>
+                    <td style={{ padding: '1rem 1.5rem', color: '#1e293b' }}>{new Date(r.fechaPrestamo).toLocaleDateString('es-MX')}</td>
                     <td style={{ padding: '1rem 1.5rem' }}>
                       <span style={{ padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: r.estado === 'Activo' ? '#dcfce7' : '#f1f5f9', color: r.estado === 'Activo' ? '#166534' : '#475569' }}>
                         {r.estado}
                       </span>
                     </td>
                     <td style={{ padding: '1rem 1.5rem', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
                         {r.estado === 'Activo' && (
-                          <button onClick={() => marcarDevuelto(r.id)} title="Marcar como Devuelto" style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', padding: '0.5rem' }}>
+                          <button onClick={() => marcarDevuelto(r.id)} title="Marcar como Devuelto" style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', padding: '0.4rem' }}>
                             <FaCheck size={18} />
                           </button>
                         )}
-                        <button title="Generar PDF" onClick={() => generarPdf(r)} style={{ background: 'none', border: 'none', color: '#691B31', cursor: 'pointer', padding: '0.5rem' }}>
-                          <FaFilePdf size={18} />
+                        <button
+                          title="Exportar a Word (.docx)"
+                          onClick={() => exportarDocx(r)}
+                          style={{
+                            background: '#EFF6FF',
+                            border: '1px solid #BFDBFE',
+                            color: '#1D4ED8',
+                            cursor: 'pointer',
+                            padding: '0.4rem 0.8rem',
+                            borderRadius: '8px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            fontWeight: '700',
+                            fontSize: '0.8rem'
+                          }}
+                        >
+                          <FaFileWord size={16} /> Word
                         </button>
                       </div>
                     </td>
@@ -423,7 +504,7 @@ function Resguardos() {
                 ))}
                 {resguardos.length === 0 && !cargando && (
                   <tr>
-                    <td colSpan="7" style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>No hay resguardos registrados.</td>
+                    <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>No hay resguardos registrados.</td>
                   </tr>
                 )}
               </tbody>
@@ -434,28 +515,28 @@ function Resguardos() {
 
       {/* Modal Nuevo Resguardo */}
       {modalAbierto && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '12px', width: '90%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
-            <div style={{ padding: '1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', borderTopLeftRadius: '12px', borderTopRightRadius: '12px' }}>
-              <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.25rem' }}>Nuevo Resguardo</h2>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '16px', width: '90%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <div style={{ padding: '1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc', borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}>
+              <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.25rem', fontWeight: '700' }}>Nuevo Resguardo</h2>
               <button onClick={() => setModalAbierto(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: '#64748b', cursor: 'pointer' }}>&times;</button>
             </div>
             
             <form onSubmit={handleGuardar} style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
                 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569' }}>Categoría *</label>
-                  <select required value={form.tipoOpcion} onChange={handleOpcionChange} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>Categoría *</label>
+                  <select required value={form.tipoOpcion} onChange={handleOpcionChange} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', backgroundColor: 'white' }}>
                     <option value="ti">TI (Tecnologías y Existencias)</option>
-                    <option value="semaforos">Semáforos</option>
                     <option value="mobiliario">Mobiliario</option>
+                    <option value="semaforos">Semáforos</option>
                   </select>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569' }}>Dispositivo/Equipo *</label>
-                  <select required value={form.itemId} onChange={handleItemChange} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>Dispositivo/Equipo *</label>
+                  <select required value={form.itemId} onChange={handleItemChange} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', backgroundColor: 'white' }}>
                     <option value="">Seleccione un ítem...</option>
                     {itemsDisponibles.map((item, idx) => (
                       <option key={`${item.__formTipo}-${item.id}-${idx}`} value={item.id}>
@@ -465,48 +546,92 @@ function Resguardos() {
                   </select>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569' }}>Nombre del Resguardante *</label>
-                  <input required type="text" value={form.nombreResguardante} onChange={e => setForm({...form, nombreResguardante: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }} placeholder="Ej. Juan Pérez" />
+                {/* 1. Primero: Nombre del Resguardante (con autocompletado inteligente de cargo y dirección) */}
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>
+                    1. Nombre del Resguardante *
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    list="lista-personas-resguardantes"
+                    value={form.nombreResguardante}
+                    onChange={e => handleNombreResguardanteChange(e.target.value)}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }}
+                    placeholder="Escriba o seleccione el nombre del resguardante"
+                  />
+                  <datalist id="lista-personas-resguardantes">
+                    {personasConocidas.map((p, idx) => (
+                      <option key={idx} value={p.nombre}>
+                        {p.cargo ? `${p.cargo} — ${p.direccion || ''}` : p.direccion || ''}
+                      </option>
+                    ))}
+                  </datalist>
                 </div>
 
+                {/* 2. Segundo: Cargo */}
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569' }}>Área de Adscripción *</label>
-                  <select required value={form.area} onChange={e => setForm({...form, area: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', backgroundColor: 'white' }}>
-                    <option value="">Seleccione un área...</option>
-                    {areas.map(a => (
-                      <option key={a.id} value={a.nombre}>{a.nombre}</option>
-                    ))}
-                  </select>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>
+                    2. Cargo
+                  </label>
+                  <input
+                    type="text"
+                    list="lista-cargos-resguardo"
+                    value={form.cargo}
+                    onChange={e => setForm({...form, cargo: e.target.value})}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }}
+                    placeholder="Cargo del resguardante"
+                  />
+                  <datalist id="lista-cargos-resguardo">
+                    {cargos.map(c => <option key={c.id} value={c.nombre} />)}
+                  </datalist>
+                </div>
+
+                {/* 3. Tercero: Dirección */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>
+                    3. Dirección
+                  </label>
+                  <input
+                    type="text"
+                    list="lista-direcciones-resguardo"
+                    value={form.direccion}
+                    onChange={e => setForm({...form, direccion: e.target.value, area: e.target.value})}
+                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }}
+                    placeholder="Dirección o área"
+                  />
+                  <datalist id="lista-direcciones-resguardo">
+                    {direcciones.map(d => <option key={d.id} value={d.nombre} />)}
+                  </datalist>
                 </div>
 
               </div>
 
-              <div style={{ backgroundColor: '#f1f5f9', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
-                <h3 style={{ marginTop: 0, color: '#475569', fontSize: '1rem', marginBottom: '1rem' }}>Datos para el PDF (Editables)</h3>
+              <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '10px', marginBottom: '1.25rem', border: '1px solid #e2e8f0' }}>
+                <h3 style={{ marginTop: 0, color: '#334155', fontSize: '0.95rem', fontWeight: '700', marginBottom: '0.75rem' }}>Datos para el Documento Word (Editables)</h3>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.85rem' }}>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569' }}>Descripción (Para el documento)</label>
-                    <textarea value={form.descripcionPdf} onChange={e => setForm({...form, descripcionPdf: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', minHeight: '80px' }} />
+                    <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: '600', color: '#475569', fontSize: '0.85rem' }}>Descripción (Detalle del Bien)</label>
+                    <textarea value={form.descripcionPdf} onChange={e => setForm({...form, descripcionPdf: e.target.value})} style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', minHeight: '75px', resize: 'vertical' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569' }}>Número de Serie (Para el documento)</label>
-                    <input type="text" value={form.numeroSeriePdf} onChange={e => setForm({...form, numeroSeriePdf: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }} />
+                    <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: '600', color: '#475569', fontSize: '0.85rem' }}>Número de Serie</label>
+                    <input type="text" value={form.numeroSeriePdf} onChange={e => setForm({...form, numeroSeriePdf: e.target.value})} style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }} />
                   </div>
                 </div>
               </div>
               
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569' }}>Observaciones del préstamo</label>
-                <textarea value={form.observaciones} onChange={e => setForm({...form, observaciones: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', minHeight: '60px' }} placeholder="Opcional. Ej. Pantalla rayada, incluye cables..." />
+                <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: '600', color: '#475569', fontSize: '0.85rem' }}>Observaciones del préstamo</label>
+                <textarea value={form.observaciones} onChange={e => setForm({...form, observaciones: e.target.value})} style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', minHeight: '55px', resize: 'vertical' }} placeholder="Opcional. Ej. Pantalla intacta, incluye cargador..." />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.5rem' }}>
-                <button type="button" onClick={() => setModalAbierto(false)} style={{ padding: '0.75rem 1.5rem', backgroundColor: 'transparent', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem' }}>
+                <button type="button" onClick={() => setModalAbierto(false)} style={{ padding: '0.65rem 1.25rem', backgroundColor: 'transparent', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
                   Cancelar
                 </button>
-                <button type="submit" style={{ padding: '0.75rem 1.5rem', backgroundColor: '#691B31', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>
+                <button type="submit" style={{ padding: '0.65rem 1.5rem', backgroundColor: '#691B31', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', boxShadow: '0 2px 4px rgba(105,27,49,0.2)' }}>
                   Guardar Resguardo
                 </button>
               </div>

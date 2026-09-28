@@ -13,8 +13,9 @@ const mobiliarioSchema = z.object({
   numeroSerie: z.string().nullable().optional(),
   descripcion: z.string().min(1, "La descripción es requerida"),
   direccion: z.string().min(1, "La dirección es requerida"),
-  subdireccion: z.string().min(1, "La subdirección es requerida"),
-  area: z.string().min(1, "El área es requerida"),
+  subdireccion: z.string().nullable().optional().default(''),
+  area: z.string().nullable().optional().default(''),
+  cargo: z.string().nullable().optional().default(''),
   nombreResguardante: z.string().min(1, "El nombre del resguardante es requerido"),
 });
 
@@ -592,7 +593,40 @@ async function listarExistencias(req, res) {
     orderBy: { nombre: 'asc' },
   });
 
-  ok(res, existencias);
+  const existenciaIds = existencias.map(e => e.id);
+  const piezasReemplazadasSemaforo = await prisma.reporteSemaforoPieza.findMany({
+    where: {
+      piezaReemplazadaExistenciaId: { in: existenciaIds }
+    },
+    include: {
+      reporteSemaforo: {
+        include: {
+          crucero: true,
+          estacion: true
+        }
+      }
+    }
+  });
+
+  const origenMap = {};
+  piezasReemplazadasSemaforo.forEach(p => {
+    if (p.piezaReemplazadaExistenciaId) {
+      origenMap[p.piezaReemplazadaExistenciaId] = {
+        folio: p.reporteSemaforo?.folio,
+        crucero: p.reporteSemaforo?.crucero?.nombre,
+        estacion: p.reporteSemaforo?.estacion?.nombre,
+        fecha: p.createdAt,
+        estadoPieza: p.estadoPiezaReemplazada
+      };
+    }
+  });
+
+  const existenciasConOrigen = existencias.map(e => ({
+    ...e,
+    origenCrucero: origenMap[e.id] || null
+  }));
+
+  ok(res, existenciasConOrigen);
 }
 
 async function ingresarExistencia(req, res) {
@@ -656,7 +690,8 @@ async function obtenerHistorialExistencia(req, res) {
   const componente = await prisma.existenciaComponente.findUnique({ where: { id } });
   if (!componente) return fail(res, 'Componente no encontrado', 404);
 
-  const historial = await prisma.reporteSemaforoPieza.findMany({
+  // 1. Piezas asignadas (salidas hacia reportes)
+  const historialAsignado = await prisma.reporteSemaforoPieza.findMany({
     where: { componenteId: id },
     include: {
       reporteSemaforo: {
@@ -669,19 +704,54 @@ async function obtenerHistorialExistencia(req, res) {
     orderBy: { createdAt: 'desc' }
   });
 
-  const historialMapeado = historial.map(h => ({
-    id: h.id,
+  // 2. Piezas retiradas/dañadas (entradas desde reportes)
+  const historialReemplazado = await prisma.reporteSemaforoPieza.findMany({
+    where: { piezaReemplazadaExistenciaId: id },
+    include: {
+      reporteSemaforo: {
+        include: {
+          estacion: true,
+          crucero: true
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+
+  const historialMapeadoAsignado = historialAsignado.map(h => ({
+    id: `asig-${h.id}`,
+    tipoMovimiento: 'Asignación / Instalación',
     cantidad: h.cantidad,
+    esSalida: true,
     fecha: h.createdAt,
     reporte: {
-      id: h.reporteSemaforo.id,
-      folio: h.reporteSemaforo.folio,
-      estacion: h.reporteSemaforo.estacion?.nombre,
-      crucero: h.reporteSemaforo.crucero?.nombre
+      id: h.reporteSemaforo?.id,
+      folio: h.reporteSemaforo?.folio,
+      estacion: h.reporteSemaforo?.estacion?.nombre,
+      crucero: h.reporteSemaforo?.crucero?.nombre
     }
   }));
 
-  ok(res, historialMapeado);
+  const historialMapeadoReemplazado = historialReemplazado.map(h => ({
+    id: `reemp-${h.id}`,
+    tipoMovimiento: 'Retirada / Reemplazo en crucero',
+    cantidad: h.cantidad,
+    esSalida: false,
+    fecha: h.createdAt,
+    estadoPieza: h.estadoPiezaReemplazada,
+    reporte: {
+      id: h.reporteSemaforo?.id,
+      folio: h.reporteSemaforo?.folio,
+      estacion: h.reporteSemaforo?.estacion?.nombre,
+      crucero: h.reporteSemaforo?.crucero?.nombre
+    }
+  }));
+
+  const historialCompleto = [...historialMapeadoReemplazado, ...historialMapeadoAsignado].sort(
+    (a, b) => new Date(b.fecha) - new Date(a.fecha)
+  );
+
+  ok(res, historialCompleto);
 }
 
 async function exportarExistenciasExcel(req, res) {
@@ -838,8 +908,9 @@ async function crearMobiliario(req, res) {
       numeroSerie: data.numeroSerie || null,
       descripcion: data.descripcion,
       direccion: data.direccion,
-      subdireccion: data.subdireccion,
-      area: data.area,
+      subdireccion: data.subdireccion || '',
+      area: data.area || '',
+      cargo: data.cargo || null,
       nombreResguardante: data.nombreResguardante,
     },
   });
@@ -883,8 +954,9 @@ async function actualizarMobiliario(req, res) {
       numeroSerie: data.numeroSerie || null,
       descripcion: data.descripcion,
       direccion: data.direccion,
-      subdireccion: data.subdireccion,
-      area: data.area,
+      subdireccion: data.subdireccion || '',
+      area: data.area || '',
+      cargo: data.cargo || null,
       nombreResguardante: data.nombreResguardante,
     },
   });

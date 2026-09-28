@@ -6,6 +6,7 @@ import {
   FaBell, 
   FaLaptop, 
   FaTrafficLight, 
+  FaWrench,
   FaCheckDouble, 
   FaClock, 
   FaCircle, 
@@ -38,11 +39,13 @@ export default function NotificationCenter() {
   const navigate = useNavigate();
   const dropdownRef = useRef(null);
 
+  const isInfra = user?.rol === 'infraestructura';
+
   const [isOpen, setIsOpen] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [notificaciones, setNotificaciones] = useState([]);
-  const [resumen, setResumen] = useState({ totalPendientes: 0, pendientesOficina: 0, pendientesSemaforo: 0 });
-  const [activeTab, setActiveTab] = useState('todos'); // 'todos' | 'oficina' | 'semaforo'
+  const [resumen, setResumen] = useState({ totalPendientes: 0, pendientesOficina: 0, pendientesSemaforo: 0, pendientesInfra: 0 });
+  const [activeTab, setActiveTab] = useState('todos'); // 'todos' | 'oficina' | 'semaforo' | 'infraestructura'
   const [readIds, setReadIds] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -126,6 +129,9 @@ export default function NotificationCenter() {
     if (activeTab === 'semaforo') {
       return notificaciones.filter((n) => n.tipo === 'semaforo');
     }
+    if (activeTab === 'infraestructura') {
+      return notificaciones.filter((n) => n.tipo === 'infraestructura');
+    }
     return notificaciones;
   }, [notificaciones, activeTab]);
 
@@ -198,38 +204,51 @@ export default function NotificationCenter() {
           </div>
 
           {/* Pestañas de filtrado */}
-          <div className="notification-tabs">
-            <button
-              type="button"
-              className={`notification-tab ${activeTab === 'todos' ? 'notification-tab--active' : ''}`}
-              onClick={() => setActiveTab('todos')}
-            >
-              <span>Todos</span>
-              <span className="notification-tab-count">{notificaciones.length}</span>
-            </button>
-            <button
-              type="button"
-              className={`notification-tab ${activeTab === 'oficina' ? 'notification-tab--active' : ''}`}
-              onClick={() => setActiveTab('oficina')}
-            >
-              <FaLaptop size={12} />
-              <span>Tecnológicos</span>
-              {sinLeerOficinas > 0 && (
-                <span className="notification-tab-count">{sinLeerOficinas}</span>
-              )}
-            </button>
-            <button
-              type="button"
-              className={`notification-tab ${activeTab === 'semaforo' ? 'notification-tab--active' : ''}`}
-              onClick={() => setActiveTab('semaforo')}
-            >
-              <FaTrafficLight size={12} />
-              <span>Semafóricos</span>
-              {sinLeerSemaforos > 0 && (
-                <span className="notification-tab-count">{sinLeerSemaforos}</span>
-              )}
-            </button>
-          </div>
+          {isInfra ? (
+            <div className="notification-tabs">
+              <button
+                type="button"
+                className="notification-tab notification-tab--active"
+              >
+                <FaWrench size={12} />
+                <span>Infraestructura</span>
+                <span className="notification-tab-count">{notificaciones.length}</span>
+              </button>
+            </div>
+          ) : (
+            <div className="notification-tabs">
+              <button
+                type="button"
+                className={`notification-tab ${activeTab === 'todos' ? 'notification-tab--active' : ''}`}
+                onClick={() => setActiveTab('todos')}
+              >
+                <span>Todos</span>
+                <span className="notification-tab-count">{notificaciones.length}</span>
+              </button>
+              <button
+                type="button"
+                className={`notification-tab ${activeTab === 'oficina' ? 'notification-tab--active' : ''}`}
+                onClick={() => setActiveTab('oficina')}
+              >
+                <FaLaptop size={12} />
+                <span>Tecnológicos</span>
+                {sinLeerOficinas > 0 && (
+                  <span className="notification-tab-count">{sinLeerOficinas}</span>
+                )}
+              </button>
+              <button
+                type="button"
+                className={`notification-tab ${activeTab === 'semaforo' ? 'notification-tab--active' : ''}`}
+                onClick={() => setActiveTab('semaforo')}
+              >
+                <FaTrafficLight size={12} />
+                <span>Semafóricos</span>
+                {sinLeerSemaforos > 0 && (
+                  <span className="notification-tab-count">{sinLeerSemaforos}</span>
+                )}
+              </button>
+            </div>
+          )}
 
           {/* Lista de notificaciones */}
           <div className="notification-list">
@@ -247,6 +266,7 @@ export default function NotificationCenter() {
               notificacionesFiltradas.map((notif) => {
                 const esNoLeido = !readIds.includes(notif.id);
                 const esOficina = notif.tipo === 'oficina';
+                const esInfra = notif.tipo === 'infraestructura';
 
                 return (
                   <div
@@ -260,11 +280,15 @@ export default function NotificationCenter() {
                     {/* Icono temático del reporte */}
                     <div
                       className={`notification-type-badge ${
-                        esOficina ? 'notification-type-badge--oficina' : 'notification-type-badge--semaforo'
+                        esInfra 
+                          ? 'notification-type-badge--infraestructura'
+                          : esOficina 
+                            ? 'notification-type-badge--oficina' 
+                            : 'notification-type-badge--semaforo'
                       }`}
                       title={notif.tipoLabel}
                     >
-                      {esOficina ? <FaLaptop /> : <FaTrafficLight />}
+                      {esInfra ? <FaWrench /> : esOficina ? <FaLaptop /> : <FaTrafficLight />}
                     </div>
 
                     {/* Contenido principal */}
@@ -301,30 +325,47 @@ export default function NotificationCenter() {
             )}
           </div>
 
-          {/* Pie de página con accesos rápidos a ambos dashboards */}
+          {/* Pie de página con accesos rápidos */}
           <div className="notification-footer">
-            <button
-              type="button"
-              className="notification-footer-link"
-              onClick={() => {
-                setIsOpen(false);
-                navigate('/dashboard-oficinas');
-              }}
-            >
-              <FaLaptop size={12} />
-              <span>Ver Tecnológicos</span>
-            </button>
-            <button
-              type="button"
-              className="notification-footer-link"
-              onClick={() => {
-                setIsOpen(false);
-                navigate('/dashboard-semaforos');
-              }}
-            >
-              <FaTrafficLight size={12} />
-              <span>Ver Semafóricos</span>
-            </button>
+            {isInfra ? (
+              <button
+                type="button"
+                className="notification-footer-link"
+                style={{ width: '100%', justifyContent: 'center' }}
+                onClick={() => {
+                  setIsOpen(false);
+                  navigate('/dashboard-infraestructura');
+                }}
+              >
+                <FaWrench size={12} />
+                <span>Ver Panel de Infraestructura</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="notification-footer-link"
+                  onClick={() => {
+                    setIsOpen(false);
+                    navigate('/dashboard-oficinas');
+                  }}
+                >
+                  <FaLaptop size={12} />
+                  <span>Ver Tecnológicos</span>
+                </button>
+                <button
+                  type="button"
+                  className="notification-footer-link"
+                  onClick={() => {
+                    setIsOpen(false);
+                    navigate('/dashboard-semaforos');
+                  }}
+                >
+                  <FaTrafficLight size={12} />
+                  <span>Ver Semafóricos</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

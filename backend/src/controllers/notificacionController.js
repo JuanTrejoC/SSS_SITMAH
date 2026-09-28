@@ -1,10 +1,77 @@
 const prisma = require('../config/db');
 const { ok, fail } = require('../utils/response');
 
+const filtroExcluirInfra = {
+  NOT: {
+    OR: [
+      { folio: { startsWith: 'RI' } },
+      { categoria: { nombre: { contains: 'Infraestructura' } } }
+    ]
+  }
+};
+
+const filtroSoloInfra = {
+  OR: [
+    { folio: { startsWith: 'RI' } },
+    { categoria: { nombre: { contains: 'Infraestructura' } } }
+  ]
+};
+
 async function obtenerNotificaciones(req, res) {
   try {
+    const rolUsuario = req.usuario?.rol;
+
+    if (rolUsuario === 'infraestructura') {
+      const [reportesInfra, pendientesInfra] = await Promise.all([
+        prisma.reporteOficina.findMany({
+          where: filtroSoloInfra,
+          take: 20,
+          orderBy: { id: 'desc' },
+          select: {
+            id: true,
+            folio: true,
+            solicitante: true,
+            prioridad: true,
+            estado: true,
+            createdAt: true,
+            descripcion: true,
+            categoria: { select: { nombre: true } },
+            area: { select: { nombre: true } },
+            sede: { select: { nombre: true } },
+          },
+        }),
+        prisma.reporteOficina.count({
+          where: { ...filtroSoloInfra, estado: { in: ['abierto', 'en_proceso'] } },
+        }),
+      ]);
+
+      const notifInfra = reportesInfra.map((r) => ({
+        id: `infra-${r.id}`,
+        reporteId: r.id,
+        tipo: 'infraestructura',
+        tipoLabel: 'Infraestructura',
+        folio: r.folio || `RI-${r.id}`,
+        solicitante: r.solicitante || 'Usuario',
+        detalle: r.categoria?.nombre || r.descripcion || 'Incidencia de infraestructura',
+        ubicacion: r.sede?.nombre || r.area?.nombre || 'Instalaciones',
+        prioridad: r.prioridad || 'media',
+        estado: r.estado || 'abierto',
+        createdAt: r.createdAt,
+        ruta: `/dashboard-infraestructura?id=${r.id}`,
+      }));
+
+      return ok(res, {
+        notificaciones: notifInfra,
+        resumen: {
+          totalPendientes: pendientesInfra,
+          pendientesInfra,
+        },
+      });
+    }
+
     const [reportesOficina, reportesSemaforo, pendientesOficina, pendientesSemaforo] = await Promise.all([
       prisma.reporteOficina.findMany({
+        where: filtroExcluirInfra,
         take: 20,
         orderBy: { id: 'desc' },
         select: {
@@ -37,7 +104,7 @@ async function obtenerNotificaciones(req, res) {
         },
       }),
       prisma.reporteOficina.count({
-        where: { estado: { in: ['abierto', 'en_proceso'] } },
+        where: { ...filtroExcluirInfra, estado: { in: ['abierto', 'en_proceso'] } },
       }),
       prisma.reporteSemaforo.count({
         where: { estado: { in: ['abierto', 'en_proceso'] } },

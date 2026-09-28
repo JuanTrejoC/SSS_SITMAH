@@ -9,7 +9,8 @@ import {
   FaWalking, FaVolumeUp, FaDesktop, FaCreditCard,
   FaPowerOff, FaMicrochip, FaNetworkWired, FaProjectDiagram,
   FaMapMarkerAlt, FaHandPointer, FaSign, FaCheckSquare,
-  FaCalendarAlt, FaUpload, FaHistory, FaDownload
+  FaCalendarAlt, FaUpload, FaHistory, FaDownload, FaExclamationTriangle,
+  FaListUl, FaSearch
 } from 'react-icons/fa'
 
 // ==================================================
@@ -110,6 +111,81 @@ export default function InventarioSemaforos() {
   const [cargandoHistorial, setCargandoHistorial] = useState(false)
   const [componenteHistorialActual, setComponenteHistorialActual] = useState(null)
   const [filtroMesHistorial, setFiltroMesHistorial] = useState('')
+
+  // Estados para consolidación y desglose de LEDs en existencias
+  const [grupoSeleccionado, setGrupoSeleccionado] = useState(null)
+  const [busquedaDesglose, setBusquedaDesglose] = useState('')
+
+  const agruparExistenciasDisponibles = (items) => {
+    const gruposMap = {
+      led_amarillos: {
+        id: 'grupo-led-amarillos',
+        esGrupo: true,
+        key: 'led_amarillos',
+        nombre: 'Led Amarillo',
+        categoria: 'componente',
+        marca: 'SEMEX',
+        colorStripe: '#f59e0b',
+        colorBadge: '#b45309',
+        bgBadge: '#fef3c7',
+        cantidad: 0,
+        subItems: []
+      },
+      led_rojos: {
+        id: 'grupo-led-rojos',
+        esGrupo: true,
+        key: 'led_rojos',
+        nombre: 'Led Rojo',
+        categoria: 'componente',
+        marca: 'SEMEX',
+        colorStripe: '#ef4444',
+        colorBadge: '#be123c',
+        bgBadge: '#ffe4e6',
+        cantidad: 0,
+        subItems: []
+      },
+      led_verdes: {
+        id: 'grupo-led-verdes',
+        esGrupo: true,
+        key: 'led_verdes',
+        nombre: 'Led Verde',
+        categoria: 'componente',
+        marca: 'SEMEX',
+        colorStripe: '#10b981',
+        colorBadge: '#047857',
+        bgBadge: '#d1fae5',
+        cantidad: 0,
+        subItems: []
+      }
+    };
+
+    const otrosItems = [];
+
+    items.forEach(item => {
+      const nombreNorm = (item.nombre || '').trim().toLowerCase();
+      if (nombreNorm.includes('led') && (nombreNorm.includes('amarillo') || nombreNorm.includes('amarrillo'))) {
+        gruposMap.led_amarillos.cantidad += item.cantidad;
+        gruposMap.led_amarillos.subItems.push(item);
+      } else if (nombreNorm.includes('led') && (nombreNorm.includes('rojo') || nombreNorm.includes('rojp'))) {
+        gruposMap.led_rojos.cantidad += item.cantidad;
+        gruposMap.led_rojos.subItems.push(item);
+      } else if (nombreNorm.includes('led') && nombreNorm.includes('verde')) {
+        gruposMap.led_verdes.cantidad += item.cantidad;
+        gruposMap.led_verdes.subItems.push(item);
+      } else {
+        otrosItems.push(item);
+      }
+    });
+
+    const resultado = [];
+    ['led_amarillos', 'led_rojos', 'led_verdes'].forEach(k => {
+      if (gruposMap[k].subItems.length > 0) {
+        resultado.push(gruposMap[k]);
+      }
+    });
+
+    return [...resultado, ...otrosItems];
+  };
 
   // ==========================================
   // ESTADOS - CONTROLADORES INSTALADOS
@@ -249,13 +325,13 @@ export default function InventarioSemaforos() {
 
   // Prevent background scrolling when modals are open
   useEffect(() => {
-    if (modalStockAbierto || modalHistorialAbierto || modalControladorAbierto) {
+    if (modalStockAbierto || modalHistorialAbierto || modalControladorAbierto || grupoSeleccionado) {
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = ''
     }
     return () => { document.body.style.overflow = '' }
-  }, [modalStockAbierto, modalHistorialAbierto, modalControladorAbierto])
+  }, [modalStockAbierto, modalHistorialAbierto, modalControladorAbierto, grupoSeleccionado])
 
 
   // ==========================================
@@ -314,6 +390,10 @@ export default function InventarioSemaforos() {
       nombre: item.nombre,
       categoria: item.categoria,
       cantidad: item.cantidad,
+      marca: item.marca || '',
+      modelo: item.modelo || '',
+      numeroSerie: item.numeroSerie || '',
+      numeroInventario: item.numeroInventario || '',
       tipoInventario: 'semaforos'
     })
     setModalStockAbierto(true)
@@ -358,7 +438,12 @@ export default function InventarioSemaforos() {
     setStockForm({
       nombre: item.nombre,
       categoria: item.categoria,
-      cantidad: item.cantidad
+      cantidad: item.cantidad,
+      marca: item.marca || '',
+      modelo: item.modelo || '',
+      numeroSerie: item.numeroSerie || '',
+      numeroInventario: item.numeroInventario || '',
+      tipoInventario: 'semaforos'
     })
     setModalStockAbierto(true)
   }
@@ -370,6 +455,10 @@ export default function InventarioSemaforos() {
       nombre: '',
       categoria: 'componente',
       cantidad: '',
+      marca: '',
+      modelo: '',
+      numeroSerie: '',
+      numeroInventario: '',
       tipoInventario: 'semaforos'
     })
   }
@@ -673,14 +762,16 @@ export default function InventarioSemaforos() {
                 {/* NIVEL 1: POR CATEGORIA */}
                 {!dbSemaforosTipo && (
                   <div>
-                    <p style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '1rem', marginTop: 0 }}>Selecciona una categoría de componentes para ver las piezas en stock:</p>
+                    <p style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '1rem', marginTop: 0 }}>Selecciona una categoría de componentes para ver las piezas disponibles en stock:</p>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.85rem' }}>
                       {Object.entries(
-                        existencias.reduce((acc, curr) => {
-                          const c = curr.categoria || 'componente';
-                          acc[c] = (acc[c] || 0) + curr.cantidad;
-                          return acc;
-                        }, {})
+                        existencias
+                          .filter(item => !((item.nombre || '').toLowerCase().includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes((item.estadoFisico || '').toLowerCase())))
+                          .reduce((acc, curr) => {
+                            const c = curr.categoria || 'componente';
+                            acc[c] = (acc[c] || 0) + curr.cantidad;
+                            return acc;
+                          }, {})
                       ).map(([cat, totalStock]) => (
                         <div
                           key={cat}
@@ -706,7 +797,7 @@ export default function InventarioSemaforos() {
                 {dbSemaforosTipo && (
                   <div>
                     <p style={{ fontSize: '0.875rem', color: '#64748B', marginBottom: '1rem', marginTop: 0 }}>
-                      Listado de existencias de la categoría <strong>{getCategoriaLabel(dbSemaforosTipo)}</strong>:
+                      Listado de existencias disponibles de la categoría <strong>{getCategoriaLabel(dbSemaforosTipo)}</strong>:
                     </p>
                     <div style={{ overflowX: 'auto', border: '1px solid #E2E8F0', borderRadius: '8px' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', textAlign: 'left' }}>
@@ -720,6 +811,7 @@ export default function InventarioSemaforos() {
                         </thead>
                         <tbody>
                           {existencias
+                            .filter(item => !((item.nombre || '').toLowerCase().includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes((item.estadoFisico || '').toLowerCase())))
                             .filter(item => item.categoria === dbSemaforosTipo)
                             .map(item => (
                               <tr key={item.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
@@ -833,7 +925,7 @@ export default function InventarioSemaforos() {
       </div>
 
       {/* CONTROLES DE PESTAÑA (TABS) */}
-      <div style={{ display: 'flex', gap: '1rem', borderBottom: '2px solid #E2E8F0', marginBottom: '2rem' }}>
+      <div style={{ display: 'flex', gap: '1rem', borderBottom: '2px solid #E2E8F0', marginBottom: '2rem', flexWrap: 'wrap' }}>
         <button
           onClick={() => setTabActiva('existencias')}
           style={{
@@ -844,7 +936,21 @@ export default function InventarioSemaforos() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <FaBoxes /> Existencias (Refacciones)
+            <FaBoxes /> Existencias Disponibles ({existencias.filter(item => !((item.nombre || '').toLowerCase().includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes((item.estadoFisico || '').toLowerCase()))).length})
+          </div>
+        </button>
+
+        <button
+          onClick={() => setTabActiva('danadas')}
+          style={{
+            padding: '0.75rem 1.25rem', border: 'none', background: 'none', fontSize: '1rem', fontWeight: '700',
+            color: tabActiva === 'danadas' ? '#DC2626' : '#9B9B9A', cursor: 'pointer',
+            borderBottom: tabActiva === 'danadas' ? '3px solid #DC2626' : '3px solid transparent',
+            transition: 'all 0.2s'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <FaExclamationTriangle style={{ color: tabActiva === 'danadas' ? '#DC2626' : '#9B9B9A' }} /> Piezas Dañadas / Reemplazadas ({existencias.filter(item => (item.nombre || '').toLowerCase().includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes((item.estadoFisico || '').toLowerCase())).length})
           </div>
         </button>
 
@@ -864,16 +970,19 @@ export default function InventarioSemaforos() {
       </div>
 
       {/* ============================================================ */}
-      {/* TABA: EXISTENCIAS / STOCK                                    */}
+      {/* TAB A: EXISTENCIAS / STOCK DISPONIBLE (BUEN ESTADO)           */}
       {/* ============================================================ */}
       {tabActiva === 'existencias' && (
         <div>
-          {/* BUSCADOR DE REFACCIONES */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
+          {/* BUSCADOR DE REFACCIONES DISPONIBLES */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ fontSize: '0.9rem', color: '#64748B', fontWeight: '600' }}>
+              Mostrando refacciones en buen estado listas para instalación en cruceros:
+            </div>
             <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
               <input
                 type="text"
-                placeholder="Buscar refacción por nombre..."
+                placeholder="Buscar refacción disponible..."
                 value={busquedaExistencias}
                 onChange={(e) => setBusquedaExistencias(e.target.value)}
                 style={{
@@ -908,128 +1017,256 @@ export default function InventarioSemaforos() {
 
           {cargandoExistencias ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#6F7271' }}>Cargando existencias de componentes...</div>
-          ) : existencias.length === 0 ? (
+          ) : agruparExistenciasDisponibles(existencias.filter(item => !((item.nombre || '').toLowerCase().includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes((item.estadoFisico || '').toLowerCase())))).length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', color: '#6F7271' }}>
-              No se han encontrado registros en el stock.
+              No se han encontrado refacciones disponibles en el stock.
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
-              {existencias
-                .filter((item) => item.nombre.toLowerCase().includes(busquedaExistencias.toLowerCase()))
+              {agruparExistenciasDisponibles(
+                existencias.filter(item => !((item.nombre || '').toLowerCase().includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes((item.estadoFisico || '').toLowerCase())))
+              )
+                .filter((item) => {
+                  if (!busquedaExistencias.trim()) return true;
+                  const q = busquedaExistencias.toLowerCase();
+                  if (item.esGrupo) {
+                    if (item.nombre.toLowerCase().includes(q) || (item.marca && item.marca.toLowerCase().includes(q))) return true;
+                    return item.subItems.some(sub =>
+                      (sub.nombre || '').toLowerCase().includes(q) ||
+                      (sub.numeroSerie || '').toLowerCase().includes(q) ||
+                      (sub.numeroInventario || '').toLowerCase().includes(q) ||
+                      (sub.modelo || '').toLowerCase().includes(q)
+                    );
+                  }
+                  return (
+                    (item.nombre || '').toLowerCase().includes(q) ||
+                    (item.marca || '').toLowerCase().includes(q) ||
+                    (item.modelo || '').toLowerCase().includes(q) ||
+                    (item.numeroSerie || '').toLowerCase().includes(q) ||
+                    (item.numeroInventario || '').toLowerCase().includes(q)
+                  );
+                })
                 .map((item) => (
-                  <div
-                    key={item.id}
-                    style={{
-                      backgroundColor: 'white',
-                      borderRadius: '16px',
-                      padding: '1.5rem',
-                      boxShadow: '0 4px 6px rgba(0,0,0,0.02), 0 10px 15px -3px rgba(0,0,0,0.03)',
-                      border: '1px solid #e2e8f0',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      transition: 'all 0.2s',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}
-                    onMouseOver={e => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = '0 12px 20px rgba(0,0,0,0.06)';
-                    }}
-                    onMouseOut={e => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.02)';
-                    }}
-                  >
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', backgroundColor: '#691B31' }}></div>
+                  item.esGrupo ? (
+                    <div
+                      key={item.id}
+                      style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '1.5rem',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.02), 0 10px 15px -3px rgba(0,0,0,0.03)',
+                        border: '1px solid #e2e8f0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        transition: 'all 0.2s',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                      onMouseOver={e => {
+                        e.currentTarget.style.transform = 'translateY(-4px)';
+                        e.currentTarget.style.boxShadow = '0 12px 20px rgba(0,0,0,0.06)';
+                      }}
+                      onMouseOut={e => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.02)';
+                      }}
+                    >
+                      <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', backgroundColor: '#691B31' }}></div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                      <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                        <div>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                            color: '#475569',
+                            textTransform: 'uppercase',
+                            backgroundColor: '#f1f5f9',
+                            padding: '0.25rem 0.6rem',
+                            borderRadius: '6px'
+                          }}>
+                            {getCategoriaIcon(item.categoria)}
+                            {getCategoriaLabel(item.categoria)}
+                          </span>
+                          <h3 style={{ fontSize: '1.25rem', margin: '0.75rem 0 0.25rem', fontWeight: '800', color: '#1e293b', textTransform: 'capitalize' }}>
+                            {item.nombre}
+                          </h3>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.25rem' }}>
+                          <button
+                            onClick={() => abrirHistorial(item.subItems?.[0] || item)}
+                            title="Ver historial de asignación"
+                            style={{
+                              backgroundColor: '#e0f2fe', border: 'none', color: '#0284c7', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
+                          >
+                            <FaHistory size={14} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setGrupoSeleccionado(item.key);
+                              setBusquedaDesglose('');
+                            }}
+                            title="Editar existencias y números de serie"
+                            style={{
+                              backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
+                          >
+                            <FaEdit size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                        <button
+                          onClick={() => {
+                            setGrupoSeleccionado(item.key);
+                            setBusquedaDesglose('');
+                          }}
+                          style={{
+                            backgroundColor: '#f1f5f9', color: '#691B31', border: 'none', borderRadius: '6px',
+                            padding: '0.4rem 0.8rem', fontSize: '0.85rem', fontWeight: '600', cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#691B31'; e.currentTarget.style.color = 'white' }}
+                          onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#f1f5f9'; e.currentTarget.style.color = '#691B31' }}
+                        >
+                          Ajustar Stock
+                        </button>
                         <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          fontSize: '0.75rem',
-                          fontWeight: '700',
-                          color: '#475569',
-                          textTransform: 'uppercase',
-                          backgroundColor: '#f1f5f9',
-                          padding: '0.25rem 0.6rem',
-                          borderRadius: '6px'
+                          fontSize: '1.5rem',
+                          fontWeight: '800',
+                          color: item.cantidad > 5 ? '#0f766e' : item.cantidad > 0 ? '#b45309' : '#be123c',
+                          backgroundColor: item.cantidad > 5 ? '#f0fdf4' : item.cantidad > 0 ? '#fffbeb' : '#fdf2f2',
+                          padding: '0.1rem 0.8rem',
+                          borderRadius: '8px'
                         }}>
-                          {getCategoriaIcon(item.categoria)}
-                          {getCategoriaLabel(item.categoria)}
+                          {item.cantidad}
                         </span>
-                        <h3 style={{ fontSize: '1.25rem', margin: '0.75rem 0 0.25rem', fontWeight: '800', color: '#1e293b', textTransform: 'capitalize' }}>
-                          {item.nombre}
-                        </h3>
-                        {(item.marca || item.modelo) && (
-                          <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.25rem' }}>
-                            {item.marca && <span style={{ fontWeight: '600' }}>{item.marca}</span>}
-                            {item.marca && item.modelo && ' - '}
-                            {item.modelo && <span>{item.modelo}</span>}
-                          </div>
-                        )}
-                        {(item.numeroSerie || item.numeroInventario) && (
-                          <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                            {item.numeroSerie && <span>S/N: {item.numeroSerie}</span>}
-                            {item.numeroInventario && <span>Inv: {item.numeroInventario}</span>}
-                          </div>
-                        )}
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '0.25rem' }}>
-                        <button
-                          onClick={() => abrirHistorial(item)}
-                          title="Ver historial de asignación"
-                          style={{
-                            backgroundColor: '#e0f2fe', border: 'none', color: '#0284c7', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
-                          }}
-                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
-                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
-                        >
-                          <FaHistory size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleEditarStock(item)}
-                          title="Editar existencias"
-                          style={{
-                            backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
-                          }}
-                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
-                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
-                        >
-                          <FaEdit size={14} />
-                        </button>
-                        {/* Botón de eliminar deshabilitado según requerimiento (solo se permite ajustar stock) */}
                       </div>
                     </div>
+                  ) : (
+                    <div
+                      key={item.id}
+                      style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '1.5rem',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.02), 0 10px 15px -3px rgba(0,0,0,0.03)',
+                        border: '1px solid #e2e8f0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        transition: 'all 0.2s',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                      onMouseOver={e => {
+                        e.currentTarget.style.transform = 'translateY(-4px)';
+                        e.currentTarget.style.boxShadow = '0 12px 20px rgba(0,0,0,0.06)';
+                      }}
+                      onMouseOut={e => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.02)';
+                      }}
+                    >
+                      <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', backgroundColor: '#691B31' }}></div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', marginTop: '0.5rem' }}>
-                      <button
-                        onClick={() => handleAjustarStockDirecto(item)}
-                        style={{
-                          backgroundColor: '#f1f5f9', color: '#691B31', border: 'none', borderRadius: '6px',
-                          padding: '0.4rem 0.8rem', fontSize: '0.85rem', fontWeight: '600', cursor: 'pointer',
-                          transition: 'all 0.15s'
-                        }}
-                        onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#691B31'; e.currentTarget.style.color = 'white' }}
-                        onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#f1f5f9'; e.currentTarget.style.color = '#691B31' }}
-                      >
-                        Ajustar Stock
-                      </button>
-                      <span style={{
-                        fontSize: '1.5rem',
-                        fontWeight: '800',
-                        color: item.cantidad > 5 ? '#0f766e' : item.cantidad > 0 ? '#b45309' : '#be123c',
-                        backgroundColor: item.cantidad > 5 ? '#f0fdf4' : item.cantidad > 0 ? '#fffbeb' : '#fdf2f2',
-                        padding: '0.1rem 0.8rem',
-                        borderRadius: '8px'
-                      }}>
-                        {item.cantidad}
-                      </span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                        <div>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                            color: '#475569',
+                            textTransform: 'uppercase',
+                            backgroundColor: '#f1f5f9',
+                            padding: '0.25rem 0.6rem',
+                            borderRadius: '6px'
+                          }}>
+                            {getCategoriaIcon(item.categoria)}
+                            {getCategoriaLabel(item.categoria)}
+                          </span>
+                          <h3 style={{ fontSize: '1.25rem', margin: '0.75rem 0 0.25rem', fontWeight: '800', color: '#1e293b', textTransform: 'capitalize' }}>
+                            {item.nombre}
+                          </h3>
+                          {(item.marca || item.modelo) && (
+                            <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.25rem' }}>
+                              {item.marca && <span style={{ fontWeight: '600' }}>{item.marca}</span>}
+                              {item.marca && item.modelo && ' - '}
+                              {item.modelo && <span>{item.modelo}</span>}
+                            </div>
+                          )}
+                          {(item.numeroSerie || item.numeroInventario) && (
+                            <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                              {item.numeroSerie && <span>S/N: {item.numeroSerie}</span>}
+                              {item.numeroInventario && <span>Inv: {item.numeroInventario}</span>}
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.25rem' }}>
+                          <button
+                            onClick={() => abrirHistorial(item)}
+                            title="Ver historial de asignación"
+                            style={{
+                              backgroundColor: '#e0f2fe', border: 'none', color: '#0284c7', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
+                          >
+                            <FaHistory size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleEditarStock(item)}
+                            title="Editar existencias"
+                            style={{
+                              backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
+                          >
+                            <FaEdit size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                        <button
+                          onClick={() => handleAjustarStockDirecto(item)}
+                          style={{
+                            backgroundColor: '#f1f5f9', color: '#691B31', border: 'none', borderRadius: '6px',
+                            padding: '0.4rem 0.8rem', fontSize: '0.85rem', fontWeight: '600', cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#691B31'; e.currentTarget.style.color = 'white' }}
+                          onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#f1f5f9'; e.currentTarget.style.color = '#691B31' }}
+                        >
+                          Ajustar Stock
+                        </button>
+                        <span style={{
+                          fontSize: '1.5rem',
+                          fontWeight: '800',
+                          color: item.cantidad > 5 ? '#0f766e' : item.cantidad > 0 ? '#b45309' : '#be123c',
+                          backgroundColor: item.cantidad > 5 ? '#f0fdf4' : item.cantidad > 0 ? '#fffbeb' : '#fdf2f2',
+                          padding: '0.1rem 0.8rem',
+                          borderRadius: '8px'
+                        }}>
+                          {item.cantidad}
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  )
                 ))}
             </div>
           )}
@@ -1037,7 +1274,229 @@ export default function InventarioSemaforos() {
       )}
 
       {/* ============================================================ */}
-      {/* TAB B: CONTROLADORES INSTALADOS                              */}
+      {/* TAB B: PIEZAS DAÑADAS / REEMPLAZADAS                         */}
+      {/* ============================================================ */}
+      {tabActiva === 'danadas' && (
+        <div>
+          {/* BUSCADOR DE PIEZAS DAÑADAS */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ fontSize: '0.9rem', color: '#B91C1C', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <FaExclamationTriangle /> Apartado de piezas reemplazadas en cruceros, en reparación o para baja:
+            </div>
+            <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
+              <input
+                type="text"
+                placeholder="Buscar pieza dañada o reemplazada..."
+                value={busquedaExistencias}
+                onChange={(e) => setBusquedaExistencias(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 3rem 0.75rem 1.5rem',
+                  border: '2px solid #FECACA',
+                  borderRadius: '9999px',
+                  fontSize: '0.9rem',
+                  fontWeight: '500',
+                  color: '#1E293B',
+                  backgroundColor: '#ffffff',
+                  boxShadow: '0 4px 6px -1px rgba(220,38,38,0.05)',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#DC2626';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(220,38,38,0.15)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#FECACA';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              />
+              <span style={{ position: 'absolute', right: '1.25rem', top: '50%', transform: 'translateY(-50%)', color: '#DC2626', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" style={{ width: '18px', height: '18px' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.602 10.602z" />
+                </svg>
+              </span>
+            </div>
+          </div>
+
+          {cargandoExistencias ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#6F7271' }}>Cargando piezas dañadas...</div>
+          ) : existencias.filter(item => (item.nombre || '').toLowerCase().includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes((item.estadoFisico || '').toLowerCase())).length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', color: '#6F7271' }}>
+              No hay piezas dañadas o reemplazadas registradas actualmente.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+              {existencias
+                .filter(item => (item.nombre || '').toLowerCase().includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes((item.estadoFisico || '').toLowerCase()))
+                .filter((item) => item.nombre.toLowerCase().includes(busquedaExistencias.toLowerCase()))
+                .map((item) => {
+                  const esDanadaDefinitiva = ['dañada', 'danada'].includes((item.estadoFisico || '').toLowerCase());
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        backgroundColor: 'white',
+                        borderRadius: '16px',
+                        padding: '1.5rem',
+                        boxShadow: '0 4px 6px rgba(0,0,0,0.02), 0 10px 15px -3px rgba(0,0,0,0.03)',
+                        border: '1.5px solid #FECACA',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        transition: 'all 0.2s',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                      onMouseOver={e => {
+                        e.currentTarget.style.transform = 'translateY(-4px)';
+                        e.currentTarget.style.boxShadow = '0 12px 20px rgba(220,38,38,0.1)';
+                      }}
+                      onMouseOut={e => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.02)';
+                      }}
+                    >
+                      <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', backgroundColor: esDanadaDefinitiva ? '#DC2626' : '#D97706' }}></div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                        <div>
+                          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              fontSize: '0.75rem',
+                              fontWeight: '700',
+                              color: '#475569',
+                              textTransform: 'uppercase',
+                              backgroundColor: '#f1f5f9',
+                              padding: '0.25rem 0.6rem',
+                              borderRadius: '6px'
+                            }}>
+                              {getCategoriaIcon(item.categoria)}
+                              {getCategoriaLabel(item.categoria)}
+                            </span>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              fontSize: '0.72rem',
+                              fontWeight: '700',
+                              color: esDanadaDefinitiva ? '#991B1B' : '#92400E',
+                              backgroundColor: esDanadaDefinitiva ? '#FEE2E2' : '#FEF3C7',
+                              padding: '0.25rem 0.55rem',
+                              borderRadius: '6px',
+                              border: esDanadaDefinitiva ? '1px solid #FCA5A5' : '1px solid #FCD34D'
+                            }}>
+                              {esDanadaDefinitiva ? '⚠️ Dañada / Baja' : '🔧 En Reparación'}
+                            </span>
+                          </div>
+
+                          <h3 style={{ fontSize: '1.2rem', margin: '0.75rem 0 0.25rem', fontWeight: '800', color: '#1e293b', textTransform: 'capitalize' }}>
+                            {item.nombre}
+                          </h3>
+                          {(item.marca || item.modelo) && (
+                            <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.25rem' }}>
+                              {item.marca && <span style={{ fontWeight: '600' }}>{item.marca}</span>}
+                              {item.marca && item.modelo && ' - '}
+                              {item.modelo && <span>{item.modelo}</span>}
+                            </div>
+                          )}
+                          {(item.numeroSerie || item.numeroInventario) && (
+                            <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
+                              {item.numeroSerie && <span>S/N: {item.numeroSerie}</span>}
+                              {item.numeroInventario && <span>Inv: {item.numeroInventario}</span>}
+                            </div>
+                          )}
+
+                          {item.origenCrucero && (
+                            <div style={{
+                              marginTop: '0.6rem',
+                              padding: '0.45rem 0.65rem',
+                              backgroundColor: '#FEF2F2',
+                              borderRadius: '8px',
+                              border: '1px solid #FECACA',
+                              fontSize: '0.82rem',
+                              color: '#991B1B'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <span style={{ fontSize: '1rem' }}>📍</span>
+                                <div>
+                                  <strong style={{ color: '#7F1D1D' }}>Retirada del Crucero:</strong>{' '}
+                                  <span style={{ fontWeight: '700' }}>{item.origenCrucero.crucero || item.origenCrucero.estacion || 'No registrado'}</span>
+                                </div>
+                              </div>
+                              {item.origenCrucero.folio && (
+                                <div style={{ marginTop: '0.2rem', paddingLeft: '1.35rem', fontSize: '0.75rem', color: '#B91C1C' }}>
+                                  Folio de Reporte: <strong>{item.origenCrucero.folio}</strong>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.25rem' }}>
+                          <button
+                            onClick={() => abrirHistorial(item)}
+                            title="Ver historial de origen y asignación"
+                            style={{
+                              backgroundColor: '#e0f2fe', border: 'none', color: '#0284c7', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
+                          >
+                            <FaHistory size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleEditarStock(item)}
+                            title="Editar pieza dañada"
+                            style={{
+                              backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
+                          >
+                            <FaEdit size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #fee2e2', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                        <button
+                          onClick={() => handleAjustarStockDirecto(item)}
+                          style={{
+                            backgroundColor: '#fee2e2', color: '#991B1B', border: '1px solid #fecaca', borderRadius: '6px',
+                            padding: '0.4rem 0.8rem', fontSize: '0.85rem', fontWeight: '700', cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#dc2626'; e.currentTarget.style.color = 'white' }}
+                          onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#fee2e2'; e.currentTarget.style.color = '#991B1B' }}
+                        >
+                          Ajustar Cantidad
+                        </button>
+                        <span style={{
+                          fontSize: '1.5rem',
+                          fontWeight: '800',
+                          color: '#b91c1c',
+                          backgroundColor: '#fef2f2',
+                          padding: '0.1rem 0.8rem',
+                          borderRadius: '8px',
+                          border: '1px solid #fecaca'
+                        }}>
+                          {item.cantidad}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* TAB C: CONTROLADORES INSTALADOS                              */}
       {/* ============================================================ */}
       {tabActiva === 'controladores' && (
         <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.03)', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
@@ -1178,8 +1637,8 @@ export default function InventarioSemaforos() {
       {modalStockAbierto && (
         <div style={{
           position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center',
-          alignItems: 'center', zIndex: 2000, padding: '1rem'
+          backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', justifyContent: 'center',
+          alignItems: 'center', zIndex: 10050, padding: '1rem', backdropFilter: 'blur(2px)'
         }}>
           <div style={{
             backgroundColor: 'white', borderRadius: '12px', padding: '2rem', width: '100%',
@@ -1228,6 +1687,64 @@ export default function InventarioSemaforos() {
                   <option value="herramienta">Herramienta</option>
                 </select>
               </div>
+
+              {!modoAjusteDirecto && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#6F7271', marginBottom: '0.25rem' }}>
+                        Marca
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. SEMEX"
+                        value={stockForm.marca}
+                        onChange={(e) => setStockForm({ ...stockForm, marca: e.target.value })}
+                        style={{ width: '100%', padding: '0.55rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#6F7271', marginBottom: '0.25rem' }}>
+                        Modelo
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. TSL-12R-LX-IL6-A1-P3"
+                        value={stockForm.modelo}
+                        onChange={(e) => setStockForm({ ...stockForm, modelo: e.target.value })}
+                        style={{ width: '100%', padding: '0.55rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#6F7271', marginBottom: '0.25rem' }}>
+                        No. Inventario
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. 13711043"
+                        value={stockForm.numeroInventario}
+                        onChange={(e) => setStockForm({ ...stockForm, numeroInventario: e.target.value })}
+                        style={{ width: '100%', padding: '0.55rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#6F7271', marginBottom: '0.25rem' }}>
+                        No. Serie
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ej. A2304029767"
+                        value={stockForm.numeroSerie}
+                        onChange={(e) => setStockForm({ ...stockForm, numeroSerie: e.target.value })}
+                        style={{ width: '100%', padding: '0.55rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem' }}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#6F7271', marginBottom: '0.35rem' }}>
@@ -1758,12 +2275,12 @@ export default function InventarioSemaforos() {
         </div>
       )}
       {modalHistorialAbierto && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10050, padding: '1rem', backdropFilter: 'blur(2px)' }}>
           <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '16px', width: '90%', maxWidth: '800px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', borderBottom: '2px solid #E2E8F0', paddingBottom: '1rem' }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <FaHistory /> Historial de Asignación
+                  <FaHistory /> Historial de Asignación y Retiro
                 </h2>
                 {componenteHistorialActual && (
                   <p style={{ margin: '0.25rem 0 0', color: '#6F7271', fontSize: '0.95rem' }}>
@@ -1807,8 +2324,9 @@ export default function InventarioSemaforos() {
                   <thead>
                     <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: '#334155', fontWeight: '700' }}>Fecha</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: '#334155', fontWeight: '700' }}>Movimiento</th>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: '#334155', fontWeight: '700' }}>Reporte</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: '#334155', fontWeight: '700' }}>Estación / Crucero</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'left', color: '#334155', fontWeight: '700' }}>Crucero / Estación</th>
                       <th style={{ padding: '0.75rem 1rem', textAlign: 'center', color: '#334155', fontWeight: '700' }}>Cantidad</th>
                     </tr>
                   </thead>
@@ -1825,13 +2343,35 @@ export default function InventarioSemaforos() {
                           <td style={{ padding: '0.75rem 1rem', color: '#475569', whiteSpace: 'nowrap' }}>
                             {new Date(h.fecha).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </td>
-                          <td style={{ padding: '0.75rem 1rem', color: '#0284c7', fontWeight: '600' }}>{h.reporte?.folio || 'N/A'}</td>
-                          <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>
-                            <div><strong style={{ color: '#334155' }}>Estación:</strong> {h.reporte?.estacion || 'N/A'}</div>
-                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Crucero: {h.reporte?.crucero || 'N/A'}</div>
+                          <td style={{ padding: '0.75rem 1rem' }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              padding: '0.25rem 0.6rem',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: '700',
+                              backgroundColor: h.esSalida ? '#EFF6FF' : '#FEF2F2',
+                              color: h.esSalida ? '#1E40AF' : '#991B1B',
+                              border: h.esSalida ? '1px solid #BFDBFE' : '1px solid #FECACA'
+                            }}>
+                              {h.esSalida ? '⬇️ Asignada a Crucero' : '🔄 Retirada de Crucero'}
+                            </span>
                           </td>
-                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: '700', color: '#ef4444' }}>
-                            -{h.cantidad}
+                          <td style={{ padding: '0.75rem 1rem', color: '#0284c7', fontWeight: '700' }}>{h.reporte?.folio || 'N/A'}</td>
+                          <td style={{ padding: '0.75rem 1rem', color: '#475569' }}>
+                            <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '0.92rem' }}>
+                              📍 {h.reporte?.crucero || h.reporte?.estacion || 'No especificado'}
+                            </div>
+                            {h.reporte?.estacion && h.reporte?.crucero && (
+                              <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.1rem' }}>
+                                Estación: {h.reporte?.estacion}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '0.75rem 1rem', textAlign: 'center', fontWeight: '800', color: h.esSalida ? '#ef4444' : '#16a34a' }}>
+                            {h.esSalida ? `-${h.cantidad}` : `+${h.cantidad}`}
                           </td>
                         </tr>
                       ))}
@@ -1842,7 +2382,7 @@ export default function InventarioSemaforos() {
                       return mesAnio === filtroMesHistorial;
                     }).length === 0 && (
                         <tr>
-                          <td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                          <td colSpan="5" style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
                             No hay registros de historial {filtroMesHistorial ? 'para el mes seleccionado' : ''}.
                           </td>
                         </tr>
@@ -1854,6 +2394,286 @@ export default function InventarioSemaforos() {
           </div>
         </div>
       )}
+
+      {/* ============================================================ */}
+      {/* MODAL DESGLOSE DE LEDS / COMPONENTES AGRUPADOS               */}
+      {/* ============================================================ */}
+      {grupoSeleccionado && (() => {
+        const grupos = agruparExistenciasDisponibles(
+          existencias.filter(item => !((item.nombre || '').toLowerCase().includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes((item.estadoFisico || '').toLowerCase())))
+        );
+        const grupo = grupos.find(g => g.key === grupoSeleccionado);
+        if (!grupo) return null;
+
+        const subItemsFiltrados = grupo.subItems.filter(sub => {
+          if (!busquedaDesglose.trim()) return true;
+          const q = busquedaDesglose.toLowerCase();
+          return (
+            (sub.nombre || '').toLowerCase().includes(q) ||
+            (sub.numeroSerie || '').toLowerCase().includes(q) ||
+            (sub.numeroInventario || '').toLowerCase().includes(q) ||
+            (sub.modelo || '').toLowerCase().includes(q) ||
+            (sub.marca || '').toLowerCase().includes(q)
+          );
+        });
+
+        return (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            zIndex: 9999, padding: '1rem', backdropFilter: 'blur(4px)'
+          }}>
+            <div style={{
+              backgroundColor: 'white', borderRadius: '16px',
+              width: '100%', maxWidth: '950px', maxHeight: '90vh',
+              display: 'flex', flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden'
+            }}>
+              {/* Header */}
+              <div style={{
+                padding: '1.25rem 1.5rem', borderBottom: '1px solid #e2e8f0',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                backgroundColor: '#fafaf9'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{
+                    width: '10px', height: '36px', borderRadius: '4px',
+                    backgroundColor: grupo.colorStripe || '#691B31'
+                  }}></div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      {grupo.nombre}
+                      <span style={{
+                        fontSize: '0.85rem', fontWeight: '700',
+                        backgroundColor: grupo.bgBadge || '#f1f5f9',
+                        color: grupo.colorBadge || '#475569',
+                        padding: '0.2rem 0.6rem', borderRadius: '6px'
+                      }}>
+                        {grupo.subItems.length} {grupo.subItems.length === 1 ? 'unidad' : 'unidades'}
+                      </span>
+                    </h3>
+                    <p style={{ margin: '0.2rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
+                      Marca: <strong>{grupo.marca}</strong> — Consulta y edición individual con No. de Serie y No. de Inventario
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setGrupoSeleccionado(null)}
+                  style={{
+                    background: 'none', border: 'none', color: '#64748b',
+                    fontSize: '1.25rem', cursor: 'pointer', padding: '0.5rem',
+                    borderRadius: '8px', display: 'flex', alignItems: 'center',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  <FaTimes />
+                </button>
+              </div>
+
+              {/* Filter and Action Bar */}
+              <div style={{
+                padding: '1rem 1.5rem', backgroundColor: '#ffffff',
+                borderBottom: '1px solid #f1f5f9',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                gap: '1rem', flexWrap: 'wrap'
+              }}>
+                <div style={{ position: 'relative', flex: '1', minWidth: '240px', maxWidth: '450px' }}>
+                  <input
+                    type="text"
+                    placeholder="Buscar por No. Serie, No. Inventario o Modelo..."
+                    value={busquedaDesglose}
+                    onChange={(e) => setBusquedaDesglose(e.target.value)}
+                    style={{
+                      width: '100%', padding: '0.55rem 1rem 0.55rem 2.2rem',
+                      border: '1px solid #cbd5e1', borderRadius: '8px',
+                      fontSize: '0.88rem', color: '#334155', outline: 'none'
+                    }}
+                  />
+                  <span style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', display: 'flex' }}>
+                    <FaSearch size={13} />
+                  </span>
+                  {busquedaDesglose && (
+                    <button
+                      onClick={() => setBusquedaDesglose('')}
+                      style={{ position: 'absolute', right: '0.75rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                    >
+                      <FaTimes size={12} />
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => {
+                    setEditandoStockId(null)
+                    setModoAjusteDirecto(false)
+                    setStockForm({
+                      nombre: grupo.subItems[0]?.nombre || grupo.nombre,
+                      categoria: 'componente',
+                      cantidad: 1,
+                      marca: grupo.marca || 'SEMEX',
+                      modelo: grupo.subItems[0]?.modelo || '',
+                      numeroSerie: '',
+                      numeroInventario: '',
+                      tipoInventario: 'semaforos'
+                    })
+                    setModalStockAbierto(true)
+                  }}
+                  style={{
+                    backgroundColor: '#BC955B', color: 'white', border: 'none',
+                    borderRadius: '8px', padding: '0.55rem 1rem', fontSize: '0.85rem',
+                    fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#9a7541'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#BC955B'}
+                >
+                  <FaPlus size={12} />
+                  Agregar Nuevo {grupo.nombre}
+                </button>
+              </div>
+
+              {/* Table */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '1rem 1.5rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                      <th style={{ padding: '0.75rem 0.75rem', textAlign: 'center', width: '40px', color: '#475569', fontWeight: '700' }}>#</th>
+                      <th style={{ padding: '0.75rem 0.75rem', textAlign: 'left', color: '#475569', fontWeight: '700' }}>No. Inventario</th>
+                      <th style={{ padding: '0.75rem 0.75rem', textAlign: 'left', color: '#475569', fontWeight: '700' }}>No. Serie</th>
+                      <th style={{ padding: '0.75rem 0.75rem', textAlign: 'left', color: '#475569', fontWeight: '700' }}>Marca</th>
+                      <th style={{ padding: '0.75rem 0.75rem', textAlign: 'left', color: '#475569', fontWeight: '700' }}>Modelo</th>
+                      <th style={{ padding: '0.75rem 0.75rem', textAlign: 'center', color: '#475569', fontWeight: '700' }}>Cant.</th>
+                      <th style={{ padding: '0.75rem 0.75rem', textAlign: 'center', width: '130px', color: '#475569', fontWeight: '700' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {subItemsFiltrados.map((subItem, idx) => (
+                      <tr
+                        key={subItem.id}
+                        style={{
+                          borderBottom: '1px solid #f1f5f9',
+                          backgroundColor: idx % 2 === 0 ? 'white' : '#fcfcfd',
+                          transition: 'background-color 0.15s'
+                        }}
+                        onMouseOver={e => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                        onMouseOut={e => e.currentTarget.style.backgroundColor = idx % 2 === 0 ? 'white' : '#fcfcfd'}
+                      >
+                        <td style={{ padding: '0.75rem 0.75rem', textAlign: 'center', color: '#94a3b8', fontWeight: '600' }}>
+                          {idx + 1}
+                        </td>
+                        <td style={{ padding: '0.75rem 0.75rem', fontWeight: '700', color: '#1e293b' }}>
+                          {subItem.numeroInventario ? (
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '0.2rem 0.5rem',
+                              borderRadius: '6px',
+                              backgroundColor: '#eff6ff',
+                              color: '#1d4ed8',
+                              fontWeight: '700',
+                              fontSize: '0.82rem'
+                            }}>
+                              {subItem.numeroInventario}
+                            </span>
+                          ) : (
+                            <span style={{ color: '#94a3b8' }}>N/A</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '0.75rem 0.75rem', fontFamily: 'monospace', fontWeight: '600', color: '#334155' }}>
+                          {subItem.numeroSerie || <span style={{ color: '#94a3b8' }}>N/A</span>}
+                        </td>
+                        <td style={{ padding: '0.75rem 0.75rem', color: '#475569' }}>
+                          {subItem.marca || 'SEMEX'}
+                        </td>
+                        <td style={{ padding: '0.75rem 0.75rem', color: '#64748b', fontSize: '0.83rem' }}>
+                          {subItem.modelo || 'N/A'}
+                        </td>
+                        <td style={{ padding: '0.75rem 0.75rem', textAlign: 'center' }}>
+                          <span style={{
+                            display: 'inline-block', padding: '0.15rem 0.55rem', borderRadius: '6px',
+                            backgroundColor: '#f1f5f9', fontWeight: '700', color: '#334155', fontSize: '0.82rem'
+                          }}>
+                            {subItem.cantidad}
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.75rem 0.75rem', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.35rem' }}>
+                            <button
+                              onClick={() => abrirHistorial(subItem)}
+                              title="Ver historial de asignación"
+                              style={{
+                                backgroundColor: '#e0f2fe', border: 'none', color: '#0284c7',
+                                cursor: 'pointer', padding: '0.45rem', borderRadius: '6px',
+                                display: 'flex', alignItems: 'center'
+                              }}
+                            >
+                              <FaHistory size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleEditarStock(subItem)}
+                              title="Editar datos de esta pieza"
+                              style={{
+                                backgroundColor: '#fef3c7', border: 'none', color: '#d97706',
+                                cursor: 'pointer', padding: '0.45rem', borderRadius: '6px',
+                                display: 'flex', alignItems: 'center'
+                              }}
+                            >
+                              <FaEdit size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleEliminarStock(subItem.id)}
+                              title="Eliminar refacción"
+                              style={{
+                                backgroundColor: '#fee2e2', border: 'none', color: '#dc2626',
+                                cursor: 'pointer', padding: '0.45rem', borderRadius: '6px',
+                                display: 'flex', alignItems: 'center'
+                              }}
+                            >
+                              <FaTrashAlt size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {subItemsFiltrados.length === 0 && (
+                      <tr>
+                        <td colSpan="7" style={{ padding: '2.5rem', textAlign: 'center', color: '#94a3b8' }}>
+                          No se encontraron piezas que coincidan con la búsqueda.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Footer */}
+              <div style={{
+                padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0',
+                backgroundColor: '#fafaf9', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+              }}>
+                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                  Mostrando {subItemsFiltrados.length} de {grupo.subItems.length} piezas registradas
+                </span>
+                <button
+                  onClick={() => setGrupoSeleccionado(null)}
+                  style={{
+                    backgroundColor: '#64748b', color: 'white', border: 'none',
+                    borderRadius: '8px', padding: '0.5rem 1.25rem', fontSize: '0.88rem',
+                    fontWeight: '600', cursor: 'pointer'
+                  }}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </main>
   )
 }
