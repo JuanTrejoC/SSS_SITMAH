@@ -459,11 +459,11 @@ export default function FormInfraestructura({ usuarioActual }) {
               1. Datos del Solicitante
             </h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', alignItems: 'start' }}>
               {/* Solicitante */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.35rem' }}>
-                  Nombre Completo <span style={{ color: '#DC2626' }}>*</span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
+                  <span>Nombre Completo <span style={{ color: '#DC2626' }}>*</span></span>
                 </label>
                 <input
                   type="text"
@@ -477,6 +477,8 @@ export default function FormInfraestructura({ usuarioActual }) {
                   onBlur={(e) => validarCampo('solicitante', e.target.value)}
                   style={{
                     width: '100%',
+                    height: '44px',
+                    boxSizing: 'border-box',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '8px',
                     border: errores.solicitante ? '1.5px solid #DC2626' : (valido.solicitante ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
@@ -488,9 +490,9 @@ export default function FormInfraestructura({ usuarioActual }) {
               </div>
 
               {/* Área / Dirección */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.35rem' }}>
-                  Dirección o Área <span style={{ color: '#DC2626' }}>*</span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
+                  <span>Dirección o Área <span style={{ color: '#DC2626' }}>*</span></span>
                 </label>
                 <select
                   value={formData.area_id}
@@ -501,6 +503,8 @@ export default function FormInfraestructura({ usuarioActual }) {
                   onBlur={(e) => validarCampo('area_id', e.target.value)}
                   style={{
                     width: '100%',
+                    height: '44px',
+                    boxSizing: 'border-box',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '8px',
                     border: errores.area_id ? '1.5px solid #DC2626' : (valido.area_id ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
@@ -518,9 +522,9 @@ export default function FormInfraestructura({ usuarioActual }) {
               </div>
 
               {/* Cargo */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.35rem' }}>
-                  Cargo / Puesto <span style={{ color: '#DC2626' }}>*</span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
+                  <span>Cargo  <span style={{ color: '#DC2626' }}>*</span></span>
                 </label>
                 <input
                   type="text"
@@ -534,6 +538,8 @@ export default function FormInfraestructura({ usuarioActual }) {
                   onBlur={(e) => validarCampo('cargo', e.target.value)}
                   style={{
                     width: '100%',
+                    height: '44px',
+                    boxSizing: 'border-box',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '8px',
                     border: errores.cargo ? '1.5px solid #DC2626' : (valido.cargo ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
@@ -548,9 +554,9 @@ export default function FormInfraestructura({ usuarioActual }) {
               </div>
 
               {/* Correo Electrónico */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.35rem' }}>
-                  Correo Electrónico <span style={{ color: '#DC2626' }}>*</span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
+                  <span>Correo Electrónico <span style={{ color: '#DC2626' }}>*</span></span>
                 </label>
                 <input
                   type="email"
@@ -563,6 +569,8 @@ export default function FormInfraestructura({ usuarioActual }) {
                   onBlur={(e) => validarCampo('email', e.target.value)}
                   style={{
                     width: '100%',
+                    height: '44px',
+                    boxSizing: 'border-box',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '8px',
                     border: errores.email ? '1.5px solid #DC2626' : (valido.email ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
@@ -574,9 +582,9 @@ export default function FormInfraestructura({ usuarioActual }) {
               </div>
 
               {/* Teléfono */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.35rem' }}>
-                  Teléfono (10 dígitos) <span style={{ color: '#DC2626' }}>*</span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
+                  <span>Teléfono  <span style={{ color: '#DC2626' }}>*</span></span>
                 </label>
                 <input
                   type="tel"
@@ -591,6 +599,8 @@ export default function FormInfraestructura({ usuarioActual }) {
                   onBlur={(e) => validarCampo('telefono', e.target.value)}
                   style={{
                     width: '100%',
+                    height: '44px',
+                    boxSizing: 'border-box',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '8px',
                     border: errores.telefono ? '1.5px solid #DC2626' : (valido.telefono ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
@@ -610,11 +620,11 @@ export default function FormInfraestructura({ usuarioActual }) {
               2. Ubicación e Incidencia de Infraestructura
             </h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', alignItems: 'start' }}>
               {/* Sede / Instalación */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.35rem' }}>
-                  Sede / Estación / Inmueble <span style={{ color: '#DC2626' }}>*</span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
+                  <span>Sede <span style={{ color: '#DC2626' }}>*</span></span>
                 </label>
                 <select
                   value={formData.sede_id}
@@ -625,6 +635,8 @@ export default function FormInfraestructura({ usuarioActual }) {
                   onBlur={(e) => validarCampo('sede_id', e.target.value)}
                   style={{
                     width: '100%',
+                    height: '44px',
+                    boxSizing: 'border-box',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '8px',
                     border: errores.sede_id ? '1.5px solid #DC2626' : (valido.sede_id ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
@@ -633,7 +645,7 @@ export default function FormInfraestructura({ usuarioActual }) {
                     backgroundColor: 'white'
                   }}
                 >
-                  <option value="">-- Seleccionar Sede / Inmueble --</option>
+                  <option value="">-- Seleccionar Sede  --</option>
                   {listaSedes.map(s => (
                     <option key={s.id} value={s.id}>{s.nombre}</option>
                   ))}
@@ -642,9 +654,9 @@ export default function FormInfraestructura({ usuarioActual }) {
               </div>
 
               {/* Elemento / Falla */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.35rem' }}>
-                  Instalación o Elemento Afectado <span style={{ color: '#DC2626' }}>*</span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
+                  <span>Instalación o Elemento Afectado <span style={{ color: '#DC2626' }}>*</span></span>
                 </label>
                 <input
                   type="text"
@@ -657,6 +669,8 @@ export default function FormInfraestructura({ usuarioActual }) {
                   onBlur={(e) => validarCampo('equipo', e.target.value)}
                   style={{
                     width: '100%',
+                    height: '44px',
+                    boxSizing: 'border-box',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '8px',
                     border: errores.equipo ? '1.5px solid #DC2626' : (valido.equipo ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
@@ -668,9 +682,9 @@ export default function FormInfraestructura({ usuarioActual }) {
               </div>
 
               {/* Categoría de Infraestructura */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.35rem' }}>
-                  Tipo de Infraestructura <span style={{ color: '#DC2626' }}>*</span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
+                  <span>Tipo de Infraestructura <span style={{ color: '#DC2626' }}>*</span></span>
                 </label>
                 <select
                   value={formData.tipo_infraestructura}
@@ -682,6 +696,8 @@ export default function FormInfraestructura({ usuarioActual }) {
                   }}
                   style={{
                     width: '100%',
+                    height: '44px',
+                    boxSizing: 'border-box',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '8px',
                     border: '1px solid #D1D5DB',
@@ -698,9 +714,9 @@ export default function FormInfraestructura({ usuarioActual }) {
 
               {/* Campo adicional si seleccionó 'Otro' */}
               {mostrarOtro && (
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.35rem' }}>
-                    Especifique el Tipo de Infraestructura <span style={{ color: '#DC2626' }}>*</span>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
+                    <span>Especifique el Tipo de Infraestructura <span style={{ color: '#DC2626' }}>*</span></span>
                   </label>
                   <input
                     type="text"
@@ -712,6 +728,8 @@ export default function FormInfraestructura({ usuarioActual }) {
                     }}
                     style={{
                       width: '100%',
+                      height: '44px',
+                      boxSizing: 'border-box',
                       padding: '0.65rem 0.85rem',
                       borderRadius: '8px',
                       border: errores.descripcion_otro ? '1.5px solid #DC2626' : '1px solid #D1D5DB',
@@ -724,9 +742,9 @@ export default function FormInfraestructura({ usuarioActual }) {
               )}
 
               {/* Referencia o Ubicación Específica */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.35rem' }}>
-                  No. de Inventario o Ubicación Específica (Opcional)
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
+                  <span>No. de Inventario o Ubicación Específica (Opcional)</span>
                 </label>
                 <input
                   type="text"
@@ -735,6 +753,8 @@ export default function FormInfraestructura({ usuarioActual }) {
                   onChange={(e) => setFormData(prev => ({ ...prev, numero_serie: e.target.value }))}
                   style={{
                     width: '100%',
+                    height: '44px',
+                    boxSizing: 'border-box',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '8px',
                     border: '1px solid #D1D5DB',
@@ -745,9 +765,9 @@ export default function FormInfraestructura({ usuarioActual }) {
               </div>
 
               {/* Prioridad */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.35rem' }}>
-                  Nivel de Prioridad <span style={{ color: '#DC2626' }}>*</span>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
+                  <span>Nivel de Prioridad <span style={{ color: '#DC2626' }}>*</span></span>
                 </label>
                 <select
                   value={formData.prioridad}
@@ -758,6 +778,8 @@ export default function FormInfraestructura({ usuarioActual }) {
                   onBlur={(e) => validarCampo('prioridad', e.target.value)}
                   style={{
                     width: '100%',
+                    height: '44px',
+                    boxSizing: 'border-box',
                     padding: '0.65rem 0.85rem',
                     borderRadius: '8px',
                     border: errores.prioridad ? '1.5px solid #DC2626' : (valido.prioridad ? '1.5px solid #10B981' : '1px solid #D1D5DB'),

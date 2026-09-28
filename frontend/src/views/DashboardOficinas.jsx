@@ -1,5 +1,5 @@
 // src/views/DashboardOficinas.jsx
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { FaEye, FaTrashAlt, FaChevronRight, FaCogs } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { formatFolio } from '../utils/formatFolio'
@@ -1231,11 +1231,12 @@ export default function DashboardOficinas() {
   )
 }
 
-// Componente Customizado para el Inventario
-const CustomInventorySelect = ({ value, onChange, inventario, piezasAsignadas = [] }) => {
+// Componente Customizado para el Inventario con 3 niveles (Categoría -> Artículo Único -> Modelos)
+const CustomInventorySelect = ({ value, onChange, inventario = [], piezasAsignadas = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [hoveredCategory, setHoveredCategory] = useState(null);
+  const [hoveredArticle, setHoveredArticle] = useState(null);
   const selectRef = useRef(null);
 
   useEffect(() => {
@@ -1264,32 +1265,69 @@ const CustomInventorySelect = ({ value, onChange, inventario, piezasAsignadas = 
       (o.nombre && o.nombre.toLowerCase().includes(searchTerm)) ||
       (o.numeroInventario && o.numeroInventario.toLowerCase().includes(searchTerm)) ||
       (o.marca && o.marca.toLowerCase().includes(searchTerm)) ||
-      (o.modelo && o.modelo.toLowerCase().includes(searchTerm))
+      (o.modelo && o.modelo.toLowerCase().includes(searchTerm)) ||
+      (o.descripcion && o.descripcion.toLowerCase().includes(searchTerm))
     );
   });
 
-  const gruposOpciones = inventario.reduce((acc, curr) => {
-    const group = curr.categoria || 'Sin Categoría';
-    if (!acc[group]) acc[group] = [];
-    acc[group].push(curr);
-    return acc;
-  }, {});
+  // Agrupación jerárquica en 3 niveles
+  const jerarquia = useMemo(() => {
+    const data = {};
+    inventario.forEach(item => {
+      const cat = item.categoria || 'Sin Categoría';
+      const rawNombre = (item.nombre || item.descripcion || 'Sin Nombre').trim();
+      
+      if (!data[cat]) data[cat] = {};
+      if (!data[cat][rawNombre]) {
+        data[cat][rawNombre] = {
+          nombre: rawNombre,
+          categoria: cat,
+          items: [],
+          totalDisponible: 0
+        };
+      }
+      data[cat][rawNombre].items.push(item);
+      data[cat][rawNombre].totalDisponible += Number(item.cantidad || 0);
+    });
+    return data;
+  }, [inventario]);
+
+  const categorias = Object.keys(jerarquia);
+
+  const activeCategory = hoveredCategory || (categorias.length > 0 ? categorias[0] : null);
+  const articulosEnCategoria = activeCategory && jerarquia[activeCategory] ? Object.values(jerarquia[activeCategory]) : [];
+  const activeArticle = hoveredArticle && jerarquia[activeCategory]?.[hoveredArticle] 
+    ? jerarquia[activeCategory][hoveredArticle] 
+    : (articulosEnCategoria.length > 0 ? articulosEnCategoria[0] : null);
+
+  const modelosEnArticulo = activeArticle ? activeArticle.items : [];
 
   return (
-    <div ref={selectRef} style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+    <div ref={selectRef} style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
       <div
         onClick={() => setIsOpen(!isOpen)}
         style={{
-          padding: '0.65rem 1rem', border: isOpen ? '1.5px solid #2563EB' : '1px solid #D1D5DB', 
-          borderRadius: '8px', fontSize: '0.9rem', backgroundColor: 'white', 
-          cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem',
+          padding: '0.65rem 1rem',
+          border: isOpen ? '1.5px solid #691B31' : '1px solid #D1D5DB',
+          borderRadius: '8px',
+          fontSize: '0.9rem',
+          backgroundColor: 'white',
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '0.75rem',
           transition: 'all 0.2s'
         }}
       >
         <span>
           {selectedOption ? (
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#111827', fontWeight: '600' }}>
-               {selectedOption.nombre || selectedOption.descripcion} (Disp: {selectedOption.cantidad ?? 'N/A'}) - Inv: {selectedOption.numeroInventario || selectedOption.numeroSerie || 'S/N'}
+              {selectedOption.nombre || selectedOption.descripcion}
+              {selectedOption.modelo ? ` — Mod: ${selectedOption.modelo}` : (selectedOption.marca ? ` (${selectedOption.marca})` : '')}
+              <span style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 'normal' }}>
+                (Disp: {selectedOption.cantidad ?? 'N/A'})
+              </span>
             </span>
           ) : (
             <span style={{ color: '#9CA3AF', fontWeight: '400' }}>-- Seleccionar componente --</span>
@@ -1299,11 +1337,11 @@ const CustomInventorySelect = ({ value, onChange, inventario, piezasAsignadas = 
       </div>
 
       {isOpen && (
-        <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 -4px 20px rgba(0,0,0,0.12)', zIndex: 50, border: '1px solid #E5E7EB', overflow: 'hidden', width: '100%', minWidth: '320px' }}>
+        <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 -6px 25px rgba(0,0,0,0.15)', zIndex: 50, border: '1px solid #E5E7EB', overflow: 'hidden', width: '100%', minWidth: '560px', maxWidth: '680px' }}>
           <div style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid #E5E7EB', backgroundColor: '#ffffff' }}>
             <input
               type="text"
-              placeholder="Buscar componente..."
+              placeholder="Buscar componente por nombre, marca o modelo..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               autoFocus
@@ -1312,7 +1350,7 @@ const CustomInventorySelect = ({ value, onChange, inventario, piezasAsignadas = 
             />
           </div>
 
-          <div style={{ display: 'flex', height: '240px' }}>
+          <div style={{ display: 'flex', height: '260px' }}>
             {search ? (
               <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto' }}>
                 {filteredOptions.length > 0 ? filteredOptions.map(opcion => {
@@ -1339,20 +1377,24 @@ const CustomInventorySelect = ({ value, onChange, inventario, piezasAsignadas = 
                         borderRadius: '8px',
                         backgroundColor: value === opcion.id ? '#FEF2F2' : 'transparent'
                       }}
-                      onMouseOver={e => { if (!deshabilitada) e.currentTarget.style.backgroundColor = '#F1F5F9'; }}
+                      onMouseOver={e => { if (!deshabilitada) e.currentTarget.style.backgroundColor = '#FFF1F2'; }}
                       onMouseOut={e => { e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF2F2' : 'transparent'; }}
                     >
-                      <FaCogs color="#691B31" size={14} />
+                      <FaCogs color="#691B31" size={16} />
                       <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: '600', color: '#111827', fontSize: '0.85rem' }}>{opcion.nombre}</span>
+                          <span style={{ fontWeight: '600', color: '#111827' }}>
+                            {opcion.nombre || opcion.descripcion} {opcion.modelo ? `— Mod: ${opcion.modelo}` : ''}
+                          </span>
                           {yaAsignada && (
                             <span style={{ fontSize: '0.7rem', color: '#B91C1C', backgroundColor: '#FEE2E2', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: '700' }}>
                               Ya asignada
                             </span>
                           )}
                         </div>
-                        <span style={{ fontSize: '0.7rem', color: '#6B7280' }}>Inv: {opcion.numeroInventario || 'S/N'} | Stock: {opcion.cantidad}</span>
+                        <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>
+                          Cat: {opcion.categoria || 'N/A'} | Disp: {opcion.cantidad ?? 'N/A'} {opcion.numeroInventario ? `| Inv: ${opcion.numeroInventario}` : ''}
+                        </span>
                       </div>
                     </div>
                   );
@@ -1364,81 +1406,143 @@ const CustomInventorySelect = ({ value, onChange, inventario, piezasAsignadas = 
               </div>
             ) : (
               <>
-                <div style={{ width: '45%', borderRight: '1px solid #E5E7EB', overflowY: 'auto', padding: '0.4rem', backgroundColor: '#ffffff' }}>
-                  {Object.keys(gruposOpciones).map((group) => (
+                {/* 1. Categorías */}
+                <div style={{ width: '28%', borderRight: '1px solid #E5E7EB', overflowY: 'auto', padding: '0.4rem', backgroundColor: '#ffffff' }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', color: '#9CA3AF', padding: '0.3rem 0.5rem' }}>
+                    Categorías
+                  </div>
+                  {categorias.map((group) => (
                     <div
                       key={group}
-                      onMouseEnter={() => setHoveredCategory(group)}
+                      onMouseEnter={() => {
+                        setHoveredCategory(group);
+                        setHoveredArticle(null);
+                      }}
                       style={{
-                        padding: '0.65rem 0.75rem',
+                        padding: '0.6rem 0.65rem',
                         cursor: 'pointer',
                         borderRadius: '8px',
                         fontWeight: '600',
                         fontSize: '0.825rem',
-                        color: hoveredCategory === group ? '#691B31' : '#4B5563',
-                        backgroundColor: hoveredCategory === group ? '#FEF2F2' : 'transparent',
+                        color: activeCategory === group ? '#691B31' : '#4B5563',
+                        backgroundColor: activeCategory === group ? '#FEF2F2' : 'transparent',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center'
                       }}
                     >
-                      {group} <FaChevronRight size={9} style={{ opacity: hoveredCategory === group ? 1 : 0.3 }} />
+                      <span style={{ textTransform: 'capitalize' }}>{group}</span>
+                      <FaChevronRight size={9} style={{ opacity: activeCategory === group ? 1 : 0.3 }} />
                     </div>
                   ))}
                 </div>
-                <div style={{ width: '55%', overflowY: 'auto', padding: '0.4rem', backgroundColor: '#F8FAFC' }}>
-                  {hoveredCategory ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                      {gruposOpciones[hoveredCategory].map(opcion => {
-                        const yaAsignada = assignedIds.has(opcion.id);
-                        const sinStock = Number(opcion.cantidad) <= 0;
-                        const deshabilitada = yaAsignada || sinStock;
 
-                        return (
-                          <div
-                            key={opcion.id}
-                            onClick={() => {
-                              if (deshabilitada) return;
-                              onChange(opcion.id);
-                              setIsOpen(false);
-                              setSearch('');
-                            }}
-                            style={{
-                              padding: '0.6rem 0.75rem',
-                              cursor: deshabilitada ? 'not-allowed' : 'pointer',
-                              opacity: deshabilitada ? 0.6 : 1,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.65rem',
-                              borderRadius: '8px',
-                              backgroundColor: value === opcion.id ? '#FEF2F2' : 'transparent'
-                            }}
-                            onMouseOver={e => { if (!deshabilitada) e.currentTarget.style.backgroundColor = '#E2E8F0'; }}
-                            onMouseOut={e => { e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF2F2' : 'transparent'; }}
-                          >
-                            <FaCogs color={value === opcion.id ? '#691B31' : '#6B7280'} size={14} />
-                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.85rem', fontWeight: '600', color: value === opcion.id ? '#691B31' : '#374151' }}>
-                                  {opcion.nombre || opcion.descripcion}
-                                </span>
-                                {yaAsignada && (
-                                  <span style={{ fontSize: '0.65rem', color: '#B91C1C', backgroundColor: '#FEE2E2', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: '700' }}>
-                                    Ya asignada
-                                  </span>
-                                )}
-                              </div>
-                              <span style={{ fontSize: '0.725rem', color: '#6B7280' }}>
-                                Disp: {opcion.cantidad ?? 'N/A'} | Inv: {opcion.numeroInventario || 'S/N'}
-                              </span>
-                            </div>
+                {/* 2. Artículos Únicos */}
+                <div style={{ width: '36%', borderRight: '1px solid #E5E7EB', overflowY: 'auto', padding: '0.4rem', backgroundColor: '#F9FAFB' }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', color: '#9CA3AF', padding: '0.3rem 0.5rem' }}>
+                    Artículos
+                  </div>
+                  {articulosEnCategoria.length > 0 ? (
+                    articulosEnCategoria.map((art) => {
+                      const isSelectedArt = activeArticle?.nombre === art.nombre;
+                      return (
+                        <div
+                          key={art.nombre}
+                          onMouseEnter={() => setHoveredArticle(art.nombre)}
+                          onClick={() => setHoveredArticle(art.nombre)}
+                          style={{
+                            padding: '0.55rem 0.65rem',
+                            cursor: 'pointer',
+                            borderRadius: '8px',
+                            backgroundColor: isSelectedArt ? '#FEF2F2' : 'transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            marginBottom: '0.2rem'
+                          }}
+                          onMouseOver={e => { if (!isSelectedArt) e.currentTarget.style.backgroundColor = '#F3F4F6'; }}
+                          onMouseOut={e => { if (!isSelectedArt) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                        >
+                          <FaCogs color={isSelectedArt ? '#691B31' : '#6B7280'} size={13} />
+                          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                            <span style={{ fontSize: '0.825rem', fontWeight: '600', color: isSelectedArt ? '#691B31' : '#1F2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {art.nombre}
+                            </span>
+                            <span style={{ fontSize: '0.7rem', color: '#6B7280' }}>
+                              Total Disp: {art.totalDisponible} {art.items.length > 1 ? `(${art.items.length} modelos)` : ''}
+                            </span>
                           </div>
-                        );
-                      })}
-                    </div>
+                          <FaChevronRight size={9} style={{ opacity: isSelectedArt ? 1 : 0.3, color: '#691B31' }} />
+                        </div>
+                      );
+                    })
                   ) : (
-                    <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#9CA3AF', fontSize: '0.8rem' }}>
-                      Pasa el cursor sobre una categoría
+                    <div style={{ padding: '2rem 0.5rem', textAlign: 'center', color: '#9CA3AF', fontSize: '0.75rem' }}>
+                      Sin artículos
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. Modelos / Piezas */}
+                <div style={{ width: '36%', overflowY: 'auto', padding: '0.4rem', backgroundColor: '#ffffff' }}>
+                  <div style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', color: '#9CA3AF', padding: '0.3rem 0.5rem' }}>
+                    Modelos / Piezas
+                  </div>
+                  {modelosEnArticulo.length > 0 ? (
+                    modelosEnArticulo.map((opcion) => {
+                      const yaAsignada = assignedIds.has(opcion.id);
+                      const sinStock = Number(opcion.cantidad) <= 0;
+                      const deshabilitada = yaAsignada || sinStock;
+                      const isCurrentVal = value === opcion.id;
+
+                      const labelModelo = opcion.modelo || opcion.marca 
+                        ? `${opcion.marca ? opcion.marca + ' ' : ''}${opcion.modelo || ''}`.trim()
+                        : (opcion.numeroInventario ? `Inv: ${opcion.numeroInventario}` : (opcion.numeroSerie ? `S/N: ${opcion.numeroSerie}` : 'Modelo Estándar'));
+
+                      return (
+                        <div
+                          key={opcion.id}
+                          onClick={() => {
+                            if (deshabilitada) return;
+                            onChange(opcion.id);
+                            setIsOpen(false);
+                            setSearch('');
+                          }}
+                          style={{
+                            padding: '0.55rem 0.65rem',
+                            cursor: deshabilitada ? 'not-allowed' : 'pointer',
+                            opacity: deshabilitada ? 0.5 : 1,
+                            borderRadius: '8px',
+                            backgroundColor: isCurrentVal ? '#D1FAE5' : 'transparent',
+                            border: isCurrentVal ? '1px solid #10B981' : '1px solid transparent',
+                            marginBottom: '0.25rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.15rem'
+                          }}
+                          onMouseOver={e => { if (!deshabilitada && !isCurrentVal) e.currentTarget.style.backgroundColor = '#EFF6FF'; }}
+                          onMouseOut={e => { if (!deshabilitada && !isCurrentVal) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: isCurrentVal ? '#065F46' : '#111827' }}>
+                              {labelModelo}
+                            </span>
+                            {yaAsignada && (
+                              <span style={{ fontSize: '0.65rem', color: '#B91C1C', backgroundColor: '#FEE2E2', padding: '0.05rem 0.3rem', borderRadius: '4px', fontWeight: '700' }}>
+                                Ya asignada
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem', color: '#6B7280' }}>
+                            <span>Disp: {opcion.cantidad ?? 1}</span>
+                            {opcion.estadoFisico && <span style={{ color: '#059669' }}>{opcion.estadoFisico}</span>}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div style={{ padding: '2rem 0.5rem', textAlign: 'center', color: '#9CA3AF', fontSize: '0.75rem' }}>
+                      Selecciona un artículo
                     </div>
                   )}
                 </div>
