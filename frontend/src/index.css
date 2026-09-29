@@ -534,8 +534,23 @@ input, select, textarea {
    TEMA ESCALA DE GRISES
    ============================================================ */
 
+/* Truco con backdrop-filter para no romper el position: fixed del header */
+body.grayscale-theme::after,
+#root.grayscale-theme::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  backdrop-filter: grayscale(100%);
+  -webkit-backdrop-filter: grayscale(100%);
+  pointer-events: none;
+  z-index: 999999;
+}
+
 #root.grayscale-theme {
-  filter: grayscale(100%);
+  filter: none;
 }
 
 /* ============================================================
