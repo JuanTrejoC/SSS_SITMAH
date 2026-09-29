@@ -52,6 +52,159 @@ const normalizarEstado = (est) => {
   return 'Stock';
 };
 
+const obtenerGrupoBase = (item) => {
+  const nombreRaw = (item.nombre || '').trim();
+  const n = nombreRaw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const catRaw = (item.categoria || item.tipo || '').toLowerCase();
+
+  // Detección por palabras clave para agrupar todos los teclados, mouses, rams, etc.
+  if (n.includes('teclado') || n.includes('keyboard') || catRaw.includes('teclado')) {
+    return {
+      nombreBase: 'Teclado USB',
+      categoria: 'periferico',
+      tipoKey: 'teclados'
+    };
+  }
+  if (n.includes('mouse') || n.includes('raton') || catRaw.includes('mouse')) {
+    return {
+      nombreBase: 'Mouse USB',
+      categoria: 'periferico',
+      tipoKey: 'mouses'
+    };
+  }
+  if (n.includes('memoria ram') || n.includes('ram')) {
+    let capacidad = '';
+    if (n.includes('16gb') || n.includes('16 gb')) capacidad = ' 16GB';
+    else if (n.includes('8gb') || n.includes('8 gb')) capacidad = ' 8GB';
+    else if (n.includes('32gb') || n.includes('32 gb')) capacidad = ' 32GB';
+    else if (n.includes('4gb') || n.includes('4 gb')) capacidad = ' 4GB';
+    return {
+      nombreBase: `Memoria RAM DDR4${capacidad}`,
+      categoria: 'componente',
+      tipoKey: `ram_${capacidad || 'general'}`
+    };
+  }
+  if (n.includes('disco') || n.includes('ssd') || n.includes('hdd') || n.includes('solido') || n.includes('sólido')) {
+    let cap = '';
+    if (n.includes('1tb') || n.includes('1 tb')) cap = ' 1TB';
+    else if (n.includes('480gb') || n.includes('480 gb')) cap = ' 480GB';
+    else if (n.includes('240gb') || n.includes('240 gb')) cap = ' 240GB';
+    else if (n.includes('512gb') || n.includes('512 gb')) cap = ' 512GB';
+    else if (n.includes('256gb') || n.includes('256 gb')) cap = ' 256GB';
+    const tipo = n.includes('ssd') || n.includes('solido') ? 'SSD' : n.includes('hdd') ? 'HDD' : 'Disco';
+    return {
+      nombreBase: `Disco Estado Sólido ${tipo}${cap}`,
+      categoria: 'componente',
+      tipoKey: `disco_${tipo}_${cap}`
+    };
+  }
+  if (n.includes('fuente') || n.includes('poder') || n.includes('power supply')) {
+    return {
+      nombreBase: 'Fuente de Poder',
+      categoria: 'componente',
+      tipoKey: 'fuente_poder'
+    };
+  }
+  if (n.includes('cable hdmi') || (n.includes('cable') && n.includes('hdmi'))) {
+    return {
+      nombreBase: 'Cable HDMI',
+      categoria: 'accesorio',
+      tipoKey: 'cable_hdmi'
+    };
+  }
+  if (n.includes('cable de red') || n.includes('rj45') || n.includes('cat 6') || n.includes('patch cord')) {
+    return {
+      nombreBase: 'Cable de Red RJ45 (Cat 6)',
+      categoria: 'accesorio',
+      tipoKey: 'cable_red'
+    };
+  }
+  if (n.includes('conector')) {
+    return {
+      nombreBase: 'Conectores RJ45',
+      categoria: 'accesorio',
+      tipoKey: 'conectores_rj45'
+    };
+  }
+  if (n.includes('adaptador') && n.includes('vga')) {
+    return {
+      nombreBase: 'Adaptador HDMI a VGA',
+      categoria: 'accesorio',
+      tipoKey: 'adaptador_vga'
+    };
+  }
+  if (n.includes('adaptador') && (n.includes('ethernet') || n.includes('red'))) {
+    return {
+      nombreBase: 'Adaptador USB a Ethernet',
+      categoria: 'accesorio',
+      tipoKey: 'adaptador_ethernet'
+    };
+  }
+  if (n.includes('adaptador')) {
+    return {
+      nombreBase: 'Adaptadores',
+      categoria: 'accesorio',
+      tipoKey: 'adaptadores'
+    };
+  }
+  if (n.includes('cinta')) {
+    return {
+      nombreBase: 'Cinta de Aislar',
+      categoria: 'accesorio',
+      tipoKey: 'cinta_aislar'
+    };
+  }
+  if (n.includes('cincho')) {
+    return {
+      nombreBase: 'Cinchos plásticos',
+      categoria: 'accesorio',
+      tipoKey: 'cinchos'
+    };
+  }
+  if (n.includes('pasta')) {
+    return {
+      nombreBase: 'Pasta Térmica',
+      categoria: 'componente',
+      tipoKey: 'pasta_termica'
+    };
+  }
+  if (n.includes('pila') || n.includes('cr2032')) {
+    return {
+      nombreBase: 'Pila CR2032',
+      categoria: 'componente',
+      tipoKey: 'pila_cr2032'
+    };
+  }
+  if (n.includes('switch')) {
+    return {
+      nombreBase: 'Switch de Red',
+      categoria: 'equipo',
+      tipoKey: 'switch'
+    };
+  }
+  if (n.includes('access point') || n.includes('ap')) {
+    return {
+      nombreBase: 'Access Point',
+      categoria: 'equipo',
+      tipoKey: 'access_point'
+    };
+  }
+  if (n.includes('lector')) {
+    return {
+      nombreBase: 'Lector de Tarjetas USB',
+      categoria: 'periferico',
+      tipoKey: 'lector_tarjetas'
+    };
+  }
+
+  // Fallback a nombre base
+  return {
+    nombreBase: nombreRaw || 'Artículo General',
+    categoria: item.categoria || item.tipo || 'componente',
+    tipoKey: n.replace(/[^a-z0-9]/g, '_')
+  };
+};
+
 export default function InventarioExistencias() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -1552,25 +1705,32 @@ export default function InventarioExistencias() {
           return (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
               {(() => {
-                // AGRUPAR itemsFiltrados por nombre, marca, modelo Y estadoFisico para que nunca se mezclen
+                // AGRUPAR itemsFiltrados por tipo base Y estadoFisico (todos los teclados juntos, mouses juntos, etc.)
                 const gruposObj = {};
                 itemsFiltrados.forEach(item => {
                   const estNorm = normalizarEstado(item.estadoFisico);
-                  const key = `${item.nombre || ''}-${item.marca || ''}-${item.modelo || ''}-${estNorm}`;
+                  const baseInfo = obtenerGrupoBase(item);
+                  const key = `${baseInfo.tipoKey}_${estNorm}`;
+
                   if (!gruposObj[key]) {
                     gruposObj[key] = {
                       key,
-                      nombre: item.nombre,
-                      marca: item.marca,
-                      modelo: item.modelo,
-                      categoria: item.categoria,
+                      nombre: baseInfo.nombreBase,
+                      categoria: baseInfo.categoria || item.categoria,
                       estadoFisico: estNorm,
                       cantidadTotal: 0,
-                      items: []
+                      items: [],
+                      marcasModelosSet: new Set()
                     };
                   }
+                  const cant = Number(item.cantidad) || 1;
                   gruposObj[key].items.push(item);
-                  gruposObj[key].cantidadTotal += (Number(item.cantidad) || 1);
+                  gruposObj[key].cantidadTotal += cant;
+
+                  const mm = `${item.marca || ''} ${item.modelo || ''}`.trim() || item.nombre;
+                  if (mm && mm !== baseInfo.nombreBase) {
+                    gruposObj[key].marcasModelosSet.add(mm);
+                  }
                 });
                 
                 return Object.values(gruposObj).map(grupo => {
@@ -1582,6 +1742,13 @@ export default function InventarioExistencias() {
                   const colorStripe = esStock ? '#10b981' : esBaja ? '#ef4444' : '#f59e0b';
                   const colorQtyText = esStock ? '#047857' : esBaja ? '#b91c1c' : '#b45309';
                   const bgQtyPill = esStock ? '#ecfdf5' : esBaja ? '#fef2f2' : '#fffbeb';
+
+                  const modelosDistintos = Array.from(grupo.marcasModelosSet);
+                  const subtitulo = modelosDistintos.length === 1
+                    ? modelosDistintos[0]
+                    : modelosDistintos.length > 1
+                    ? `${modelosDistintos.length} modelos (${modelosDistintos.slice(0, 2).join(', ')}${modelosDistintos.length > 2 ? '...' : ''})`
+                    : '';
 
                   return (
                     <div
@@ -1642,7 +1809,7 @@ export default function InventarioExistencias() {
                           </span>
                         </div>
 
-                        {/* Top right buttons placeholder */}
+                        {/* Top right toggle button */}
                         <div style={{ display: 'flex', gap: '0.4rem' }}>
                           <button 
                             onClick={toggleExpand}
@@ -1666,7 +1833,7 @@ export default function InventarioExistencias() {
                         </div>
                       </div>
 
-                      {/* Middle: Title */}
+                      {/* Middle: Title & Subtitle */}
                       <div style={{ paddingLeft: '0.5rem', flex: 1, minHeight: '55px' }}>
                         <h3 style={{
                           fontSize: '1.1rem',
@@ -1677,9 +1844,9 @@ export default function InventarioExistencias() {
                         }}>
                           {grupo.nombre}
                         </h3>
-                        {(grupo.marca || grupo.modelo) && (
+                        {subtitulo && (
                           <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '500' }}>
-                            {grupo.marca} {grupo.modelo}
+                            {subtitulo}
                           </div>
                         )}
                       </div>
@@ -1728,7 +1895,7 @@ export default function InventarioExistencias() {
                         </span>
                       </div>
 
-                      {/* Expanded View */}
+                      {/* Expanded View with individual item cards */}
                       {isExpanded && (
                         <div style={{ 
                           marginTop: '1.5rem', 
@@ -1737,60 +1904,72 @@ export default function InventarioExistencias() {
                           paddingLeft: '0.5rem'
                         }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                            {grupo.items.map((item, idx) => (
-                              <div key={item.id || idx} style={{
-                                backgroundColor: '#f8fafc', 
-                                border: '1px solid #e2e8f0', 
-                                borderRadius: '8px', 
-                                padding: '0.75rem',
-                                position: 'relative'
-                              }}>
-                                <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                                  {item.numeroSerie && <span><strong style={{color:'#64748b'}}>S/N:</strong> {item.numeroSerie}</span>}
-                                  {item.numeroInventario && <span><strong style={{color:'#64748b'}}>Inv:</strong> {item.numeroInventario}</span>}
-                                </div>
+                            {grupo.items.map((item, idx) => {
+                              const nombreModeloItem = `${item.marca || ''} ${item.modelo || ''}`.trim() || item.nombre;
+                              const mostrarNombreItem = nombreModeloItem && nombreModeloItem.toLowerCase() !== grupo.nombre.toLowerCase();
 
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
-                                  <span style={{
-                                    backgroundColor: (item.estadoFisico === 'Stock' || item.estadoFisico === 'Buen Estado') ? '#ecfdf5' : (item.estadoFisico === 'Baja' || item.estadoFisico === 'Dañado') ? '#fef2f2' : '#fffbeb',
-                                    color: (item.estadoFisico === 'Stock' || item.estadoFisico === 'Buen Estado') ? '#047857' : (item.estadoFisico === 'Baja' || item.estadoFisico === 'Dañado') ? '#b91c1c' : '#b45309',
-                                    padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold'
-                                  }}>
-                                    {item.estadoFisico === 'Refacciones' || item.estadoFisico === 'reparacion' ? 'Mantenimiento' : item.estadoFisico}
-                                  </span>
-
-                                  {(item.areaUbicacion || item.equipoOriginal?.responsable) && (
-                                    <span style={{ fontSize: '0.7rem', color: '#475569', backgroundColor: '#e2e8f0', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
-                                      {item.equipoOriginal?.responsable ? item.equipoOriginal.responsable : item.areaUbicacion}
-                                    </span>
+                              return (
+                                <div key={item.id || idx} style={{
+                                  backgroundColor: '#f8fafc', 
+                                  border: '1px solid #e2e8f0', 
+                                  borderRadius: '8px', 
+                                  padding: '0.75rem',
+                                  position: 'relative'
+                                }}>
+                                  {mostrarNombreItem && (
+                                    <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#1e293b', marginBottom: '0.35rem' }}>
+                                      {nombreModeloItem}
+                                    </div>
                                   )}
+
+                                  <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                                    {item.numeroSerie && <span><strong style={{color:'#64748b'}}>S/N:</strong> {item.numeroSerie}</span>}
+                                    {item.numeroInventario && <span><strong style={{color:'#64748b'}}>Inv:</strong> {item.numeroInventario}</span>}
+                                    {item.cantidad > 1 && <span><strong style={{color:'#64748b'}}>Cantidad:</strong> {item.cantidad} uds.</span>}
+                                  </div>
+
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
+                                    <span style={{
+                                      backgroundColor: (item.estadoFisico === 'Stock' || item.estadoFisico === 'Buen Estado') ? '#ecfdf5' : (item.estadoFisico === 'Baja' || item.estadoFisico === 'Dañado') ? '#fef2f2' : '#fffbeb',
+                                      color: (item.estadoFisico === 'Stock' || item.estadoFisico === 'Buen Estado') ? '#047857' : (item.estadoFisico === 'Baja' || item.estadoFisico === 'Dañado') ? '#b91c1c' : '#b45309',
+                                      padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold'
+                                    }}>
+                                      {item.estadoFisico === 'Refacciones' || item.estadoFisico === 'reparacion' ? 'Mantenimiento' : item.estadoFisico}
+                                    </span>
+
+                                    {(item.areaUbicacion || item.equipoOriginal?.responsable || item.equipoOriginal?.area) && (
+                                      <span style={{ fontSize: '0.7rem', color: '#475569', backgroundColor: '#e2e8f0', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                                        {item.equipoOriginal?.responsable || item.equipoOriginal?.area || item.areaUbicacion}
+                                      </span>
+                                    )}
+                                  </div>
+                                  
+                                  <button
+                                    onClick={() => handleEditar(item)}
+                                    title="Editar pieza"
+                                    style={{
+                                      position: 'absolute',
+                                      top: '0.5rem',
+                                      right: '0.5rem',
+                                      backgroundColor: '#fef3c7',
+                                      border: 'none',
+                                      color: '#d97706',
+                                      cursor: 'pointer',
+                                      padding: '0.35rem',
+                                      borderRadius: '6px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      transition: 'background-color 0.2s'
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
+                                    onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
+                                  >
+                                    <FaEdit size={12} />
+                                  </button>
                                 </div>
-                                
-                                <button
-                                  onClick={() => handleEditar(item)}
-                                  title="Editar pieza"
-                                  style={{
-                                    position: 'absolute',
-                                    top: '0.5rem',
-                                    right: '0.5rem',
-                                    backgroundColor: '#fef3c7',
-                                    border: 'none',
-                                    color: '#d97706',
-                                    cursor: 'pointer',
-                                    padding: '0.35rem',
-                                    borderRadius: '6px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: 'background-color 0.2s'
-                                  }}
-                                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
-                                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
-                                >
-                                  <FaEdit size={12} />
-                                </button>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
