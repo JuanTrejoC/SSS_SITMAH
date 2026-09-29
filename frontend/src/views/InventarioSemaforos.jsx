@@ -112,79 +112,66 @@ export default function InventarioSemaforos() {
   const [componenteHistorialActual, setComponenteHistorialActual] = useState(null)
   const [filtroMesHistorial, setFiltroMesHistorial] = useState('')
 
-  // Estados para consolidación y desglose de LEDs en existencias
+  // Estados para consolidación y desglose de existencias de semáforos
   const [grupoSeleccionado, setGrupoSeleccionado] = useState(null)
   const [busquedaDesglose, setBusquedaDesglose] = useState('')
 
-  const agruparExistenciasDisponibles = (items) => {
-    const gruposMap = {
-      led_amarillos: {
-        id: 'grupo-led-amarillos',
-        esGrupo: true,
-        key: 'led_amarillos',
-        nombre: 'Led Amarillo',
-        categoria: 'componente',
-        marca: 'SEMEX',
-        colorStripe: '#f59e0b',
-        colorBadge: '#b45309',
-        bgBadge: '#fef3c7',
-        cantidad: 0,
-        subItems: []
-      },
-      led_rojos: {
-        id: 'grupo-led-rojos',
-        esGrupo: true,
-        key: 'led_rojos',
-        nombre: 'Led Rojo',
-        categoria: 'componente',
-        marca: 'SEMEX',
-        colorStripe: '#ef4444',
-        colorBadge: '#be123c',
-        bgBadge: '#ffe4e6',
-        cantidad: 0,
-        subItems: []
-      },
-      led_verdes: {
-        id: 'grupo-led-verdes',
-        esGrupo: true,
-        key: 'led_verdes',
-        nombre: 'Led Verde',
-        categoria: 'componente',
-        marca: 'SEMEX',
-        colorStripe: '#10b981',
-        colorBadge: '#047857',
-        bgBadge: '#d1fae5',
-        cantidad: 0,
-        subItems: []
-      }
-    };
+  const getColoresParaComponente = () => {
+    return { colorStripe: '#691B31', colorBadge: '#691B31', bgBadge: '#fdf2f4' };
+  };
 
-    const otrosItems = [];
+  const agruparExistenciasDisponibles = (items) => {
+    const gruposMap = {};
 
     items.forEach(item => {
-      const nombreNorm = (item.nombre || '').trim().toLowerCase();
-      if (nombreNorm.includes('led') && (nombreNorm.includes('amarillo') || nombreNorm.includes('amarrillo'))) {
-        gruposMap.led_amarillos.cantidad += item.cantidad;
-        gruposMap.led_amarillos.subItems.push(item);
-      } else if (nombreNorm.includes('led') && (nombreNorm.includes('rojo') || nombreNorm.includes('rojp'))) {
-        gruposMap.led_rojos.cantidad += item.cantidad;
-        gruposMap.led_rojos.subItems.push(item);
-      } else if (nombreNorm.includes('led') && nombreNorm.includes('verde')) {
-        gruposMap.led_verdes.cantidad += item.cantidad;
-        gruposMap.led_verdes.subItems.push(item);
+      const nombreRaw = (item.nombre || 'Componente').trim();
+      const n = nombreRaw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+      let claveBase = '';
+      let nombreGrupo = nombreRaw;
+
+      // Normalización inteligente para que variantes de leds u otros componentes se consoliden
+      if (n.includes('led') && (n.includes('amarill') || n.includes('amarrill'))) {
+        claveBase = 'led_amarillos';
+        nombreGrupo = 'Led Amarillo';
+      } else if (n.includes('led') && (n.includes('roj') || n.includes('rojp'))) {
+        claveBase = 'led_rojos';
+        nombreGrupo = 'Led Rojo';
+      } else if (n.includes('led') && n.includes('verd')) {
+        claveBase = 'led_verdes';
+        nombreGrupo = 'Led Verde';
       } else {
-        otrosItems.push(item);
+        // Clave normalizada basada en el nombre
+        claveBase = n.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        if (!claveBase) claveBase = 'componente_' + (item.id || 'general');
+      }
+
+      if (!gruposMap[claveBase]) {
+        const colores = getColoresParaComponente(nombreGrupo, item.categoria);
+        gruposMap[claveBase] = {
+          id: `grupo-${claveBase}`,
+          esGrupo: true,
+          key: claveBase,
+          nombre: nombreGrupo,
+          categoria: item.categoria || 'componente',
+          marca: item.marca || 'SEMEX',
+          colorStripe: colores.colorStripe,
+          colorBadge: colores.colorBadge,
+          bgBadge: colores.bgBadge,
+          cantidad: 0,
+          subItems: []
+        };
+      }
+
+      gruposMap[claveBase].cantidad += (Number(item.cantidad) || 0);
+      gruposMap[claveBase].subItems.push(item);
+
+      if ((!gruposMap[claveBase].marca || gruposMap[claveBase].marca === 'SEMEX') && item.marca) {
+        gruposMap[claveBase].marca = item.marca;
       }
     });
 
-    const resultado = [];
-    ['led_amarillos', 'led_rojos', 'led_verdes'].forEach(k => {
-      if (gruposMap[k].subItems.length > 0) {
-        resultado.push(gruposMap[k]);
-      }
-    });
-
-    return [...resultado, ...otrosItems];
+    return Object.values(gruposMap);
   };
 
   // ==========================================
@@ -1047,226 +1034,119 @@ export default function InventarioSemaforos() {
                   );
                 })
                 .map((item) => (
-                  item.esGrupo ? (
-                    <div
-                      key={item.id}
-                      style={{
-                        backgroundColor: 'white',
-                        borderRadius: '16px',
-                        padding: '1.5rem',
-                        boxShadow: '0 4px 6px rgba(0,0,0,0.02), 0 10px 15px -3px rgba(0,0,0,0.03)',
-                        border: '1px solid #e2e8f0',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        transition: 'all 0.2s',
-                        position: 'relative',
-                        overflow: 'hidden'
-                      }}
-                      onMouseOver={e => {
-                        e.currentTarget.style.transform = 'translateY(-4px)';
-                        e.currentTarget.style.boxShadow = '0 12px 20px rgba(0,0,0,0.06)';
-                      }}
-                      onMouseOut={e => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.02)';
-                      }}
-                    >
-                      <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', backgroundColor: '#691B31' }}></div>
+                  <div
+                    key={item.id}
+                    style={{
+                      backgroundColor: 'white',
+                      borderRadius: '16px',
+                      padding: '1.5rem',
+                      boxShadow: '0 4px 6px rgba(0,0,0,0.02), 0 10px 15px -3px rgba(0,0,0,0.03)',
+                      border: '1px solid #e2e8f0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      transition: 'all 0.2s',
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.boxShadow = '0 12px 20px rgba(0,0,0,0.06)';
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.02)';
+                    }}
+                  >
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '5px', height: '100%', backgroundColor: item.colorStripe || '#691B31' }}></div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                        <div>
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            fontSize: '0.75rem',
-                            fontWeight: '700',
-                            color: '#475569',
-                            textTransform: 'uppercase',
-                            backgroundColor: '#f1f5f9',
-                            padding: '0.25rem 0.6rem',
-                            borderRadius: '6px'
-                          }}>
-                            {getCategoriaIcon(item.categoria)}
-                            {getCategoriaLabel(item.categoria)}
-                          </span>
-                          <h3 style={{ fontSize: '1.25rem', margin: '0.75rem 0 0.25rem', fontWeight: '800', color: '#1e293b', textTransform: 'capitalize' }}>
-                            {item.nombre}
-                          </h3>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '0.25rem' }}>
-                          <button
-                            onClick={() => abrirHistorial(item.subItems?.[0] || item)}
-                            title="Ver historial de asignación"
-                            style={{
-                              backgroundColor: '#e0f2fe', border: 'none', color: '#0284c7', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
-                            }}
-                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
-                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
-                          >
-                            <FaHistory size={14} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setGrupoSeleccionado(item.key);
-                              setBusquedaDesglose('');
-                            }}
-                            title="Editar existencias y números de serie"
-                            style={{
-                              backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
-                            }}
-                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
-                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
-                          >
-                            <FaEdit size={14} />
-                          </button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                      <div style={{ flex: 1, paddingRight: '0.5rem' }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          fontSize: '0.75rem',
+                          fontWeight: '700',
+                          color: '#475569',
+                          textTransform: 'uppercase',
+                          backgroundColor: '#f1f5f9',
+                          padding: '0.25rem 0.6rem',
+                          borderRadius: '6px'
+                        }}>
+                          {getCategoriaIcon(item.categoria)}
+                          {getCategoriaLabel(item.categoria)}
+                        </span>
+                        <h3 style={{ fontSize: '1.25rem', margin: '0.75rem 0 0.25rem', fontWeight: '800', color: '#1e293b', textTransform: 'capitalize' }}>
+                          {item.nombre}
+                        </h3>
+                        <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.2rem' }}>
+                          {item.marca && <span style={{ fontWeight: '600' }}>{item.marca}</span>}
+                          {item.subItems?.length > 1
+                            ? ` — ${item.subItems.length} registros individuales`
+                            : item.subItems?.[0]?.modelo
+                            ? ` — ${item.subItems[0].modelo}`
+                            : ''}
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                        <button
+                          onClick={() => abrirHistorial(item.subItems?.[0] || item)}
+                          title="Ver historial de asignación"
+                          style={{
+                            backgroundColor: '#e0f2fe', border: 'none', color: '#0284c7', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
+                        >
+                          <FaHistory size={14} />
+                        </button>
                         <button
                           onClick={() => {
                             setGrupoSeleccionado(item.key);
                             setBusquedaDesglose('');
                           }}
+                          title="Editar existencias y números de serie"
                           style={{
-                            backgroundColor: '#f1f5f9', color: '#691B31', border: 'none', borderRadius: '6px',
-                            padding: '0.4rem 0.8rem', fontSize: '0.85rem', fontWeight: '600', cursor: 'pointer',
-                            transition: 'all 0.15s'
+                            backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
                           }}
-                          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#691B31'; e.currentTarget.style.color = 'white' }}
-                          onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#f1f5f9'; e.currentTarget.style.color = '#691B31' }}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
                         >
-                          Ajustar Stock
+                          <FaEdit size={14} />
                         </button>
-                        <span style={{
-                          fontSize: '1.5rem',
-                          fontWeight: '800',
-                          color: item.cantidad > 5 ? '#0f766e' : item.cantidad > 0 ? '#b45309' : '#be123c',
-                          backgroundColor: item.cantidad > 5 ? '#f0fdf4' : item.cantidad > 0 ? '#fffbeb' : '#fdf2f2',
-                          padding: '0.1rem 0.8rem',
-                          borderRadius: '8px'
-                        }}>
-                          {item.cantidad}
-                        </span>
                       </div>
                     </div>
-                  ) : (
-                    <div
-                      key={item.id}
-                      style={{
-                        backgroundColor: 'white',
-                        borderRadius: '16px',
-                        padding: '1.5rem',
-                        boxShadow: '0 4px 6px rgba(0,0,0,0.02), 0 10px 15px -3px rgba(0,0,0,0.03)',
-                        border: '1px solid #e2e8f0',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        transition: 'all 0.2s',
-                        position: 'relative',
-                        overflow: 'hidden'
-                      }}
-                      onMouseOver={e => {
-                        e.currentTarget.style.transform = 'translateY(-4px)';
-                        e.currentTarget.style.boxShadow = '0 12px 20px rgba(0,0,0,0.06)';
-                      }}
-                      onMouseOut={e => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.02)';
-                      }}
-                    >
-                      <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', backgroundColor: '#691B31' }}></div>
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                        <div>
-                          <span style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            fontSize: '0.75rem',
-                            fontWeight: '700',
-                            color: '#475569',
-                            textTransform: 'uppercase',
-                            backgroundColor: '#f1f5f9',
-                            padding: '0.25rem 0.6rem',
-                            borderRadius: '6px'
-                          }}>
-                            {getCategoriaIcon(item.categoria)}
-                            {getCategoriaLabel(item.categoria)}
-                          </span>
-                          <h3 style={{ fontSize: '1.25rem', margin: '0.75rem 0 0.25rem', fontWeight: '800', color: '#1e293b', textTransform: 'capitalize' }}>
-                            {item.nombre}
-                          </h3>
-                          {(item.marca || item.modelo) && (
-                            <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.25rem' }}>
-                              {item.marca && <span style={{ fontWeight: '600' }}>{item.marca}</span>}
-                              {item.marca && item.modelo && ' - '}
-                              {item.modelo && <span>{item.modelo}</span>}
-                            </div>
-                          )}
-                          {(item.numeroSerie || item.numeroInventario) && (
-                            <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.25rem', display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                              {item.numeroSerie && <span>S/N: {item.numeroSerie}</span>}
-                              {item.numeroInventario && <span>Inv: {item.numeroInventario}</span>}
-                            </div>
-                          )}
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '0.25rem' }}>
-                          <button
-                            onClick={() => abrirHistorial(item)}
-                            title="Ver historial de asignación"
-                            style={{
-                              backgroundColor: '#e0f2fe', border: 'none', color: '#0284c7', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
-                            }}
-                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
-                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
-                          >
-                            <FaHistory size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleEditarStock(item)}
-                            title="Editar existencias"
-                            style={{
-                              backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', padding: '0.5rem', borderRadius: '8px', display: 'flex', alignItems: 'center', transition: 'background-color 0.2s'
-                            }}
-                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
-                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
-                          >
-                            <FaEdit size={14} />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', marginTop: '0.5rem' }}>
-                        <button
-                          onClick={() => handleAjustarStockDirecto(item)}
-                          style={{
-                            backgroundColor: '#f1f5f9', color: '#691B31', border: 'none', borderRadius: '6px',
-                            padding: '0.4rem 0.8rem', fontSize: '0.85rem', fontWeight: '600', cursor: 'pointer',
-                            transition: 'all 0.15s'
-                          }}
-                          onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#691B31'; e.currentTarget.style.color = 'white' }}
-                          onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#f1f5f9'; e.currentTarget.style.color = '#691B31' }}
-                        >
-                          Ajustar Stock
-                        </button>
-                        <span style={{
-                          fontSize: '1.5rem',
-                          fontWeight: '800',
-                          color: item.cantidad > 5 ? '#0f766e' : item.cantidad > 0 ? '#b45309' : '#be123c',
-                          backgroundColor: item.cantidad > 5 ? '#f0fdf4' : item.cantidad > 0 ? '#fffbeb' : '#fdf2f2',
-                          padding: '0.1rem 0.8rem',
-                          borderRadius: '8px'
-                        }}>
-                          {item.cantidad}
-                        </span>
-                      </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', marginTop: '0.5rem' }}>
+                      <button
+                        onClick={() => {
+                          setGrupoSeleccionado(item.key);
+                          setBusquedaDesglose('');
+                        }}
+                        style={{
+                          backgroundColor: '#f1f5f9', color: '#691B31', border: 'none', borderRadius: '6px',
+                          padding: '0.45rem 0.9rem', fontSize: '0.85rem', fontWeight: '700', cursor: 'pointer',
+                          transition: 'all 0.15s'
+                        }}
+                        onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#691B31'; e.currentTarget.style.color = 'white' }}
+                        onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#f1f5f9'; e.currentTarget.style.color = '#691B31' }}
+                      >
+                        Ajustar Stock
+                      </button>
+                      <span style={{
+                        fontSize: '1.4rem',
+                        fontWeight: '800',
+                        color: '#0f766e',
+                        backgroundColor: '#f0fdf4',
+                        padding: '0.2rem 0.85rem',
+                        borderRadius: '8px'
+                      }}>
+                        {item.cantidad}
+                      </span>
                     </div>
-                  )
+                  </div>
                 ))}
             </div>
           )}
@@ -2451,7 +2331,7 @@ export default function InventarioSemaforos() {
                         color: grupo.colorBadge || '#475569',
                         padding: '0.2rem 0.6rem', borderRadius: '6px'
                       }}>
-                        {grupo.subItems.length} {grupo.subItems.length === 1 ? 'unidad' : 'unidades'}
+                        {grupo.cantidad} {grupo.cantidad === 1 ? 'unidad' : 'unidades'}
                       </span>
                     </h3>
                     <p style={{ margin: '0.2rem 0 0', fontSize: '0.85rem', color: '#64748b' }}>
@@ -2513,7 +2393,7 @@ export default function InventarioSemaforos() {
                     setModoAjusteDirecto(false)
                     setStockForm({
                       nombre: grupo.subItems[0]?.nombre || grupo.nombre,
-                      categoria: 'componente',
+                      categoria: grupo.categoria || 'componente',
                       cantidad: 1,
                       marca: grupo.marca || 'SEMEX',
                       modelo: grupo.subItems[0]?.modelo || '',
@@ -2580,17 +2460,17 @@ export default function InventarioSemaforos() {
                               {subItem.numeroInventario}
                             </span>
                           ) : (
-                            <span style={{ color: '#94a3b8' }}>N/A</span>
+                            <span style={{ color: '#94a3b8' }}>—</span>
                           )}
                         </td>
-                        <td style={{ padding: '0.75rem 0.75rem', fontFamily: 'monospace', fontWeight: '600', color: '#334155' }}>
-                          {subItem.numeroSerie || <span style={{ color: '#94a3b8' }}>N/A</span>}
+                        <td style={{ padding: '0.75rem 0.75rem', fontFamily: 'monospace', fontWeight: '700', color: '#334155' }}>
+                          {subItem.numeroSerie || <span style={{ color: '#94a3b8', fontFamily: 'inherit', fontWeight: 'normal' }}>—</span>}
                         </td>
                         <td style={{ padding: '0.75rem 0.75rem', color: '#475569' }}>
-                          {subItem.marca || 'SEMEX'}
+                          {subItem.marca || grupo.marca || 'SEMEX'}
                         </td>
                         <td style={{ padding: '0.75rem 0.75rem', color: '#64748b', fontSize: '0.83rem' }}>
-                          {subItem.modelo || 'N/A'}
+                          {subItem.modelo || '—'}
                         </td>
                         <td style={{ padding: '0.75rem 0.75rem', textAlign: 'center' }}>
                           <span style={{

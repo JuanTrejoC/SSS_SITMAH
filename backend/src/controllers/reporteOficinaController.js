@@ -350,7 +350,7 @@ async function asignarPieza(req, res) {
       data: { cantidad: { decrement: cantidad } }
     });
 
-    const estadoFisicoVieja = estado_pieza_reemplazada === 'danada' ? 'Dañado' : 'Por Reparar';
+    const estadoFisicoVieja = (estado_pieza_reemplazada === 'danada' || estado_pieza_reemplazada === 'baja') ? 'Baja' : 'Mantenimiento';
 
     // Registrar la pieza retirada/vieja en ExistenciaComponente para que figure en el inventario
     const piezaViejaExistencia = await tx.existenciaComponente.create({

@@ -45,6 +45,13 @@ const ARTICULOS_AGRUPADOS = {
 
 const ARTICULOS_COMUNES = Object.values(ARTICULOS_AGRUPADOS).flat().map(item => item.value);
 
+const normalizarEstado = (est) => {
+  const e = String(est || '').toLowerCase().trim();
+  if (e === 'baja' || e === 'dañado' || e === 'danado' || e === 'danada') return 'Baja';
+  if (e === 'mantenimiento' || e === 'por reparar' || e === 'refacciones' || e === 'reparacion') return 'Mantenimiento';
+  return 'Stock';
+};
+
 export default function InventarioExistencias() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -54,7 +61,7 @@ export default function InventarioExistencias() {
   const [busqueda, setBusqueda] = useState('');
   const [expandedGroups, setExpandedGroups] = useState({});
   const [filtroCategoria, setFiltroCategoria] = useState('');
-  const [filtroEstado, setFiltroEstado] = useState(''); // '' | 'Stock' | 'Refacciones' | 'Baja'
+  const [filtroEstado, setFiltroEstado] = useState('Stock'); // 'Stock' | 'Mantenimiento' | 'Baja' | ''
   const [filtroOrigen, setFiltroOrigen] = useState(''); // '' | 'reemplazadas' | 'almacen'
   const [menuExportarAbierto, setMenuExportarAbierto] = useState(false);
   const exportDropdownRef = useRef(null);
@@ -77,11 +84,43 @@ export default function InventarioExistencias() {
     tipoInventario: 'tecnologico'
   });
 
+  const handleNuevo = () => {
+    resetForm();
+    setModalAbierto(true);
+  };
+
   const cargarExistencias = async () => {
     if (!user?.token) return;
     setCargando(true);
     try {
-      // Fetch all non-active technological equipment
+      // 1. Cargar componentes y piezas registrados directamente en existencias tecnológicas
+      const resExistencias = await fetch(`${API_BASE_URL}/api/inventario/existencias?tipoInventario=tecnologico`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      });
+      let exItems = [];
+      if (resExistencias.ok) {
+        const jsonEx = await resExistencias.json();
+        const lista = jsonEx.data || jsonEx;
+        if (Array.isArray(lista)) {
+          exItems = lista.map(item => ({
+            id: item.id,
+            origen: 'existencia',
+            nombre: item.nombre,
+            categoria: item.categoria || 'componente',
+            cantidad: item.cantidad !== undefined ? item.cantidad : 1,
+            estadoFisico: normalizarEstado(item.estadoFisico),
+            areaUbicacion: item.areaUbicacion || 'Almacén de Sistemas',
+            marca: item.marca || '',
+            modelo: item.modelo || '',
+            numeroSerie: item.numeroSerie || '',
+            numeroInventario: item.numeroInventario || '',
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt
+          }));
+        }
+      }
+
+      // 2. Cargar equipos tecnológicos que no estén en estatus Activo (Stock, Refacciones, Mantenimiento, Baja)
       const resEq = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?limit=2000&estatusNot=Activo`, {
         headers: { 'Authorization': `Bearer ${user.token}` }
       });
@@ -96,7 +135,7 @@ export default function InventarioExistencias() {
               nombre: item.detalles?.nombre || `${item.marca || ''} ${item.modelo || ''}`.trim() || item.tipo,
               categoria: item.detalles?.categoria || item.tipo,
               cantidad: 1,
-              estadoFisico: item.estatus || 'Stock', // Mapear a estatus
+              estadoFisico: normalizarEstado(item.estatus || item.detalles?.estadoFisico),
               areaUbicacion: item.areaUbicacion || item.detalles?.areaUbicacion || 'Almacén de Sistemas',
               marca: item.marca || '',
               modelo: item.modelo || '',
@@ -108,7 +147,7 @@ export default function InventarioExistencias() {
         }
       }
 
-      setExistencias(eqItems);
+      setExistencias([...exItems, ...eqItems]);
     } catch (err) {
       console.error('Error al cargar existencias:', err);
     } finally {
@@ -360,16 +399,16 @@ export default function InventarioExistencias() {
       let tituloDoc = 'INVENTARIO DE EXISTENCIAS';
       let subtituloDoc = 'REPORTE GENERAL DE STOCK Y REFACCIONES';
 
-      if (tipo === 'buen_estado') {
-        registros = existencias.filter(i => i.estadoFisico === 'Stock');
-        tituloDoc = 'REPORTE DE PIEZAS EN BUEN ESTADO';
+      if (tipo === 'Stock' || tipo === 'buen_estado') {
+        registros = existencias.filter(i => i.estadoFisico === 'Stock' || i.estadoFisico === 'Buen Estado');
+        tituloDoc = 'REPORTE DE PIEZAS EN STOCK';
         subtituloDoc = 'Componentes, accesorios y equipos operativos en stock';
-      } else if (tipo === 'por_reparar') {
-        registros = existencias.filter(i => i.estadoFisico === 'Refacciones');
-        tituloDoc = 'REPORTE DE PIEZAS POR REPARAR';
-        subtituloDoc = 'Piezas y refacciones en proceso de revisión o mantenimiento';
-      } else if (tipo === 'danado') {
-        registros = existencias.filter(i => i.estadoFisico === 'Baja');
+      } else if (tipo === 'Mantenimiento' || tipo === 'Refacciones' || tipo === 'por_reparar') {
+        registros = existencias.filter(i => i.estadoFisico === 'Mantenimiento' || i.estadoFisico === 'Refacciones' || i.estadoFisico === 'reparacion');
+        tituloDoc = 'REPORTE DE PIEZAS EN MANTENIMIENTO / REVISIÓN';
+        subtituloDoc = 'Piezas retiradas o en proceso de revisión o mantenimiento';
+      } else if (tipo === 'Baja' || tipo === 'danado') {
+        registros = existencias.filter(i => i.estadoFisico === 'Baja' || i.estadoFisico === 'Dañado');
         tituloDoc = 'REPORTE DE PIEZAS DAÑADAS / BAJA';
         subtituloDoc = 'Piezas no operativas o descartadas tras reemplazo';
       } else {
@@ -383,7 +422,15 @@ export default function InventarioExistencias() {
             (item.numeroInventario || '').toLowerCase().includes(busqueda.toLowerCase()) ||
             (item.areaUbicacion || '').toLowerCase().includes(busqueda.toLowerCase())
           );
-          const coincideEstado = !filtroEstado || item.estadoFisico === filtroEstado;
+          const coincideEstado = !filtroEstado || (
+            filtroEstado === 'Stock'
+              ? (item.estadoFisico === 'Stock' || item.estadoFisico === 'Buen Estado')
+              : filtroEstado === 'Mantenimiento'
+              ? (item.estadoFisico === 'Mantenimiento' || item.estadoFisico === 'Refacciones' || item.estadoFisico === 'reparacion')
+              : filtroEstado === 'Baja'
+              ? (item.estadoFisico === 'Baja' || item.estadoFisico === 'Dañado')
+              : item.estadoFisico === filtroEstado
+          );
           const coincideOrigen = !filtroOrigen || (
               filtroOrigen === 'reemplazadas'
                 ? (item.nombre?.includes('Reemplazada') || item.nombre?.includes('Retirada') || item.numeroInventario?.includes('-RET'))
@@ -651,16 +698,16 @@ export default function InventarioExistencias() {
           </p>
         </div>
 
-        {/* MENÚ / BOTÓN EXPORTAR REPORTES PDF */}
-        <div ref={exportDropdownRef} style={{ position: 'relative' }}>
+        {/* BOTONES DE ACCIÓN: INGRESAR STOCK Y EXPORTAR REPORTES PDF */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button
             type="button"
-            onClick={() => setMenuExportarAbierto(!menuExportarAbierto)}
+            onClick={handleNuevo}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '0.6rem',
-              backgroundColor: '#691B31',
+              backgroundColor: '#BC955B',
               color: 'white',
               border: 'none',
               borderRadius: '10px',
@@ -668,16 +715,42 @@ export default function InventarioExistencias() {
               fontWeight: '700',
               fontSize: '0.9rem',
               cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(105, 27, 49, 0.25)',
+              boxShadow: '0 4px 12px rgba(188, 149, 91, 0.25)',
               transition: 'all 0.2s'
             }}
-            onMouseOver={e => e.currentTarget.style.backgroundColor = '#531325'}
-            onMouseOut={e => e.currentTarget.style.backgroundColor = '#691B31'}
+            onMouseOver={e => e.currentTarget.style.backgroundColor = '#9e7943'}
+            onMouseOut={e => e.currentTarget.style.backgroundColor = '#BC955B'}
           >
-            <FaFilePdf size={16} />
-            <span>Exportar Reportes PDF</span>
-            <FaChevronDown size={11} style={{ transform: menuExportarAbierto ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
+            <FaPlus size={14} />
+            <span>Ingresar Stock</span>
           </button>
+
+          <div ref={exportDropdownRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setMenuExportarAbierto(!menuExportarAbierto)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                backgroundColor: '#691B31',
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '0.75rem 1.25rem',
+                fontWeight: '700',
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(105, 27, 49, 0.25)',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#531325'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#691B31'}
+            >
+              <FaFilePdf size={16} />
+              <span>Exportar Reportes PDF</span>
+              <FaChevronDown size={11} style={{ transform: menuExportarAbierto ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
+            </button>
 
           {menuExportarAbierto && (
             <div style={{
@@ -732,12 +805,12 @@ export default function InventarioExistencias() {
                   </div>
                 </button>
 
-                {/* 2. Refacciones */}
+                {/* 2. Mantenimiento / Revisión */}
                 <button
                   type="button"
                   onClick={() => {
                     setMenuExportarAbierto(false);
-                    exportarReportePDF('Refacciones');
+                    exportarReportePDF('Mantenimiento');
                   }}
                   style={{
                     width: '100%',
@@ -759,8 +832,8 @@ export default function InventarioExistencias() {
                     <FaTools size={13} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#92400E' }}>2. Piezas Refacciones</div>
-                    <div style={{ fontSize: '0.72rem', color: '#6B7280' }}>En revisión o mantenimiento</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#92400E' }}>2. Piezas en Mantenimiento</div>
+                    <div style={{ fontSize: '0.72rem', color: '#6B7280' }}>En revisión o reparación</div>
                   </div>
                 </button>
 
@@ -834,18 +907,19 @@ export default function InventarioExistencias() {
           )}
         </div>
       </div>
+    </div>
 
-      {/* FILTROS DE ESTADO FÍSICO (3 CUADRIS) */}
+      {/* FILTROS DE ESTADO FÍSICO (3 TARJETAS) */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
         gap: '1.25rem',
         marginBottom: '2rem'
       }}>
         {/* Cuadri: Stock */}
         {(() => {
-          const countBuenEstado = existencias.filter(i => i.estadoFisico === 'Stock').reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
-          const totalArticulos = existencias.filter(i => i.estadoFisico === 'Stock').length;
+          const countBuenEstado = existencias.filter(i => i.estadoFisico === 'Stock' || i.estadoFisico === 'Buen Estado').reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
+          const totalArticulos = existencias.filter(i => i.estadoFisico === 'Stock' || i.estadoFisico === 'Buen Estado').length;
           const isActive = filtroEstado === 'Stock';
           return (
             <div
@@ -884,7 +958,7 @@ export default function InventarioExistencias() {
                     width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block'
                   }}></span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Stock
+                    Stock / Disponible
                   </span>
                 </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#064e3b', lineHeight: 1.1 }}>
@@ -942,14 +1016,14 @@ export default function InventarioExistencias() {
           );
         })()}
 
-        {/* Cuadri: Refacciones */}
+        {/* Cuadri: Mantenimiento / Revisión */}
         {(() => {
-          const countPorReparar = existencias.filter(i => i.estadoFisico === 'Refacciones').reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
-          const totalArticulos = existencias.filter(i => i.estadoFisico === 'Refacciones').length;
-          const isActive = filtroEstado === 'Refacciones';
+          const countMantenimiento = existencias.filter(i => i.estadoFisico === 'Mantenimiento' || i.estadoFisico === 'Refacciones' || i.estadoFisico === 'reparacion').reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
+          const totalArticulos = existencias.filter(i => i.estadoFisico === 'Mantenimiento' || i.estadoFisico === 'Refacciones' || i.estadoFisico === 'reparacion').length;
+          const isActive = filtroEstado === 'Mantenimiento';
           return (
             <div
-              onClick={() => setFiltroEstado(isActive ? '' : 'Refacciones')}
+              onClick={() => setFiltroEstado(isActive ? '' : 'Mantenimiento')}
               style={{
                 backgroundColor: isActive ? '#fffbeb' : '#ffffff',
                 border: isActive ? '2px solid #f59e0b' : '1px solid #e2e8f0',
@@ -984,114 +1058,14 @@ export default function InventarioExistencias() {
                     width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#f59e0b', display: 'inline-block'
                   }}></span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Refacciones
+                    En Mantenimiento / Revisión
                   </span>
                 </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#78350f', lineHeight: 1.1 }}>
-                  {countPorReparar} <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#d97706' }}>piezas</span>
+                  {countMantenimiento} <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#d97706' }}>piezas</span>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
                   {totalArticulos} {totalArticulos === 1 ? 'artículo en revisión' : 'artículos en revisión'}
-                </div>
-
-                {/* Botón rápido de PDF en la tarjeta */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    exportarReportePDF('Refacciones');
-                  }}
-                  title="Descargar Reporte PDF de Refacciones"
-                  style={{
-                    marginTop: '0.75rem',
-                    padding: '0.3rem 0.65rem',
-                    backgroundColor: '#FEF3C7',
-                    color: '#B45309',
-                    border: '1px solid #FDE68A',
-                    borderRadius: '6px',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    transition: 'all 0.15s'
-                  }}
-                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#FDE68A'}
-                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#FEF3C7'}
-                >
-                  <FaDownload size={10} /> PDF Refacciones
-                </button>
-              </div>
-
-              <div style={{
-                backgroundColor: isActive ? '#f59e0b' : '#fffbeb',
-                color: isActive ? '#ffffff' : '#d97706',
-                width: '46px',
-                height: '46px',
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.3rem',
-                flexShrink: 0
-              }}>
-                <FaTools />
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Cuadri: Mantenimiento */}
-        {(() => {
-          const countMantenimiento = existencias.filter(i => i.estadoFisico === 'Mantenimiento').reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
-          const totalArticulos = existencias.filter(i => i.estadoFisico === 'Mantenimiento').length;
-          const isActive = filtroEstado === 'Mantenimiento';
-          return (
-            <div
-              onClick={() => setFiltroEstado(isActive ? '' : 'Mantenimiento')}
-              style={{
-                backgroundColor: isActive ? '#fef3c7' : '#ffffff',
-                border: isActive ? '2px solid #d97706' : '1px solid #e2e8f0',
-                borderRadius: '16px',
-                padding: '1.25rem 1.5rem',
-                cursor: 'pointer',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                boxShadow: isActive ? '0 8px 16px rgba(217, 119, 6, 0.15)' : '0 2px 4px rgba(0,0,0,0.02)',
-                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                position: 'relative',
-                overflow: 'hidden'
-              }}
-              onMouseOver={e => {
-                if (!isActive) {
-                  e.currentTarget.style.borderColor = '#d97706';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                }
-              }}
-              onMouseOut={e => {
-                if (!isActive) {
-                  e.currentTarget.style.borderColor = '#e2e8f0';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                }
-              }}
-            >
-              <div style={{ position: 'absolute', top: 0, left: 0, width: '6px', height: '100%', backgroundColor: '#d97706' }}></div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-                  <span style={{
-                    width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#d97706', display: 'inline-block'
-                  }}></span>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Mantenimiento
-                  </span>
-                </div>
-                <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#78350f', lineHeight: 1.1 }}>
-                  {countMantenimiento} <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#b45309' }}>piezas</span>
-                </div>
-                <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
-                  {totalArticulos} {totalArticulos === 1 ? 'artículo' : 'artículos'}
                 </div>
 
                 {/* Botón rápido de PDF en la tarjeta */}
@@ -1120,13 +1094,13 @@ export default function InventarioExistencias() {
                   onMouseOver={e => e.currentTarget.style.backgroundColor = '#FDE68A'}
                   onMouseOut={e => e.currentTarget.style.backgroundColor = '#FEF3C7'}
                 >
-                  <FaDownload size={10} /> PDF Mant...
+                  <FaDownload size={10} /> PDF Mantenimiento
                 </button>
               </div>
 
               <div style={{
-                backgroundColor: isActive ? '#d97706' : '#fef3c7',
-                color: isActive ? '#ffffff' : '#b45309',
+                backgroundColor: isActive ? '#f59e0b' : '#fffbeb',
+                color: isActive ? '#ffffff' : '#d97706',
                 width: '46px',
                 height: '46px',
                 borderRadius: '12px',
@@ -1144,8 +1118,8 @@ export default function InventarioExistencias() {
 
         {/* Cuadri: Baja */}
         {(() => {
-          const countDanado = existencias.filter(i => i.estadoFisico === 'Baja').reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
-          const totalArticulos = existencias.filter(i => i.estadoFisico === 'Baja').length;
+          const countDanado = existencias.filter(i => i.estadoFisico === 'Baja' || i.estadoFisico === 'Dañado').reduce((sum, i) => sum + (Number(i.cantidad) || 0), 0);
+          const totalArticulos = existencias.filter(i => i.estadoFisico === 'Baja' || i.estadoFisico === 'Dañado').length;
           const isActive = filtroEstado === 'Baja';
           return (
             <div
@@ -1184,14 +1158,14 @@ export default function InventarioExistencias() {
                     width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#ef4444', display: 'inline-block'
                   }}></span>
                   <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#b91c1c', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Baja / Baja
+                    Baja / Dañado
                   </span>
                 </div>
                 <div style={{ fontSize: '1.75rem', fontWeight: 800, color: '#7f1d1d', lineHeight: 1.1 }}>
                   {countDanado} <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#dc2626' }}>piezas</span>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
-                  {totalArticulos} {totalArticulos === 1 ? 'artículo baja' : 'artículos bajas'}
+                  {totalArticulos} {totalArticulos === 1 ? 'artículo en baja' : 'artículos en baja'}
                 </div>
 
                 {/* Botón rápido de PDF en la tarjeta */}
@@ -1249,12 +1223,12 @@ export default function InventarioExistencias() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          backgroundColor: filtroEstado === 'Stock' ? '#ecfdf5' : filtroEstado === 'Refacciones' ? '#fffbeb' : filtroEstado === 'Baja' ? '#fef2f2' : '#f1f5f9',
-          border: `1px solid ${filtroEstado === 'Stock' ? '#a7f3d0' : filtroEstado === 'Refacciones' ? '#fde68a' : filtroEstado === 'Baja' ? '#fecaca' : '#cbd5e1'}`,
+          backgroundColor: filtroEstado === 'Stock' ? '#ecfdf5' : filtroEstado === 'Mantenimiento' || filtroEstado === 'Refacciones' ? '#fffbeb' : filtroEstado === 'Baja' ? '#fef2f2' : '#f1f5f9',
+          border: `1px solid ${filtroEstado === 'Stock' ? '#a7f3d0' : filtroEstado === 'Mantenimiento' || filtroEstado === 'Refacciones' ? '#fde68a' : filtroEstado === 'Baja' ? '#fecaca' : '#cbd5e1'}`,
           borderRadius: '10px',
           padding: '0.65rem 1.25rem',
           marginBottom: '1.5rem',
-          color: filtroEstado === 'Stock' ? '#065f46' : filtroEstado === 'Refacciones' ? '#92400e' : filtroEstado === 'Baja' ? '#991b1b' : '#334155',
+          color: filtroEstado === 'Stock' ? '#065f46' : filtroEstado === 'Mantenimiento' || filtroEstado === 'Refacciones' ? '#92400e' : filtroEstado === 'Baja' ? '#991b1b' : '#334155',
           fontWeight: '600',
           fontSize: '0.9rem',
           flexWrap: 'wrap',
@@ -1364,6 +1338,145 @@ export default function InventarioExistencias() {
         </select>
       </div>
 
+      {/* PESTAÑAS DE NAVEGACIÓN POR ESTADO */}
+      {(() => {
+        const countStock = existencias.filter(i => normalizarEstado(i.estadoFisico) === 'Stock').reduce((sum, i) => sum + (Number(i.cantidad) || 1), 0);
+        const countMantenimiento = existencias.filter(i => normalizarEstado(i.estadoFisico) === 'Mantenimiento').reduce((sum, i) => sum + (Number(i.cantidad) || 1), 0);
+        const countBaja = existencias.filter(i => normalizarEstado(i.estadoFisico) === 'Baja').reduce((sum, i) => sum + (Number(i.cantidad) || 1), 0);
+        const countTotal = existencias.reduce((sum, i) => sum + (Number(i.cantidad) || 1), 0);
+
+        return (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.65rem',
+            marginBottom: '1.75rem',
+            flexWrap: 'wrap',
+            backgroundColor: '#ffffff',
+            padding: '0.6rem 0.75rem',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+          }}>
+            <button
+              type="button"
+              onClick={() => setFiltroEstado('Stock')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.6rem 1.15rem',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: filtroEstado === 'Stock' ? '#10b981' : 'transparent',
+                color: filtroEstado === 'Stock' ? '#ffffff' : '#475569',
+                fontWeight: '700',
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                boxShadow: filtroEstado === 'Stock' ? '0 4px 10px rgba(16, 185, 129, 0.25)' : 'none'
+              }}
+              onMouseOver={e => {
+                if (filtroEstado !== 'Stock') e.currentTarget.style.backgroundColor = '#f1f5f9';
+              }}
+              onMouseOut={e => {
+                if (filtroEstado !== 'Stock') e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <FaCheckCircle size={13} />
+              <span>Stock / Disponibles ({countStock})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFiltroEstado('Mantenimiento')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.6rem 1.15rem',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: filtroEstado === 'Mantenimiento' ? '#f59e0b' : 'transparent',
+                color: filtroEstado === 'Mantenimiento' ? '#ffffff' : '#475569',
+                fontWeight: '700',
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                boxShadow: filtroEstado === 'Mantenimiento' ? '0 4px 10px rgba(245, 158, 11, 0.25)' : 'none'
+              }}
+              onMouseOver={e => {
+                if (filtroEstado !== 'Mantenimiento') e.currentTarget.style.backgroundColor = '#f1f5f9';
+              }}
+              onMouseOut={e => {
+                if (filtroEstado !== 'Mantenimiento') e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <FaTools size={13} />
+              <span>En Mantenimiento ({countMantenimiento})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFiltroEstado('Baja')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.6rem 1.15rem',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: filtroEstado === 'Baja' ? '#ef4444' : 'transparent',
+                color: filtroEstado === 'Baja' ? '#ffffff' : '#475569',
+                fontWeight: '700',
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                boxShadow: filtroEstado === 'Baja' ? '0 4px 10px rgba(239, 68, 68, 0.25)' : 'none'
+              }}
+              onMouseOver={e => {
+                if (filtroEstado !== 'Baja') e.currentTarget.style.backgroundColor = '#f1f5f9';
+              }}
+              onMouseOut={e => {
+                if (filtroEstado !== 'Baja') e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <FaExclamationTriangle size={13} />
+              <span>Bajas / Dañados ({countBaja})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFiltroEstado('')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.6rem 1.15rem',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: filtroEstado === '' ? '#691B31' : 'transparent',
+                color: filtroEstado === '' ? '#ffffff' : '#64748b',
+                fontWeight: '700',
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                boxShadow: filtroEstado === '' ? '0 4px 10px rgba(105, 27, 49, 0.25)' : 'none'
+              }}
+              onMouseOver={e => {
+                if (filtroEstado !== '') e.currentTarget.style.backgroundColor = '#f1f5f9';
+              }}
+              onMouseOut={e => {
+                if (filtroEstado !== '') e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <FaBoxes size={13} />
+              <span>Ver Todos ({countTotal})</span>
+            </button>
+          </div>
+        );
+      })()}
+
       {/* LISTA / GRID DE EXISTENCIAS */}
       {cargando ? (
         <div style={{ textAlign: 'center', padding: '4rem', color: '#64748b', fontSize: '1.1rem' }}>Cargando existencias...</div>
@@ -1382,7 +1495,8 @@ export default function InventarioExistencias() {
               (item.numeroInventario || '').toLowerCase().includes(busqueda.toLowerCase()) ||
               (item.areaUbicacion || '').toLowerCase().includes(busqueda.toLowerCase())
             );
-            const coincideEstado = !filtroEstado || item.estadoFisico === filtroEstado;
+            const estadoItem = normalizarEstado(item.estadoFisico);
+            const coincideEstado = !filtroEstado || estadoItem === filtroEstado;
             const coincideOrigen = !filtroOrigen || (
               filtroOrigen === 'reemplazadas'
                 ? (item.nombre?.includes('Reemplazada') || item.nombre?.includes('Retirada') || item.numeroInventario?.includes('-RET'))
@@ -1399,9 +1513,15 @@ export default function InventarioExistencias() {
             return (
               <div style={{ textAlign: 'center', padding: '3.5rem', backgroundColor: 'white', borderRadius: '16px', border: '1px dashed #cbd5e1', color: '#64748b' }}>
                 <FaBoxes size={36} color="#94a3b8" style={{ marginBottom: '0.75rem' }} />
-                <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#334155', fontWeight: '700' }}>No se encontraron artículos</h3>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', color: '#334155', fontWeight: '700' }}>No se encontraron artículos en este apartado</h3>
                 <p style={{ margin: '0.5rem 0 1rem', fontSize: '0.9rem', color: '#64748b' }}>
-                  No hay existencias que coincidan con la búsqueda o los filtros aplicados.
+                  {filtroEstado === 'Stock'
+                    ? 'No hay piezas disponibles en Stock con los filtros aplicados.'
+                    : filtroEstado === 'Mantenimiento'
+                    ? 'No hay piezas en Mantenimiento / Revisión actualmente.'
+                    : filtroEstado === 'Baja'
+                    ? 'No hay piezas registradas en Bajas / Dañados.'
+                    : 'No hay existencias que coincidan con la búsqueda.'}
                 </p>
                 {(filtroEstado || filtroOrigen || filtroCategoria || busqueda) && (
                   <button
@@ -1432,10 +1552,11 @@ export default function InventarioExistencias() {
           return (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
               {(() => {
-                // AGRUPAR itemsFiltrados por nombre, marca y modelo
+                // AGRUPAR itemsFiltrados por nombre, marca, modelo Y estadoFisico para que nunca se mezclen
                 const gruposObj = {};
                 itemsFiltrados.forEach(item => {
-                  const key = `${item.nombre || ''}-${item.marca || ''}-${item.modelo || ''}`;
+                  const estNorm = normalizarEstado(item.estadoFisico);
+                  const key = `${item.nombre || ''}-${item.marca || ''}-${item.modelo || ''}-${estNorm}`;
                   if (!gruposObj[key]) {
                     gruposObj[key] = {
                       key,
@@ -1443,7 +1564,7 @@ export default function InventarioExistencias() {
                       marca: item.marca,
                       modelo: item.modelo,
                       categoria: item.categoria,
-                      estadoFisico: item.estadoFisico,
+                      estadoFisico: estNorm,
                       cantidadTotal: 0,
                       items: []
                     };
@@ -1456,8 +1577,11 @@ export default function InventarioExistencias() {
                   const isExpanded = !!expandedGroups[grupo.key];
                   const toggleExpand = () => setExpandedGroups(prev => ({...prev, [grupo.key]: !prev[grupo.key]}));
                   
-                  const bgCat = getCategoriaBg(grupo.categoria);
-                  const textCat = getCategoriaTextColor(grupo.categoria);
+                  const esStock = grupo.estadoFisico === 'Stock';
+                  const esBaja = grupo.estadoFisico === 'Baja';
+                  const colorStripe = esStock ? '#10b981' : esBaja ? '#ef4444' : '#f59e0b';
+                  const colorQtyText = esStock ? '#047857' : esBaja ? '#b91c1c' : '#b45309';
+                  const bgQtyPill = esStock ? '#ecfdf5' : esBaja ? '#fef2f2' : '#fffbeb';
 
                   return (
                     <div
@@ -1483,29 +1607,42 @@ export default function InventarioExistencias() {
                         e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.04)';
                       }}
                     >
-                      {/* Left accent bar (similar to original image) */}
-                      <div style={{ position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', backgroundColor: '#691B31' }}></div>
+                      {/* Left accent bar correspondiente al estado */}
+                      <div style={{ position: 'absolute', top: 0, left: 0, width: '5px', height: '100%', backgroundColor: colorStripe }}></div>
                       
-                      {/* Top Row: Category and Action icons */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingLeft: '0.5rem' }}>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.4rem',
-                          fontSize: '0.7rem',
-                          fontWeight: '800',
-                          color: '#475569',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          backgroundColor: '#f1f5f9',
-                          padding: '0.25rem 0.6rem',
-                          borderRadius: '6px'
-                        }}>
-                          {getCategoriaIcon(grupo.categoria)}
-                          {getCategoriaLabel(grupo.categoria)}
-                        </span>
+                      {/* Top Row: Category and State Badge */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', paddingLeft: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            fontSize: '0.7rem',
+                            fontWeight: '800',
+                            color: '#475569',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            backgroundColor: '#f1f5f9',
+                            padding: '0.25rem 0.6rem',
+                            borderRadius: '6px'
+                          }}>
+                            {getCategoriaIcon(grupo.categoria)}
+                            {getCategoriaLabel(grupo.categoria)}
+                          </span>
 
-                        {/* Top right buttons placeholder to match image aesthetics */}
+                          <span style={{
+                            fontSize: '0.68rem',
+                            fontWeight: '700',
+                            padding: '0.2rem 0.5rem',
+                            borderRadius: '6px',
+                            backgroundColor: bgQtyPill,
+                            color: colorQtyText
+                          }}>
+                            {esStock ? '🟢 Stock' : esBaja ? '🔴 Baja' : '🟡 Mantenimiento'}
+                          </span>
+                        </div>
+
+                        {/* Top right buttons placeholder */}
                         <div style={{ display: 'flex', gap: '0.4rem' }}>
                           <button 
                             onClick={toggleExpand}
@@ -1530,9 +1667,9 @@ export default function InventarioExistencias() {
                       </div>
 
                       {/* Middle: Title */}
-                      <div style={{ paddingLeft: '0.5rem', flex: 1, minHeight: '60px' }}>
+                      <div style={{ paddingLeft: '0.5rem', flex: 1, minHeight: '55px' }}>
                         <h3 style={{
-                          fontSize: '1.15rem',
+                          fontSize: '1.1rem',
                           margin: '0 0 0.25rem 0',
                           fontWeight: '800',
                           color: '#0f172a',
@@ -1558,12 +1695,12 @@ export default function InventarioExistencias() {
                         <button 
                           onClick={toggleExpand}
                           style={{
-                            padding: '0.3rem 0.65rem',
+                            padding: '0.35rem 0.75rem',
                             backgroundColor: '#f1f5f9',
                             border: 'none',
                             borderRadius: '6px',
                             cursor: 'pointer',
-                            color: '#9f1239',
+                            color: '#691B31',
                             fontWeight: '700',
                             fontSize: '0.75rem',
                             display: 'inline-flex',
@@ -1573,14 +1710,14 @@ export default function InventarioExistencias() {
                           onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
                           onMouseOut={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
                         >
-                          Ver Piezas
+                          {isExpanded ? 'Ocultar' : 'Ver Piezas'}
                         </button>
                         
                         <span style={{
-                          fontSize: '1.4rem',
+                          fontSize: '1.35rem',
                           fontWeight: '800',
-                          color: '#047857',
-                          backgroundColor: '#ecfdf5',
+                          color: colorQtyText,
+                          backgroundColor: bgQtyPill,
                           padding: '0.2rem 0.8rem',
                           borderRadius: '8px',
                           minWidth: '2.5rem',
@@ -1615,11 +1752,11 @@ export default function InventarioExistencias() {
 
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
                                   <span style={{
-                                    backgroundColor: item.estadoFisico === 'Stock' ? '#ecfdf5' : item.estadoFisico === 'Refacciones' ? '#fffbeb' : '#fef2f2',
-                                    color: item.estadoFisico === 'Stock' ? '#047857' : item.estadoFisico === 'Refacciones' ? '#b45309' : '#b91c1c',
+                                    backgroundColor: (item.estadoFisico === 'Stock' || item.estadoFisico === 'Buen Estado') ? '#ecfdf5' : (item.estadoFisico === 'Baja' || item.estadoFisico === 'Dañado') ? '#fef2f2' : '#fffbeb',
+                                    color: (item.estadoFisico === 'Stock' || item.estadoFisico === 'Buen Estado') ? '#047857' : (item.estadoFisico === 'Baja' || item.estadoFisico === 'Dañado') ? '#b91c1c' : '#b45309',
                                     padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold'
                                   }}>
-                                    {item.estadoFisico}
+                                    {item.estadoFisico === 'Refacciones' || item.estadoFisico === 'reparacion' ? 'Mantenimiento' : item.estadoFisico}
                                   </span>
 
                                   {(item.areaUbicacion || item.equipoOriginal?.responsable) && (
@@ -1723,10 +1860,9 @@ export default function InventarioExistencias() {
                     onChange={e => setForm({ ...form, estadoFisico: e.target.value })}
                     style={{ ...inputStyle, cursor: 'pointer', fontWeight: '600' }}
                   >
-                    <option value="Stock">🟢 Stock</option>
-                    <option value="Refacciones">🟡 Refacciones</option>
-                    <option value="Mantenimiento">🟠 Mantenimiento</option>
-                    <option value="Baja">🔴 Baja / Baja</option>
+                    <option value="Stock">🟢 Stock (Disponible)</option>
+                    <option value="Mantenimiento">🟡 En Mantenimiento / Revisión</option>
+                    <option value="Baja">🔴 Baja (Dañado / Inservible)</option>
                   </select>
                 </div>
               </div>
