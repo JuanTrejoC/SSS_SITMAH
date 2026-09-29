@@ -1,14 +1,14 @@
-import { 
-  Document, 
-  Packer, 
-  Paragraph, 
-  TextRun, 
-  Table, 
-  TableRow, 
-  TableCell, 
-  WidthType, 
-  AlignmentType, 
-  BorderStyle, 
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  AlignmentType,
+  BorderStyle,
   ImageRun,
   VerticalAlign
 } from 'docx';
@@ -39,29 +39,29 @@ export async function generarResguardoDocx(resguardo) {
 
   // Extraer datos de resguardante, cargo y dirección
   const nombreResguardante = (
-    resguardo.nombreResguardante || 
-    resguardo.mobiliario?.nombreResguardante || 
-    resguardo.equipoTecnologico?.responsable || 
-    resguardo.existencia?.responsable || 
-    'SIN ASIGNAR'
-  ).toUpperCase();
+    resguardo.nombreResguardante ||
+    resguardo.mobiliario?.nombreResguardante ||
+    resguardo.equipoTecnologico?.responsable ||
+    resguardo.existencia?.responsable ||
+    ''
+  ).trim();
 
   const cargo = (
-    resguardo.cargo || 
-    resguardo.mobiliario?.cargo || 
-    resguardo.equipoTecnologico?.cargoResponsable || 
-    resguardo.existencia?.cargoResponsable || 
+    resguardo.cargo ||
+    resguardo.mobiliario?.cargo ||
+    resguardo.equipoTecnologico?.cargoResponsable ||
+    resguardo.existencia?.cargoResponsable ||
     ''
-  ).toUpperCase();
+  ).trim();
 
   const direccion = (
-    resguardo.direccion || 
-    resguardo.mobiliario?.direccion || 
-    resguardo.equipoTecnologico?.direccion || 
-    resguardo.equipoTecnologico?.areaUbicacion || 
-    resguardo.area || 
+    resguardo.direccion ||
+    resguardo.area ||
+    resguardo.mobiliario?.direccion ||
+    resguardo.equipoTecnologico?.direccion ||
+    resguardo.equipoTecnologico?.areaUbicacion ||
     ''
-  ).toUpperCase();
+  ).trim();
 
   const numeroSerie = (resguardo.numeroSeriePdf || resguardo.numeroSerie || resguardo.mobiliario?.numeroSerie || resguardo.equipoTecnologico?.numeroSerie || 'S/S').trim().toUpperCase();
 
@@ -396,12 +396,12 @@ export async function generarResguardoDocx(resguardo) {
           }),
 
           // Espacio para la firma
-          new Paragraph({ spacing: { before: 500, after: 0 } }),
+          new Paragraph({ spacing: { before: 360, after: 0 } }),
 
-          // 7. LÍNEA Y FIRMA DEL RESGUARDANTE
+          // 7. LÍNEA Y FIRMA DEL RESGUARDANTE CON DATOS AUTOMÁTICOS
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 60 },
+            spacing: { before: 0, after: 40 },
             children: [
               new TextRun({
                 text: '________________________________________',
@@ -414,10 +414,10 @@ export async function generarResguardoDocx(resguardo) {
           }),
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 60 },
+            spacing: { before: 0, after: (nombreResguardante || cargo || direccion) ? 30 : 60 },
             children: [
               new TextRun({
-                text: 'NOMBRE Y FIRMA DEL RESGUARDANTE',
+
                 font: 'Arial',
                 size: 20, // 10pt
                 bold: true,
@@ -425,9 +425,52 @@ export async function generarResguardoDocx(resguardo) {
               })
             ]
           }),
+          ...(nombreResguardante ? [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 20 },
+              children: [
+                new TextRun({
+                  text: nombreResguardante.toUpperCase(),
+                  font: 'Arial',
+                  size: 20, // 10pt
+                  bold: true,
+                  color: '000000'
+                })
+              ]
+            })
+          ] : []),
+          ...(cargo ? [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 20 },
+              children: [
+                new TextRun({
+                  text: cargo.toUpperCase(),
+                  font: 'Arial',
+                  size: 19, // 9.5pt
+                  color: '333333'
+                })
+              ]
+            })
+          ] : []),
+          ...(direccion && direccion.toUpperCase() !== 'S/N' ? [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 20 },
+              children: [
+                new TextRun({
+                  text: direccion.toUpperCase(),
+                  font: 'Arial',
+                  size: 19, // 9.5pt
+                  color: '333333'
+                })
+              ]
+            })
+          ] : []),
 
           // Espacio hacia el pie
-          new Paragraph({ spacing: { before: 600, after: 0 } }),
+          new Paragraph({ spacing: { before: 400, after: 0 } }),
 
           // 8. PIE DE PÁGINA (Alineado a la derecha)
           new Paragraph({
