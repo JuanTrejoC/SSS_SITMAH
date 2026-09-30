@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { FaClipboardCheck, FaPlus, FaSearch, FaFileWord, FaCheck } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
@@ -384,6 +384,75 @@ function Resguardos() {
     return 'Desconocido';
   };
 
+  const resguardosFiltrados = useMemo(() => {
+    if (!busqueda.trim()) return resguardos;
+    const term = busqueda.toLowerCase().trim();
+
+    return resguardos.filter(r => {
+      const nombreItem = getNombreItem(r).toLowerCase();
+      const nombre = (r.nombreResguardante || '').toLowerCase();
+      const cargo = (r.cargo || '').toLowerCase();
+      const direccion = (r.direccion || r.area || '').toLowerCase();
+      const tipo = (r.tipoInventario || '').toLowerCase();
+      const estado = (r.estado || '').toLowerCase();
+      const descPdf = (r.descripcionPdf || '').toLowerCase();
+      const seriePdf = (r.numeroSeriePdf || '').toLowerCase();
+      const obs = (r.observaciones || '').toLowerCase();
+
+      // Mobiliario
+      const mobBien = (r.mobiliario?.bien || '').toLowerCase();
+      const mobInv = (r.mobiliario?.numeroInventario || '').toLowerCase();
+      const mobSerie = (r.mobiliario?.numeroSerie || '').toLowerCase();
+      const mobDesc = (r.mobiliario?.descripcion || '').toLowerCase();
+
+      // Equipo Tecnológico
+      const tecTipo = (r.equipoTecnologico?.tipo || '').toLowerCase();
+      const tecMarca = (r.equipoTecnologico?.marca || '').toLowerCase();
+      const tecModelo = (r.equipoTecnologico?.modelo || '').toLowerCase();
+      const tecInv = (r.equipoTecnologico?.numeroInventario || '').toLowerCase();
+      const tecSerie = (r.equipoTecnologico?.numeroSerie || '').toLowerCase();
+
+      // Existencia / Herramienta
+      const exNombre = (r.existencia?.nombre || '').toLowerCase();
+      const exMarca = (r.existencia?.marca || '').toLowerCase();
+      const exModelo = (r.existencia?.modelo || '').toLowerCase();
+      const exInv = (r.existencia?.numeroInventario || '').toLowerCase();
+      const exSerie = (r.existencia?.numeroSerie || '').toLowerCase();
+
+      // Semáforos
+      const semModelo = (r.controladorSemaforo?.modelo || '').toLowerCase();
+      const semMarca = (r.controladorSemaforo?.marca || '').toLowerCase();
+
+      return (
+        nombreItem.includes(term) ||
+        nombre.includes(term) ||
+        cargo.includes(term) ||
+        direccion.includes(term) ||
+        tipo.includes(term) ||
+        estado.includes(term) ||
+        descPdf.includes(term) ||
+        seriePdf.includes(term) ||
+        obs.includes(term) ||
+        mobBien.includes(term) ||
+        mobInv.includes(term) ||
+        mobSerie.includes(term) ||
+        mobDesc.includes(term) ||
+        tecTipo.includes(term) ||
+        tecMarca.includes(term) ||
+        tecModelo.includes(term) ||
+        tecInv.includes(term) ||
+        tecSerie.includes(term) ||
+        exNombre.includes(term) ||
+        exMarca.includes(term) ||
+        exModelo.includes(term) ||
+        exInv.includes(term) ||
+        exSerie.includes(term) ||
+        semModelo.includes(term) ||
+        semMarca.includes(term)
+      );
+    });
+  }, [resguardos, busqueda]);
+
   const exportarDocx = async (resguardo) => {
     try {
       Swal.fire({
@@ -423,12 +492,12 @@ function Resguardos() {
         </div>
 
         <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-          <div style={{ padding: '1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ position: 'relative', width: '300px' }}>
+          <div style={{ padding: '1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ position: 'relative', width: '380px', maxWidth: '100%' }}>
               <FaSearch style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
               <input 
                 type="text" 
-                placeholder="Buscar por nombre o dirección..." 
+                placeholder="Buscar por dispositivo, no. inventario, nombre o dirección..." 
                 value={busqueda}
                 onChange={e => setBusqueda(e.target.value)}
                 style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', boxSizing: 'border-box' }}
@@ -445,17 +514,13 @@ function Resguardos() {
                   <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Nombre del Resguardante</th>
                   <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Cargo</th>
                   <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Dirección</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Fecha Préstamo</th>
+                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Fecha Préstamo / Devolución</th>
                   <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Estado</th>
                   <th style={{ padding: '1rem 1.5rem', fontWeight: '600', textAlign: 'center' }}>Exportar / Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {resguardos.filter(r => 
-                  r.nombreResguardante.toLowerCase().includes(busqueda.toLowerCase()) || 
-                  (r.direccion || r.area || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-                  (r.cargo || '').toLowerCase().includes(busqueda.toLowerCase())
-                ).map(r => (
+                {resguardosFiltrados.map(r => (
                   <tr key={r.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
                     <td style={{ padding: '1rem 1.5rem', color: '#1e293b', fontWeight: '500' }}>{getNombreItem(r)}</td>
                     <td style={{ padding: '1rem 1.5rem', color: '#1e293b', textTransform: 'capitalize' }}>{r.tipoInventario}</td>
@@ -466,7 +531,18 @@ function Resguardos() {
                     <td style={{ padding: '1rem 1.5rem', color: '#64748b', fontSize: '0.875rem' }}>
                       {r.direccion || r.area || '—'}
                     </td>
-                    <td style={{ padding: '1rem 1.5rem', color: '#1e293b' }}>{new Date(r.fechaPrestamo).toLocaleDateString('es-MX')}</td>
+                    <td style={{ padding: '1rem 1.5rem', color: '#1e293b' }}>
+                      <div>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>Préstamo: </span>
+                        <span>{new Date(r.fechaPrestamo).toLocaleDateString('es-MX')}</span>
+                      </div>
+                      {r.fechaDevolucion && (
+                        <div style={{ marginTop: '0.25rem' }}>
+                          <span style={{ fontSize: '0.75rem', color: '#0369a1', fontWeight: '600' }}>Devolución: </span>
+                          <span style={{ color: '#0284c7', fontWeight: '500' }}>{new Date(r.fechaDevolucion).toLocaleDateString('es-MX')}</span>
+                        </div>
+                      )}
+                    </td>
                     <td style={{ padding: '1rem 1.5rem' }}>
                       <span style={{ padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: r.estado === 'Activo' ? '#dcfce7' : '#f1f5f9', color: r.estado === 'Activo' ? '#166534' : '#475569' }}>
                         {r.estado}
@@ -502,9 +578,11 @@ function Resguardos() {
                     </td>
                   </tr>
                 ))}
-                {resguardos.length === 0 && !cargando && (
+                {resguardosFiltrados.length === 0 && !cargando && (
                   <tr>
-                    <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>No hay resguardos registrados.</td>
+                    <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
+                      {busqueda.trim() ? 'No se encontraron resguardos que coincidan con la búsqueda.' : 'No hay resguardos registrados.'}
+                    </td>
                   </tr>
                 )}
               </tbody>

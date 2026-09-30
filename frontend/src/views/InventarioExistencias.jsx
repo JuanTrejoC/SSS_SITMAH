@@ -553,15 +553,15 @@ export default function InventarioExistencias() {
       let subtituloDoc = 'REPORTE GENERAL DE STOCK Y REFACCIONES';
 
       if (tipo === 'Stock' || tipo === 'buen_estado') {
-        registros = existencias.filter(i => i.estadoFisico === 'Stock' || i.estadoFisico === 'Buen Estado');
-        tituloDoc = 'REPORTE DE PIEZAS EN STOCK';
-        subtituloDoc = 'Componentes, accesorios y equipos operativos en stock';
+        registros = existencias.filter(i => normalizarEstado(i.estadoFisico) === 'Stock');
+        tituloDoc = 'REPORTE DE PIEZAS EN BUEN ESTADO / STOCK';
+        subtituloDoc = 'Componentes, accesorios y equipos operativos en buen estado';
       } else if (tipo === 'Mantenimiento' || tipo === 'Refacciones' || tipo === 'por_reparar') {
-        registros = existencias.filter(i => i.estadoFisico === 'Mantenimiento' || i.estadoFisico === 'Refacciones' || i.estadoFisico === 'reparacion');
-        tituloDoc = 'REPORTE DE PIEZAS EN MANTENIMIENTO / REVISIÓN';
-        subtituloDoc = 'Piezas retiradas o en proceso de revisión o mantenimiento';
+        registros = existencias.filter(i => normalizarEstado(i.estadoFisico) === 'Mantenimiento');
+        tituloDoc = 'REPORTE DE PIEZAS POR REPARAR / MANTENIMIENTO';
+        subtituloDoc = 'Piezas retiradas o en proceso de revisión o reparación';
       } else if (tipo === 'Baja' || tipo === 'danado') {
-        registros = existencias.filter(i => i.estadoFisico === 'Baja' || i.estadoFisico === 'Dañado');
+        registros = existencias.filter(i => normalizarEstado(i.estadoFisico) === 'Baja');
         tituloDoc = 'REPORTE DE PIEZAS DAÑADAS / BAJA';
         subtituloDoc = 'Piezas no operativas o descartadas tras reemplazo';
       } else {
@@ -575,15 +575,7 @@ export default function InventarioExistencias() {
             (item.numeroInventario || '').toLowerCase().includes(busqueda.toLowerCase()) ||
             (item.areaUbicacion || '').toLowerCase().includes(busqueda.toLowerCase())
           );
-          const coincideEstado = !filtroEstado || (
-            filtroEstado === 'Stock'
-              ? (item.estadoFisico === 'Stock' || item.estadoFisico === 'Buen Estado')
-              : filtroEstado === 'Mantenimiento'
-              ? (item.estadoFisico === 'Mantenimiento' || item.estadoFisico === 'Refacciones' || item.estadoFisico === 'reparacion')
-              : filtroEstado === 'Baja'
-              ? (item.estadoFisico === 'Baja' || item.estadoFisico === 'Dañado')
-              : item.estadoFisico === filtroEstado
-          );
+          const coincideEstado = !filtroEstado || normalizarEstado(item.estadoFisico) === normalizarEstado(filtroEstado);
           const coincideOrigen = !filtroOrigen || (
               filtroOrigen === 'reemplazadas'
                 ? (item.nombre?.includes('Reemplazada') || item.nombre?.includes('Retirada') || item.numeroInventario?.includes('-RET'))
@@ -597,8 +589,9 @@ export default function InventarioExistencias() {
         });
 
         if (filtroEstado) {
-          tituloDoc = `REPORTE DE PIEZAS - ${filtroEstado.toUpperCase()}`;
-          subtituloDoc = `Filtro aplicado por estado físico: ${filtroEstado}`;
+          const nombreEstadoFiltro = normalizarEstado(filtroEstado) === 'Stock' ? 'BUEN ESTADO' : normalizarEstado(filtroEstado) === 'Mantenimiento' ? 'POR REPARAR' : 'DAÑADAS / BAJA';
+          tituloDoc = `REPORTE DE PIEZAS - ${nombreEstadoFiltro}`;
+          subtituloDoc = `Filtro aplicado por estado físico: ${nombreEstadoFiltro}`;
         }
       }
 
@@ -640,9 +633,9 @@ export default function InventarioExistencias() {
       const logoSitmah = await loadImg('/images/sistema de tm.webp');
 
       const totalPiezas = registros.reduce((acc, r) => acc + (Number(r.cantidad) || 0), 0);
-      const countBuen = registros.filter(r => r.estadoFisico === 'Stock').reduce((a, r) => a + (Number(r.cantidad) || 0), 0);
-      const countRep = registros.filter(r => r.estadoFisico === 'Refacciones').reduce((a, r) => a + (Number(r.cantidad) || 0), 0);
-      const countDan = registros.filter(r => r.estadoFisico === 'Baja').reduce((a, r) => a + (Number(r.cantidad) || 0), 0);
+      const countBuen = registros.filter(r => normalizarEstado(r.estadoFisico) === 'Stock').reduce((a, r) => a + (Number(r.cantidad) || 0), 0);
+      const countRep = registros.filter(r => normalizarEstado(r.estadoFisico) === 'Mantenimiento').reduce((a, r) => a + (Number(r.cantidad) || 0), 0);
+      const countDan = registros.filter(r => normalizarEstado(r.estadoFisico) === 'Baja').reduce((a, r) => a + (Number(r.cantidad) || 0), 0);
 
       const drawHeaderFooter = (data) => {
         // Franja superior institucional
@@ -719,6 +712,14 @@ export default function InventarioExistencias() {
         }
       };
 
+      const getEstadoFisicoTexto = (est) => {
+        const norm = normalizarEstado(est);
+        if (norm === 'Stock') return 'BUEN ESTADO';
+        if (norm === 'Mantenimiento') return 'POR REPARAR';
+        if (norm === 'Baja') return 'DAÑADO / BAJA';
+        return (est || 'BUEN ESTADO').toUpperCase();
+      };
+
       const tableColumn = [
         "#",
         "ARTÍCULO / COMPONENTE",
@@ -746,7 +747,7 @@ export default function InventarioExistencias() {
           item.numeroSerie || '—',
           item.areaUbicacion || 'Almacén de Sistemas',
           origenTexto,
-          (item.estadoFisico || 'Stock').toUpperCase()
+          getEstadoFisicoTexto(item.estadoFisico)
         ];
       });
 
@@ -785,9 +786,9 @@ export default function InventarioExistencias() {
             let bgColor = [220, 252, 231];
             let textColor = [22, 163, 74];
 
-            if (estado.includes('POR REPARAR') || estado.includes('REPARACIÓN')) {
+            if (estado.includes('POR REPARAR') || estado.includes('MANTENIMIENTO') || estado.includes('REPARACIÓN')) {
               bgColor = [254, 249, 195];
-              textColor = [202, 138, 4];
+              textColor = [180, 83, 9];
             } else if (estado.includes('DAÑAD') || estado.includes('BAJA')) {
               bgColor = [254, 226, 226];
               textColor = [220, 38, 38];
@@ -809,7 +810,7 @@ export default function InventarioExistencias() {
         }
       });
 
-      const sufijo = tipo === 'buen_estado' ? 'Buen_Estado' : tipo === 'por_reparar' ? 'Por_Reparar' : tipo === 'danado' ? 'Danados' : 'Existencias';
+      const sufijo = tipo === 'buen_estado' || tipo === 'Stock' ? 'Buen_Estado' : tipo === 'por_reparar' || tipo === 'Mantenimiento' ? 'Por_Reparar' : tipo === 'danado' || tipo === 'Baja' ? 'Danados' : 'Existencias';
       const nombreArchivo = `Reporte_SITMAH_${sufijo}_${new Date().toISOString().slice(0, 10)}.pdf`;
       doc.save(nombreArchivo);
 
@@ -953,7 +954,7 @@ export default function InventarioExistencias() {
                     <FaCheckCircle size={13} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#065F46' }}>1. Piezas en Stock</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#065F46' }}>1. Piezas en Buen Estado</div>
                     <div style={{ fontSize: '0.72rem', color: '#6B7280' }}>Stock operativo disponible</div>
                   </div>
                 </button>
@@ -985,8 +986,8 @@ export default function InventarioExistencias() {
                     <FaTools size={13} />
                   </div>
                   <div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#92400E' }}>2. Piezas en Mantenimiento</div>
-                    <div style={{ fontSize: '0.72rem', color: '#6B7280' }}>En revisión o reparación</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#92400E' }}>2. Piezas Por Reparar / Mantenimiento</div>
+                    <div style={{ fontSize: '0.72rem', color: '#6B7280' }}>En proceso de revisión o reparación</div>
                   </div>
                 </button>
 
