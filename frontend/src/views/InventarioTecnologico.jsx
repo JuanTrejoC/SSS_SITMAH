@@ -9,7 +9,7 @@ import {
   FaLaptop, FaPlus, FaEdit, FaTrashAlt, FaLink, FaUnlink,
   FaChevronLeft, FaChevronRight, FaTimes, FaDesktop, FaMobileAlt, FaNetworkWired,
   FaServer, FaShieldAlt, FaWifi, FaVideo, FaHdd, FaBroadcastTower, FaPrint, FaTv, FaMemory,
-  FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone, FaFilePdf, FaPlug, FaTabletAlt,
+  FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone, FaFilePdf, FaFileExcel, FaPlug, FaTabletAlt,
   FaCogs, FaBoxes, FaTools, FaWrench, FaCheckCircle, FaExclamationTriangle, FaExclamationCircle,
   FaMapMarkerAlt, FaSearch
 } from 'react-icons/fa';
@@ -495,23 +495,32 @@ export default function InventarioTecnologico() {
   }, [pagina, busqueda, filtroTipo]);
 
   const exportarAExcel = async () => {
-    // El Excel siempre descarga todo sin filtros (como fue solicitado)
+    // Exporta respetando los filtros activos (búsqueda y tipo de equipo)
     const query = new URLSearchParams({
-      search: '',
-      tipo: 'tecnologico',
+      search: busqueda || '',
+      tipo: filtroTipo || 'tecnologico',
       includeImages: 'false',
       order: 'asc'
     });
     try {
+      Swal.fire({
+        title: 'Generando Excel...',
+        text: 'Por favor espere un momento.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
       const res = await fetch(`${API_BASE_URL}/api/inventario/tecnologico/export?${query}`, {
         headers: { Authorization: `Bearer ${user.token}` },
       });
+      Swal.close();
       if (res.ok) {
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'inventario_tecnologico_completo.xlsx';
+        const sufijoTipo = filtroTipo ? `_${filtroTipo}` : '';
+        const sufijoBusqueda = busqueda ? `_filtrado` : '';
+        a.download = `inventario_tecnologico${sufijoTipo}${sufijoBusqueda}.xlsx`;
         a.click();
         window.URL.revokeObjectURL(url);
       } else {
@@ -524,17 +533,287 @@ export default function InventarioTecnologico() {
     }
   };
 
+  const exportarFichaIndividualPdf = async (item) => {
+    try {
+      Swal.fire({
+        title: 'Generando Ficha Técnica...',
+        text: 'Por favor espere un momento.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
+      const doc = new jsPDF('portrait');
+      const pageWidth = doc.internal.pageSize.width;
+      const pageHeight = doc.internal.pageSize.height;
+
+      const loadImg = (src, tintColor) => new Promise((resolve) => {
+        const img = new Image();
+        img.src = src;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          if (tintColor) {
+            ctx.globalCompositeOperation = 'source-in';
+            ctx.fillStyle = tintColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+          resolve(canvas.toDataURL('image/png'));
+        };
+        img.onerror = () => resolve(null);
+      });
+
+      const logoHidalgo = await loadImg('/images/sitmah_logo.webp', '#691B31');
+      const logoSitmah = await loadImg('/images/sistema de tm.webp');
+
+      // Franja superior guinda
+      doc.setFillColor(105, 27, 49); // #691B31
+      doc.rect(0, 0, pageWidth, 6, 'F');
+
+      // Franja dorada
+      doc.setFillColor(188, 149, 91); // #BC955B
+      doc.rect(0, 6, pageWidth, 1.5, 'F');
+
+      // Logos
+      if (logoHidalgo) {
+        doc.addImage(logoHidalgo, 'PNG', 14, 10, 32, 11);
+      }
+      if (logoSitmah) {
+        doc.addImage(logoSitmah, 'PNG', pageWidth - 46, 10, 32, 11);
+      }
+
+      // Título
+      doc.setTextColor(105, 27, 49);
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text('FICHA TÉCNICA DE EQUIPO TECNOLÓGICO', pageWidth / 2, 16, { align: 'center' });
+
+      doc.setTextColor(188, 149, 91);
+      doc.setFontSize(9);
+      doc.text('SISTEMA INTEGRADO DE TRANSPORTE MASIVO DE HIDALGO', pageWidth / 2, 21, { align: 'center' });
+
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(100);
+      doc.setFontSize(7.5);
+      doc.text(`Fecha de emisión: ${new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}`, pageWidth / 2, 25, { align: 'center' });
+
+      const labelTipo = TIPOS_EQUIPO.find(t => t.value === item.tipo)?.label || (item.tipo ? item.tipo.toUpperCase() : 'EQUIPO');
+
+      // 1. Tabla: DATOS GENERALES Y ASIGNACIÓN
+      const datosGenerales = [
+        [
+          { content: 'Tipo de Dispositivo:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105], width: 45 } },
+          { content: labelTipo, styles: { fontStyle: 'bold', textColor: [15, 23, 42] } },
+          { content: 'Estatus:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105], width: 35 } },
+          { content: (item.estatus || 'ACTIVO').toUpperCase(), styles: { fontStyle: 'bold', textColor: item.estatus === 'Stock' ? [180, 83, 9] : item.estatus === 'Baja' ? [100, 116, 139] : [22, 101, 52] } }
+        ],
+        [
+          { content: 'No. de Inventario:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
+          { content: item.numeroInventario || 'S/N' },
+          { content: 'No. de Serie:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
+          { content: item.numeroSerie || 'S/S' }
+        ],
+        [
+          { content: 'Marca:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
+          { content: item.marca || 'N/A' },
+          { content: 'Modelo:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
+          { content: item.modelo || 'N/A' }
+        ],
+        [
+          { content: 'Procedencia:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
+          { content: item.procedencia || 'N/A', colSpan: 3 }
+        ],
+        [
+          { content: 'Responsable Asignado:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
+          { content: item.responsable || 'SIN ASIGNAR', styles: { fontStyle: 'bold' } },
+          { content: 'Cargo:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
+          { content: item.cargoResponsable || 'N/A' }
+        ],
+        [
+          { content: 'Dirección / Dependencia:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
+          { content: item.direccion || 'N/A' },
+          { content: 'Ubicación / Sede:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], textColor: [71, 85, 105] } },
+          { content: item.areaUbicacion || 'N/A' }
+        ]
+      ];
+
+      autoTable(doc, {
+        startY: 30,
+        head: [[{ content: '1. IDENTIFICACIÓN Y ASIGNACIÓN DEL EQUIPO', colSpan: 4, styles: { fillColor: [105, 27, 49], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'left', fontSize: 8.5 } }]],
+        body: datosGenerales,
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 2.5, lineColor: [226, 232, 240], textColor: [30, 41, 59] },
+        margin: { left: 14, right: 14 }
+      });
+
+      // 2. Tabla: ESPECIFICACIONES TÉCNICAS Y HARDWARE
+      const detallesObj = item.detalles || {};
+      const especificacionesRows = [];
+
+      if (['escritorio', 'laptop', 'servidor', 'tableta', 'computadora'].includes(item.tipo)) {
+        especificacionesRows.push(
+          [
+            { content: 'Procesador:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], width: 45 } },
+            { content: detallesObj.procesador || 'N/A' },
+            { content: 'Memoria RAM:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252], width: 35 } },
+            { content: detallesObj.ram || 'N/A' }
+          ],
+          [
+            { content: 'Almacenamiento:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252] } },
+            { content: `${detallesObj.almacenamiento || 'N/A'}${detallesObj.tipoAlmacenamiento ? ` (${detallesObj.tipoAlmacenamiento})` : ''}` },
+            { content: 'Tarjeta Gráfica:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252] } },
+            { content: detallesObj.tarjetaGrafica || 'Integrada / N/A' }
+          ],
+          [
+            { content: 'Sistema Operativo:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252] } },
+            { content: detallesObj.sistemaOperativo || 'N/A' },
+            { content: 'Dirección IP / MAC:', styles: { fontStyle: 'bold', fillColor: [248, 250, 252] } },
+            { content: `${detallesObj.ip || detallesObj.ipPredeterminada || 'N/A'}${detallesObj.mac ? ` / ${detallesObj.mac}` : ''}` }
+          ]
+        );
+      } else {
+        const entries = Object.entries(detallesObj).filter(([k, v]) => v !== undefined && v !== null && v !== '' && typeof v !== 'object');
+        if (entries.length > 0) {
+          for (let i = 0; i < entries.length; i += 2) {
+            const [k1, v1] = entries[i];
+            const [k2, v2] = entries[i + 1] || [];
+            especificacionesRows.push([
+              { content: `${k1.charAt(0).toUpperCase() + k1.slice(1)}:`, styles: { fontStyle: 'bold', fillColor: [248, 250, 252], width: 45 } },
+              { content: String(v1), colSpan: k2 ? 1 : 3 },
+              ...(k2 ? [
+                { content: `${k2.charAt(0).toUpperCase() + k2.slice(1)}:`, styles: { fontStyle: 'bold', fillColor: [248, 250, 252], width: 35 } },
+                { content: String(v2) }
+              ] : [])
+            ]);
+          }
+        } else {
+          especificacionesRows.push([
+            { content: 'Sin especificaciones técnicas adicionales registradas.', colSpan: 4, styles: { halign: 'center', textColor: [148, 163, 184] } }
+          ]);
+        }
+      }
+
+      const prevY1 = doc.lastAutoTable.finalY + 4;
+      autoTable(doc, {
+        startY: prevY1,
+        head: [[{ content: '2. ESPECIFICACIONES TÉCNICAS Y CARACTERÍSTICAS', colSpan: 4, styles: { fillColor: [105, 27, 49], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'left', fontSize: 8.5 } }]],
+        body: especificacionesRows,
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 2.5, lineColor: [226, 232, 240], textColor: [30, 41, 59] },
+        margin: { left: 14, right: 14 }
+      });
+
+      // 3. Tabla: COMPONENTES Y PERIFÉRICOS VINCULADOS
+      const perifericosRows = [];
+      if (detallesObj.monitores && Array.isArray(detallesObj.monitores) && detallesObj.monitores.length > 0) {
+        detallesObj.monitores.forEach((m, idx) => {
+          perifericosRows.push([
+            `Monitor #${idx + 1}`,
+            m.marca || 'N/A',
+            m.modelo || 'N/A',
+            m.serie || m.numeroSerie || 'S/S',
+            m.numeroInventario || 'S/N'
+          ]);
+        });
+      }
+      if (detallesObj.teclado && (detallesObj.teclado.marca || detallesObj.teclado.serie || detallesObj.teclado.numeroInventario)) {
+        perifericosRows.push(['Teclado', detallesObj.teclado.marca || 'N/A', detallesObj.teclado.modelo || 'N/A', detallesObj.teclado.serie || 'S/S', detallesObj.teclado.numeroInventario || 'S/N']);
+      }
+      if (detallesObj.mouse && (detallesObj.mouse.marca || detallesObj.mouse.serie || detallesObj.mouse.numeroInventario)) {
+        perifericosRows.push(['Mouse', detallesObj.mouse.marca || 'N/A', detallesObj.mouse.modelo || 'N/A', detallesObj.mouse.serie || 'S/S', detallesObj.mouse.numeroInventario || 'S/N']);
+      }
+      if (detallesObj.regulador && (detallesObj.regulador.marca || detallesObj.regulador.serie || detallesObj.regulador.numeroInventario)) {
+        perifericosRows.push(['Regulador / No Break', detallesObj.regulador.marca || 'N/A', detallesObj.regulador.modelo || 'N/A', detallesObj.regulador.serie || 'S/S', detallesObj.regulador.numeroInventario || 'S/N']);
+      }
+
+      if (perifericosRows.length > 0) {
+        const prevY2 = doc.lastAutoTable.finalY + 4;
+        autoTable(doc, {
+          startY: prevY2,
+          head: [
+            [{ content: '3. ACCESORIOS Y PERIFÉRICOS ASOCIADOS', colSpan: 5, styles: { fillColor: [105, 27, 49], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'left', fontSize: 8.5 } }],
+            ['COMPONENTE', 'MARCA', 'MODELO', 'NO. DE SERIE', 'NO. INVENTARIO']
+          ],
+          body: perifericosRows,
+          theme: 'grid',
+          styles: { fontSize: 7.5, cellPadding: 2, lineColor: [226, 232, 240], textColor: [30, 41, 59], halign: 'center' },
+          headStyles: { fillColor: [241, 245, 249], textColor: [71, 85, 105], fontStyle: 'bold' },
+          margin: { left: 14, right: 14 }
+        });
+      }
+
+      // 4. BLOQUE DE FIRMAS
+      const prevY3 = doc.lastAutoTable.finalY + 8;
+      const firmaY = Math.max(prevY3, pageHeight - 55);
+
+      doc.setDrawColor(71, 85, 105);
+      doc.setLineWidth(0.4);
+
+      // Línea izquierda: Responsable
+      const leftColX = 25;
+      const colWidth = 70;
+      doc.line(leftColX, firmaY + 15, leftColX + colWidth, firmaY + 15);
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text(item.responsable ? item.responsable.toUpperCase() : 'NOMBRE Y FIRMA', leftColX + colWidth / 2, firmaY + 19, { align: 'center' });
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(100);
+      doc.text(item.cargoResponsable ? item.cargoResponsable.toUpperCase() : 'RESPONSABLE ASIGNADO', leftColX + colWidth / 2, firmaY + 23, { align: 'center' });
+      doc.text(item.direccion ? item.direccion.toUpperCase() : 'DIRECCIÓN / ÁREA', leftColX + colWidth / 2, firmaY + 26.5, { align: 'center' });
+
+      // Línea derecha: Tecnologías de la Información
+      const rightColX = pageWidth - 25 - colWidth;
+      doc.line(rightColX, firmaY + 15, rightColX + colWidth, firmaY + 15);
+      doc.setFontSize(8);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.text('DEPARTAMENTO DE TI / SISTEMAS', rightColX + colWidth / 2, firmaY + 19, { align: 'center' });
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(100);
+      doc.text('ENTREGA / SUPERVISIÓN DE EQUIPO', rightColX + colWidth / 2, firmaY + 23, { align: 'center' });
+      doc.text('SISTEMA INTEGRADO DE TRANSPORTE MASIVO', rightColX + colWidth / 2, firmaY + 26.5, { align: 'center' });
+
+      // Footer
+      doc.setFillColor(105, 27, 49);
+      doc.rect(0, pageHeight - 6, pageWidth, 6, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(7);
+      doc.text('SITMAH - Ficha Oficial de Control Tecnológico', 14, pageHeight - 2);
+      doc.text('Página 1 de 1', pageWidth - 14, pageHeight - 2, { align: 'right' });
+
+      const numId = (item.numeroInventario || item.numeroSerie || item.id).toString().replace(/[^a-zA-Z0-9]/g, '_');
+      doc.save(`Ficha_Tecnica_${item.tipo || 'equipo'}_${numId}.pdf`);
+      Swal.close();
+    } catch (err) {
+      console.error('Error al generar ficha individual PDF:', err);
+      Swal.fire('Error', 'No se pudo generar la ficha técnica en PDF', 'error');
+    }
+  };
+
   const exportarAPdf = async () => {
     try {
+      Swal.fire({
+        title: 'Generando PDF...',
+        text: 'Por favor espere un momento.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
       const query = new URLSearchParams({
         limit: 10000,
-        search: busqueda,
+        search: busqueda || '',
         tipo: filtroTipo || 'tecnologico'
       });
       const res = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?${query}`, {
         headers: { 'Authorization': `Bearer ${user.token}` }
       });
       const json = await res.json();
+      Swal.close();
       
       if (res.ok && json.ok) {
         const registros = json.data;
@@ -628,12 +907,21 @@ export default function InventarioTecnologico() {
             doc.setFontSize(10);
             doc.text('SISTEMA DE TRANSPORTE METROPOLITANO DE HIDALGO', pageWidth / 2, 21, { align: 'center' });
 
+            if (filtroTipo || busqueda) {
+              const labelFiltro = filtroTipo ? (TIPOS_EQUIPO.find(t => t.value === filtroTipo)?.label || filtroTipo) : 'Todos los tipos';
+              const textoFiltro = `Filtro aplicado: ${labelFiltro}${busqueda ? ` | Búsqueda: "${busqueda}"` : ''} (${registros.length} registros)`;
+              doc.setTextColor(105, 27, 49);
+              doc.setFontSize(7.5);
+              doc.setFont(undefined, 'bold');
+              doc.text(textoFiltro, pageWidth / 2, 25, { align: 'center' });
+            }
+
             doc.setTextColor(100);
             doc.setFontSize(8);
             doc.setFont(undefined, 'normal');
             doc.text(`Fecha de generación:\n${new Date().toLocaleString()}`, pageWidth - 14, 12, { align: 'right' });
 
-            const total = registros.length;
+            const totalCount = registros.length;
             const operando = registros.filter(r => r.estatus?.toLowerCase() === 'operando' || r.estatus?.toLowerCase() === 'activo').length;
             const refacciones = registros.filter(r => r.estatus?.toLowerCase().includes('refacciones')).length;
             const ubicaciones = new Set(registros.map(r => r.areaUbicacion)).size;
@@ -663,10 +951,10 @@ export default function InventarioTecnologico() {
             const gap = 15;
             const startX = (pageWidth - (4 * cardW + 3 * gap)) / 2;
             
-            drawCard(startX, 26, cardW, 18, 'TOTAL DE EQUIPOS', total, iTot);
-            drawCard(startX + cardW + gap, 26, cardW, 18, 'OPERANDO', operando, iOp);
-            drawCard(startX + 2 * (cardW + gap), 26, cardW, 18, 'EN REFACCIONES', refacciones, iRef);
-            drawCard(startX + 3 * (cardW + gap), 26, cardW, 18, 'UBICACIONES', ubicaciones, iUbi);
+            drawCard(startX, 28, cardW, 18, 'TOTAL DE EQUIPOS', totalCount, iTot);
+            drawCard(startX + cardW + gap, 28, cardW, 18, 'OPERANDO', operando, iOp);
+            drawCard(startX + 2 * (cardW + gap), 28, cardW, 18, 'EN REFACCIONES', refacciones, iRef);
+            drawCard(startX + 3 * (cardW + gap), 28, cardW, 18, 'UBICACIONES', ubicaciones, iUbi);
           } else {
             // Encabezado compacto para páginas 2 en adelante
             if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 6, 22, 7);
@@ -711,7 +999,7 @@ export default function InventarioTecnologico() {
         autoTable(doc, {
           head: [tableColumn],
           body: tableRows,
-          startY: 50,
+          startY: 52,
           margin: {
             top: 18,
             bottom: 28,
@@ -769,7 +1057,9 @@ export default function InventarioTecnologico() {
           }
         });
 
-        doc.save(`inventario_tecnologico_${new Date().getTime()}.pdf`);
+        const sufijoTipo = filtroTipo ? `_${filtroTipo}` : '';
+        const sufijoBusqueda = busqueda ? `_filtrado` : '';
+        doc.save(`inventario_tecnologico${sufijoTipo}${sufijoBusqueda}_${new Date().getTime()}.pdf`);
       } else {
         Swal.fire('Error', json.error || 'Error al obtener datos', 'error');
       }
@@ -1206,8 +1496,9 @@ export default function InventarioTecnologico() {
             }}
             onMouseOver={e => e.currentTarget.style.backgroundColor = '#059669'}
             onMouseOut={e => e.currentTarget.style.backgroundColor = '#10b981'}
+            title={busqueda || filtroTipo ? `Exportar ${total} equipo(s) filtrado(s) a Excel` : 'Exportar todo el inventario a Excel'}
           >
-            Exportar a Excel
+            <FaFileExcel /> Exportar a Excel {(busqueda || filtroTipo) ? `(${total})` : ''}
           </button>
           <button
             onClick={exportarAPdf}
@@ -1218,8 +1509,9 @@ export default function InventarioTecnologico() {
             }}
             onMouseOver={e => e.currentTarget.style.backgroundColor = '#be123c'}
             onMouseOut={e => e.currentTarget.style.backgroundColor = '#e11d48'}
+            title={busqueda || filtroTipo ? `Exportar ${total} equipo(s) filtrado(s) a PDF` : 'Exportar todo el inventario a PDF'}
           >
-            <FaFilePdf /> Exportar a PDF
+            <FaFilePdf /> Exportar a PDF {(busqueda || filtroTipo) ? `(${total})` : ''}
           </button>
           <button
             onClick={() => { resetForm(); setModalAbierto(true); }}

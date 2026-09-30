@@ -802,24 +802,28 @@ async function exportarEquipoTecnologicoExcel(req, res) {
     if (tipo === 'herramientas') {
       where.tipo = { in: ['herramienta_tec', 'herramienta_infra'] };
     } else if (tipo === 'tecnologico') {
-      where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra'] };
+      where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra', 'refaccion'] };
     } else if (tipo) {
       where.tipo = tipo;
     } else {
-      where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra'] };
+      where.tipo = { notIn: ['herramienta_tec', 'herramienta_infra', 'refaccion'] };
     }
   }
   if (area) where.areaUbicacion = { contains: area };
 
   if (search) {
     where.OR = [
+      { tipo: { contains: search } },
       { numeroInventario: { contains: search } },
       { numeroSerie: { contains: search } },
       { marca: { contains: search } },
       { modelo: { contains: search } },
       { responsable: { contains: search } },
+      { cargoResponsable: { contains: search } },
       { areaUbicacion: { contains: search } },
       { direccion: { contains: search } },
+      { procedencia: { contains: search } },
+      { estatus: { contains: search } },
     ];
   }
   
