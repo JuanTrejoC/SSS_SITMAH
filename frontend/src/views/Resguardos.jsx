@@ -470,124 +470,131 @@ function Resguardos() {
   };
 
   return (
-    <div style={{ padding: '2rem', backgroundColor: '#f8fafc', minHeight: '100vh', boxSizing: 'border-box', overflowY: 'auto' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <div>
-            <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#691B31', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <FaClipboardCheck /> Resguardos
-            </h1>
-            <p style={{ color: '#6F7271', margin: '0.5rem 0 0', fontSize: '1rem' }}>
-              Gestión de préstamos y asignaciones de dispositivos y mobiliario con exportación de documentos oficiales.
-            </p>
-          </div>
-          <button 
-            onClick={abrirNuevoResguardo}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.75rem 1.5rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 6px -1px rgba(188, 149, 91, 0.3)' }}
-            onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-            onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
-          >
-            <FaPlus /> Nuevo Resguardo
-          </button>
+    <main style={{ padding: '2.5rem', flex: 1, backgroundColor: '#f8fafc', overflowY: 'auto', minHeight: '800px', boxSizing: 'border-box' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#691B31', margin: 0, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <FaClipboardCheck /> Resguardos
+          </h1>
+          <p style={{ color: '#6F7271', margin: '0.5rem 0 0', fontSize: '1rem' }}>
+            Gestión de préstamos y asignaciones de dispositivos y mobiliario con exportación de documentos oficiales.
+          </p>
         </div>
+        <button 
+          onClick={abrirNuevoResguardo}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.5rem',
+            backgroundColor: '#BC955B', color: 'white',
+            border: 'none', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
+            boxShadow: '0 4px 6px rgba(188,149,91,0.25)', transition: 'all 0.2s', fontSize: '1rem'
+          }}
+          onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+        >
+          <FaPlus /> Nuevo Resguardo
+        </button>
+      </div>
 
-        <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-          <div style={{ padding: '1.5rem', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ position: 'relative', width: '380px', maxWidth: '100%' }}>
-              <FaSearch style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-              <input 
-                type="text" 
-                placeholder="Buscar por dispositivo, no. inventario, nombre o dirección..." 
-                value={busqueda}
-                onChange={e => setBusqueda(e.target.value)}
-                style={{ width: '100%', padding: '0.75rem 1rem 0.75rem 2.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', boxSizing: 'border-box' }}
-              />
-            </div>
-          </div>
+      <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', marginBottom: '2rem' }}>
+        <input 
+          type="text" 
+          placeholder="Buscar por dispositivo, no. inventario, nombre o dirección..." 
+          value={busqueda}
+          onChange={e => setBusqueda(e.target.value)}
+          style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none', boxSizing: 'border-box', fontSize: '1rem' }}
+        />
+      </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f1f5f9', color: '#475569', fontSize: '0.875rem' }}>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Dispositivo/Mueble</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Tipo</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Nombre del Resguardante</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Cargo</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Dirección</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Fecha Préstamo / Devolución</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600' }}>Estado</th>
-                  <th style={{ padding: '1rem 1.5rem', fontWeight: '600', textAlign: 'center' }}>Exportar / Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {resguardosFiltrados.map(r => (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '1rem 1.5rem', color: '#1e293b', fontWeight: '500' }}>{getNombreItem(r)}</td>
-                    <td style={{ padding: '1rem 1.5rem', color: '#1e293b', textTransform: 'capitalize' }}>{r.tipoInventario}</td>
-                    <td style={{ padding: '1rem 1.5rem', color: '#1e293b', fontWeight: '600' }}>{r.nombreResguardante}</td>
-                    <td style={{ padding: '1rem 1.5rem', color: '#64748b', fontSize: '0.875rem' }}>
-                      {r.cargo ? <span style={{ fontWeight: '600', color: '#BC955B' }}>{r.cargo}</span> : '—'}
-                    </td>
-                    <td style={{ padding: '1rem 1.5rem', color: '#64748b', fontSize: '0.875rem' }}>
-                      {r.direccion || r.area || '—'}
-                    </td>
-                    <td style={{ padding: '1rem 1.5rem', color: '#1e293b' }}>
-                      <div>
-                        <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>Préstamo: </span>
-                        <span>{new Date(r.fechaPrestamo).toLocaleDateString('es-MX')}</span>
+      <div style={{ overflowX: 'auto', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+          <thead style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+            <tr>
+              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>DISPOSITIVO / MUEBLE</th>
+              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>TIPO</th>
+              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>NOMBRE DEL RESGUARDANTE</th>
+              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>CARGO</th>
+              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>DIRECCIÓN</th>
+              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>FECHA PRÉSTAMO / DEVOLUCIÓN</th>
+              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>ESTADO</th>
+              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600', textAlign: 'center' }}>EXPORTAR / ACCIONES</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cargando ? (
+              <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>Cargando...</td></tr>
+            ) : resguardosFiltrados.length === 0 ? (
+              <tr>
+                <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
+                  {busqueda.trim() ? 'No se encontraron resguardos que coincidan con la búsqueda.' : 'No hay resguardos registrados.'}
+                </td>
+              </tr>
+            ) : (
+              resguardosFiltrados.map(r => (
+                <tr key={r.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '1rem', color: '#1e293b', fontWeight: '500' }}>{getNombreItem(r)}</td>
+                  <td style={{ padding: '1rem', color: '#1e293b', textTransform: 'capitalize' }}>{r.tipoInventario}</td>
+                  <td style={{ padding: '1rem', color: '#1e293b', fontWeight: '600' }}>{r.nombreResguardante}</td>
+                  <td style={{ padding: '1rem', color: '#64748b', fontSize: '0.875rem' }}>
+                    {r.cargo ? <span style={{ fontWeight: '600', color: '#BC955B' }}>{r.cargo}</span> : '—'}
+                  </td>
+                  <td style={{ padding: '1rem', color: '#64748b', fontSize: '0.875rem' }}>
+                    {r.direccion || r.area || '—'}
+                  </td>
+                  <td style={{ padding: '1rem', color: '#1e293b' }}>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>Préstamo: </span>
+                      <span>{new Date(r.fechaPrestamo).toLocaleDateString('es-MX')}</span>
+                    </div>
+                    {r.fechaDevolucion && (
+                      <div style={{ marginTop: '0.25rem' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#0369a1', fontWeight: '600' }}>Devolución: </span>
+                        <span style={{ color: '#0284c7', fontWeight: '500' }}>{new Date(r.fechaDevolucion).toLocaleDateString('es-MX')}</span>
                       </div>
-                      {r.fechaDevolucion && (
-                        <div style={{ marginTop: '0.25rem' }}>
-                          <span style={{ fontSize: '0.75rem', color: '#0369a1', fontWeight: '600' }}>Devolución: </span>
-                          <span style={{ color: '#0284c7', fontWeight: '500' }}>{new Date(r.fechaDevolucion).toLocaleDateString('es-MX')}</span>
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '1rem 1.5rem' }}>
-                      <span style={{ padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: r.estado === 'Activo' ? '#dcfce7' : '#f1f5f9', color: r.estado === 'Activo' ? '#166534' : '#475569' }}>
-                        {r.estado}
-                      </span>
-                    </td>
-                    <td style={{ padding: '1rem 1.5rem', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
-                        {r.estado === 'Activo' && (
-                          <button onClick={() => marcarDevuelto(r.id)} title="Marcar como Devuelto" style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', padding: '0.4rem' }}>
-                            <FaCheck size={18} />
-                          </button>
-                        )}
-                        <button
-                          title="Exportar a Word (.docx)"
-                          onClick={() => exportarDocx(r)}
-                          style={{
-                            background: '#EFF6FF',
-                            border: '1px solid #BFDBFE',
-                            color: '#1D4ED8',
-                            cursor: 'pointer',
-                            padding: '0.4rem 0.8rem',
-                            borderRadius: '8px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            fontWeight: '700',
-                            fontSize: '0.8rem'
-                          }}
-                        >
-                          <FaFileWord size={16} /> Word
+                    )}
+                  </td>
+                  <td style={{ padding: '1rem' }}>
+                    <span style={{ padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: r.estado === 'Activo' ? '#dcfce7' : '#f1f5f9', color: r.estado === 'Activo' ? '#166534' : '#475569' }}>
+                      {r.estado}
+                    </span>
+                  </td>
+                  <td style={{ padding: '1rem', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
+                      {r.estado === 'Activo' && (
+                        <button onClick={() => marcarDevuelto(r.id)} title="Marcar como Devuelto" style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', padding: '0.4rem' }}>
+                          <FaCheck size={18} />
                         </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {resguardosFiltrados.length === 0 && !cargando && (
-                  <tr>
-                    <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
-                      {busqueda.trim() ? 'No se encontraron resguardos que coincidan con la búsqueda.' : 'No hay resguardos registrados.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                      )}
+                      <button
+                        title="Exportar a Word (.docx)"
+                        onClick={() => exportarDocx(r)}
+                        style={{
+                          background: '#EFF6FF',
+                          border: '1px solid #BFDBFE',
+                          color: '#1D4ED8',
+                          cursor: 'pointer',
+                          padding: '0.4rem 0.8rem',
+                          borderRadius: '8px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          fontWeight: '700',
+                          fontSize: '0.8rem'
+                        }}
+                      >
+                        <FaFileWord size={16} /> Word
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+        
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0' }}>
+          <span style={{ color: '#64748b' }}>
+            Mostrando {resguardosFiltrados.length} {resguardosFiltrados.length === 1 ? 'resguardo' : 'resguardos'}
+          </span>
         </div>
       </div>
 
@@ -717,7 +724,7 @@ function Resguardos() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }
 

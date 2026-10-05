@@ -558,28 +558,59 @@ body.grayscale-theme::after,
    ============================================================ */
 
 @media print {
-  aside, nav, .no-print { display: none !important; }
-  .print-only-block { display: block !important; }
-  main { padding: 0 !important; }
-  body { background: white !important; }
-  .contenedor-estadisticas { padding: 0 !important; }
+  @page {
+    size: letter portrait;
+    margin: 8mm;
+  }
+  header, .app-header, aside, nav, .sidebar-overlay, .theme-toggle-btn, .no-print {
+    display: none !important;
+  }
+  .layout-main-col {
+    padding-top: 0 !important;
+  }
+  main, .main-content-padding, .contenedor-estadisticas {
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: auto !important;
+    background: white !important;
+  }
+  body, html {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .print-only-block {
+    display: block !important;
+  }
+  .resumen {
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 0.6rem !important;
+    margin-bottom: 1.25rem !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .card-padding {
+    padding: 0.8rem 1rem !important;
+  }
   .graficas-flex-container {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 2rem !important;
+    gap: 1.25rem !important;
+    margin-bottom: 1.25rem !important;
     page-break-inside: avoid;
+    break-inside: avoid;
   }
   .grafico-card {
     break-inside: avoid;
     page-break-inside: avoid;
     box-shadow: none !important;
-    border: 1px solid #6F7271;
+    border: 1px solid #e2e8f0 !important;
+    padding: 1rem !important;
   }
-  .resumen {
-    grid-template-columns: repeat(5, 1fr) !important;
-    page-break-inside: avoid;
+  .print-break-inside-avoid {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
-  .theme-toggle-btn { display: none !important; }
 }
 
 /* ============================================================
