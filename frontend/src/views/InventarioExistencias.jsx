@@ -234,6 +234,9 @@ export default function InventarioExistencias() {
     modelo: '',
     numeroSerie: '',
     numeroInventario: '',
+    procedencia: '',
+    responsable: '',
+    cargoResponsable: '',
     tipoInventario: 'tecnologico'
   });
 
@@ -246,34 +249,6 @@ export default function InventarioExistencias() {
     if (!user?.token) return;
     setCargando(true);
     try {
-      // 1. Cargar componentes y piezas registrados directamente en existencias tecnológicas
-      const resExistencias = await fetch(`${API_BASE_URL}/api/inventario/existencias?tipoInventario=tecnologico`, {
-        headers: { 'Authorization': `Bearer ${user.token}` }
-      });
-      let exItems = [];
-      if (resExistencias.ok) {
-        const jsonEx = await resExistencias.json();
-        const lista = jsonEx.data || jsonEx;
-        if (Array.isArray(lista)) {
-          exItems = lista.map(item => ({
-            id: item.id,
-            origen: 'existencia',
-            nombre: item.nombre,
-            categoria: item.categoria || 'componente',
-            cantidad: item.cantidad !== undefined ? item.cantidad : 1,
-            estadoFisico: normalizarEstado(item.estadoFisico),
-            areaUbicacion: item.areaUbicacion || 'Almacén de Sistemas',
-            marca: item.marca || '',
-            modelo: item.modelo || '',
-            numeroSerie: item.numeroSerie || '',
-            numeroInventario: item.numeroInventario || '',
-            createdAt: item.createdAt,
-            updatedAt: item.updatedAt
-          }));
-        }
-      }
-
-      // 2. Cargar equipos tecnológicos que no estén en estatus Activo (Stock, Refacciones, Mantenimiento, Baja)
       const resEq = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?limit=2000&estatusNot=Activo`, {
         headers: { 'Authorization': `Bearer ${user.token}` }
       });
@@ -299,8 +274,7 @@ export default function InventarioExistencias() {
           });
         }
       }
-
-      setExistencias([...exItems, ...eqItems]);
+      setExistencias(eqItems);
     } catch (err) {
       console.error('Error al cargar existencias:', err);
     } finally {
@@ -335,71 +309,55 @@ export default function InventarioExistencias() {
     const cantidadFinal = form.cantidad === '' || isNaN(Number(form.cantidad)) ? 1 : Math.max(0, Number(form.cantidad));
 
     try {
-      if (editandoId && itemOrigen === 'equipo') {
-        const payload = {
-          tipo: 'refaccion',
-          marca: form.marca || null,
-          modelo: form.modelo || null,
-          numeroSerie: form.numeroSerie || null,
-          numeroInventario: form.numeroInventario || null,
-          areaUbicacion: form.areaUbicacion || 'Almacén de Sistemas',
-          estatus: form.estadoFisico,
-          detalles: {
-            nombre: form.nombre,
-            categoria: form.categoria,
-            cantidad: cantidadFinal,
-            estadoFisico: form.estadoFisico,
-            areaUbicacion: form.areaUbicacion
-          }
-        };
-        const res = await fetch(`${API_BASE_URL}/api/inventario-tecnologico/${editandoId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${user.token}`
-          },
-          body: JSON.stringify(payload)
-        });
-        const json = await res.json();
-        if (res.ok && json.ok) {
-          Swal.fire({ title: 'Éxito', text: 'Refacción actualizada correctamente.', icon: 'success', confirmButtonColor: '#691B31' });
-          setModalAbierto(false);
-          resetForm();
-          cargarExistencias();
-        } else {
-          Swal.fire('Error', json.error || 'No se pudo actualizar.', 'error');
+      const payload = {
+        tipo: form.categoria || 'Componentes',
+        marca: form.marca || null,
+        modelo: form.modelo || null,
+        numeroSerie: form.numeroSerie || null,
+        numeroInventario: form.numeroInventario || null,
+        areaUbicacion: form.areaUbicacion || 'Almacén de Sistemas',
+        estatus: form.estadoFisico,
+        procedencia: form.procedencia || null,
+        responsable: form.responsable || null,
+        cargoResponsable: form.cargoResponsable || null,
+        detalles: {
+          nombre: form.nombre,
+          categoria: form.categoria,
+          cantidad: cantidadFinal,
+          estadoFisico: form.estadoFisico,
+          areaUbicacion: form.areaUbicacion,
+          procedencia: form.procedencia,
+          responsable: form.responsable,
+          cargoResponsable: form.cargoResponsable
         }
+      };
+
+      const url = editandoId
+        ? `${API_BASE_URL}/api/inventario-tecnologico/${editandoId}`
+        : `${API_BASE_URL}/api/inventario-tecnologico`;
+      const method = editandoId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (res.ok && json.ok) {
+        Swal.fire({
+          title: 'Éxito',
+          text: editandoId ? 'Artículo actualizado correctamente.' : 'Artículo registrado correctamente.',
+          icon: 'success',
+          confirmButtonColor: '#691B31'
+        });
+        setModalAbierto(false);
+        resetForm();
+        cargarExistencias();
       } else {
-        const url = editandoId
-          ? `${API_BASE_URL}/api/inventario/existencias/${editandoId}`
-          : `${API_BASE_URL}/api/inventario/existencias`;
-        const method = editandoId ? 'PUT' : 'POST';
-
-        const res = await fetch(url, {
-          method,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${user.token}`
-          },
-          body: JSON.stringify({ ...form, cantidad: cantidadFinal })
-        });
-
-        if (res.ok) {
-          const json = await res.json();
-          if (json.ok) {
-            Swal.fire({
-              title: 'Éxito',
-              text: editandoId ? 'Existencias actualizadas correctamente.' : 'Existencias ingresadas correctamente.',
-              icon: 'success',
-              confirmButtonColor: '#691B31'
-            });
-            setModalAbierto(false);
-            resetForm();
-            cargarExistencias();
-          } else {
-            Swal.fire('Error', json.error || 'No se pudo guardar la existencia.', 'error');
-          }
-        }
+        Swal.fire('Error', json.error || 'No se pudo guardar el artículo.', 'error');
       }
     } catch (err) {
       console.error('Error al guardar existencias:', err);
@@ -422,6 +380,9 @@ export default function InventarioExistencias() {
       modelo: item.modelo || '',
       numeroSerie: item.numeroSerie || '',
       numeroInventario: item.numeroInventario || '',
+      procedencia: item.equipoOriginal?.procedencia || '',
+      responsable: item.equipoOriginal?.responsable || '',
+      cargoResponsable: item.equipoOriginal?.cargoResponsable || '',
       tipoInventario: 'tecnologico'
     });
     setModalAbierto(true);
@@ -441,9 +402,7 @@ export default function InventarioExistencias() {
 
     if (confirmacion.isConfirmed) {
       try {
-        const url = item.origen === 'equipo'
-          ? `${API_BASE_URL}/api/inventario-tecnologico/${item.id}`
-          : `${API_BASE_URL}/api/inventario/existencias/${item.id}`;
+        const url = `${API_BASE_URL}/api/inventario-tecnologico/${item.id}`;
         const res = await fetch(url, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${user.token}` }
@@ -476,7 +435,10 @@ export default function InventarioExistencias() {
       modelo: '',
       numeroSerie: '',
       numeroInventario: '',
-      tipoInventario: 'tecnologico'
+    procedencia: '',
+    responsable: '',
+    cargoResponsable: '',
+    tipoInventario: 'tecnologico'
     });
   };
 
