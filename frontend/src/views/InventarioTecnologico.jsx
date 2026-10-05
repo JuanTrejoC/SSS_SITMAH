@@ -599,7 +599,7 @@ export default function InventarioTecnologico() {
       doc.setFontSize(7.5);
       doc.text(`Fecha de emisión: ${new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}`, pageWidth / 2, 25, { align: 'center' });
 
-      const labelTipo = TIPOS_EQUIPO.find(t => t.value === item.tipo)?.label || (item.tipo ? item.tipo.toUpperCase() : 'EQUIPO');
+      const labelTipo = item.tipo === 'otro' ? ((item.detalles?.nombre || 'Otro').toUpperCase()) : (item.tipo === 'otro' ? ((item.detalles?.nombre || 'Otro').toUpperCase()) : (TIPOS_EQUIPO.find(t => t.value === item.tipo)?.label || (item.tipo ? item.tipo.toUpperCase() : 'EQUIPO')));
 
       // 1. Tabla: DATOS GENERALES Y ASIGNACIÓN
       const datosGenerales = [
@@ -1891,6 +1891,19 @@ export default function InventarioTecnologico() {
                   opciones={TIPOS_EQUIPO}
                   gruposOpciones={gruposOpciones}
                 />
+                {form.tipo === 'otro' && (
+                  <div style={{ marginTop: '1.25rem' }}>
+                    <label style={labelStyle}>Especificar Tipo / Nombre de Equipo *</label>
+                    <input
+                      type="text"
+                      value={form.detalles?.nombre || ''}
+                      onChange={e => setForm({ ...form, detalles: { ...form.detalles, nombre: e.target.value } })}
+                      style={inputStyle}
+                      placeholder="Ej. Servidor NAS, Consola, Pantalla Interactiva, etc."
+                      required
+                    />
+                  </div>
+                )}
               </div>
 
               {form.tipo ? (
