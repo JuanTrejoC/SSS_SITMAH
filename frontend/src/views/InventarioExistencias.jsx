@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { jsPDF } from 'jspdf';
@@ -8,8 +8,31 @@ import { useAuth } from '../context/AuthContext';
 import {
   FaBoxes, FaPlus, FaEdit, FaTimes, FaSearch, FaCogs, FaWrench, FaTools, FaHdd, FaChevronRight,
   FaCheckCircle, FaExclamationTriangle, FaMapMarkerAlt, FaFilter, FaArrowLeft, FaRedoAlt,
-  FaFilePdf, FaDownload, FaFileAlt, FaChevronDown
+  FaFilePdf, FaDownload, FaFileAlt, FaChevronDown,
+  FaDesktop, FaLaptop, FaMobileAlt, FaNetworkWired, FaServer, FaShieldAlt, FaWifi, FaVideo,
+  FaBroadcastTower, FaPrint, FaTv, FaMemory, FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone,
+  FaPlug, FaTabletAlt, FaChevronLeft, FaLink, FaUnlink, FaTrashAlt, FaExclamationCircle
 } from 'react-icons/fa';
+
+const labelStyle = {
+  display: 'block',
+  fontSize: '0.85rem',
+  fontWeight: '600',
+  color: '#475569',
+  marginBottom: '0.4rem'
+};
+
+const inputStyle = {
+  width: '100%',
+  padding: '0.75rem 1rem',
+  border: '1px solid #CBD5E1',
+  borderRadius: '8px',
+  fontSize: '0.95rem',
+  color: '#1E293B',
+  boxSizing: 'border-box',
+  outline: 'none',
+  transition: 'border-color 0.2s, box-shadow 0.2s'
+};
 
 const ARTICULOS_AGRUPADOS = {
   'Componentes': [
@@ -205,6 +228,25 @@ const obtenerGrupoBase = (item) => {
   };
 };
 
+function getInitialForm() {
+  return {
+    tipo: '',
+    numeroInventario: '',
+    numeroSerie: '',
+    marca: '',
+    modelo: '',
+    responsable: '',
+    cargoResponsable: '',
+    direccion: '',
+    areaUbicacion: 'Almacén de Sistemas',
+    procedencia: '',
+    estatus: 'Stock',
+    detalles: {
+      cantidad: 1
+    }
+  };
+}
+
 export default function InventarioExistencias() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -222,26 +264,80 @@ export default function InventarioExistencias() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [itemOrigen, setItemOrigen] = useState('existencia'); // 'existencia' | 'equipo'
-  const [esNombrePersonalizado, setEsNombrePersonalizado] = useState(false);
+  const [form, setForm] = useState(getInitialForm());
+  const [mostrarDetallesForm, setMostrarDetallesForm] = useState(false);
+  const [esClonIndividual, setEsClonIndividual] = useState(false);
 
-  const [form, setForm] = useState({
-    nombre: '',
-    categoria: 'componente',
-    cantidad: 1,
-    estadoFisico: 'Stock',
-    areaUbicacion: 'Almacén de Sistemas',
-    marca: '',
-    modelo: '',
-    numeroSerie: '',
-    numeroInventario: '',
-    procedencia: '',
-    responsable: '',
-    cargoResponsable: '',
-    tipoInventario: 'tecnologico'
-  });
+  const [todosLosEquipos, setTodosLosEquipos] = useState([]);
+  const [sedesList, setSedesList] = useState([]);
+  const [cargosList, setCargosList] = useState([]);
+  const [areasList, setAreasList] = useState([]);
+  const [estacionesList, setEstacionesList] = useState([]);
+
+  const procesadoresUnicos = useMemo(() => {
+    const todos = todosLosEquipos
+      .map(eq => eq.detalles?.procesador)
+      .filter(p => typeof p === 'string' && p.trim() !== '');
+    return [...new Set(todos)].sort();
+  }, [todosLosEquipos]);
+
+  const graficasUnicas = useMemo(() => {
+    const todos = todosLosEquipos
+      .map(eq => eq.detalles?.tarjetaGrafica)
+      .filter(p => typeof p === 'string' && p.trim() !== '');
+    return [...new Set(todos)].sort();
+  }, [todosLosEquipos]);
+
+  const marcasUnicas = useMemo(() => {
+    const todos = todosLosEquipos
+      .map(eq => eq.marca)
+      .filter(p => typeof p === 'string' && p.trim() !== '');
+    return [...new Set(todos)].sort();
+  }, [todosLosEquipos]);
+
+  const modelosUnicos = useMemo(() => {
+    const todos = todosLosEquipos
+      .map(eq => eq.modelo)
+      .filter(p => typeof p === 'string' && p.trim() !== '');
+    return [...new Set(todos)].sort();
+  }, [todosLosEquipos]);
+
+  const seriesUnicas = useMemo(() => {
+    const todos = todosLosEquipos
+      .map(eq => eq.numeroSerie)
+      .filter(p => typeof p === 'string' && p.trim() !== '');
+    return [...new Set(todos)].sort();
+  }, [todosLosEquipos]);
+
+  const inventariosUnicos = useMemo(() => {
+    const todos = todosLosEquipos
+      .map(eq => eq.numeroInventario)
+      .filter(p => typeof p === 'string' && p.trim() !== '');
+    return [...new Set(todos)].sort();
+  }, [todosLosEquipos]);
+
+  const tieneMAC = ['switch', 'servidor', 'firewall', 'access_point', 'camara', 'dvr', 'antena', 'impresora', 'plotter', 'router'].includes(form.tipo);
+  const tieneIP = ['switch', 'servidor', 'firewall', 'access_point', 'camara', 'dvr', 'antena', 'impresora', 'plotter', 'router'].includes(form.tipo);
+  const tienePuertosRed = ['switch', 'firewall', 'router', 'dvr'].includes(form.tipo);
+  const tieneAlmacenamiento = ['servidor', 'escritorio', 'laptop', 'celular', 'tableta'].includes(form.tipo);
+  const tieneProcesador = ['servidor', 'escritorio', 'laptop'].includes(form.tipo);
+  const sinInventario = ['internet', 'aire'].includes(form.tipo);
+  const requiereResponsable = ['escritorio', 'laptop', 'radio', 'no_break', 'tableta'].includes(form.tipo);
+
+  const gruposOpciones = TIPOS_EQUIPO.reduce((acc, curr) => {
+    if (!acc[curr.group]) acc[curr.group] = [];
+    acc[curr.group].push(curr);
+    return acc;
+  }, {});
+
+  const handleDetalleChange = (key, value) => {
+    setForm(prev => ({ ...prev, detalles: { ...prev.detalles, [key]: value } }));
+  };
 
   const handleNuevo = () => {
     resetForm();
+    setMostrarDetallesForm(true);
+    setEsClonIndividual(false);
     setModalAbierto(true);
   };
 
@@ -289,6 +385,55 @@ export default function InventarioExistencias() {
   }, [filtroCategoria]);
 
   useEffect(() => {
+    const cargarCatalogos = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/catalogos/sedes`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.ok && json.data && json.data.length > 0) setSedesList(json.data.map(s => s.nombre));
+        }
+      } catch (err) { console.error('Error al cargar sedes:', err); }
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/catalogos/cargos`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.ok && json.data && json.data.length > 0) setCargosList(json.data.map(c => c.nombre));
+        }
+      } catch (err) { console.error('Error al cargar cargos:', err); }
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/catalogos/areas`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.ok && json.data && json.data.length > 0) setAreasList(json.data.map(a => a.nombre));
+        }
+      } catch (err) { console.error('Error al cargar areas:', err); }
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/catalogos/estaciones`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.ok && json.data && json.data.length > 0) setEstacionesList(json.data);
+        }
+      } catch (err) { console.error('Error al cargar estaciones:', err); }
+    };
+
+    const cargarTodosLosEquipos = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?limit=1000`, {
+          headers: { 'Authorization': `Bearer ${user.token}` }
+        });
+        const json = await res.json();
+        if (res.ok && json.ok) setTodosLosEquipos(json.data);
+      } catch (err) { console.error('Error al cargar todos los equipos:', err); }
+    };
+
+    cargarCatalogos();
+    if (user?.token) cargarTodosLosEquipos();
+  }, [user]);
+
+  useEffect(() => {
     if (modalAbierto) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -301,35 +446,25 @@ export default function InventarioExistencias() {
 
   const handleGuardar = async (e) => {
     e.preventDefault();
-    if (!form.nombre.trim()) {
-      Swal.fire('Error', 'El nombre del componente/artículo es obligatorio.', 'error');
+    if (!form.tipo) {
+      Swal.fire('Error', 'Seleccione un tipo de equipo.', 'error');
       return;
     }
 
-    const cantidadFinal = form.cantidad === '' || isNaN(Number(form.cantidad)) ? 1 : Math.max(0, Number(form.cantidad));
-
     try {
       const payload = {
-        tipo: form.categoria || 'Componentes',
+        tipo: form.tipo,
         marca: form.marca || null,
         modelo: form.modelo || null,
         numeroSerie: form.numeroSerie || null,
         numeroInventario: form.numeroInventario || null,
         areaUbicacion: form.areaUbicacion || 'Almacén de Sistemas',
-        estatus: form.estadoFisico,
+        estatus: form.estatus,
         procedencia: form.procedencia || null,
         responsable: form.responsable || null,
         cargoResponsable: form.cargoResponsable || null,
-        detalles: {
-          nombre: form.nombre,
-          categoria: form.categoria,
-          cantidad: cantidadFinal,
-          estadoFisico: form.estadoFisico,
-          areaUbicacion: form.areaUbicacion,
-          procedencia: form.procedencia,
-          responsable: form.responsable,
-          cargoResponsable: form.cargoResponsable
-        }
+        direccion: form.direccion || null,
+        detalles: { ...form.detalles }
       };
 
       const url = editandoId
@@ -349,7 +484,7 @@ export default function InventarioExistencias() {
       if (res.ok && json.ok) {
         Swal.fire({
           title: 'Éxito',
-          text: editandoId ? 'Artículo actualizado correctamente.' : 'Artículo registrado correctamente.',
+          text: editandoId ? 'Actualizado correctamente.' : 'Registrado correctamente.',
           icon: 'success',
           confirmButtonColor: '#691B31'
         });
@@ -357,7 +492,7 @@ export default function InventarioExistencias() {
         resetForm();
         cargarExistencias();
       } else {
-        Swal.fire('Error', json.error || 'No se pudo guardar el artículo.', 'error');
+        Swal.fire('Error', json.error || 'No se pudo guardar.', 'error');
       }
     } catch (err) {
       console.error('Error al guardar existencias:', err);
@@ -368,23 +503,69 @@ export default function InventarioExistencias() {
   const handleEditar = (item) => {
     setEditandoId(item.id);
     setItemOrigen(item.origen || 'existencia');
-    const esComun = ARTICULOS_COMUNES.includes(item.nombre || '');
-    setEsNombrePersonalizado(!esComun && !!item.nombre);
+    const original = item.equipoOriginal || item;
     setForm({
-      nombre: item.nombre || '',
-      categoria: item.categoria || 'componente',
-      cantidad: item.cantidad !== undefined ? item.cantidad : 0,
-      estadoFisico: item.estadoFisico || 'Stock',
-      areaUbicacion: item.areaUbicacion || 'Almacén de Sistemas',
-      marca: item.marca || '',
-      modelo: item.modelo || '',
-      numeroSerie: item.numeroSerie || '',
-      numeroInventario: item.numeroInventario || '',
-      procedencia: item.equipoOriginal?.procedencia || '',
-      responsable: item.equipoOriginal?.responsable || '',
-      cargoResponsable: item.equipoOriginal?.cargoResponsable || '',
-      tipoInventario: 'tecnologico'
+      tipo: original.tipo || '',
+      numeroInventario: original.numeroInventario || '',
+      numeroSerie: original.numeroSerie || '',
+      marca: original.marca || '',
+      modelo: original.modelo || '',
+      responsable: original.responsable || '',
+      cargoResponsable: original.cargoResponsable || '',
+      direccion: original.direccion || '',
+      areaUbicacion: original.areaUbicacion || 'Almacén de Sistemas',
+      procedencia: original.procedencia || '',
+      estatus: original.estatus || 'Stock',
+      detalles: original.detalles || { cantidad: original.cantidad || 1 }
     });
+    setMostrarDetallesForm(true);
+    setEsClonIndividual(false);
+    setModalAbierto(true);
+  };
+
+  const handleClonar = (item) => {
+    setEditandoId(null);
+    setItemOrigen(item.origen || 'existencia');
+    const original = item.equipoOriginal || item;
+    setForm({
+      tipo: original.tipo || '',
+      numeroInventario: '',
+      numeroSerie: '',
+      marca: original.marca || '',
+      modelo: original.modelo || '',
+      responsable: '',
+      cargoResponsable: '',
+      direccion: '',
+      areaUbicacion: '',
+      procedencia: original.procedencia || '',
+      estatus: original.estatus || 'Stock',
+      detalles: { ...(original.detalles || {}), cantidad: 1 }
+    });
+    setMostrarDetallesForm(false);
+    setEsClonIndividual(false);
+    setModalAbierto(true);
+  };
+
+  const handleClonarIndividual = (item) => {
+    setEditandoId(null);
+    setItemOrigen(item.origen || 'existencia');
+    const original = item.equipoOriginal || item;
+    setForm({
+      tipo: original.tipo || '',
+      numeroInventario: '',
+      numeroSerie: '',
+      marca: original.marca || '',
+      modelo: original.modelo || '',
+      responsable: original.responsable || '',
+      cargoResponsable: original.cargoResponsable || '',
+      direccion: original.direccion || '',
+      areaUbicacion: original.areaUbicacion || 'Almacén de Sistemas',
+      procedencia: original.procedencia || '',
+      estatus: original.estatus || 'Stock',
+      detalles: { ...(original.detalles || {}), cantidad: 1 }
+    });
+    setMostrarDetallesForm(false);
+    setEsClonIndividual(true);
     setModalAbierto(true);
   };
 
@@ -424,22 +605,7 @@ export default function InventarioExistencias() {
   const resetForm = () => {
     setEditandoId(null);
     setItemOrigen('existencia');
-    setEsNombrePersonalizado(false);
-    setForm({
-      nombre: '',
-      categoria: 'componente',
-      cantidad: '',
-      estadoFisico: 'Stock',
-      areaUbicacion: 'Almacén de Sistemas',
-      marca: '',
-      modelo: '',
-      numeroSerie: '',
-      numeroInventario: '',
-    procedencia: '',
-    responsable: '',
-    cargoResponsable: '',
-    tipoInventario: 'tecnologico'
-    });
+    setForm(getInitialForm());
   };
 
   const getCategoriaLabel = (cat) => {
@@ -484,14 +650,6 @@ export default function InventarioExistencias() {
       case 'herramienta': return <FaWrench style={{ color: '#475569' }} />;
       default: return <FaBoxes style={{ color: '#64748b' }} />;
     }
-  };
-
-  const labelStyle = {
-    display: 'block',
-    fontSize: '0.85rem',
-    fontWeight: '600',
-    color: '#475569',
-    marginBottom: '0.4rem'
   };
 
   useEffect(() => {
@@ -789,20 +947,50 @@ export default function InventarioExistencias() {
     }
   };
 
-  const inputStyle = {
-    width: '100%',
-    padding: '0.75rem 1rem',
-    border: '1px solid #CBD5E1',
-    borderRadius: '8px',
-    fontSize: '0.95rem',
-    color: '#1E293B',
-    boxSizing: 'border-box',
-    outline: 'none',
-    transition: 'border-color 0.2s, box-shadow 0.2s'
-  };
-
   return (
     <main style={{ padding: '2.5rem', flex: 1, backgroundColor: '#f8fafc', overflowY: 'auto', minHeight: '800px', paddingBottom: '15rem' }}>
+      <style>{`
+        .inventario-grid-2col {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1.5rem;
+          margin-bottom: 2rem;
+        }
+        .inventario-grid-spec {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1.5rem;
+        }
+        .dropdown-select-container {
+          display: flex;
+          height: 320px;
+        }
+        .dropdown-left-pane {
+          width: 45%;
+          border-right: 1px solid #e2e8f0;
+          overflow-y: auto;
+          padding: 0.5rem;
+          background-color: #ffffff;
+        }
+        .dropdown-right-pane {
+          width: 55%;
+          overflow-y: auto;
+          padding: 0.5rem;
+          background-color: #f8fafc;
+        }
+        @media (max-width: 768px) {
+          .inventario-grid-2col, .inventario-grid-spec {
+            grid-template-columns: 1fr;
+          }
+          .dropdown-select-container {
+            flex-direction: column;
+            height: auto;
+          }
+          .dropdown-left-pane, .dropdown-right-pane {
+            width: 100%;
+          }
+        }
+      `}</style>
       {/* HEADER */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
@@ -1822,26 +2010,55 @@ export default function InventarioExistencias() {
                         paddingLeft: '0.5rem',
                         marginTop: '1rem'
                       }}>
-                        <button 
-                          onClick={toggleExpand}
-                          style={{
-                            padding: '0.35rem 0.75rem',
-                            backgroundColor: '#f1f5f9',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            color: '#691B31',
-                            fontWeight: '700',
-                            fontSize: '0.75rem',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            transition: 'background-color 0.2s'
-                          }}
-                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
-                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                        >
-                          {isExpanded ? 'Ocultar' : 'Ver Piezas'}
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button 
+                            onClick={toggleExpand}
+                            style={{
+                              padding: '0.35rem 0.75rem',
+                              backgroundColor: '#f1f5f9',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              color: '#691B31',
+                              fontWeight: '700',
+                              fontSize: '0.75rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              transition: 'background-color 0.2s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                          >
+                            {isExpanded ? 'Ocultar' : 'Ver Piezas'}
+                          </button>
+
+                          <button 
+                            onClick={() => {
+                              if (grupo.items && grupo.items.length > 0) {
+                                handleClonar(grupo.items[0]);
+                              }
+                            }}
+                            title="Clonar / Agregar otra pieza igual"
+                            style={{
+                              padding: '0.35rem 0.75rem',
+                              backgroundColor: '#e0f2fe',
+                              border: 'none',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              color: '#0284c7',
+                              fontWeight: '700',
+                              fontSize: '0.75rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              transition: 'background-color 0.2s'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
+                          >
+                            <FaPlus size={10} /> Agregar
+                          </button>
+                        </div>
                         
                         <span style={{
                           fontSize: '1.35rem',
@@ -1908,6 +2125,30 @@ export default function InventarioExistencias() {
                                   </div>
                                   
                                   <button
+                                    onClick={() => handleClonarIndividual(item)}
+                                    title="Clonar / Agregar otra pieza igual"
+                                    style={{
+                                      position: 'absolute',
+                                      top: '0.5rem',
+                                      right: '2.3rem',
+                                      backgroundColor: '#e0f2fe',
+                                      border: 'none',
+                                      color: '#0284c7',
+                                      cursor: 'pointer',
+                                      padding: '0.35rem',
+                                      borderRadius: '6px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      transition: 'background-color 0.2s'
+                                    }}
+                                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
+                                    onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
+                                  >
+                                    <FaPlus size={12} />
+                                  </button>
+                                  
+                                  <button
                                     onClick={() => handleEditar(item)}
                                     title="Editar pieza"
                                     style={{
@@ -1948,164 +2189,527 @@ export default function InventarioExistencias() {
       {/* FORM MODAL */}
       {modalAbierto && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '1rem' }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '2.5rem', width: '100%', maxWidth: '540px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', position: 'relative' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '2.5rem', width: '100%', maxWidth: '850px', display: 'flex', flexDirection: 'column', minHeight: '620px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', position: 'relative' }}>
             <button type="button" onClick={() => setModalAbierto(false)} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', color: '#64748b', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}>
               <FaTimes size={16} />
             </button>
 
             <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1e293b', marginBottom: '1.75rem' }}>
-              {editandoId ? 'Editar Existencias / Refacción' : 'Ingresar Existencias / Refacción'}
+              {editandoId ? 'Actualizar Equipo / Stock' : 'Registrar Nuevo Equipo / Stock'}
             </h2>
 
-            <form onSubmit={handleGuardar}>
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label style={labelStyle}>Nombre del artículo *</label>
-                <CustomArticleSelect
-                  value={form.nombre}
-                  onChange={nuevoNombre => setForm(prev => ({ ...prev, nombre: nuevoNombre }))}
-                  esPersonalizado={esNombrePersonalizado}
-                  setEsPersonalizado={setEsNombrePersonalizado}
+            <form onSubmit={handleGuardar} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <div style={{ marginBottom: '2rem' }}>
+                <label style={labelStyle}>Tipo de Equipo *</label>
+                <CustomEquipmentSelect
+                  value={form.tipo}
+                  onChange={(nuevoTipo) => {
+                    setForm(prev => ({ ...prev, tipo: nuevoTipo, detalles: {} }));
+                  }}
+                  opciones={TIPOS_EQUIPO}
+                  gruposOpciones={gruposOpciones}
                 />
-
-                {esNombrePersonalizado && (
-                  <input
-                    type="text"
-                    value={form.nombre}
-                    onChange={e => setForm({ ...form, nombre: e.target.value })}
-                    style={{ ...inputStyle, marginTop: '0.75rem' }}
-                    placeholder="Escriba el nombre del artículo personalizado"
-                    required
-                  />
+                {form.tipo === 'otro' && (
+                  <div style={{ marginTop: '1.25rem' }}>
+                    <label style={labelStyle}>Especificar Tipo / Nombre de Equipo *</label>
+                    <input
+                      type="text"
+                      value={form.detalles?.nombre || ''}
+                      onChange={e => setForm({ ...form, detalles: { ...form.detalles, nombre: e.target.value } })}
+                      style={inputStyle}
+                      placeholder="Ej. Servidor NAS, Consola, Pantalla Interactiva, etc."
+                      required
+                    />
+                  </div>
                 )}
               </div>
 
-              <div style={{ marginBottom: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={labelStyle}>Categoría</label>
-                  <select
-                    value={form.categoria}
-                    onChange={e => setForm({ ...form, categoria: e.target.value })}
-                    style={{ ...inputStyle, cursor: 'pointer' }}
-                  >
-                    <option value="componente">Componente</option>
-                    <option value="accesorio">Accesorio</option>
-                    <option value="periferico">Periférico</option>
-                    <option value="equipo">Equipo</option>
-                    <option value="herramienta">Herramienta</option>
-                  </select>
-                </div>
+              {form.tipo ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.25rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setMostrarDetallesForm(!mostrarDetallesForm)}
+                      style={{
+                        padding: '0.4rem 0.8rem',
+                        backgroundColor: mostrarDetallesForm ? '#fef2f2' : '#f0fdf4',
+                        color: mostrarDetallesForm ? '#ef4444' : '#16a34a',
+                        border: '1px solid',
+                        borderColor: mostrarDetallesForm ? '#fca5a5' : '#86efac',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      {mostrarDetallesForm ? 'Ocultar Detalles' : 'Mostrar Detalles Avanzados'}
+                    </button>
+                  </div>
+                  <div className="inventario-grid-2col">
+                    {/* Campos Base */}
+                    {mostrarDetallesForm && (
+                      <>
+                        <div>
+                          <label style={labelStyle}>Marca</label>
+                          <input type="text" value={form.marca} onChange={e => setForm({ ...form, marca: e.target.value })} style={inputStyle} list="marcas-list" />
+                          <datalist id="marcas-list">
+                            {marcasUnicas.filter(m => m.toLowerCase().includes(form.marca?.toLowerCase() || '')).slice(0, 5).map(m => <option key={m} value={m} />)}
+                          </datalist>
+                        </div>
+                        <div>
+                          <label style={labelStyle}>Modelo</label>
+                          <input type="text" value={form.modelo} onChange={e => setForm({ ...form, modelo: e.target.value })} style={inputStyle} list="modelos-list" />
+                          <datalist id="modelos-list">
+                            {modelosUnicos.filter(m => m.toLowerCase().includes(form.modelo?.toLowerCase() || '')).slice(0, 5).map(m => <option key={m} value={m} />)}
+                          </datalist>
+                        </div>
+                      </>
+                    )}
 
-                <div>
-                  <label style={labelStyle}>Estado Físico</label>
-                  <select
-                    value={form.estadoFisico}
-                    onChange={e => setForm({ ...form, estadoFisico: e.target.value })}
-                    style={{ ...inputStyle, cursor: 'pointer', fontWeight: '600' }}
-                  >
-                    <option value="Stock">🟢 Stock (Disponible)</option>
-                    <option value="Mantenimiento">🟡 En Mantenimiento / Revisión</option>
-                    <option value="Baja">🔴 Baja (Dañado / Inservible)</option>
-                  </select>
-                </div>
-              </div>
+                    {!sinInventario && (
+                      <div>
+                        <label style={labelStyle}>No. Inventario {form.tipo === 'router' ? '*' : ''}</label>
+                        <input type="text" value={form.numeroInventario} onChange={e => setForm({ ...form, numeroInventario: e.target.value })} style={inputStyle} required={form.tipo === 'router'} list="inventarios-list" />
+                        <datalist id="inventarios-list">
+                          {inventariosUnicos.filter(i => i.toLowerCase().includes(form.numeroInventario?.toLowerCase() || '')).slice(0, 5).map(i => <option key={i} value={i} />)}
+                        </datalist>
+                      </div>
+                    )}
+                    <div>
+                      <label style={labelStyle}>No. Serie</label>
+                      <input type="text" value={form.numeroSerie} onChange={e => setForm({ ...form, numeroSerie: e.target.value })} style={inputStyle} list="series-list" />
+                      <datalist id="series-list">
+                        {seriesUnicas.filter(s => s.toLowerCase().includes(form.numeroSerie?.toLowerCase() || '')).slice(0, 5).map(s => <option key={s} value={s} />)}
+                      </datalist>
+                    </div>
 
-              <div style={{ marginBottom: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={labelStyle}>Marca (opcional)</label>
-                  <input
-                    type="text"
-                    value={form.marca}
-                    onChange={e => setForm({ ...form, marca: e.target.value })}
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Modelo (opcional)</label>
-                  <input
-                    type="text"
-                    value={form.modelo}
-                    onChange={e => setForm({ ...form, modelo: e.target.value })}
-                    style={inputStyle}
-                  />
-                </div>
-              </div>
+                    {(!esClonIndividual || mostrarDetallesForm) && (
+                      <>
+                        <div>
+                          <label style={labelStyle}>Área *</label>
+                          <select
+                            value={form.direccion}
+                            onChange={e => setForm({ ...form, direccion: e.target.value })}
+                            style={{ ...inputStyle, cursor: 'pointer', backgroundColor: esClonIndividual ? '#f1f5f9' : 'white' }}
+                            disabled={esClonIndividual && !mostrarDetallesForm}
+                            required
+                          >
+                            <option value="">-- Seleccionar Área --</option>
+                            {areasList.map(a => (
+                              <option key={a} value={a}>{a}</option>
+                            ))}
+                          </select>
+                        </div>
 
-              <div style={{ marginBottom: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={labelStyle}>No. de Serie (opcional)</label>
-                  <input
-                    type="text"
-                    value={form.numeroSerie}
-                    onChange={e => setForm({ ...form, numeroSerie: e.target.value })}
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>No. Inventario (opcional)</label>
-                  <input
-                    type="text"
-                    value={form.numeroInventario}
-                    onChange={e => setForm({ ...form, numeroInventario: e.target.value })}
-                    style={inputStyle}
-                  />
-                </div>
-              </div>
+                        <div>
+                          <label style={labelStyle}>Ubicación *</label>
+                          <select
+                            value={form.areaUbicacion}
+                            onChange={e => setForm({ ...form, areaUbicacion: e.target.value })}
+                            style={{ ...inputStyle, cursor: 'pointer', backgroundColor: esClonIndividual ? '#f1f5f9' : 'white' }}
+                            disabled={esClonIndividual && !mostrarDetallesForm}
+                            required
+                          >
+                            <option value="">-- Seleccionar Ubicación --</option>
+                            {(form.tipo === 'camara' ? estacionesList.map(e => typeof e === 'string' ? e : e.nombre) : sedesList).map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        </div>
 
-              <div style={{ marginBottom: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={labelStyle}>Ubicación / Área</label>
-                  <input
-                    type="text"
-                    value={form.areaUbicacion}
-                    onChange={e => setForm({ ...form, areaUbicacion: e.target.value })}
-                    style={inputStyle}
-                    placeholder="Ej. Almacén de Sistemas"
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>{editandoId ? 'Cantidad actual' : 'Cantidad a ingresar'}</label>
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="1"
-                    value={form.cantidad ?? ''}
-                    onFocus={e => e.target.select()}
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (val === '') {
-                        setForm(prev => ({ ...prev, cantidad: '' }));
-                      } else {
-                        const num = parseInt(val, 10);
-                        setForm(prev => ({ ...prev, cantidad: isNaN(num) ? '' : Math.max(0, num) }));
-                      }
-                    }}
-                    style={inputStyle}
-                    required
-                  />
-                </div>
-              </div>
+                        <div>
+                          <label style={labelStyle}>Procedencia</label>
+                          <select
+                            value={form.procedencia}
+                            onChange={e => setForm({ ...form, procedencia: e.target.value })}
+                            style={{ ...inputStyle, cursor: 'pointer', backgroundColor: esClonIndividual ? '#f1f5f9' : 'white' }}
+                            disabled={esClonIndividual && !mostrarDetallesForm}
+                          >
+                            <option value="">-- Seleccionar Procedencia --</option>
+                            <option value="Gobierno del Estado">Gobierno del Estado</option>
+                            <option value="Donacion">Donación</option>
+                            <option value="Fideicomiso">Fideicomiso</option>
+                            <option value="Recurso Propio">Recurso Propio</option>
+                          </select>
+                        </div>
 
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', marginTop: '1.75rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setModalAbierto(false)}
-                  style={{
-                    padding: '0.65rem 1.25rem', border: '1px solid #CBD5E1', borderRadius: '8px',
-                    backgroundColor: 'white', color: '#6F7271', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem'
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: '0.65rem 1.25rem', border: 'none', borderRadius: '8px',
-                    backgroundColor: '#691B31', color: 'white', cursor: 'pointer', fontWeight: '600', fontSize: '0.95rem',
-                    boxShadow: '0 2px 4px rgba(105,27,49,0.2)'
-                  }}
-                >
-                  {editandoId ? 'Actualizar' : 'Registrar'}
-                </button>
+                        <div>
+                          <label style={labelStyle}>Estatus</label>
+                          <select
+                            value={form.estatus}
+                            onChange={e => setForm({ ...form, estatus: e.target.value })}
+                            style={{ ...inputStyle, cursor: 'pointer', backgroundColor: esClonIndividual ? '#f1f5f9' : 'white' }}
+                            disabled={esClonIndividual && !mostrarDetallesForm}
+                          >
+                            <option value="Activo">Activo</option>
+                            <option value="Stock">Stock</option>
+                            <option value="Refacciones">Refacciones</option>
+                            <option value="Baja">Baja</option>
+                            <option value="Mantenimiento">Mantenimiento</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+
+                    {form.estatus === 'Refacciones' && (
+                      <div>
+                        <label style={labelStyle}>Motivo de baja</label>
+                        <select
+                          value={form.detalles?.motivoBaja || ''}
+                          onChange={e => setForm({ ...form, detalles: { ...form.detalles, motivoBaja: e.target.value } })}
+                          style={{ ...inputStyle, cursor: 'pointer' }}
+                        >
+                          <option value="">-- Seleccionar motivo --</option>
+                          <option value="Robo">Robo</option>
+                          <option value="Siniestro">Siniestro</option>
+                          <option value="Vandalismo">Vandalismo</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {form.estatus === 'Refacciones' && ['Siniestro', 'Robo', 'Vandalismo'].includes(form.detalles?.motivoBaja) && (
+                      <>
+                        {['Robo', 'Vandalismo'].includes(form.detalles?.motivoBaja) && (
+                          <div>
+                            <label style={labelStyle}>¿Carpeta de investigación?</label>
+                            <select
+                              value={form.detalles?.carpetaInvestigacion || ''}
+                              onChange={e => setForm({ ...form, detalles: { ...form.detalles, carpetaInvestigacion: e.target.value } })}
+                              style={{ ...inputStyle, cursor: 'pointer' }}
+                            >
+                              <option value="">-- Seleccionar --</option>
+                              <option value="Si">Sí</option>
+                              <option value="No">No</option>
+                            </select>
+                          </div>
+                        )}
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <label style={labelStyle}>Observaciones</label>
+                          <textarea
+                            value={form.detalles?.observacionesBaja || ''}
+                            onChange={e => setForm({ ...form, detalles: { ...form.detalles, observacionesBaja: e.target.value } })}
+                            style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
+                            placeholder={form.detalles?.motivoBaja === 'Siniestro' ? 'Especifica los detalles del siniestro aquí...' : 'Escribe las observaciones aquí...'}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {(!esClonIndividual || mostrarDetallesForm) && (
+                      <>
+                        {/* Campos Responsable (Para todos los equipos) */}
+                        <div>
+                          <label style={labelStyle}>Responsable del equipo</label>
+                          <input type="text" value={form.responsable} onChange={e => setForm({ ...form, responsable: e.target.value })} style={{ ...inputStyle, backgroundColor: esClonIndividual ? '#f1f5f9' : 'white' }} disabled={esClonIndividual && !mostrarDetallesForm} />
+                        </div>
+                        <div>
+                          <label style={labelStyle}>Cargo del responsable</label>
+                          <select
+                            value={form.cargoResponsable}
+                            onChange={e => setForm({ ...form, cargoResponsable: e.target.value })}
+                            style={{ ...inputStyle, cursor: 'pointer', backgroundColor: esClonIndividual ? '#f1f5f9' : 'white' }}
+                            disabled={esClonIndividual && !mostrarDetallesForm}
+                          >
+                            <option value="">-- Seleccionar Cargo --</option>
+                            {cargosList.map(c => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {mostrarDetallesForm && (
+                    <div style={{ padding: '1.75rem', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#334155', marginBottom: '1.5rem', borderBottom: '1px solid #cbd5e1', paddingBottom: '0.5rem' }}>Especificaciones Técnicas</h3>
+
+                    <div className="inventario-grid-spec">
+                      {tieneMAC && (
+                        <div><label style={labelStyle}>Dirección MAC</label><input type="text" value={form.detalles.mac || ''} onChange={e => handleDetalleChange('mac', e.target.value)} style={inputStyle} placeholder="00:00:00:00:00:00" /></div>
+                      )}
+                      {tieneIP && (
+                        <div><label style={labelStyle}>IP Predeterminada</label><input type="text" value={form.detalles.ipPredeterminada || ''} onChange={e => handleDetalleChange('ipPredeterminada', e.target.value)} style={inputStyle} placeholder="192.168.1.1" /></div>
+                      )}
+
+                      {tienePuertosRed && (
+                        <>
+                          {['switch', 'firewall', 'router'].includes(form.tipo) && <div><label style={labelStyle}>Puertos WAN</label><input type="number" value={form.detalles.puertosWan || ''} onChange={e => handleDetalleChange('puertosWan', e.target.value)} style={inputStyle} /></div>}
+                          <div><label style={labelStyle}>Puertos LAN</label><input type="number" value={form.detalles.puertosLan || ''} onChange={e => handleDetalleChange('puertosLan', e.target.value)} style={inputStyle} /></div>
+                          {['switch', 'firewall', 'router'].includes(form.tipo) && (
+                            <>
+                              <div><label style={labelStyle}>Puertos USB</label><input type="number" value={form.detalles.puertosUsb || ''} onChange={e => handleDetalleChange('puertosUsb', e.target.value)} style={inputStyle} /></div>
+                              <div><label style={labelStyle}>Puertos Consola</label><input type="number" value={form.detalles.puertosConsola || ''} onChange={e => handleDetalleChange('puertosConsola', e.target.value)} style={inputStyle} /></div>
+                            </>
+                          )}
+                        </>
+                      )}
+
+                      {tieneAlmacenamiento && (
+                        <>
+                          <CustomSpecSelect
+                            label="Almacenamiento (Capacidad)"
+                            value={form.detalles.almacenamiento || ''}
+                            options={['64GB', '128GB', '256GB', '512GB', '1TB', '2TB']}
+                            onChange={val => handleDetalleChange('almacenamiento', val)}
+                            placeholder="Ej: 500GB SSD"
+                          />
+                          <CustomSpecSelect
+                            label="Memoria RAM"
+                            value={form.detalles.ram || ''}
+                            options={['4GB', '8GB', '16GB', '32GB', '64GB']}
+                            onChange={val => handleDetalleChange('ram', val)}
+                            placeholder="Ej: 12GB DDR4"
+                          />
+                          {['escritorio', 'laptop'].includes(form.tipo) && (
+                            <CustomSpecSelect
+                              label="Tipo de Almacenamiento"
+                              value={form.detalles.tipoAlmacenamiento || ''}
+                              options={['SSD', 'HDD', 'M.2 NVMe', 'M.2 SATA']}
+                              onChange={val => handleDetalleChange('tipoAlmacenamiento', val)}
+                              placeholder="Ej: SSD + HDD"
+                            />
+                          )}
+                        </>
+                      )}
+
+                      {tieneProcesador && (
+                        <div>
+                          <label style={labelStyle}>Procesador</label>
+                          <input 
+                            type="text" 
+                            value={form.detalles.procesador || ''} 
+                            onChange={e => handleDetalleChange('procesador', e.target.value)} 
+                            style={inputStyle} 
+                            placeholder="Ej: Intel Core i7-13620H" 
+                            list="procesadores-list"
+                          />
+                          <datalist id="procesadores-list">
+                            {procesadoresUnicos.filter(p => p.toLowerCase().includes(form.detalles?.procesador?.toLowerCase() || '')).slice(0, 5).map(p => <option key={p} value={p} />)}
+                          </datalist>
+                        </div>
+                      )}
+
+                      {['escritorio', 'laptop', 'celular', 'tableta'].includes(form.tipo) && (
+                        <CustomSpecSelect
+                          label="Sistema Operativo"
+                          value={form.detalles.sistemaOperativo || ''}
+                          options={['Windows 10 Pro', 'Windows 11 Pro', 'Linux Ubuntu', 'Linux Debian', 'macOS', 'Android', 'iOS']}
+                          onChange={val => handleDetalleChange('sistemaOperativo', val)}
+                          placeholder="Ej: Windows Server 2022"
+                        />
+                      )}
+
+                      {['escritorio', 'laptop'].includes(form.tipo) && (
+                        <>
+                          <div>
+                            <label style={labelStyle}>Tarjeta Gráfica</label>
+                            <input 
+                              type="text" 
+                              value={form.detalles.tarjetaGrafica || ''} 
+                              onChange={e => handleDetalleChange('tarjetaGrafica', e.target.value)} 
+                              style={inputStyle} 
+                              placeholder="Ej: NVIDIA GeForce RTX 4060" 
+                              list="graficas-list"
+                            />
+                            <datalist id="graficas-list">
+                              {graficasUnicas.filter(g => g.toLowerCase().includes(form.detalles?.tarjetaGrafica?.toLowerCase() || '')).slice(0, 5).map(g => <option key={g} value={g} />)}
+                            </datalist>
+                          </div>
+                          <div><label style={labelStyle}>Conectividad de Red</label>
+                            <select value={form.detalles.red || ''} onChange={e => handleDetalleChange('red', e.target.value)} style={inputStyle}>
+                              <option value="">-- Seleccionar --</option>
+                              <option value="wifi">Solo Wi-Fi</option>
+                              <option value="ethernet">Solo Ethernet</option>
+                              <option value="ambos">Ambos</option>
+                            </select>
+                          </div>
+                        </>
+                      )}
+
+                      {['camara', 'dvr'].includes(form.tipo) && (
+                        <CustomSpecSelect
+                          label="Megapíxeles (MP)"
+                          value={form.detalles.megapixeles || ''}
+                          options={['2MP', '4MP', '5MP', '8MP (4K)']}
+                          onChange={val => handleDetalleChange('megapixeles', val)}
+                          placeholder="Ej: 3MP"
+                        />
+                      )}
+
+
+
+                      {form.tipo === 'dvr' && (
+                        <CustomSpecSelect
+                          label="Tipo (Análogo, IP)"
+                          value={form.detalles.tipoDvr || ''}
+                          options={['Análogo', 'IP', 'Híbrido']}
+                          onChange={val => handleDetalleChange('tipoDvr', val)}
+                          placeholder="Ej: NVR IP"
+                        />
+                      )}
+
+                      {form.tipo === 'impresora' && (
+                        <>
+                          <CustomSpecSelect
+                            label="Tipo (Monocromática o Color)"
+                            value={form.detalles.tipoColor || ''}
+                            options={['Monocromática', 'Color']}
+                            onChange={val => handleDetalleChange('tipoColor', val)}
+                            placeholder="Ej: Monocromática Láser"
+                          />
+                          <CustomSpecSelect
+                            label="Propiedad (Rentada / SITMAH)"
+                            value={form.detalles.propiedad || ''}
+                            options={['Rentada', 'SITMAH']}
+                            onChange={val => handleDetalleChange('propiedad', val)}
+                            placeholder="Ej: En comodato"
+                          />
+                        </>
+                      )}
+
+                      {form.tipo === 'pantalla' && (
+                        <CustomSpecSelect
+                          label="Pulgadas"
+                          value={form.detalles.pulgadas || ''}
+                          options={['24"', '27"', '32"', '43"', '55"', '65"', '75"']}
+                          onChange={val => handleDetalleChange('pulgadas', val)}
+                          placeholder='Ej: 21.5"'
+                        />
+                      )}
+
+                      {form.tipo === 'videowall' && (
+                        <div><label style={labelStyle}>Pantallas Asignadas</label><input type="text" value={form.detalles.pantallasAsignadas || ''} onChange={e => handleDetalleChange('pantallasAsignadas', e.target.value)} style={inputStyle} /></div>
+                      )}
+
+                      {['internet', 'telefono'].includes(form.tipo) && (
+                        <>
+                          <CustomSpecSelect
+                            label="Compañía Proveedora"
+                            value={form.detalles.compania || ''}
+                            options={['Telmex', 'Totalplay', 'Izzi', 'Megacable']}
+                            onChange={val => handleDetalleChange('compania', val)}
+                            placeholder="Ej: Telcel"
+                          />
+                          <div><label style={labelStyle}>Número de Teléfono</label><input type="text" value={form.detalles.numeroTelefono || ''} onChange={e => handleDetalleChange('numeroTelefono', e.target.value)} style={inputStyle} /></div>
+                        </>
+                      )}
+
+                      {form.tipo === 'internet' && (
+                        <>
+                          <div><label style={labelStyle}>Módem Asignado</label><input type="text" value={form.detalles.modem || ''} onChange={e => handleDetalleChange('modem', e.target.value)} style={inputStyle} /></div>
+                          <div><label style={labelStyle}>IP Fija</label><input type="text" value={form.detalles.ipFija || ''} onChange={e => handleDetalleChange('ipFija', e.target.value)} style={inputStyle} /></div>
+                          <div><label style={labelStyle}>Megas de Velocidad</label><input type="text" value={form.detalles.megas || ''} onChange={e => handleDetalleChange('megas', e.target.value)} style={inputStyle} /></div>
+                        </>
+                      )}
+
+                      {form.tipo === 'aire' && (
+                        <div><label style={labelStyle}>Tonelaje</label><input type="text" value={form.detalles.tonelaje || ''} onChange={e => handleDetalleChange('tonelaje', e.target.value)} style={inputStyle} /></div>
+                      )}
+
+                      {form.tipo === 'ram' && (
+                        <>
+                          <div>
+                            <label style={labelStyle}>Para equipo</label>
+                            <input type="text" value={form.detalles.paraEquipo || ''} onChange={e => handleDetalleChange('paraEquipo', e.target.value)} style={inputStyle} list="para-equipo-list" placeholder="Ej: Escritorio, Laptop, Mac..." />
+                            <datalist id="para-equipo-list">
+                              <option value="Escritorio" />
+                              <option value="Laptop" />
+                              <option value="Mac" />
+                            </datalist>
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Tipo de Memoria</label>
+                            <input type="text" value={form.detalles.tipoDDR || ''} onChange={e => handleDetalleChange('tipoDDR', e.target.value)} style={inputStyle} list="tipo-ddr-list" placeholder="Ej: DDR4, DDR5..." />
+                            <datalist id="tipo-ddr-list">
+                              <option value="DDR3" />
+                              <option value="DDR4" />
+                              <option value="DDR5" />
+                            </datalist>
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Capacidad</label>
+                            <input type="text" value={form.detalles.capacidad || ''} onChange={e => handleDetalleChange('capacidad', e.target.value)} style={inputStyle} list="capacidad-ram-list" placeholder="Ej: 8 GB, 16 GB..." />
+                            <datalist id="capacidad-ram-list">
+                              <option value="1 GB" />
+                              <option value="2 GB" />
+                              <option value="4 GB" />
+                              <option value="8 GB" />
+                              <option value="16 GB" />
+                              <option value="32 GB" />
+                            </datalist>
+                          </div>
+                        </>
+                      )}
+
+                      {form.tipo === 'almacenamiento' && (
+                        <>
+                          <div>
+                            <label style={labelStyle}>Tipo de Almacenamiento</label>
+                            <input type="text" value={form.detalles.tipoDisco || ''} onChange={e => handleDetalleChange('tipoDisco', e.target.value)} style={inputStyle} list="tipo-disco-list" placeholder="Ej: SSD, HDD, M.2..." />
+                            <datalist id="tipo-disco-list">
+                              <option value="SSD" />
+                              <option value="HDD" />
+                              <option value="M.2" />
+                              <option value="NVMe" />
+                            </datalist>
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Para equipo</label>
+                            <input type="text" value={form.detalles.paraEquipo || ''} onChange={e => handleDetalleChange('paraEquipo', e.target.value)} style={inputStyle} list="para-equipo-list" placeholder="Ej: Escritorio, Laptop, Mac..." />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Capacidad</label>
+                            <input type="text" value={form.detalles.capacidad || ''} onChange={e => handleDetalleChange('capacidad', e.target.value)} style={inputStyle} list="capacidad-almacenamiento-list" placeholder="Ej: 500 GB, 1 TB..." />
+                            <datalist id="capacidad-almacenamiento-list">
+                              <option value="256 GB" />
+                              <option value="512 GB" />
+                              <option value="1 TB" />
+                              <option value="2 TB" />
+                            </datalist>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: '0.5rem' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                              <input type="checkbox" checked={form.detalles.esExterno || false} onChange={e => handleDetalleChange('esExterno', e.target.checked)} style={{ width: '1.2rem', height: '1.2rem', accentColor: '#0f766e' }} />
+                              <span style={{ fontWeight: '500', color: '#334155' }}>¿Es un disco externo?</span>
+                            </label>
+                          </div>
+                        </>
+                      )}
+
+                      {['otro', 'antena_wifi', 'monitor', 'cabezal'].includes(form.tipo) && (
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <label style={labelStyle}>Detalles / Descripción Adicional</label>
+                          <textarea
+                            value={form.detalles.descripcionOtro || ''}
+                            onChange={e => handleDetalleChange('descripcionOtro', e.target.value)}
+                            style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
+                            placeholder="Escribe detalles o características adicionales..."
+                          />
+                        </div>
+                      )}
+
+                    </div>
+                  </div>
+                  )}
+
+
+
+                </>
+              ) : (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: '#cbd5e1', padding: '2rem', textAlign: 'center', gap: '1rem', marginTop: '1rem' }}>
+                  <FaDesktop size={64} style={{ opacity: 0.4 }} />
+                  <p style={{ fontSize: '1.1rem', fontWeight: '500', color: '#94a3b8' }}>Seleccione un tipo de equipo para continuar</p>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: 'auto', paddingTop: '2rem' }}>
+                <button type="button" onClick={() => setModalAbierto(false)} style={{ padding: '0.75rem 2rem', border: 'none', backgroundColor: '#e2e8f0', color: '#475569', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '1rem', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#cbd5e1'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}>Cancelar</button>
+                <button type="submit" disabled={!form.tipo} style={{ padding: '0.75rem 2.5rem', border: 'none', backgroundColor: form.tipo ? '#691B31' : '#cbd5e1', color: 'white', borderRadius: '8px', cursor: form.tipo ? 'pointer' : 'not-allowed', fontWeight: '600', fontSize: '1rem', boxShadow: form.tipo ? '0 4px 6px rgba(105,27,49,0.2)' : 'none', transition: 'background-color 0.2s' }} onMouseOver={e => { if (form.tipo) e.currentTarget.style.backgroundColor = '#8a2441' }} onMouseOut={e => { if (form.tipo) e.currentTarget.style.backgroundColor = '#691B31' }}>Guardar Equipo</button>
               </div>
             </form>
           </div>
@@ -2116,30 +2720,55 @@ export default function InventarioExistencias() {
 }
 
 
-const inputStyle = {
-  width: '100%',
-  padding: '0.75rem 1rem',
-  border: '1px solid #CBD5E1',
-  borderRadius: '8px',
-  fontSize: '0.95rem',
-  color: '#1E293B',
-  boxSizing: 'border-box',
-  outline: 'none',
-  transition: 'border-color 0.2s, box-shadow 0.2s'
-};
 
-const CustomArticleSelect = ({ value, onChange, esPersonalizado, setEsPersonalizado }) => {
+
+
+
+const TIPOS_EQUIPO = [
+  { value: 'escritorio', label: 'Escritorio', icon: FaDesktop, group: 'Computadoras' },
+  { value: 'laptop', label: 'Laptop', icon: FaLaptop, group: 'Computadoras' },
+  { value: 'tableta', label: 'Tableta', icon: FaTabletAlt, group: 'Computadoras' },
+  { value: 'servidor', label: 'Servidor', icon: FaServer, group: 'Computadoras' },
+  { value: 'teclado', label: 'Teclado', icon: FaCogs, group: 'Periféricos y Accesorios' },
+  { value: 'mouse', label: 'Mouse', icon: FaCogs, group: 'Periféricos y Accesorios' },
+  { value: 'router', label: 'Router', icon: FaNetworkWired, group: 'Redes y Conectividad' },
+  { value: 'switch', label: 'Switch', icon: FaNetworkWired, group: 'Redes y Conectividad' },
+  { value: 'firewall', label: 'Firewall', icon: FaShieldAlt, group: 'Redes y Conectividad' },
+  { value: 'access_point', label: 'Access Point', icon: FaWifi, group: 'Redes y Conectividad' },
+  { value: 'antena', label: 'Antena Microonda', icon: FaBroadcastTower, group: 'Redes y Conectividad' },
+  { value: 'internet', label: 'Internet / Módem', icon: FaGlobe, group: 'Redes y Conectividad' },
+  { value: 'camara', label: 'Cámara de Videovigilancia', icon: FaVideo, group: 'Videovigilancia' },
+  { value: 'dvr', label: 'DVRs', icon: FaHdd, group: 'Videovigilancia' },
+  { value: 'impresora', label: 'Impresora', icon: FaPrint, group: 'Impresión y Escaneo' },
+  { value: 'plotter', label: 'Plotter', icon: FaPrint, group: 'Impresión y Escaneo' },
+  { value: 'pantalla', label: 'Pantallas', icon: FaTv, group: 'Visualización' },
+  { value: 'monitor', label: 'Monitor', icon: FaDesktop, group: 'Visualización' },
+  { value: 'videowall', label: 'Controlador de Videowall', icon: FaThLarge, group: 'Visualización' },
+  { value: 'celular', label: 'Celular', icon: FaMobileAlt, group: 'Comunicación' },
+  { value: 'telefono', label: 'Teléfono', icon: FaPhone, group: 'Comunicación' },
+  { value: 'radio', label: 'Radio', icon: FaMicrophone, group: 'Comunicación' },
+  { value: 'aire', label: 'Aire Acondicionado', icon: FaFan, group: 'Infraestructura' },
+  { value: 'no_break', label: 'No Break (UPS)', icon: FaPlug, group: 'Infraestructura' },
+  { value: 'regulador', label: 'Regulador', icon: FaPlug, group: 'Infraestructura' },
+  { value: 'lectora_tags', label: 'Lectora de Tags', icon: FaBroadcastTower, group: 'Peaje y Control' },
+  { value: 'controladora', label: 'Controladora', icon: FaShieldAlt, group: 'Peaje y Control' },
+  { value: 'ram', label: 'Memoria RAM', icon: FaMemory, group: 'Componentes' },
+  { value: 'almacenamiento', label: 'Disco Duro / SSD', icon: FaHdd, group: 'Componentes' },
+  { value: 'antena_wifi', label: 'Antena WiFi', icon: FaWifi, group: 'Componentes' },
+  { value: 'cabezal', label: 'Cabezal de Impresión', icon: FaPrint, group: 'Componentes' },
+  { value: 'otro', label: 'Otro', icon: FaBoxes, group: 'Otros' },
+];
+
+
+
+const CustomEquipmentSelect = ({ value, onChange, opciones, gruposOpciones }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [hoveredCategory, setHoveredCategory] = useState('Componentes');
+  const [hoveredCategory, setHoveredCategory] = useState(null);
 
-  const todasLasOpciones = Object.entries(ARTICULOS_AGRUPADOS).flatMap(([group, items]) =>
-    items.map(item => ({ ...item, group }))
-  );
+  const selectedOption = opciones.find(o => o.value === value);
 
-  const selectedOption = todasLasOpciones.find(o => o.value === value);
-
-  const filteredOptions = todasLasOpciones.filter(o =>
+  const filteredOptions = opciones.filter(o =>
     o.label.toLowerCase().includes(search.toLowerCase()) ||
     o.group.toLowerCase().includes(search.toLowerCase())
   );
@@ -2151,19 +2780,12 @@ const CustomArticleSelect = ({ value, onChange, esPersonalizado, setEsPersonaliz
         style={{ ...inputStyle, padding: '0.75rem 1rem', fontSize: '1rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
       >
         <span>
-          {esPersonalizado ? (
+          {selectedOption ? (
             <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b', fontWeight: '600' }}>
-              <FaBoxes color="#691B31" size={18} /> Otro: {value || '(Escriba abajo)'}
-            </span>
-          ) : selectedOption ? (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b', fontWeight: '600' }}>
-              {(() => {
-                const Icon = selectedOption.icon;
-                return <Icon color="#691B31" size={18} />;
-              })()} {selectedOption.label}
+              <selectedOption.icon color="#691B31" size={18} /> {selectedOption.label}
             </span>
           ) : (
-            <span style={{ color: '#94a3b8' }}>-- Seleccionar artículo --</span>
+            <span style={{ color: '#94a3b8' }}>-- Seleccionar el tipo de equipo --</span>
           )}
         </span>
         <FaChevronRight size={14} style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.2s', color: '#64748b' }} />
@@ -2176,7 +2798,7 @@ const CustomArticleSelect = ({ value, onChange, esPersonalizado, setEsPersonaliz
             <div style={{ padding: '0.75rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
               <input
                 type="text"
-                placeholder="Buscar artículo..."
+                placeholder="Buscar equipo (ej. Servidor, DVR...)"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 autoFocus
@@ -2185,39 +2807,33 @@ const CustomArticleSelect = ({ value, onChange, esPersonalizado, setEsPersonaliz
               />
             </div>
 
-            <div style={{ display: 'flex', height: '280px' }}>
+            <div className="dropdown-select-container">
               {search ? (
+                // Search Results
                 <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto' }}>
-                  {filteredOptions.length > 0 ? filteredOptions.map(opcion => {
-                    const Icon = opcion.icon;
-                    return (
-                      <div
-                        key={opcion.value}
-                        onClick={() => {
-                          setEsPersonalizado(false);
-                          onChange(opcion.value);
-                          setIsOpen(false);
-                          setSearch('');
-                        }}
-                        style={{ padding: '0.75rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', transition: 'background-color 0.15s' }}
-                        onMouseOver={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                        onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                      >
-                        <Icon color="#691B31" size={18} />
-                        <span style={{ fontWeight: '500', color: '#334155' }}>{opcion.label}</span>
-                        <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginLeft: 'auto', backgroundColor: '#e2e8f0', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: '600' }}>{opcion.group}</span>
-                      </div>
-                    );
-                  }) : (
-                    <div style={{ padding: '2rem', color: '#64748b', textAlign: 'center' }}>
-                      No se encontraron artículos para "{search}"
+                  {filteredOptions.length > 0 ? filteredOptions.map(opcion => (
+                    <div
+                      key={opcion.value}
+                      onClick={() => { onChange(opcion.value); setIsOpen(false); setSearch(''); }}
+                      style={{ padding: '0.75rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', transition: 'background-color 0.15s' }}
+                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                      onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <opcion.icon color="#691B31" size={18} />
+                      <span style={{ fontWeight: '500', color: '#334155' }}>{opcion.label}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginLeft: 'auto', backgroundColor: '#e2e8f0', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: '600' }}>{opcion.group}</span>
+                    </div>
+                  )) : (
+                    <div style={{ padding: '2rem', color: '#64748b', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                      <span>No se encontraron equipos para "{search}"</span>
                     </div>
                   )}
                 </div>
               ) : (
+                // Category Hover View
                 <>
-                  <div style={{ width: '45%', borderRight: '1px solid #e2e8f0', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#ffffff' }}>
-                    {Object.keys(ARTICULOS_AGRUPADOS).map((group) => (
+                  <div className="dropdown-left-pane">
+                    {Object.keys(gruposOpciones).map((group) => (
                       <div
                         key={group}
                         onMouseEnter={() => setHoveredCategory(group)}
@@ -2239,84 +2855,29 @@ const CustomArticleSelect = ({ value, onChange, esPersonalizado, setEsPersonaliz
                         {group} <FaChevronRight size={10} style={{ opacity: hoveredCategory === group ? 1 : 0.3 }} />
                       </div>
                     ))}
-                    
-                    <div
-                      onMouseEnter={() => setHoveredCategory('Otro')}
-                      onClick={() => {
-                        setEsPersonalizado(true);
-                        onChange('');
-                        setIsOpen(false);
-                      }}
-                      style={{
-                        padding: '0.85rem 1rem',
-                        cursor: 'pointer',
-                        borderRadius: '8px',
-                        fontWeight: '600',
-                        fontSize: '0.9rem',
-                        color: hoveredCategory === 'Otro' ? '#691B31' : '#475569',
-                        backgroundColor: hoveredCategory === 'Otro' ? '#fdf2f8' : 'transparent',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginTop: '0.5rem',
-                        borderTop: '1px dashed #cbd5e1',
-                        transition: 'background-color 0.2s, color 0.2s'
-                      }}
-                    >
-                      Otro (Especificar) <FaChevronRight size={10} style={{ opacity: hoveredCategory === 'Otro' ? 1 : 0.3 }} />
-                    </div>
                   </div>
-                  
-                  <div style={{ width: '55%', overflowY: 'auto', padding: '0.5rem', backgroundColor: '#f8fafc' }}>
-                    {hoveredCategory === 'Otro' ? (
-                      <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: '#64748b' }}>
-                        <div style={{ fontWeight: 'bold', color: '#334155', marginBottom: '0.5rem' }}>Artículo Personalizado</div>
-                        <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>
-                          Haz clic aquí para poder escribir un nombre personalizado.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEsPersonalizado(true);
-                            onChange('');
-                            setIsOpen(false);
-                          }}
-                          style={{
-                            backgroundColor: '#691B31', color: 'white', border: 'none',
-                            padding: '0.5rem 1rem', borderRadius: '6px', fontWeight: '600', cursor: 'pointer'
-                          }}
-                        >
-                          Especificar Otro
-                        </button>
-                      </div>
-                    ) : hoveredCategory ? (
+                  <div className="dropdown-right-pane">
+                    {hoveredCategory ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                         <div style={{ padding: '0.5rem 0.75rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          Artículos en {hoveredCategory}
+                          Equipos en {hoveredCategory}
                         </div>
-                        {ARTICULOS_AGRUPADOS[hoveredCategory].map(opcion => {
-                          const Icon = opcion.icon;
-                          return (
-                            <div
-                              key={opcion.value}
-                              onClick={() => {
-                                setEsPersonalizado(false);
-                                onChange(opcion.value);
-                                setIsOpen(false);
-                              }}
-                              style={{ padding: '0.75rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', transition: 'background-color 0.15s, color 0.15s' }}
-                              onMouseOver={e => { e.currentTarget.style.backgroundColor = '#e2e8f0'; e.currentTarget.style.color = '#0f172a'; }}
-                              onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#475569'; }}
-                            >
-                              <Icon color="#64748b" size={16} /> <span style={{ fontSize: '0.95rem', fontWeight: '500' }}>{opcion.label}</span>
-                            </div>
-                          );
-                        })}
+                        {gruposOpciones[hoveredCategory].map(opcion => (
+                          <div
+                            key={opcion.value}
+                            onClick={() => { onChange(opcion.value); setIsOpen(false); }}
+                            style={{ padding: '0.75rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', transition: 'background-color 0.15s, color 0.15s' }}
+                            onMouseOver={e => { e.currentTarget.style.backgroundColor = '#e2e8f0'; e.currentTarget.style.color = '#0f172a'; }}
+                            onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#475569'; }}
+                          >
+                            <opcion.icon color="#64748b" size={16} /> <span style={{ fontSize: '0.95rem', fontWeight: '500' }}>{opcion.label}</span>
+                          </div>
+                        ))}
                       </div>
                     ) : (
                       <div style={{ padding: '3rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-                        <FaBoxes size={32} color="#cbd5e1" />
-                        Selecciona una categoría a la izquierda
+                        <FaLaptop size={32} color="#cbd5e1" />
+                        Pasa el cursor sobre una categoría a la izquierda para ver los equipos disponibles
                       </div>
                     )}
                   </div>
@@ -2325,6 +2886,142 @@ const CustomArticleSelect = ({ value, onChange, esPersonalizado, setEsPersonaliz
             </div>
           </div>
         </>
+      )}
+    </div>
+  );
+};
+
+const CustomSpecSelect = ({ label, value, options, onChange, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [esOtro, setEsOtro] = useState(false);
+  const [customVal, setCustomVal] = useState('');
+
+  useEffect(() => {
+    if (value) {
+      // Solo regresar al modo de selección si coinciden las opciones y no estábamos ya escribiendo otra cosa
+      if (options.includes(value) && !esOtro) {
+        setEsOtro(false);
+        setCustomVal('');
+      } else if (!options.includes(value)) {
+        setEsOtro(true);
+        setCustomVal(value);
+      }
+    } else {
+      if (!esOtro) {
+        setCustomVal('');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, options]);
+
+  const handleSelectOption = (opt) => {
+    setEsOtro(false);
+    setIsOpen(false);
+    onChange(opt);
+  };
+
+  const handleSelectOtro = () => {
+    setEsOtro(true);
+    setIsOpen(false);
+  };
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setCustomVal(val);
+    onChange(val);
+  };
+
+  const displayVal = esOtro ? `Otro: ${value || '(Escriba abajo)'}` : (value || '-- Seleccionar --');
+
+  return (
+    <div style={{ position: 'relative', width: '100%' }}>
+      <label style={labelStyle}>{label}</label>
+
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          ...inputStyle,
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          backgroundColor: '#fff',
+          fontWeight: value ? '600' : 'normal',
+          color: value ? '#1e293b' : '#94a3b8',
+          marginBottom: esOtro ? '0.5rem' : '0'
+        }}
+      >
+        <span>{displayVal}</span>
+        <FaChevronRight size={12} style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.2s', color: '#64748b' }} />
+      </div>
+
+      {isOpen && (
+        <>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 90 }} onClick={() => setIsOpen(false)} />
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            marginTop: '0.25rem',
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)',
+            zIndex: 100,
+            border: '1px solid #e2e8f0',
+            maxHeight: '200px',
+            overflowY: 'auto'
+          }}>
+            {options.map(opt => (
+              <div
+                key={opt}
+                onClick={() => handleSelectOption(opt)}
+                style={{
+                  padding: '0.6rem 1rem',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  color: value === opt ? '#691B31' : '#475569',
+                  backgroundColor: value === opt ? '#fdf2f8' : 'transparent',
+                  fontWeight: value === opt ? '600' : 'normal',
+                  transition: 'background-color 0.15s'
+                }}
+                onMouseOver={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                onMouseOut={e => e.currentTarget.style.backgroundColor = value === opt ? '#fdf2f8' : 'transparent'}
+              >
+                {opt}
+              </div>
+            ))}
+
+            <div
+              onClick={handleSelectOtro}
+              style={{
+                padding: '0.6rem 1rem',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                color: esOtro ? '#691B31' : '#475569',
+                backgroundColor: esOtro ? '#fdf2f8' : 'transparent',
+                fontWeight: esOtro ? '600' : 'normal',
+                borderTop: '1px dashed #cbd5e1',
+                transition: 'background-color 0.15s'
+              }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = esOtro ? '#fdf2f8' : 'transparent'}
+            >
+              Otro (Especificar)
+            </div>
+          </div>
+        </>
+      )}
+
+      {esOtro && (
+        <input
+          type="text"
+          value={customVal}
+          onChange={handleInputChange}
+          placeholder={placeholder || `Escriba ${label.toLowerCase()}`}
+          style={inputStyle}
+          required
+        />
       )}
     </div>
   );
