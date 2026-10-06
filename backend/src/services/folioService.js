@@ -12,40 +12,66 @@ async function generarFolio(tipo) {
   const inicioAnio = new Date(`${anio}-01-01T00:00:00`);
   const finAnio = new Date(`${anio + 1}-01-01T00:00:00`);
 
-  let count = 0;
+  let maxNumero = 0;
 
-  if (tipo === 'infraestructura') {
-    count = await prisma.reporteOficina.count({
+  if (tipo === 'semaforo') {
+    const reportes = await prisma.reporteSemaforo.findMany({
       where: {
         createdAt: { gte: inicioAnio, lt: finAnio },
-        OR: [
-          { folio: { startsWith: 'RI' } },
-          { categoria: { nombre: { contains: 'Infraestructura' } } }
-        ]
+        folio: { startsWith: `${prefijo}-` }
       },
+      select: { folio: true }
     });
-  } else if (tipo === 'oficina' || tipo === 'tecnologico') {
-    count = await prisma.reporteOficina.count({
-      where: {
-        createdAt: { gte: inicioAnio, lt: finAnio },
-        NOT: {
-          OR: [
-            { folio: { startsWith: 'RI' } },
-            { categoria: { nombre: { contains: 'Infraestructura' } } }
-          ]
+
+    for (const r of reportes) {
+      if (!r.folio) continue;
+      const partes = r.folio.split('-');
+      if (partes.length >= 2) {
+        const num = parseInt(partes[1], 10);
+        if (!isNaN(num) && num > maxNumero) {
+          maxNumero = num;
         }
-      },
-    });
+      }
+    }
   } else {
-    count = await prisma.reporteSemaforo.count({
-      where: { createdAt: { gte: inicioAnio, lt: finAnio } },
+    // Oficina / Tecnológico (RT) o Infraestructura (RI)
+    const reportes = await prisma.reporteOficina.findMany({
+      where: {
+        createdAt: { gte: inicioAnio, lt: finAnio },
+        folio: { startsWith: `${prefijo}-` }
+      },
+      select: { folio: true }
     });
+
+    for (const r of reportes) {
+      if (!r.folio) continue;
+      const partes = r.folio.split('-');
+      if (partes.length >= 2) {
+        const num = parseInt(partes[1], 10);
+        if (!isNaN(num) && num > maxNumero) {
+          maxNumero = num;
+        }
+      }
+    }
   }
 
-  // Generar secuencia con padding de 2 dígitos
-  const secuencia = String(count + 1).padStart(2, '0');
+  let siguienteNumero = maxNumero + 1;
+  let folioCandidato = `${prefijo}-${String(siguienteNumero).padStart(2, '0')}-${anio}`;
 
-  return `${prefijo}-${secuencia}-${anio}`;
+  // Verificación adicional contra colisiones
+  if (tipo === 'semaforo') {
+    while (await prisma.reporteSemaforo.findUnique({ where: { folio: folioCandidato } })) {
+      siguienteNumero++;
+      folioCandidato = `${prefijo}-${String(siguienteNumero).padStart(2, '0')}-${anio}`;
+    }
+  } else {
+    while (await prisma.reporteOficina.findUnique({ where: { folio: folioCandidato } })) {
+      siguienteNumero++;
+      folioCandidato = `${prefijo}-${String(siguienteNumero).padStart(2, '0')}-${anio}`;
+    }
+  }
+
+  return folioCandidato;
 }
 
 module.exports = { generarFolio };

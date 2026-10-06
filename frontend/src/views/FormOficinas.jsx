@@ -297,6 +297,137 @@ export default function FormOficinas({ usuarioActual }) {
   const enviar = async (e) => {
     e.preventDefault()
 
+    const nuevosErrores = {}
+    const nuevosValidos = {}
+    let formularioValido = true
+
+    // Solicitante
+    const solVal = formData.solicitante?.trim() || ''
+    if (!solVal) {
+      nuevosErrores.solicitante = 'Campo obligatorio'
+      nuevosValidos.solicitante = false
+      formularioValido = false
+    } else if (solVal.length < 3) {
+      nuevosErrores.solicitante = 'Mínimo 3 caracteres'
+      nuevosValidos.solicitante = false
+      formularioValido = false
+    } else if (!/^[A-Za-zÁáÉéÍíÓóÚúÑñ\s]{3,100}$/.test(solVal)) {
+      nuevosErrores.solicitante = 'Solo letras y espacios'
+      nuevosValidos.solicitante = false
+      formularioValido = false
+    } else {
+      nuevosValidos.solicitante = true
+    }
+
+    // Área
+    if (!formData.area_id) {
+      nuevosErrores.area_id = 'Campo obligatorio'
+      nuevosValidos.area_id = false
+      formularioValido = false
+    } else {
+      nuevosValidos.area_id = true
+    }
+
+    // Cargo
+    if (!formData.cargo) {
+      nuevosErrores.cargo = 'Campo obligatorio'
+      nuevosValidos.cargo = false
+      formularioValido = false
+    } else {
+      nuevosValidos.cargo = true
+    }
+
+    // Email
+    const emailVal = formData.email?.trim() || ''
+    const regexCorreo = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+    if (!emailVal) {
+      nuevosErrores.email = 'Campo obligatorio'
+      nuevosValidos.email = false
+      formularioValido = false
+    } else if (!regexCorreo.test(emailVal)) {
+      nuevosErrores.email = 'Correo inválido (ej: nombre@dominio.com)'
+      nuevosValidos.email = false
+      formularioValido = false
+    } else {
+      nuevosValidos.email = true
+    }
+
+    // Teléfono
+    const soloNumeros = (formData.telefono || '').replace(/[^0-9]/g, '')
+    if (!soloNumeros) {
+      nuevosErrores.telefono = 'Campo obligatorio'
+      nuevosValidos.telefono = false
+      formularioValido = false
+    } else if (soloNumeros.length !== 10) {
+      nuevosErrores.telefono = 'Debe tener 10 dígitos'
+      nuevosValidos.telefono = false
+      formularioValido = false
+    } else {
+      nuevosValidos.telefono = true
+    }
+
+    // Sede
+    if (!formData.sede_id) {
+      nuevosErrores.sede_id = 'Campo obligatorio'
+      nuevosValidos.sede_id = false
+      formularioValido = false
+    } else {
+      nuevosValidos.sede_id = true
+    }
+
+    // Equipo o Serie
+    const eqVal = formData.equipo?.trim() || ''
+    const serVal = formData.numero_serie?.trim() || ''
+    if (!eqVal && !serVal) {
+      nuevosErrores.equipo = 'Ingrese Inventario o Serie'
+      nuevosErrores.numero_serie = 'Ingrese Inventario o Serie'
+      nuevosValidos.equipo = false
+      nuevosValidos.numero_serie = false
+      formularioValido = false
+    } else {
+      nuevosValidos.equipo = true
+      nuevosValidos.numero_serie = true
+    }
+
+    // Categoría
+    if (!formData.categoria_id) {
+      nuevosErrores.categoria_id = 'Campo obligatorio'
+      nuevosValidos.categoria_id = false
+      formularioValido = false
+    } else {
+      nuevosValidos.categoria_id = true
+    }
+
+    // Categoría Otro
+    if (mostrarOtro && !formData.descripcion_otro?.trim()) {
+      nuevosErrores.descripcion_otro = 'Especifique la categoría'
+      nuevosValidos.descripcion_otro = false
+      formularioValido = false
+    } else if (mostrarOtro) {
+      nuevosValidos.descripcion_otro = true
+    }
+
+    // Prioridad
+    if (!formData.prioridad) {
+      nuevosErrores.prioridad = 'Campo obligatorio'
+      nuevosValidos.prioridad = false
+      formularioValido = false
+    } else {
+      nuevosValidos.prioridad = true
+    }
+
+    setErrores(nuevosErrores)
+    setValido(nuevosValidos)
+
+    if (!formularioValido) {
+      if (!eqVal && !serVal) {
+        Swal.fire('Atención', 'Debe ingresar al menos el Número de Inventario o el Número de Serie del equipo', 'warning')
+      } else {
+        Swal.fire('Atención', 'Complete todos los campos obligatorios correctamente', 'warning')
+      }
+      return
+    }
+
     const confirmar = await Swal.fire({
       title: '¿Enviar reporte?',
       text: 'Puede cancelar si desea revisar o editar algo antes de enviarlo.',
@@ -309,30 +440,6 @@ export default function FormOficinas({ usuarioActual }) {
     })
 
     if (!confirmar.isConfirmed) return
-
-    Object.keys(formData).forEach(campo => {
-      if (campo !== 'evidencia' && campo !== 'evidencias' && campo !== 'descripcion') {
-        validarCampo(campo, formData[campo])
-      }
-    })
-
-    const eqVal = formData.equipo?.trim() || ''
-    const serVal = formData.numero_serie?.trim() || ''
-    if (!eqVal && !serVal) {
-      setErrores(prev => ({ ...prev, equipo: 'Ingrese Inventario o Serie', numero_serie: 'Ingrese Inventario o Serie' }))
-      setValido(prev => ({ ...prev, equipo: false, numero_serie: false }))
-      Swal.fire('Atención', 'Debe ingresar al menos el Número de Inventario o el Número de Serie del equipo', 'warning');
-      return
-    } else {
-      setErrores(prev => ({ ...prev, equipo: '', numero_serie: '' }))
-      setValido(prev => ({ ...prev, equipo: true, numero_serie: true }))
-    }
-
-    const hayErrores = Object.values(valido).some(est => est === false)
-    if (hayErrores) {
-      Swal.fire('Atención', 'Complete todos los campos obligatorios', 'warning');
-      return
-    }
 
     setCargando(true)
 
