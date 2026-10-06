@@ -1,0 +1,129 @@
+const CustomEquipmentSelect = ({ value, onChange, opciones, gruposOpciones }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [hoveredCategory, setHoveredCategory] = useState(null);
+
+  const selectedOption = opciones.find(o => o.value === value);
+
+  const filteredOptions = opciones.filter(o =>
+    o.label.toLowerCase().includes(search.toLowerCase()) ||
+    o.group.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div style={{ position: 'relative', width: '100%' }}>
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ ...inputStyle, padding: '0.75rem 1rem', fontSize: '1rem', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+      >
+        <span>
+          {selectedOption ? (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1e293b', fontWeight: '600' }}>
+              <selectedOption.icon color="#691B31" size={18} /> {selectedOption.label}
+            </span>
+          ) : (
+            <span style={{ color: '#94a3b8' }}>-- Seleccionar el tipo de equipo --</span>
+          )}
+        </span>
+        <FaChevronRight size={14} style={{ transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.2s', color: '#64748b' }} />
+      </div>
+
+      {isOpen && (
+        <>
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} onClick={() => setIsOpen(false)} />
+          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)', zIndex: 50, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            <div style={{ padding: '0.75rem', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+              <input
+                type="text"
+                placeholder="Buscar equipo (ej. Servidor, DVR...)"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+                style={{ width: '100%', padding: '0.65rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.95rem' }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+
+            <div className="dropdown-select-container">
+              {search ? (
+                // Search Results
+                <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto' }}>
+                  {filteredOptions.length > 0 ? filteredOptions.map(opcion => (
+                    <div
+                      key={opcion.value}
+                      onClick={() => { onChange(opcion.value); setIsOpen(false); setSearch(''); }}
+                      style={{ padding: '0.75rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', transition: 'background-color 0.15s' }}
+                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                      onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                    >
+                      <opcion.icon color="#691B31" size={18} />
+                      <span style={{ fontWeight: '500', color: '#334155' }}>{opcion.label}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginLeft: 'auto', backgroundColor: '#e2e8f0', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: '600' }}>{opcion.group}</span>
+                    </div>
+                  )) : (
+                    <div style={{ padding: '2rem', color: '#64748b', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                      <span>No se encontraron equipos para "{search}"</span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Category Hover View
+                <>
+                  <div className="dropdown-left-pane">
+                    {Object.keys(gruposOpciones).map((group) => (
+                      <div
+                        key={group}
+                        onMouseEnter={() => setHoveredCategory(group)}
+                        style={{
+                          padding: '0.85rem 1rem',
+                          cursor: 'pointer',
+                          borderRadius: '8px',
+                          fontWeight: '600',
+                          fontSize: '0.9rem',
+                          color: hoveredCategory === group ? '#691B31' : '#475569',
+                          backgroundColor: hoveredCategory === group ? '#fdf2f8' : 'transparent',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginBottom: '0.25rem',
+                          transition: 'background-color 0.2s, color 0.2s'
+                        }}
+                      >
+                        {group} <FaChevronRight size={10} style={{ opacity: hoveredCategory === group ? 1 : 0.3 }} />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="dropdown-right-pane">
+                    {hoveredCategory ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <div style={{ padding: '0.5rem 0.75rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Equipos en {hoveredCategory}
+                        </div>
+                        {gruposOpciones[hoveredCategory].map(opcion => (
+                          <div
+                            key={opcion.value}
+                            onClick={() => { onChange(opcion.value); setIsOpen(false); }}
+                            style={{ padding: '0.75rem 1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', borderRadius: '8px', transition: 'background-color 0.15s, color 0.15s' }}
+                            onMouseOver={e => { e.currentTarget.style.backgroundColor = '#e2e8f0'; e.currentTarget.style.color = '#0f172a'; }}
+                            onMouseOut={e => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#475569'; }}
+                          >
+                            <opcion.icon color="#64748b" size={16} /> <span style={{ fontSize: '0.95rem', fontWeight: '500' }}>{opcion.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ padding: '3rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.9rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                        <FaLaptop size={32} color="#cbd5e1" />
+                        Pasa el cursor sobre una categoría a la izquierda para ver los equipos disponibles
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
