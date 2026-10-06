@@ -789,9 +789,9 @@ export default function FormInfraestructura({ usuarioActual }) {
                   }}
                 >
                   <option value="">-- Seleccionar Prioridad --</option>
-                  <option value="baja">Baja (Mantenimiento preventivo / Estético)</option>
-                  <option value="media">Media (Afectación parcial sin riesgo)</option>
-                  <option value="alta">Alta (Urgencia operativa / Riesgo)</option>
+                  <option value="baja">Baja</option>
+                  <option value="media">Media</option>
+                  <option value="alta">Alta</option>
                 </select>
                 {errores.prioridad && <span style={{ color: '#DC2626', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>{errores.prioridad}</span>}
               </div>

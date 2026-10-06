@@ -54,18 +54,11 @@ const router = createBrowserRouter([
         ]
       },
 
-      // SOLO INFRAESTRUCTURA: Panel independiente
-      {
-        element: <RutaSoloInfra />,
-        children: [
-          { path: '/dashboard-infraestructura', element: <DashboardInfraestructura /> }
-        ]
-      },
-
-      // ADMIN O INFRA: Protegido
+      // ADMIN O INFRA: Protegido (Panel de Infraestructura e Inventario de Herramientas)
       {
         element: <RutaAdminOrInfra />,
         children: [
+          { path: '/dashboard-infraestructura', element: <DashboardInfraestructura /> },
           { path: '/inventario-herramientas', element: <InventarioHerramientas /> }
         ]
       }

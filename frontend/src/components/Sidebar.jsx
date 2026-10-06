@@ -138,8 +138,8 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         </div>
       )}
 
-      {/* SECCIÓN: INFRAESTRUCTURA — solo usuario de infraestructura */}
-      {user?.rol === 'infraestructura' && (
+      {/* SECCIÓN: INFRAESTRUCTURA — administrador e infraestructura */}
+      {(user?.rol === 'administrador' || user?.rol === 'infraestructura') && (
         <div style={{ marginBottom: '1.5rem' }}>
           <p className="sidebar-section-label">Infraestructura</p>
 
@@ -154,16 +154,18 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             Panel de Infraestructura
           </Link>
 
-          <Link
-            to="/inventario-herramientas"
-            style={linkStyle('/inventario-herramientas')}
-            onMouseOver={linkHover('/inventario-herramientas').over}
-            onMouseOut={linkHover('/inventario-herramientas').out}
-            onClick={closeSidebar}
-          >
-            <FaBoxes size={15} />
-            Inventario de Herramientas
-          </Link>
+          {user?.rol === 'infraestructura' && (
+            <Link
+              to="/inventario-herramientas"
+              style={linkStyle('/inventario-herramientas')}
+              onMouseOver={linkHover('/inventario-herramientas').over}
+              onMouseOut={linkHover('/inventario-herramientas').out}
+              onClick={closeSidebar}
+            >
+              <FaBoxes size={15} />
+              Inventario de Herramientas
+            </Link>
+          )}
         </div>
       )}
 
