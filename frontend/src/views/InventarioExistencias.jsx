@@ -1002,8 +1002,39 @@ export default function InventarioExistencias() {
           </p>
         </div>
 
-        {/* BOTONES DE ACCIÓN: INGRESAR STOCK Y EXPORTAR REPORTES PDF */}
+        {/* BOTONES DE ACCIÓN: VOLVER, INGRESAR STOCK Y EXPORTAR REPORTES PDF */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => navigate('/inventario-tecnologico')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.6rem',
+              backgroundColor: 'white',
+              color: '#334155',
+              border: '1px solid #CBD5E1',
+              borderRadius: '10px',
+              padding: '0.75rem 1.25rem',
+              fontWeight: '700',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={e => {
+              e.currentTarget.style.backgroundColor = '#F8FAFC';
+              e.currentTarget.style.borderColor = '#94A3B8';
+            }}
+            onMouseOut={e => {
+              e.currentTarget.style.backgroundColor = 'white';
+              e.currentTarget.style.borderColor = '#CBD5E1';
+            }}
+          >
+            <FaArrowLeft size={14} />
+            <span>Volver a Inventario Tecnológico</span>
+          </button>
+
           <button
             type="button"
             onClick={handleNuevo}

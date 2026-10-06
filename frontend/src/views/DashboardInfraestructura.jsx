@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { FaEye, FaTrashAlt, FaChevronRight, FaCogs, FaFileExcel, FaWrench } from 'react-icons/fa'
+import { FaEye, FaTrashAlt, FaChevronRight, FaCogs, FaFileExcel, FaWrench, FaBoxes } from 'react-icons/fa'
 import Swal from 'sweetalert2'
 import { useAuth } from '../context/AuthContext'
 import { formatFolio } from '../utils/formatFolio'
@@ -99,7 +99,7 @@ export default function DashboardInfraestructura() {
   const cargarInventario = async () => {
     if (!user?.token) return
     try {
-      const response = await fetch(`${API_BASE_URL}/api/inventario/existencias?soloBuenEstado=true&limit=1000`, {
+      const response = await fetch(`${API_BASE_URL}/api/inventario/existencias?tipoInventario=infraestructura&soloBuenEstado=true&limit=1000`, {
         headers: { 'Authorization': `Bearer ${user.token}` }
       })
       const json = await response.json()
@@ -391,6 +391,36 @@ export default function DashboardInfraestructura() {
               Gestión y seguimiento de averías en instalaciones, estaciones, edificios y mantenimiento general.
             </p>
           </div>
+
+          <button
+            onClick={() => navigate('/stock-infraestructura')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              backgroundColor: '#059669',
+              color: 'white',
+              border: 'none',
+              padding: '0.65rem 1.25rem',
+              borderRadius: '10px',
+              fontWeight: '700',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 6px -1px rgba(5, 150, 105, 0.25)',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = '#047857'
+              e.currentTarget.style.transform = 'translateY(-1px)'
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = '#059669'
+              e.currentTarget.style.transform = 'translateY(0)'
+            }}
+          >
+            <FaBoxes size={16} />
+            Stock
+          </button>
         </div>
 
         {/* TARJETAS KPI DE MÉTRICAS */}
@@ -804,7 +834,7 @@ export default function DashboardInfraestructura() {
 
                   {mostrarInventario && (
                     <div style={{ backgroundColor: '#F8FAFC', padding: '1rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid #E5E7EB' }}>
-                      <h4 style={{ margin: '0 0 0.65rem 0', fontSize: '0.85rem', color: '#4B5563', fontWeight: '700' }}>Seleccionar del Inventario de Existencias</h4>
+                      <h4 style={{ margin: '0 0 0.65rem 0', fontSize: '0.85rem', color: '#4B5563', fontWeight: '700' }}>Seleccionar del Stock de Infraestructura</h4>
                       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
                         <div style={{ flex: '1', minWidth: '180px' }}>
                           <CustomInventorySelect
@@ -1007,7 +1037,7 @@ const CustomInventorySelect = ({ value, onChange, inventario, piezasAsignadas = 
               {selectedOption.nombre || selectedOption.descripcion} (Disp: {selectedOption.cantidad ?? 'N/A'})
             </span>
           ) : (
-            <span style={{ color: '#9CA3AF' }}>-- Seleccionar pieza o herramienta --</span>
+            <span style={{ color: '#9CA3AF' }}>-- Seleccionar refacción del stock --</span>
           )}
         </span>
         <FaChevronRight size={12} style={{ transform: isOpen ? 'rotate(-90deg)' : 'rotate(90deg)', transition: '0.2s', color: '#6B7280' }} />

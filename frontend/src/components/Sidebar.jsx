@@ -154,6 +154,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             Panel de Infraestructura
           </Link>
 
+
           {user?.rol === 'infraestructura' && (
             <Link
               to="/inventario-herramientas"
@@ -218,16 +219,6 @@ export default function Sidebar({ isOpen, setIsOpen }) {
             Inventario Tecnológico
           </Link>
 
-          <Link
-            to="/inventario-existencias"
-            style={linkStyle('/inventario-existencias')}
-            onMouseOver={linkHover('/inventario-existencias').over}
-            onMouseOut={linkHover('/inventario-existencias').out}
-            onClick={closeSidebar}
-          >
-            <FaBoxes size={15} />
-            Inventario de Existencias
-          </Link>
 
           <Link
             to="/inventario-herramientas"

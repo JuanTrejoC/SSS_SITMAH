@@ -20,6 +20,7 @@ import InventarioExistencias from '../views/InventarioExistencias'
 import InventarioHerramientas from '../views/InventarioHerramientas'
 import InventarioMobiliario from '../views/InventarioMobiliario'
 import Resguardos from '../views/Resguardos'
+import StockInfraestructura from '../views/StockInfraestructura'
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -59,6 +60,7 @@ const router = createBrowserRouter([
         element: <RutaAdminOrInfra />,
         children: [
           { path: '/dashboard-infraestructura', element: <DashboardInfraestructura /> },
+          { path: '/stock-infraestructura', element: <StockInfraestructura /> },
           { path: '/inventario-herramientas', element: <InventarioHerramientas /> }
         ]
       }
