@@ -42,6 +42,7 @@ const TIPOS_EQUIPO = [
   { value: 'regulador', label: 'Regulador', icon: FaPlug, group: 'Infraestructura' },
   { value: 'lectora_tags', label: 'Lectora de Tags', icon: FaBroadcastTower, group: 'Peaje y Control' },
   { value: 'controladora', label: 'Controladora', icon: FaShieldAlt, group: 'Peaje y Control' },
+  { value: 'terminal_multibiometrica', label: 'Terminal Multibiométrica', icon: FaShieldAlt, group: 'Peaje y Control' },
   { value: 'ram', label: 'Memoria RAM', icon: FaMemory, group: 'Componentes' },
   { value: 'almacenamiento', label: 'Disco Duro / SSD', icon: FaHdd, group: 'Componentes' },
   { value: 'antena_wifi', label: 'Antena WiFi', icon: FaWifi, group: 'Componentes' },
@@ -1942,33 +1943,55 @@ export default function InventarioTecnologico() {
                       </datalist>
                     </div>
 
-                    <div>
-                      <label style={labelStyle}>Área *</label>
-                      <select
-                        value={form.direccion}
-                        onChange={e => setForm({ ...form, direccion: e.target.value })}
-                        style={{ ...inputStyle, cursor: 'pointer' }}
-                        required
-                      >
-                        <option value="">-- Seleccionar Área --</option>
-                        {areasList.map(a => (
-                          <option key={a} value={a}>{a}</option>
-                        ))}
-                      </select>
-                    </div>
+                    {!(form.tipo && ['camara', 'terminal_multibiometrica'].includes(form.tipo) && estacionesList.map(e => typeof e === 'string' ? e : e.nombre).includes(form.areaUbicacion)) && (
+                      <div>
+                        <label style={labelStyle}>Área *</label>
+                        <select
+                          value={form.direccion}
+                          onChange={e => setForm({ ...form, direccion: e.target.value })}
+                          style={{ ...inputStyle, cursor: 'pointer' }}
+                          required
+                        >
+                          <option value="">-- Seleccionar Área --</option>
+                          {areasList.map(a => (
+                            <option key={a} value={a}>{a}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
 
                     <div>
                       <label style={labelStyle}>Ubicación *</label>
                       <select
                         value={form.areaUbicacion}
-                        onChange={e => setForm({ ...form, areaUbicacion: e.target.value })}
+                        onChange={e => {
+                          const val = e.target.value;
+                          const isEstacion = ['camara', 'terminal_multibiometrica'].includes(form.tipo) && estacionesList.map(est => typeof est === 'string' ? est : est.nombre).includes(val);
+                          setForm({ ...form, areaUbicacion: val, direccion: isEstacion ? '' : form.direccion });
+                        }}
                         style={{ ...inputStyle, cursor: 'pointer' }}
                         required
                       >
                         <option value="">-- Seleccionar Ubicación --</option>
-                        {(form.tipo === 'camara' ? estacionesList.map(e => typeof e === 'string' ? e : e.nombre) : sedesList).map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
+                        {['camara', 'terminal_multibiometrica'].includes(form.tipo) ? (
+                          <>
+                            <optgroup label="Sedes">
+                              {sedesList.map(s => (
+                                <option key={`sede-${s}`} value={s}>{s}</option>
+                              ))}
+                            </optgroup>
+                            <optgroup label="Estaciones / Paraderos">
+                              {estacionesList.map(e => {
+                                const val = typeof e === 'string' ? e : e.nombre;
+                                return <option key={`est-${val}`} value={val}>{val}</option>;
+                              })}
+                            </optgroup>
+                          </>
+                        ) : (
+                          sedesList.map(s => (
+                            <option key={`sede-${s}`} value={s}>{s}</option>
+                          ))
+                        )}
                       </select>
                     </div>
 
