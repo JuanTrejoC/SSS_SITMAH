@@ -64,7 +64,8 @@ const obtenerEquipos = async (req, res) => {
               numeroInventario: true,
               numeroSerie: true
             }
-          }
+          },
+          componentes: true
         }
       }),
       prisma.equipoTecnologico.count({ where })
@@ -341,6 +342,12 @@ async function procesarPerifericosDeDetalles(detalles, equipoPrincipalId, respon
   const nuevosDetalles = { ...detalles };
   const perifericosAcrear = [];
 
+  const componentesExistentes = equipoPrincipalId
+    ? await prisma.equipoTecnologico.findMany({
+        where: { equipoPrincipalId: parseInt(equipoPrincipalId) }
+      })
+    : [];
+
   // 1. Procesar periféricos planos (Teclado, Mouse, Cargador, Diadema, Candado, Regulador, No break, Antena)
   const mapeoPlanos = [
     { tipo: 'Teclado', sufijo: 'Teclado' },
@@ -355,15 +362,53 @@ async function procesarPerifericosDeDetalles(detalles, equipoPrincipalId, respon
 
   for (const p of mapeoPlanos) {
     const { tipo, sufijo } = p;
+    const tieneProp = detalles[`tiene${sufijo}`];
     const marca = detalles[`marca${sufijo}`];
     const modelo = detalles[`modelo${sufijo}`];
     const serie = detalles[`serie${sufijo}`];
     let inventario = detalles[`numeroInventario${sufijo}`] ? String(detalles[`numeroInventario${sufijo}`]) : null;
 
-    if (marca || modelo || serie || inventario) {
-      perifericosAcrear.push({ tipo, marca, modelo, serie, inventario });
+    const existente = componentesExistentes.find(c => (c.tipo || '').toLowerCase() === tipo.toLowerCase());
+
+    if (tieneProp === false) {
+      // Si el usuario desmarcó el checkbox explícitamente, desvincular el periférico existente
+      if (existente) {
+        await prisma.equipoTecnologico.update({
+          where: { id: existente.id },
+          data: { equipoPrincipalId: null }
+        });
+      }
+    } else if (tieneProp === true || marca || modelo || serie || inventario) {
+      if (existente) {
+        // Actualizar el periférico existente sin duplicar
+        let finalInventario = inventario && inventario.trim() !== '' ? inventario.trim() : existente.numeroInventario;
+        if (finalInventario && finalInventario !== existente.numeroInventario) {
+          const existeOtro = await prisma.equipoTecnologico.findFirst({
+            where: { numeroInventario: finalInventario, id: { not: existente.id } }
+          });
+          if (existeOtro) finalInventario = `${finalInventario}-1`;
+        }
+
+        await prisma.equipoTecnologico.update({
+          where: { id: existente.id },
+          data: {
+            marca: marca !== undefined ? (marca && marca.trim() !== '' ? String(marca) : null) : existente.marca,
+            modelo: modelo !== undefined ? (modelo && modelo.trim() !== '' ? String(modelo) : null) : existente.modelo,
+            numeroSerie: serie !== undefined ? (serie && serie.trim() !== '' ? String(serie) : null) : existente.numeroSerie,
+            numeroInventario: finalInventario || null,
+            responsable: responsable || null,
+            cargoResponsable: cargoResponsable || null,
+            areaUbicacion: areaUbicacion || null,
+            direccion: direccion || null,
+            procedencia: procedencia || null,
+          }
+        });
+      } else if (marca || modelo || serie || inventario) {
+        // Si no existía y tiene datos, crear nuevo
+        perifericosAcrear.push({ tipo, marca, modelo, serie, inventario });
+      }
     }
-    
+
     // Limpiar JSON
     delete nuevosDetalles[`marca${sufijo}`];
     delete nuevosDetalles[`modelo${sufijo}`];
@@ -374,26 +419,64 @@ async function procesarPerifericosDeDetalles(detalles, equipoPrincipalId, respon
   }
 
   // 2. Procesar arreglos de periféricos (como monitores)
-  if (Array.isArray(detalles.monitores)) {
-    for (const monitor of detalles.monitores) {
+  const monitoresExistentes = componentesExistentes.filter(c => (c.tipo || '').toLowerCase() === 'monitor');
+
+  if (detalles.tieneMonitores === false) {
+    for (const m of monitoresExistentes) {
+      await prisma.equipoTecnologico.update({
+        where: { id: m.id },
+        data: { equipoPrincipalId: null }
+      });
+    }
+  } else if (Array.isArray(detalles.monitores)) {
+    for (let i = 0; i < detalles.monitores.length; i++) {
+      const monitor = detalles.monitores[i];
       if (monitor.marca || monitor.modelo || monitor.serie || monitor.numeroInventario) {
-        perifericosAcrear.push({
-          tipo: 'Monitor',
-          marca: monitor.marca,
-          modelo: monitor.modelo,
-          serie: monitor.serie,
-          inventario: monitor.numeroInventario ? String(monitor.numeroInventario) : null
+        const existente = (monitor.id && monitoresExistentes.find(m => m.id === monitor.id)) || monitoresExistentes[i];
+        if (existente) {
+          await prisma.equipoTecnologico.update({
+            where: { id: existente.id },
+            data: {
+              marca: monitor.marca?.trim() || null,
+              modelo: monitor.modelo?.trim() || null,
+              numeroSerie: monitor.serie?.trim() || null,
+              numeroInventario: monitor.numeroInventario?.trim() || null,
+              responsable: responsable || null,
+              cargoResponsable: cargoResponsable || null,
+              areaUbicacion: areaUbicacion || null,
+              direccion: direccion || null,
+              procedencia: procedencia || null,
+            }
+          });
+        } else {
+          perifericosAcrear.push({
+            tipo: 'Monitor',
+            marca: monitor.marca,
+            modelo: monitor.modelo,
+            serie: monitor.serie,
+            inventario: monitor.numeroInventario ? String(monitor.numeroInventario) : null
+          });
+        }
+      }
+    }
+
+    if (monitoresExistentes.length > detalles.monitores.length) {
+      for (let i = detalles.monitores.length; i < monitoresExistentes.length; i++) {
+        await prisma.equipoTecnologico.update({
+          where: { id: monitoresExistentes[i].id },
+          data: { equipoPrincipalId: null }
         });
       }
     }
-    delete nuevosDetalles.monitores;
-    delete nuevosDetalles.tieneMonitores;
-    delete nuevosDetalles.cantidadMonitores;
-    delete nuevosDetalles.marcaMonitores;
-    delete nuevosDetalles.modeloMonitores;
-    delete nuevosDetalles.serieMonitores;
-    delete nuevosDetalles.numeroInventarioMonitores;
   }
+
+  delete nuevosDetalles.monitores;
+  delete nuevosDetalles.tieneMonitores;
+  delete nuevosDetalles.cantidadMonitores;
+  delete nuevosDetalles.marcaMonitores;
+  delete nuevosDetalles.modeloMonitores;
+  delete nuevosDetalles.serieMonitores;
+  delete nuevosDetalles.numeroInventarioMonitores;
 
   // 3. Crear en BD
   for (const p of perifericosAcrear) {
@@ -425,7 +508,7 @@ async function procesarPerifericosDeDetalles(detalles, equipoPrincipalId, respon
         direccion: direccion || null,
         procedencia: procedencia || null,
         estatus: 'Activo',
-        equipoPrincipalId,
+        equipoPrincipalId: parseInt(equipoPrincipalId),
         detalles: {}
       }
     });

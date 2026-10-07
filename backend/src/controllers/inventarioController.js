@@ -120,8 +120,6 @@ async function listarEquipoTecnologico(req, res) {
     ];
   }
 
-  require('fs').writeFileSync('where_debug.json', JSON.stringify({ query: req.query, where }, null, 2));
-
   const [items, total] = await Promise.all([
     prisma.equipoTecnologico.findMany({
       where,

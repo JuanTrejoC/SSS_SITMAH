@@ -1137,6 +1137,70 @@ export default function InventarioTecnologico() {
   const handleEditar = (item) => {
     setEditandoId(item.id);
     setEquipoPrincipalInfo(item.equipoPrincipal || (item.equipoPrincipalId ? { id: item.equipoPrincipalId } : null));
+
+    // Cargar componentes vinculados (periféricos asignados)
+    const comps = (item.componentes && item.componentes.length > 0)
+      ? item.componentes
+      : (todosLosEquipos || []).filter(e => e.equipoPrincipalId === item.id);
+
+    const nuevosDetalles = { ...(item.detalles || {}) };
+
+    if (['escritorio', 'laptop'].includes(item.tipo)) {
+      // 1. Teclado
+      const compTeclado = comps.find(c => (c.tipo || '').toLowerCase() === 'teclado');
+      if (compTeclado) {
+        nuevosDetalles.tieneTeclado = true;
+        nuevosDetalles.numeroInventarioTeclado = compTeclado.numeroInventario || '';
+        nuevosDetalles.marcaTeclado = compTeclado.marca || '';
+        nuevosDetalles.modeloTeclado = compTeclado.modelo || '';
+        nuevosDetalles.serieTeclado = compTeclado.numeroSerie || '';
+      }
+
+      // 2. Mouse
+      const compMouse = comps.find(c => (c.tipo || '').toLowerCase() === 'mouse');
+      if (compMouse) {
+        nuevosDetalles.tieneMouse = true;
+        nuevosDetalles.numeroInventarioMouse = compMouse.numeroInventario || '';
+        nuevosDetalles.marcaMouse = compMouse.marca || '';
+        nuevosDetalles.modeloMouse = compMouse.modelo || '';
+        nuevosDetalles.serieMouse = compMouse.numeroSerie || '';
+      }
+
+      // 3. Monitores
+      const compMonitores = comps.filter(c => (c.tipo || '').toLowerCase() === 'monitor');
+      if (compMonitores.length > 0) {
+        nuevosDetalles.tieneMonitores = true;
+        nuevosDetalles.cantidadMonitores = compMonitores.length.toString();
+        nuevosDetalles.monitores = compMonitores.map(m => ({
+          id: m.id,
+          numeroInventario: m.numeroInventario || '',
+          marca: m.marca || '',
+          modelo: m.modelo || '',
+          serie: m.numeroSerie || ''
+        }));
+      }
+
+      // 4. Cargador
+      const compCargador = comps.find(c => (c.tipo || '').toLowerCase() === 'cargador');
+      if (compCargador) {
+        nuevosDetalles.tieneCargador = true;
+        nuevosDetalles.numeroInventarioCargador = compCargador.numeroInventario || '';
+        nuevosDetalles.marcaCargador = compCargador.marca || '';
+        nuevosDetalles.modeloCargador = compCargador.modelo || '';
+        nuevosDetalles.serieCargador = compCargador.numeroSerie || '';
+      }
+
+      // 5. Diadema
+      const compDiadema = comps.find(c => (c.tipo || '').toLowerCase() === 'diadema');
+      if (compDiadema) {
+        nuevosDetalles.tieneDiadema = true;
+        nuevosDetalles.numeroInventarioDiadema = compDiadema.numeroInventario || '';
+        nuevosDetalles.marcaDiadema = compDiadema.marca || '';
+        nuevosDetalles.modeloDiadema = compDiadema.modelo || '';
+        nuevosDetalles.serieDiadema = compDiadema.numeroSerie || '';
+      }
+    }
+
     setForm({
       tipo: item.tipo || '',
       numeroInventario: item.numeroInventario || '',
@@ -1149,7 +1213,7 @@ export default function InventarioTecnologico() {
       areaUbicacion: item.areaUbicacion || '',
       procedencia: item.procedencia || '',
       estatus: item.estatus || 'Activo',
-      detalles: item.detalles || {},
+      detalles: nuevosDetalles,
       equipoPrincipalId: item.equipoPrincipalId || null
     });
     setModalAbierto(true);
