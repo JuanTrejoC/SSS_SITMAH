@@ -23,7 +23,7 @@ async function listar(req, res) {
 
 async function crear(req, res) {
   const parsed = usuarioSchema.safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const { username, email, password, nombre, rol } = parsed.data;
   if (!password) return fail(res, 'La contraseña es requerida al crear usuario');
@@ -41,7 +41,7 @@ async function crear(req, res) {
 async function actualizar(req, res) {
   const id = Number(req.params.id);
   const parsed = usuarioSchema.partial().safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const data = { ...parsed.data };
   if (data.password) {

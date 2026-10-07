@@ -257,7 +257,7 @@ async function procesarPerifericosDeDetalles(detalles, equipoPrincipalId, respon
 
 async function crearEquipoTecnologico(req, res) {
   const parsed = equipoTecnologicoSchema.safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const data = parsed.data;
   if (req.usuario && req.usuario.rol === 'infraestructura' && data.tipo !== 'herramienta_infra') {
@@ -365,7 +365,7 @@ async function obtenerEquipoTecnologico(req, res) {
 async function actualizarEquipoTecnologico(req, res) {
   const id = Number(req.params.id);
   const parsed = equipoTecnologicoSchema.safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const data = parsed.data;
 
@@ -477,7 +477,7 @@ async function crearControladorSemaforo(req, res) {
   });
 
   const parsed = controladorSemaforoSchema.safeParse(body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const dataToSave = { ...parsed.data };
   if (req.file) {
@@ -514,7 +514,7 @@ async function actualizarControladorSemaforo(req, res) {
   });
 
   const parsed = controladorSemaforoSchema.safeParse(body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const existe = await prisma.controladorSemaforo.findUnique({ where: { id } });
   if (!existe) return fail(res, 'Controlador semafórico no encontrado', 404);
@@ -631,7 +631,7 @@ async function listarExistencias(req, res) {
 
 async function ingresarExistencia(req, res) {
   const parsed = ingresoExistenciaSchema.safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const { nombre, categoria, cantidad, marca, modelo, numeroSerie, numeroInventario, tipoInventario } = parsed.data;
 
@@ -654,7 +654,7 @@ async function ingresarExistencia(req, res) {
 async function actualizarExistencia(req, res) {
   const id = Number(req.params.id);
   const parsed = ajusteExistenciaSchema.safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const existe = await prisma.existenciaComponente.findUnique({ where: { id } });
   if (!existe) return fail(res, 'Componente no encontrado', 404);
@@ -892,7 +892,7 @@ async function listarMobiliario(req, res) {
 
 async function crearMobiliario(req, res) {
   const parsed = mobiliarioSchema.safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const data = parsed.data;
 
@@ -932,7 +932,7 @@ async function obtenerMobiliario(req, res) {
 async function actualizarMobiliario(req, res) {
   const id = Number(req.params.id);
   const parsed = mobiliarioSchema.safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const data = parsed.data;
 

@@ -72,7 +72,7 @@ async function obtenerCategoriaInfraId(categoriaIdPropuesto) {
 
 async function crear(req, res) {
   const parsed = crearSchema.safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const data = parsed.data;
   const folio = await generarFolio('infraestructura');
@@ -219,7 +219,7 @@ async function obtener(req, res) {
 async function cambiarEstado(req, res) {
   const id = Number(req.params.id);
   const parsed = estadoSchema.safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const actual = await prisma.reporteOficina.findFirst({
     where: { id, ...filtroSoloInfra },
@@ -332,7 +332,7 @@ const actualizarEstadoPiezaSchema = z.object({
 async function asignarPieza(req, res) {
   const reporteId = Number(req.params.id);
   const parsed = asignarPiezaSchema.safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const { componente_id, estado_pieza_reemplazada } = parsed.data;
   const cantidad = 1;
@@ -428,7 +428,7 @@ async function desasignarPieza(req, res) {
 async function actualizarEstadoPiezaReemplazada(req, res) {
   const piezaId = Number(req.params.piezaId);
   const parsed = actualizarEstadoPiezaSchema.safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const asignacion = await prisma.reporteOficinaPieza.findUnique({
     where: { id: piezaId }

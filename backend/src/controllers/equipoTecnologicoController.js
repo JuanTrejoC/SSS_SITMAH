@@ -53,7 +53,19 @@ const obtenerEquipos = async (req, res) => {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        include: {
+          equipoPrincipal: {
+            select: {
+              id: true,
+              tipo: true,
+              marca: true,
+              modelo: true,
+              numeroInventario: true,
+              numeroSerie: true
+            }
+          }
+        }
       }),
       prisma.equipoTecnologico.count({ where })
     ]);
@@ -226,21 +238,39 @@ const actualizarEquipo = async (req, res) => {
       }
     }
 
+    const datosActualizar = {
+      tipo,
+      numeroInventario: numeroInventario || null,
+      numeroSerie: numeroSerie || null,
+      marca: marca || null,
+      modelo: modelo || null,
+      responsable: responsable || null,
+      cargoResponsable: cargoResponsable || null,
+      areaUbicacion: areaUbicacion || null,
+      direccion: direccion || null,
+      procedencia: procedencia || null,
+      estatus: estatus || 'Activo',
+      detalles: detalles || {}
+    };
+
+    if (equipoPrincipalId !== undefined) {
+      datosActualizar.equipoPrincipalId = equipoPrincipalId ? parseInt(equipoPrincipalId) : null;
+    }
+
     const equipoActualizado = await prisma.equipoTecnologico.update({
       where: { id: parseInt(id) },
-      data: {
-        tipo,
-        numeroInventario: numeroInventario || null,
-        numeroSerie: numeroSerie || null,
-        marca: marca || null,
-        modelo: modelo || null,
-        responsable: responsable || null,
-        cargoResponsable: cargoResponsable || null,
-        areaUbicacion: areaUbicacion || null,
-        direccion: direccion || null,
-        procedencia: procedencia || null,
-        estatus: estatus || 'Activo',
-        detalles: detalles || {}
+      data: datosActualizar,
+      include: {
+        equipoPrincipal: {
+          select: {
+            id: true,
+            tipo: true,
+            marca: true,
+            modelo: true,
+            numeroInventario: true,
+            numeroSerie: true
+          }
+        }
       }
     });
 
@@ -257,7 +287,19 @@ const actualizarEquipo = async (req, res) => {
     if (JSON.stringify(detalles || {}) !== JSON.stringify(detallesLimpios)) {
       const eqAc2 = await prisma.equipoTecnologico.update({
         where: { id: equipoActualizado.id },
-        data: { detalles: detallesLimpios }
+        data: { detalles: detallesLimpios },
+        include: {
+          equipoPrincipal: {
+            select: {
+              id: true,
+              tipo: true,
+              marca: true,
+              modelo: true,
+              numeroInventario: true,
+              numeroSerie: true
+            }
+          }
+        }
       });
       return res.json({ ok: true, data: eqAc2 });
     }

@@ -64,6 +64,7 @@ export default function InventarioTecnologico() {
 
   const [modalAbierto, setModalAbierto] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
+  const [equipoPrincipalInfo, setEquipoPrincipalInfo] = useState(null);
   const [form, setForm] = useState(getInitialForm());
   const [todosLosEquipos, setTodosLosEquipos] = useState([]);
   const [dashboardTipo, setDashboardTipo] = useState(null);
@@ -460,7 +461,8 @@ export default function InventarioTecnologico() {
       areaUbicacion: '',
       procedencia: '',
       estatus: 'Activo',
-      detalles: {}
+      detalles: {},
+      equipoPrincipalId: null
     };
   }
 
@@ -1121,6 +1123,7 @@ export default function InventarioTecnologico() {
       if (res.ok && json.ok) {
         Swal.fire('Éxito', editandoId ? 'Equipo actualizado' : 'Equipo registrado', 'success');
         setModalAbierto(false);
+        resetForm();
         cargarEquipos();
       } else {
         Swal.fire('Error', json.error || 'Error al guardar el equipo', 'error');
@@ -1132,11 +1135,8 @@ export default function InventarioTecnologico() {
   };
 
   const handleEditar = (item) => {
-    if (item.equipoPrincipalId) {
-      Swal.fire('Equipo Vinculado', 'Este equipo está vinculado a otro equipo principal. Para editarlo, primero debes desvincularlo usando el botón de "Desvincular".', 'warning');
-      return;
-    }
     setEditandoId(item.id);
+    setEquipoPrincipalInfo(item.equipoPrincipal || (item.equipoPrincipalId ? { id: item.equipoPrincipalId } : null));
     setForm({
       tipo: item.tipo || '',
       numeroInventario: item.numeroInventario || '',
@@ -1149,7 +1149,8 @@ export default function InventarioTecnologico() {
       areaUbicacion: item.areaUbicacion || '',
       procedencia: item.procedencia || '',
       estatus: item.estatus || 'Activo',
-      detalles: item.detalles || {}
+      detalles: item.detalles || {},
+      equipoPrincipalId: item.equipoPrincipalId || null
     });
     setModalAbierto(true);
   };
@@ -1176,7 +1177,7 @@ export default function InventarioTecnologico() {
 
         if (res.ok) {
           Swal.fire('¡Desvinculado!', 'El equipo ahora es independiente.', 'success');
-          fetchEquipos();
+          cargarEquipos();
         } else {
           const data = await res.json();
           Swal.fire('Error', data.error || 'No se pudo desvincular el equipo', 'error');
@@ -1207,7 +1208,8 @@ export default function InventarioTecnologico() {
           headers: { 'Authorization': `Bearer ${user.token}` }
         });
         const dataBusqueda = await resBusqueda.json();
-        const padre = dataBusqueda.items?.find(i => i.numeroInventario?.toLowerCase() === invPadre.trim().toLowerCase());
+        const listaEquipos = dataBusqueda.data || dataBusqueda.items || [];
+        const padre = listaEquipos.find(i => i.numeroInventario?.toLowerCase() === invPadre.trim().toLowerCase());
 
         if (!padre) {
           return Swal.fire('No encontrado', `No se encontró ningún equipo con inventario "${invPadre}". Verifica el número.`, 'error');
@@ -1228,7 +1230,7 @@ export default function InventarioTecnologico() {
 
         if (res.ok) {
           Swal.fire('¡Vinculado!', 'El equipo fue vinculado y su ubicación actualizada.', 'success');
-          fetchEquipos();
+          cargarEquipos();
         } else {
           const data = await res.json();
           Swal.fire('Error', data.error || 'No se pudo vincular el equipo', 'error');
@@ -1269,6 +1271,7 @@ export default function InventarioTecnologico() {
 
   const resetForm = () => {
     setEditandoId(null);
+    setEquipoPrincipalInfo(null);
     setForm(getInitialForm());
   };
 
@@ -1791,6 +1794,12 @@ export default function InventarioTecnologico() {
                       <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#e0e7ff', color: '#4338ca', padding: '0.35rem 0.75rem', borderRadius: '9999px', fontSize: '0.85rem', fontWeight: '600', width: 'fit-content' }}>
                         {getIconForTipo(item.tipo)} {TIPOS_EQUIPO.find(t => t.value === item.tipo)?.label || item.tipo}
                       </span>
+                      {item.equipoPrincipalId && (
+                        <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: '#4338ca', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '500' }}>
+                          <FaLink size={10} />
+                          {item.equipoPrincipal ? `Vinculado a ${item.equipoPrincipal.tipo || 'equipo'}` : 'Vinculado'}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '1.25rem' }}>
                       <div>
@@ -1875,12 +1884,58 @@ export default function InventarioTecnologico() {
       {modalAbierto && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '1rem' }}>
           <div className="modal-container-custom">
-            <button type="button" onClick={() => setModalAbierto(false)} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', color: '#64748b', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}>
+            <button type="button" onClick={() => { setModalAbierto(false); resetForm(); }} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', color: '#64748b', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}>
               <FaTimes size={16} />
             </button>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', marginBottom: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', marginBottom: equipoPrincipalInfo ? '1rem' : '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               {editandoId ? 'Actualizar Equipo' : 'Registrar Nuevo Equipo'}
             </h2>
+
+            {equipoPrincipalInfo && (
+              <div style={{
+                backgroundColor: '#eef2ff',
+                border: '1px solid #c7d2fe',
+                borderRadius: '10px',
+                padding: '0.85rem 1.15rem',
+                marginBottom: '1.75rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                color: '#3730a3',
+                fontSize: '0.9rem'
+              }}>
+                <div style={{
+                  backgroundColor: '#4f46e5',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <FaLink size={14} />
+                </div>
+                <div style={{ flex: 1, lineHeight: '1.4' }}>
+                  <div style={{ fontWeight: 700, color: '#1e1b4b', marginBottom: '0.15rem' }}>
+                    Equipo Vinculado
+                  </div>
+                  <div>
+                    {equipoPrincipalInfo.tipo || equipoPrincipalInfo.marca || equipoPrincipalInfo.numeroInventario ? (
+                      <>
+                        Este equipo está vinculado a: <strong>{equipoPrincipalInfo.tipo || 'Equipo'} {equipoPrincipalInfo.marca || ''} {equipoPrincipalInfo.modelo || ''}</strong>
+                        {equipoPrincipalInfo.numeroInventario ? ` (Inv: ${equipoPrincipalInfo.numeroInventario})` : ''}
+                        {equipoPrincipalInfo.numeroSerie ? ` (S/N: ${equipoPrincipalInfo.numeroSerie})` : ''}.
+                      </>
+                    ) : (
+                      <>Este equipo está vinculado a su equipo principal.</>
+                    )}
+                    {' '}Al guardar los cambios, <strong>seguirá vinculado</strong>. Solo se desvinculará si usas el botón específico de desvincular.
+                  </div>
+                </div>
+              </div>
+            )}
             <form onSubmit={handleGuardar} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               <div style={{ marginBottom: '2rem' }}>
                 <label style={labelStyle}>Tipo de Equipo *</label>

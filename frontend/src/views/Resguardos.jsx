@@ -1,10 +1,431 @@
-import { useState, useEffect, useMemo } from 'react';
-import { FaClipboardCheck, FaPlus, FaSearch, FaFileWord, FaCheck } from 'react-icons/fa';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  FaClipboardCheck, FaPlus, FaSearch, FaFileWord, FaCheck,
+  FaCouch, FaDesktop, FaTrafficLight, FaChevronDown, FaTimes
+} from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
 import { generarResguardoDocx } from '../utils/resguardoDocx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+function SelectorEquipoResguardo({ items, selectedId, tipoOpcion, onSelect, onClear }) {
+  const [abierto, setAbierto] = useState(false);
+  const [busqueda, setBusqueda] = useState('');
+  const [familiaSeleccionada, setFamiliaSeleccionada] = useState('Todos');
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setAbierto(false);
+      }
+    }
+    if (abierto) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [abierto]);
+
+  useEffect(() => {
+    setFamiliaSeleccionada('Todos');
+    setBusqueda('');
+  }, [tipoOpcion]);
+
+  const itemSeleccionado = useMemo(() => {
+    if (!selectedId) return null;
+    return (items || []).find(i => String(i.id) === String(selectedId)) || null;
+  }, [items, selectedId]);
+
+  const getFamilia = (item) => {
+    if (tipoOpcion === 'mobiliario') {
+      const b = (item.bien || '').toUpperCase().trim();
+      if (b.includes('SILLA') || b.includes('SILLON')) return 'Sillas';
+      if (b.includes('ESCRITORIO')) return 'Escritorios';
+      if (b.includes('ISLA')) return 'Islas de Trabajo';
+      if (b.includes('ARCHIVERO') || b.includes('GAVETA')) return 'Archiveros';
+      if (b.includes('MESA')) return 'Mesas';
+      if (b.includes('LIBRERO') || b.includes('ESTANTE')) return 'Estantes / Libreros';
+      if (b.includes('CREDENZA')) return 'Credenzas';
+      return item.bien ? (item.bien.charAt(0).toUpperCase() + item.bien.slice(1).toLowerCase()) : 'Otros';
+    } else if (tipoOpcion === 'ti') {
+      const t = (item.tipo || '').toLowerCase();
+      if (t.includes('laptop')) return 'Laptops';
+      if (t.includes('escritorio') || t.includes('computadora')) return 'Computadoras';
+      if (t.includes('monitor') || t.includes('pantalla')) return 'Monitores';
+      if (t.includes('impresora') || t.includes('plotter')) return 'Impresoras';
+      if (t.includes('teclado') || t.includes('mouse')) return 'Periféricos';
+      if (t.includes('servidor') || t.includes('switch') || t.includes('router')) return 'Redes / Servidores';
+      return item.tipo ? (item.tipo.charAt(0).toUpperCase() + item.tipo.slice(1).toLowerCase()) : 'Otros';
+    }
+    return 'Controladores';
+  };
+
+  const familias = useMemo(() => {
+    if (!items || items.length === 0) return [];
+    const counts = {};
+    items.forEach(i => {
+      const f = getFamilia(i);
+      counts[f] = (counts[f] || 0) + 1;
+    });
+
+    const ordenadas = Object.keys(counts).map(name => ({
+      name,
+      count: counts[name]
+    })).sort((a, b) => b.count - a.count);
+
+    return [{ name: 'Todos', count: items.length }, ...ordenadas];
+  }, [items, tipoOpcion]);
+
+  const itemsFiltrados = useMemo(() => {
+    let res = items || [];
+    if (familiaSeleccionada !== 'Todos') {
+      res = res.filter(i => getFamilia(i) === familiaSeleccionada);
+    }
+    if (busqueda.trim()) {
+      const q = busqueda.toLowerCase().trim();
+      res = res.filter(i => {
+        const nombre = (i.bien || i.tipo || i.nombre || i.modelo || '').toLowerCase();
+        const inv = (i.numeroInventario || '').toLowerCase();
+        const serie = (i.numeroSerie || i.sn || '').toLowerCase();
+        const marca = (i.marca || '').toLowerCase();
+        return nombre.includes(q) || inv.includes(q) || serie.includes(q) || marca.includes(q);
+      });
+    }
+    return res;
+  }, [items, familiaSeleccionada, busqueda, tipoOpcion]);
+
+  const placeholderButton = useMemo(() => {
+    if (tipoOpcion === 'mobiliario') return 'Buscar mueble o no. de inventario...';
+    if (tipoOpcion === 'ti') return 'Buscar equipo o no. de serie...';
+    return 'Buscar controlador semafórico o crucero...';
+  }, [tipoOpcion]);
+
+  const placeholderInput = useMemo(() => {
+    if (tipoOpcion === 'mobiliario') return 'Escribe nombre de mueble o no. de inventario...';
+    if (tipoOpcion === 'ti') return 'Escribe equipo, serie o inventario...';
+    return 'Escribe modelo de controlador o crucero...';
+  }, [tipoOpcion]);
+
+  const tipoPlural = useMemo(() => {
+    if (tipoOpcion === 'mobiliario') return 'muebles';
+    if (tipoOpcion === 'ti') return 'equipos';
+    return 'controladores';
+  }, [tipoOpcion]);
+
+  const getIcon = () => {
+    if (tipoOpcion === 'mobiliario') return <FaCouch style={{ color: '#0284c7' }} size={16} />;
+    if (tipoOpcion === 'ti') return <FaDesktop style={{ color: '#4f46e5' }} size={16} />;
+    return <FaTrafficLight style={{ color: '#d97706' }} size={16} />;
+  };
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative' }}>
+      {!abierto && itemSeleccionado ? (
+        <div
+          onClick={() => setAbierto(true)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.55rem 0.85rem',
+            borderRadius: '8px',
+            border: '1.5px solid #691B31',
+            backgroundColor: '#ffffff',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+          }}
+          title="Clic para cambiar bien seleccionado"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0, flex: 1 }}>
+            <div style={{
+              backgroundColor: '#f1f5f9',
+              padding: '0.45rem',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              {getIcon()}
+            </div>
+            <div style={{ minWidth: 0, flex: 1, lineHeight: 1.25 }}>
+              <div style={{
+                fontWeight: 700,
+                color: '#1e293b',
+                fontSize: '0.875rem',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {itemSeleccionado.bien || itemSeleccionado.tipo || itemSeleccionado.modelo || itemSeleccionado.nombre}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem', flexWrap: 'wrap' }}>
+                {itemSeleccionado.numeroInventario && (
+                  <span style={{
+                    backgroundColor: '#e0e7ff',
+                    color: '#3730a3',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    padding: '0.1rem 0.4rem',
+                    borderRadius: '4px'
+                  }}>
+                    Inv: {itemSeleccionado.numeroInventario}
+                  </span>
+                )}
+                <span style={{ color: '#64748b', fontSize: '0.75rem' }}>
+                  {itemSeleccionado.marca ? `Marca: ${itemSeleccionado.marca}` : 'Sin Marca'}
+                  {(itemSeleccionado.numeroSerie || itemSeleccionado.sn) && ` • S/N: ${itemSeleccionado.numeroSerie || itemSeleccionado.sn}`}
+                </span>
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            title="Quitar selección"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              padding: '0.35rem',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: '0.5rem',
+              transition: 'color 0.2s'
+            }}
+            onMouseOver={e => e.currentTarget.style.color = '#ef4444'}
+            onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
+          >
+            <FaTimes size={13} />
+          </button>
+        </div>
+      ) : (
+        <div
+          onClick={() => setAbierto(true)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '0.72rem 0.85rem',
+            borderRadius: '8px',
+            border: abierto ? '1.5px solid #691B31' : '1px solid #cbd5e1',
+            backgroundColor: 'white',
+            cursor: 'pointer',
+            transition: 'border-color 0.2s',
+            boxShadow: abierto ? '0 0 0 3px rgba(105, 27, 49, 0.1)' : 'none'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#94a3b8', fontSize: '0.875rem' }}>
+            <FaSearch size={13} style={{ color: '#64748b' }} />
+            <span>{placeholderButton}</span>
+          </div>
+          <FaChevronDown size={12} style={{ color: '#94a3b8', transform: abierto ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+        </div>
+      )}
+
+      {abierto && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 6px)',
+          left: 0,
+          right: 0,
+          backgroundColor: 'white',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 12px 28px rgba(0, 0, 0, 0.14), 0 4px 10px rgba(0, 0, 0, 0.06)',
+          zIndex: 100,
+          padding: '0.75rem',
+          minWidth: '320px'
+        }}>
+          <div style={{ position: 'relative', marginBottom: '0.65rem' }}>
+            <FaSearch size={13} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input
+              type="text"
+              autoFocus
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              placeholder={placeholderInput}
+              style={{
+                width: '100%',
+                padding: '0.55rem 2rem 0.55rem 2.2rem',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                fontSize: '0.85rem',
+                outlineColor: '#691B31',
+                backgroundColor: '#f8fafc'
+              }}
+            />
+            {busqueda && (
+              <button
+                type="button"
+                onClick={() => setBusqueda('')}
+                style={{
+                  position: 'absolute',
+                  right: '0.5rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: '0.25rem'
+                }}
+              >
+                <FaTimes size={11} />
+              </button>
+            )}
+          </div>
+
+          {familias.length > 2 && (
+            <div style={{
+              display: 'flex',
+              gap: '0.35rem',
+              overflowX: 'auto',
+              paddingBottom: '0.5rem',
+              marginBottom: '0.5rem',
+              scrollbarWidth: 'thin'
+            }}>
+              {familias.map(fam => {
+                const activa = familiaSeleccionada === fam.name;
+                return (
+                  <button
+                    key={fam.name}
+                    type="button"
+                    onClick={() => setFamiliaSeleccionada(fam.name)}
+                    style={{
+                      padding: '0.25rem 0.6rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      border: 'none',
+                      whiteSpace: 'nowrap',
+                      cursor: 'pointer',
+                      backgroundColor: activa ? '#691B31' : '#f1f5f9',
+                      color: activa ? '#ffffff' : '#475569',
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    {fam.name} <span style={{ opacity: activa ? 0.9 : 0.6, fontSize: '0.7rem' }}>({fam.count})</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            {itemsFiltrados.length === 0 ? (
+              <div style={{ padding: '1.5rem 1rem', textAlign: 'center', color: '#94a3b8', fontSize: '0.85rem' }}>
+                No se encontraron {tipoPlural} con ese criterio de búsqueda.
+              </div>
+            ) : (
+              itemsFiltrados.map((item, idx) => {
+                const esSeleccionado = String(item.id) === String(selectedId);
+                const nombreItem = item.bien || item.tipo || item.modelo || item.nombre || 'Item';
+                return (
+                  <div
+                    key={`${item.__formTipo}-${item.id}-${idx}`}
+                    onClick={() => {
+                      onSelect(item);
+                      setAbierto(false);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.55rem 0.75rem',
+                      borderRadius: '8px',
+                      backgroundColor: esSeleccionado ? '#fdf2f4' : 'transparent',
+                      border: esSeleccionado ? '1px solid #fbcfe8' : '1px solid transparent',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.15s'
+                    }}
+                    onMouseOver={e => {
+                      if (!esSeleccionado) e.currentTarget.style.backgroundColor = '#f8fafc';
+                    }}
+                    onMouseOut={e => {
+                      if (!esSeleccionado) e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <div style={{ minWidth: 0, flex: 1, paddingRight: '0.5rem' }}>
+                      <div style={{
+                        fontWeight: 700,
+                        color: esSeleccionado ? '#691B31' : '#1e293b',
+                        fontSize: '0.85rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {nombreItem}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.15rem', flexWrap: 'wrap' }}>
+                        {item.numeroInventario && (
+                          <span style={{
+                            backgroundColor: '#e0e7ff',
+                            color: '#3730a3',
+                            fontSize: '0.72rem',
+                            fontWeight: 600,
+                            padding: '0.08rem 0.35rem',
+                            borderRadius: '4px'
+                          }}>
+                            Inv: {item.numeroInventario}
+                          </span>
+                        )}
+                        <span style={{ color: '#64748b', fontSize: '0.73rem' }}>
+                          {item.marca ? `Marca: ${item.marca}` : 'Sin Marca'}
+                          {(item.numeroSerie || item.sn) && ` • Serie: ${item.numeroSerie || item.sn}`}
+                        </span>
+                      </div>
+                    </div>
+                    {esSeleccionado && (
+                      <span style={{ color: '#691B31', fontWeight: 'bold', fontSize: '0.85rem' }}>✓</span>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div style={{
+            borderTop: '1px solid #f1f5f9',
+            marginTop: '0.5rem',
+            paddingTop: '0.4rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '0.75rem',
+            color: '#94a3b8'
+          }}>
+            <span>Mostrando {itemsFiltrados.length} de {items.length} {tipoPlural} disponibles</span>
+            <button
+              type="button"
+              onClick={() => setAbierto(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#691B31',
+                cursor: 'pointer',
+                fontWeight: 600,
+                fontSize: '0.75rem'
+              }}
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Resguardos() {
   const { user, logout } = useAuth();
@@ -620,15 +1041,36 @@ function Resguardos() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>Dispositivo/Equipo *</label>
-                  <select required value={form.itemId} onChange={handleItemChange} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', backgroundColor: 'white' }}>
-                    <option value="">Seleccione un ítem...</option>
-                    {itemsDisponibles.map((item, idx) => (
-                      <option key={`${item.__formTipo}-${item.id}-${idx}`} value={item.id}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>
+                    {form.tipoOpcion === 'mobiliario'
+                      ? 'Mueble / Bien *'
+                      : form.tipoOpcion === 'ti'
+                      ? 'Equipo Tecnológico *'
+                      : 'Controlador Semafórico *'}
+                  </label>
+                  <SelectorEquipoResguardo
+                    items={itemsDisponibles}
+                    selectedId={form.itemId}
+                    tipoOpcion={form.tipoOpcion}
+                    onSelect={(item) => {
+                      setForm(prev => ({
+                        ...prev,
+                        itemId: item.id,
+                        tipoInventario: item.__formTipo,
+                        descripcionPdf: item.desc || '',
+                        numeroSeriePdf: item.sn || 'S/S'
+                      }));
+                    }}
+                    onClear={() => {
+                      setForm(prev => ({
+                        ...prev,
+                        itemId: '',
+                        tipoInventario: '',
+                        descripcionPdf: '',
+                        numeroSeriePdf: ''
+                      }));
+                    }}
+                  />
                 </div>
 
                 {/* 1. Primero: Nombre del Resguardante (con autocompletado inteligente de cargo y dirección) */}

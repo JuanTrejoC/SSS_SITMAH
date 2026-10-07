@@ -10,7 +10,9 @@ import {
   AlignmentType,
   BorderStyle,
   ImageRun,
-  VerticalAlign
+  VerticalAlign,
+  Footer,
+  HeightRule
 } from 'docx';
 import headerLogos from '../assets/header_logos.png';
 
@@ -138,6 +140,45 @@ export async function generarResguardoDocx(resguardo) {
               left: 1000   // ~0.7 in
             }
           }
+        },
+        footers: {
+          default: new Footer({
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                spacing: { before: 0, after: 0, line: 240 },
+                children: [
+                  new TextRun({
+                    text: 'Blvd. Felipe Ángeles Km 86 + 040',
+                    font: 'Arial',
+                    size: 15, // 7.5pt
+                    color: '64748B'
+                  }),
+                  new TextRun({
+                    text: 'Col. Venta Prieta',
+                    break: 1,
+                    font: 'Arial',
+                    size: 15,
+                    color: '64748B'
+                  }),
+                  new TextRun({
+                    text: 'Pachuca de Soto, Hgo.,',
+                    break: 1,
+                    font: 'Arial',
+                    size: 15,
+                    color: '64748B'
+                  }),
+                  new TextRun({
+                    text: 'C. P. 42083.',
+                    break: 1,
+                    font: 'Arial',
+                    size: 15,
+                    color: '64748B'
+                  })
+                ]
+              })
+            ]
+          })
         },
         children: [
           // 1. LOGOS DE CABECERA (Alineados a la derecha)
@@ -338,17 +379,18 @@ export async function generarResguardoDocx(resguardo) {
                 ]
               }),
               new TableRow({
+                height: { value: 3400, rule: HeightRule.ATLEAST },
                 children: [
                   new TableCell({
                     width: { size: 55, type: WidthType.PERCENTAGE },
                     verticalAlign: VerticalAlign.TOP,
-                    margins: { top: 160, bottom: 160, left: 120, right: 120 },
+                    margins: { top: 160, bottom: 160, left: 140, right: 140 },
                     children: descripcionParagraphs
                   }),
                   new TableCell({
                     width: { size: 45, type: WidthType.PERCENTAGE },
                     verticalAlign: VerticalAlign.TOP,
-                    margins: { top: 160, bottom: 160, left: 120, right: 120 },
+                    margins: { top: 160, bottom: 160, left: 140, right: 140 },
                     children: [
                       new Paragraph({
                         alignment: AlignmentType.CENTER,
@@ -368,58 +410,42 @@ export async function generarResguardoDocx(resguardo) {
             ]
           }),
 
-          // Espacio
-          new Paragraph({ spacing: { before: 200, after: 0 } }),
+          // Espacio tras tabla
+          new Paragraph({ spacing: { before: 180, after: 0 } }),
 
           // 6. CLÁUSULA DE CONDICIONES / ADVERTENCIA
           new Paragraph({
-            spacing: { before: 80, after: 40 },
+            spacing: { before: 40, after: 30 },
             children: [
               new TextRun({
                 text: leyendaLinea1,
                 font: 'Arial',
-                size: 17, // ~8.5pt
+                size: 16, // 8pt
                 color: '333333'
               })
             ]
           }),
           new Paragraph({
-            spacing: { before: 0, after: 260 },
+            spacing: { before: 0, after: 0 },
             children: [
               new TextRun({
                 text: leyendaLinea2,
                 font: 'Arial',
-                size: 17,
+                size: 16, // 8pt
                 color: '333333'
               })
             ]
           }),
 
-          // Espacio para la firma
-          new Paragraph({ spacing: { before: 360, after: 0 } }),
-
           // 7. LÍNEA Y FIRMA DEL RESGUARDANTE CON DATOS AUTOMÁTICOS
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 40 },
+            spacing: { before: 900, after: 50 },
             children: [
               new TextRun({
                 text: '________________________________________',
                 font: 'Arial',
                 size: 20,
-                bold: true,
-                color: '000000'
-              })
-            ]
-          }),
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: (nombreResguardante || cargo || direccion) ? 30 : 60 },
-            children: [
-              new TextRun({
-
-                font: 'Arial',
-                size: 20, // 10pt
                 bold: true,
                 color: '000000'
               })
@@ -439,7 +465,21 @@ export async function generarResguardoDocx(resguardo) {
                 })
               ]
             })
-          ] : []),
+          ] : [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 0, after: 20 },
+              children: [
+                new TextRun({
+                  text: 'NOMBRE Y FIRMA DEL RESGUARDANTE',
+                  font: 'Arial',
+                  size: 20, // 10pt
+                  bold: true,
+                  color: '000000'
+                })
+              ]
+            })
+          ]),
           ...(cargo ? [
             new Paragraph({
               alignment: AlignmentType.CENTER,
@@ -457,7 +497,7 @@ export async function generarResguardoDocx(resguardo) {
           ...(direccion && direccion.toUpperCase() !== 'S/N' ? [
             new Paragraph({
               alignment: AlignmentType.CENTER,
-              spacing: { before: 0, after: 20 },
+              spacing: { before: 0, after: 0 },
               children: [
                 new TextRun({
                   text: direccion.toUpperCase(),
@@ -467,45 +507,7 @@ export async function generarResguardoDocx(resguardo) {
                 })
               ]
             })
-          ] : []),
-
-          // Espacio hacia el pie
-          new Paragraph({ spacing: { before: 400, after: 0 } }),
-
-          // 8. PIE DE PÁGINA (Alineado a la derecha)
-          new Paragraph({
-            alignment: AlignmentType.RIGHT,
-            spacing: { before: 0, after: 0 },
-            children: [
-              new TextRun({
-                text: 'Blvd. Felipe Ángeles Km 86 + 040',
-                font: 'Arial',
-                size: 15, // 7.5pt
-                color: '64748B'
-              }),
-              new TextRun({
-                text: 'Col. Venta Prieta',
-                break: 1,
-                font: 'Arial',
-                size: 15,
-                color: '64748B'
-              }),
-              new TextRun({
-                text: 'Pachuca de Soto, Hgo.',
-                break: 1,
-                font: 'Arial',
-                size: 15,
-                color: '64748B'
-              }),
-              new TextRun({
-                text: 'C. P. 42083.',
-                break: 1,
-                font: 'Arial',
-                size: 15,
-                color: '64748B'
-              })
-            ]
-          })
+          ] : [])
         ]
       }
     ]

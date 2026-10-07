@@ -1,6 +1,6 @@
 {
   "query": {
-    "limit": "2000"
+    "limit": "10"
   },
   "where": {
     "tipo": {

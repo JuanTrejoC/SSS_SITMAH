@@ -43,7 +43,7 @@ async function crear(req, res) {
   if (!config) return fail(res, 'Catálogo no encontrado', 404);
 
   const parsed = itemSchema.safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const item = await config.model().create({ data: parsed.data });
   ok(res, item, 201);
@@ -55,7 +55,7 @@ async function actualizar(req, res) {
 
   const id = Number(req.params.id);
   const parsed = itemSchema.partial().safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const item = await config.model().update({ where: { id }, data: parsed.data });
   ok(res, item);
@@ -77,7 +77,7 @@ async function listarCorreos(req, res) {
 
 async function crearCorreo(req, res) {
   const parsed = correoSchema.safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const item = await prisma.correoNotificacion.create({ data: parsed.data });
   ok(res, item, 201);
@@ -86,7 +86,7 @@ async function crearCorreo(req, res) {
 async function actualizarCorreo(req, res) {
   const id = Number(req.params.id);
   const parsed = correoSchema.partial().safeParse(req.body);
-  if (!parsed.success) return fail(res, parsed.error.errors[0].message);
+  if (!parsed.success) return fail(res, parsed.error);
 
   const item = await prisma.correoNotificacion.update({ where: { id }, data: parsed.data });
   ok(res, item);
