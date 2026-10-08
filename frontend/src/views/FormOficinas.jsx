@@ -113,14 +113,9 @@ export default function FormOficinas({ usuarioActual }) {
       }
 
       case 'equipo':
-      case 'numero_serie': {
-        const esEq = nombre === 'equipo'
-        const eqVal = esEq ? valor : (formData.equipo?.trim() || '')
-        const serVal = !esEq ? valor : (formData.numero_serie?.trim() || '')
-        if (!eqVal && !serVal) mensajeError = 'Ingrese Inventario o Serie'
-        else esValido = true
-        break
-      }
+      case 'numero_serie':
+        esValido = valor ? true : null
+        break;
 
       case 'descripcion_otro':
         if (mostrarOtro && !valor) mensajeError = 'Especifique la categoría'
@@ -375,19 +370,11 @@ export default function FormOficinas({ usuarioActual }) {
       nuevosValidos.sede_id = true
     }
 
-    // Equipo o Serie
+    // Equipo o Serie (Opcionales)
     const eqVal = formData.equipo?.trim() || ''
     const serVal = formData.numero_serie?.trim() || ''
-    if (!eqVal && !serVal) {
-      nuevosErrores.equipo = 'Ingrese Inventario o Serie'
-      nuevosErrores.numero_serie = 'Ingrese Inventario o Serie'
-      nuevosValidos.equipo = false
-      nuevosValidos.numero_serie = false
-      formularioValido = false
-    } else {
-      nuevosValidos.equipo = true
-      nuevosValidos.numero_serie = true
-    }
+    nuevosValidos.equipo = eqVal ? true : null
+    nuevosValidos.numero_serie = serVal ? true : null
 
     // Categoría
     if (!formData.categoria_id) {
@@ -420,11 +407,7 @@ export default function FormOficinas({ usuarioActual }) {
     setValido(nuevosValidos)
 
     if (!formularioValido) {
-      if (!eqVal && !serVal) {
-        Swal.fire('Atención', 'Debe ingresar al menos el Número de Inventario o el Número de Serie del equipo', 'warning')
-      } else {
-        Swal.fire('Atención', 'Complete todos los campos obligatorios correctamente', 'warning')
-      }
+      Swal.fire('Atención', 'Complete todos los campos obligatorios correctamente', 'warning')
       return
     }
 

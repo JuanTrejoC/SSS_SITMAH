@@ -21,6 +21,10 @@ const TIPOS_EQUIPO = [
   { value: 'servidor', label: 'Servidor', icon: FaServer, group: 'Computadoras' },
   { value: 'teclado', label: 'Teclado', icon: FaCogs, group: 'Periféricos y Accesorios' },
   { value: 'mouse', label: 'Mouse', icon: FaCogs, group: 'Periféricos y Accesorios' },
+  { value: 'adaptador', label: 'Adaptador / Hub USB', icon: FaPlug, group: 'Periféricos y Accesorios' },
+  { value: 'antena_wifi', label: 'Antena / Adaptador WiFi', icon: FaWifi, group: 'Periféricos y Accesorios' },
+  { value: 'cargador', label: 'Cargador / Eliminador', icon: FaPlug, group: 'Periféricos y Accesorios' },
+  { value: 'cable', label: 'Cable (HDMI, Red, DisplayPort)', icon: FaWrench, group: 'Periféricos y Accesorios' },
   { value: 'router', label: 'Router', icon: FaNetworkWired, group: 'Redes y Conectividad' },
   { value: 'switch', label: 'Switch', icon: FaNetworkWired, group: 'Redes y Conectividad' },
   { value: 'firewall', label: 'Firewall', icon: FaShieldAlt, group: 'Redes y Conectividad' },
@@ -45,7 +49,6 @@ const TIPOS_EQUIPO = [
   { value: 'terminal_multibiometrica', label: 'Terminal Multibiométrica', icon: FaShieldAlt, group: 'Peaje y Control' },
   { value: 'ram', label: 'Memoria RAM', icon: FaMemory, group: 'Componentes' },
   { value: 'almacenamiento', label: 'Disco Duro / SSD', icon: FaHdd, group: 'Componentes' },
-  { value: 'antena_wifi', label: 'Antena WiFi', icon: FaWifi, group: 'Componentes' },
   { value: 'cabezal', label: 'Cabezal de Impresión', icon: FaPrint, group: 'Componentes' },
   { value: 'otro', label: 'Otro', icon: FaBoxes, group: 'Otros' },
 ];

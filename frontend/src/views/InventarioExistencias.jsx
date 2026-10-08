@@ -52,6 +52,9 @@ const ARTICULOS_AGRUPADOS = {
     { value: 'Conectores RJ45', label: 'Conectores RJ45', icon: FaWrench },
     { value: 'Adaptador USB a Ethernet', label: 'Adaptador USB a Ethernet', icon: FaWrench },
     { value: 'Adaptador HDMI a VGA', label: 'Adaptador HDMI a VGA', icon: FaWrench },
+    { value: 'Adaptador / Hub USB', label: 'Adaptador / Hub USB', icon: FaPlug },
+    { value: 'Antena / Adaptador WiFi', label: 'Antena / Adaptador WiFi', icon: FaWifi },
+    { value: 'Cargador / Eliminador', label: 'Cargador / Eliminador', icon: FaPlug },
     { value: 'Cinta de Aislar', label: 'Cinta de Aislar', icon: FaWrench },
     { value: 'Cinchos plásticos', label: 'Cinchos plásticos', icon: FaWrench }
   ],
@@ -163,11 +166,25 @@ const obtenerGrupoBase = (item) => {
       tipoKey: 'adaptador_ethernet'
     };
   }
-  if (n.includes('adaptador')) {
+  if (n.includes('adaptador wifi') || n.includes('antena wifi') || catRaw.includes('antena_wifi') || (n.includes('adaptador') && n.includes('wifi'))) {
+    return {
+      nombreBase: 'Adaptadores WiFi',
+      categoria: 'accesorio',
+      tipoKey: 'adaptadores_wifi'
+    };
+  }
+  if (n.includes('adaptador') || catRaw === 'adaptador') {
     return {
       nombreBase: 'Adaptadores',
       categoria: 'accesorio',
       tipoKey: 'adaptadores'
+    };
+  }
+  if (n.includes('cargador') || catRaw === 'cargador') {
+    return {
+      nombreBase: 'Cargadores',
+      categoria: 'accesorio',
+      tipoKey: 'cargadores'
     };
   }
   if (n.includes('cinta')) {
@@ -703,8 +720,9 @@ export default function InventarioExistencias() {
             );
             const normalizar = str => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/s$/, '');
             const catFiltro = normalizar(filtroCategoria);
-            const catItem = normalizar(item.categoria || item.tipo || 'componente');
-            const coincideCategoria = !filtroCategoria || catItem.includes(catFiltro);
+            const baseInfo = obtenerGrupoBase(item);
+            const catItem = normalizar(baseInfo.categoria || item.categoria || item.tipo || 'componente');
+            const coincideCategoria = !filtroCategoria || catItem.includes(catFiltro) || normalizar(item.tipo || '').includes(catFiltro);
             return coincideTexto && coincideEstado && coincideOrigen && coincideCategoria;
         });
 
@@ -1839,8 +1857,9 @@ export default function InventarioExistencias() {
             );
             const normalizar = str => (str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/s$/, '');
             const catFiltro = normalizar(filtroCategoria);
-            const catItem = normalizar(item.categoria || item.tipo || 'componente');
-            const coincideCategoria = !filtroCategoria || catItem.includes(catFiltro);
+            const baseInfo = obtenerGrupoBase(item);
+            const catItem = normalizar(baseInfo.categoria || item.categoria || item.tipo || 'componente');
+            const coincideCategoria = !filtroCategoria || catItem.includes(catFiltro) || normalizar(item.tipo || '').includes(catFiltro);
             return coincideTexto && coincideEstado && coincideOrigen && coincideCategoria;
           });
 
@@ -2762,6 +2781,10 @@ const TIPOS_EQUIPO = [
   { value: 'servidor', label: 'Servidor', icon: FaServer, group: 'Computadoras' },
   { value: 'teclado', label: 'Teclado', icon: FaCogs, group: 'Periféricos y Accesorios' },
   { value: 'mouse', label: 'Mouse', icon: FaCogs, group: 'Periféricos y Accesorios' },
+  { value: 'adaptador', label: 'Adaptador / Hub USB', icon: FaPlug, group: 'Periféricos y Accesorios' },
+  { value: 'antena_wifi', label: 'Antena / Adaptador WiFi', icon: FaWifi, group: 'Periféricos y Accesorios' },
+  { value: 'cargador', label: 'Cargador / Eliminador', icon: FaPlug, group: 'Periféricos y Accesorios' },
+  { value: 'cable', label: 'Cable (HDMI, Red, DisplayPort)', icon: FaWrench, group: 'Periféricos y Accesorios' },
   { value: 'router', label: 'Router', icon: FaNetworkWired, group: 'Redes y Conectividad' },
   { value: 'switch', label: 'Switch', icon: FaNetworkWired, group: 'Redes y Conectividad' },
   { value: 'firewall', label: 'Firewall', icon: FaShieldAlt, group: 'Redes y Conectividad' },
@@ -2785,7 +2808,6 @@ const TIPOS_EQUIPO = [
   { value: 'controladora', label: 'Controladora', icon: FaShieldAlt, group: 'Peaje y Control' },
   { value: 'ram', label: 'Memoria RAM', icon: FaMemory, group: 'Componentes' },
   { value: 'almacenamiento', label: 'Disco Duro / SSD', icon: FaHdd, group: 'Componentes' },
-  { value: 'antena_wifi', label: 'Antena WiFi', icon: FaWifi, group: 'Componentes' },
   { value: 'cabezal', label: 'Cabezal de Impresión', icon: FaPrint, group: 'Componentes' },
   { value: 'otro', label: 'Otro', icon: FaBoxes, group: 'Otros' },
 ];
