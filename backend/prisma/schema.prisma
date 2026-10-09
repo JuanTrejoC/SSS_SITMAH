@@ -295,6 +295,11 @@ model EquipoTecnologico {
   updatedAt        DateTime @updatedAt @map("updated_at")
   resguardos       Resguardo[]
 
+  @@index([tipo])
+  @@index([estatus])
+  @@index([responsable])
+  @@index([numeroSerie])
+  @@index([createdAt])
   @@map("equipo_tecnologico")
 }
 
@@ -344,6 +349,9 @@ model ExistenciaComponente {
   reportesOficina  ReporteOficinaPieza[]
   resguardos       Resguardo[]
 
+  @@index([tipoInventario])
+  @@index([categoria])
+  @@index([nombre])
   @@map("existencia_componente")
 }
 
@@ -394,6 +402,8 @@ model InventarioMobiliario {
   updatedAt          DateTime @updatedAt @map("updated_at")
   resguardos         Resguardo[]
 
+  @@index([bien])
+  @@index([nombreResguardante])
   @@map("inventario_mobiliario")
 }
 
@@ -427,5 +437,9 @@ model Resguardo {
   existencia           ExistenciaComponente? @relation(fields: [existenciaId], references: [id])
   controladorSemaforo  ControladorSemaforo?  @relation(fields: [controladorSemaforoId], references: [id])
 
+  @@index([tipoInventario])
+  @@index([estado])
+  @@index([nombreResguardante])
+  @@index([createdAt])
   @@map("resguardo")
 }

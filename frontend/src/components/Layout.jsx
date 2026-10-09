@@ -2,7 +2,8 @@ import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Header from './Header/Header'
 import ThemeToggle from './ThemeToggle'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import CargandoPagina from './CargandoPagina'
 
 export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -39,7 +40,9 @@ export default function Layout() {
         <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
         <main className="main-content-padding" style={{ flex: 1 }}>
-          <Outlet />
+          <Suspense fallback={<CargandoPagina />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

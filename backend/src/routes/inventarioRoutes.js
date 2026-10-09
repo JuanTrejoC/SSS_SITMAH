@@ -25,6 +25,10 @@ const upload = multer({ storage });
 
 const router = express.Router();
 
+// =========================================================================
+// RUTAS ACCESIBLES POR ADMIN E INFRAESTRUCTURA (authAdminOrInfra)
+// =========================================================================
+
 // Technological Equipment Routes (Herramientas & Tecnologico)
 router.get('/tecnologico', authAdminOrInfra, asyncHandler(inventario.listarEquipoTecnologico));
 router.post('/tecnologico', authAdminOrInfra, asyncHandler(inventario.crearEquipoTecnologico));
@@ -34,7 +38,17 @@ router.get('/tecnologico/:id', authAdminOrInfra, asyncHandler(inventario.obtener
 router.put('/tecnologico/:id', authAdminOrInfra, asyncHandler(inventario.actualizarEquipoTecnologico));
 router.delete('/tecnologico/:id', authAdminOrInfra, asyncHandler(inventario.eliminarEquipoTecnologico));
 
-// Apply authAdmin middleware to all remaining inventory routes
+// Existencias / Stock Routes (Gestionadas por ambos)
+router.get('/existencias', authAdminOrInfra, asyncHandler(inventario.listarExistencias));
+router.post('/existencias', authAdminOrInfra, asyncHandler(inventario.ingresarExistencia));
+router.get('/existencias/:id/historial', authAdminOrInfra, asyncHandler(inventario.obtenerHistorialExistencia));
+router.put('/existencias/:id', authAdminOrInfra, asyncHandler(inventario.actualizarExistencia));
+router.delete('/existencias/:id', authAdminOrInfra, asyncHandler(inventario.eliminarExistencia));
+router.get('/existencias/export', authAdminOrInfra, asyncHandler(inventario.exportarExistenciasExcel));
+
+// =========================================================================
+// RUTAS EXCLUSIVAS DE ADMINISTRADOR (authAdmin)
+// =========================================================================
 router.use(authAdmin);
 
 // Traffic Light Controllers Routes
@@ -44,14 +58,6 @@ router.get('/controladores/:id', asyncHandler(inventario.obtenerControladorSemaf
 router.get('/controladores/:id/descargar-programacion', asyncHandler(inventario.descargarProgramacion));
 router.put('/controladores/:id', upload.single('archivoProgramacion'), asyncHandler(inventario.actualizarControladorSemaforo));
 router.delete('/controladores/:id', asyncHandler(inventario.eliminarControladorSemaforo));
-
-// Existencias / Stock Routes
-router.get('/existencias', asyncHandler(inventario.listarExistencias));
-router.post('/existencias', asyncHandler(inventario.ingresarExistencia));
-router.get('/existencias/:id/historial', asyncHandler(inventario.obtenerHistorialExistencia));
-router.put('/existencias/:id', asyncHandler(inventario.actualizarExistencia));
-router.delete('/existencias/:id', asyncHandler(inventario.eliminarExistencia));
-router.get('/existencias/export', asyncHandler(inventario.exportarExistenciasExcel));
 
 // Mobiliario Routes
 router.get('/mobiliario', asyncHandler(inventario.listarMobiliario));

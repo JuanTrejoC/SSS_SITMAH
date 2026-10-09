@@ -1,4 +1,4 @@
-export function formatFolio(folio, fallbackId) {
+export function formatFolio(folio, fallbackId, contexto = null) {
   if (!folio) {
     return fallbackId ? `#${fallbackId}` : '—';
   }
@@ -21,8 +21,11 @@ export function formatFolio(folio, fallbackId) {
   if (match2) {
     const originalPrefijo = match2[1];
     let prefijo = 'RS';
-    if (originalPrefijo === 'OF') prefijo = 'RT';
-    else if (originalPrefijo === 'INF') prefijo = 'RI';
+    if (originalPrefijo === 'OF') {
+      prefijo = (contexto === 'infraestructura') ? 'RI' : 'RT';
+    } else if (originalPrefijo === 'INF') {
+      prefijo = 'RI';
+    }
     const anio = match2[2];
     const numero = String(parseInt(match2[3], 10)).padStart(2, '0');
     return `${prefijo}-${numero}-${anio}`;

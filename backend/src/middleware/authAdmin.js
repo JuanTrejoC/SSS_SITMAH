@@ -12,6 +12,9 @@ function authAdmin(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.rol !== 'admin' && decoded.rol !== 'administrador') {
+      return fail(res, 'No autorizado para esta acción (se requieren permisos de administrador)', 403);
+    }
     req.usuario = decoded;
     next();
   } catch {

@@ -1,32 +1,42 @@
+import { lazy, Suspense } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
 import { RutaSoloAdmin, RutaSoloSolicitante, RutaSoloInfra, RutaAdminOrInfra } from './RutasProtegidas'
 import InicioRedirect from './InicioRedirect'
 import Layout from '../components/Layout'
+import CargandoPagina from '../components/CargandoPagina'
 
-import Login from '../views/Login'
-import Dashboard from '../views/Dashboard'
-import Estadisticas from '../views/Estadisticas'
-import FormOficinas from '../views/FormOficinas'
-import FormSemaforos from '../views/FormSemaforos'
-import FormInfraestructura from '../views/FormInfraestructura'
-import ConfigAdmin from '../views/ConfigAdmin'
+// Vistas cargadas bajo demanda con Code Splitting (React.lazy)
+const Login = lazy(() => import('../views/Login'))
+const Dashboard = lazy(() => import('../views/Dashboard'))
+const Estadisticas = lazy(() => import('../views/Estadisticas'))
+const FormOficinas = lazy(() => import('../views/FormOficinas'))
+const FormSemaforos = lazy(() => import('../views/FormSemaforos'))
+const FormInfraestructura = lazy(() => import('../views/FormInfraestructura'))
+const ConfigAdmin = lazy(() => import('../views/ConfigAdmin'))
 
-import DashboardOficinas from '../views/DashboardOficinas'
-import DashboardSemaforos from '../views/DashboardSemaforos'
-import DashboardInfraestructura from '../views/DashboardInfraestructura'
-import InventarioSemaforos from '../views/InventarioSemaforos'
-import InventarioTecnologico from '../views/InventarioTecnologico'
-import InventarioExistencias from '../views/InventarioExistencias'
-import InventarioHerramientas from '../views/InventarioHerramientas'
-import InventarioMobiliario from '../views/InventarioMobiliario'
-import Resguardos from '../views/Resguardos'
-import StockInfraestructura from '../views/StockInfraestructura'
+const DashboardOficinas = lazy(() => import('../views/DashboardOficinas'))
+const DashboardSemaforos = lazy(() => import('../views/DashboardSemaforos'))
+const DashboardInfraestructura = lazy(() => import('../views/DashboardInfraestructura'))
+const InventarioSemaforos = lazy(() => import('../views/InventarioSemaforos'))
+const InventarioTecnologico = lazy(() => import('../views/InventarioTecnologico'))
+const InventarioExistencias = lazy(() => import('../views/InventarioExistencias'))
+const InventarioHerramientas = lazy(() => import('../views/InventarioHerramientas'))
+const InventarioMobiliario = lazy(() => import('../views/InventarioMobiliario'))
+const Resguardos = lazy(() => import('../views/Resguardos'))
+const StockInfraestructura = lazy(() => import('../views/StockInfraestructura'))
 
 const router = createBrowserRouter([
-  { path: '/login', element: <Login /> },
+  {
+    path: '/login',
+    element: (
+      <Suspense fallback={<CargandoPagina />}>
+        <Login />
+      </Suspense>
+    )
+  },
 
   {
-    element: <Layout />, // ESTE LAYOUT DEBE TENER <Outlet />
+    element: <Layout />, // Este Layout contiene <Outlet /> envuelto en <Suspense />
     children: [
       // SOLICITANTE: admin o infra es redirigido a su panel
       {
@@ -70,7 +80,6 @@ const router = createBrowserRouter([
   // INICIO: admin → dashboard, solicitante → crear reporte
   { path: '/', element: <InicioRedirect /> },
   { path: '*', element: <InicioRedirect /> }
-
 ])
 
 export default router

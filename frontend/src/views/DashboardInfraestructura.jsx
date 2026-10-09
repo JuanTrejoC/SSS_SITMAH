@@ -616,7 +616,7 @@ export default function DashboardInfraestructura() {
                         onMouseLeave={e => e.currentTarget.style.backgroundColor = 'white'}
                       >
                         <td style={{ padding: '0.85rem 1rem', fontWeight: '700', color: '#059669' }}>
-                          {formatFolio(rep.folio, rep.id)}
+                          {formatFolio(rep.folio, rep.id, 'infraestructura')}
                         </td>
                         <td style={{ padding: '0.85rem 1rem' }}>
                           <div style={{ fontWeight: '600', color: '#111827' }}>{rep.solicitante}</div>
@@ -766,7 +766,7 @@ export default function DashboardInfraestructura() {
                     Reporte de Infraestructura
                   </span>
                   <h2 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#111827', margin: '0.2rem 0 0 0' }}>
-                    Folio: {formatFolio(verDetalle.folio, verDetalle.id)}
+                    Folio: {formatFolio(verDetalle.folio, verDetalle.id, 'infraestructura')}
                   </h2>
                 </div>
                 <button

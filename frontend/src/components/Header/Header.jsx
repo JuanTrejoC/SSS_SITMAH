@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { FaExclamationCircle, FaCheckCircle, FaBars, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaExclamationCircle, FaCheckCircle, FaBars, FaLock, FaEye, FaEyeSlash, FaSearch } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import NotificationCenter from './NotificationCenter';
+import BuscadorGlobalModal from './BuscadorGlobalModal';
 import './Header.css';
 
 export default function Header({ toggleSidebar, hideLogos, hideBackButton = false }) {
@@ -13,11 +14,24 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
   const [verContrasena, setVerContrasena] = useState(false);
   const [datosLogin, setDatosLogin] = useState({ usuario: '', contrasena: '' });
   const [errores, setErrores] = useState({ usuario: false, contrasena: false });
+  const [mostrarBuscador, setMostrarBuscador] = useState(false);
   
   const navigate = useNavigate();
   const location = useLocation();
   const profileRef = useRef(null);
   const loginRef = useRef(null);
+
+  // Atajo de teclado global Ctrl+K o Cmd+K para abrir el buscador
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && user) {
+        e.preventDefault();
+        setMostrarBuscador((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [user]);
 
 
   useEffect(() => {
@@ -161,6 +175,19 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
 
           {user && (
             <>
+              {/* Botón de Búsqueda Global Spotlight */}
+              <button
+                type="button"
+                className="header-search-trigger"
+                onClick={() => setMostrarBuscador(true)}
+                title="Buscar en todo el sistema (Ctrl + K)"
+                aria-label="Buscar en todo el sistema"
+              >
+                <FaSearch size={13} style={{ color: '#691B31' }} />
+                <span className="header-search-text">Buscar...</span>
+                <kbd className="header-search-kbd">Ctrl K</kbd>
+              </button>
+
               {(user.rol === 'administrador' || user.rol === 'infraestructura') && <NotificationCenter />}
               <div className="app-header__profile" ref={profileRef}>
               <button 
@@ -191,6 +218,12 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
         </div>
         
       </div>
+
+      {/* Modal flotante de búsqueda global */}
+      <BuscadorGlobalModal
+        isOpen={mostrarBuscador}
+        onClose={() => setMostrarBuscador(false)}
+      />
     </header>
   );
 }
