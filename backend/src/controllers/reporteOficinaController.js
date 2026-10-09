@@ -572,6 +572,119 @@ async function modificarResuelto(req, res) {
   ok(res, reporte);
 }
 
+async function asignarEquipoTecnologico(req, res) {
+  const reporteId = Number(req.params.id);
+  const { equipoNuevoId, responsable, cargoResponsable, areaUbicacion, direccion, equipoPrincipalId } = req.body;
+
+  if (!equipoNuevoId) return fail(res, 'Falta el equipo a asignar');
+
+  const reporte = await prisma.reporteOficina.findUnique({
+    where: { id: reporteId }
+  });
+  if (!reporte) return fail(res, 'Reporte no encontrado', 404);
+
+  const equipoNuevo = await prisma.equipoTecnologico.findUnique({
+    where: { id: Number(equipoNuevoId) }
+  });
+  if (!equipoNuevo || equipoNuevo.estatus !== 'Stock') {
+    return fail(res, 'El equipo a asignar no está disponible o no está en Stock');
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.equipoTecnologico.update({
+      where: { id: equipoNuevo.id },
+      data: {
+        estatus: 'Activo',
+        responsable: responsable || null,
+        cargoResponsable: cargoResponsable || null,
+        areaUbicacion: areaUbicacion || null,
+        direccion: direccion || null,
+        equipoPrincipalId: equipoPrincipalId ? Number(equipoPrincipalId) : null,
+      }
+    });
+
+    await tx.historialReporte.create({
+      data: {
+        usuarioId: req.usuario.id,
+        tipoReporte: 'oficina',
+        reporteId: reporteId,
+        estadoAnterior: reporte.estado,
+        estadoNuevo: reporte.estado,
+        comentario: `Se asignó el equipo tecnológico (Inv: ${equipoNuevo.numeroInventario || 'S/N'}, Serie: ${equipoNuevo.numeroSerie || 'S/N'}) a ${responsable || 'N/A'}.`
+      }
+    });
+  });
+
+  ok(res, { message: 'Equipo asignado correctamente' });
+}
+
+async function reemplazarEquipoTecnologico(req, res) {
+  const reporteId = Number(req.params.id);
+  const { equipoViejoId, equipoNuevoId, estadoViejo, observacionesBaja } = req.body;
+
+  if (!equipoViejoId || !equipoNuevoId) return fail(res, 'Faltan equipos para el reemplazo');
+
+  const reporte = await prisma.reporteOficina.findUnique({
+    where: { id: reporteId }
+  });
+  if (!reporte) return fail(res, 'Reporte no encontrado', 404);
+
+  const equipoViejo = await prisma.equipoTecnologico.findUnique({
+    where: { id: Number(equipoViejoId) }
+  });
+  
+  const equipoNuevo = await prisma.equipoTecnologico.findUnique({
+    where: { id: Number(equipoNuevoId) }
+  });
+
+  if (!equipoViejo) return fail(res, 'El equipo a reemplazar no existe');
+  if (!equipoNuevo || equipoNuevo.estatus !== 'Stock') return fail(res, 'El equipo nuevo no está disponible o no está en Stock');
+
+  await prisma.$transaction(async (tx) => {
+    await tx.equipoTecnologico.update({
+      where: { id: equipoNuevo.id },
+      data: {
+        estatus: 'Activo',
+        responsable: equipoViejo.responsable,
+        cargoResponsable: equipoViejo.cargoResponsable,
+        areaUbicacion: equipoViejo.areaUbicacion,
+        direccion: equipoViejo.direccion,
+        equipoPrincipalId: equipoViejo.equipoPrincipalId
+      }
+    });
+
+    const nuevosDetallesViejo = typeof equipoViejo.detalles === 'object' && equipoViejo.detalles !== null 
+      ? { ...equipoViejo.detalles } : {};
+      
+    if (estadoViejo === 'Baja' || estadoViejo === 'Refacciones') {
+      nuevosDetallesViejo.motivoBaja = 'Reemplazo';
+      if (observacionesBaja) nuevosDetallesViejo.observacionesBaja = observacionesBaja;
+    }
+
+    await tx.equipoTecnologico.update({
+      where: { id: equipoViejo.id },
+      data: {
+        estatus: estadoViejo || 'Baja',
+        equipoPrincipalId: null,
+        detalles: nuevosDetallesViejo
+      }
+    });
+
+    await tx.historialReporte.create({
+      data: {
+        usuarioId: req.usuario.id,
+        tipoReporte: 'oficina',
+        reporteId: reporteId,
+        estadoAnterior: reporte.estado,
+        estadoNuevo: reporte.estado,
+        comentario: `Se reemplazó el equipo (Inv: ${equipoViejo.numeroInventario || 'S/N'}) por el equipo nuevo (Inv: ${equipoNuevo.numeroInventario || 'S/N'}). El equipo viejo pasó a estado: ${estadoViejo}.`
+      }
+    });
+  });
+
+  ok(res, { message: 'Reemplazo de equipo realizado correctamente' });
+}
+
 module.exports = {
   crear,
   resumen,
@@ -584,4 +697,6 @@ module.exports = {
   asignarPieza,
   desasignarPieza,
   actualizarEstadoPiezaReemplazada,
+  asignarEquipoTecnologico,
+  reemplazarEquipoTecnologico,
 };

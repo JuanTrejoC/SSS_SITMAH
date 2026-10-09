@@ -7,7 +7,8 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { API_BASE_URL } from '../config'
 import Swal from 'sweetalert2'
 import AtencionReporte from '../components/AtencionReporte'
-import ModalReemplazoPeriferico from '../components/ModalReemplazoPeriferico'
+import ModalAsignacionEquipo from '../components/ModalAsignacionEquipo'
+import ModalReemplazoEquipo from '../components/ModalReemplazoEquipo'
 
 export default function DashboardOficinas() {
   const { user } = useAuth()
@@ -26,11 +27,11 @@ export default function DashboardOficinas() {
   const [confirmResuelto, setConfirmResuelto] = useState({ visible: false, id: null })
   const [modalReemplazoAbierto, setModalReemplazoAbierto] = useState(false)
   
-  const [inventario, setInventario] = useState([])
-  const [mostrarInventario, setMostrarInventario] = useState(false)
-  const [componenteSeleccionado, setComponenteSeleccionado] = useState('')
-  const [cantidadSeleccionada, setCantidadSeleccionada] = useState(1)
-  const [estadoPiezaReemplazada, setEstadoPiezaReemplazada] = useState('reparacion')
+  const [modalAsignacionAbierto, setModalAsignacionAbierto] = useState(false)
+
+
+
+
 
   useEffect(() => {
     if (verDetalle || confirmResuelto.visible) {
@@ -109,31 +110,7 @@ export default function DashboardOficinas() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, mesFiltro, anioFiltro])
 
-  const cargarInventario = async () => {
-    if (!user?.token) return;
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/inventario/existencias?tipoInventario=tecnologico&soloBuenEstado=true&limit=1000`, {
-        headers: { 'Authorization': `Bearer ${user.token}` }
-      });
-      const json = await response.json();
-      if (response.ok && json.ok) {
-        const soloDisponibles = (json.data || []).filter(item => {
-          const estado = item.estadoFisico || 'Buen Estado';
-          const esBuenEstado = estado === 'Buen Estado' || (!item.estadoFisico && !item.nombre?.includes('Reemplazada'));
-          return esBuenEstado && Number(item.cantidad) > 0 && !item.nombre?.includes('Reemplazada') && !item.nombre?.includes('Retirada');
-        });
-        setInventario(soloDisponibles);
-      }
-    } catch (err) {
-      console.error('Error al cargar inventario', err);
-    }
-  };
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    cargarInventario();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  ;
 
   const asignarPieza = async () => {
     if (!componenteSeleccionado) {
@@ -189,9 +166,7 @@ export default function DashboardOficinas() {
               : rep
           )
         );
-        setComponenteSeleccionado('');
-        setCantidadSeleccionada(1);
-        setEstadoPiezaReemplazada('reparacion');
+        
         cargarInventario();
         Swal.fire('Asignada', 'Pieza asignada correctamente al reporte.', 'success');
       } else {
@@ -765,7 +740,7 @@ export default function DashboardOficinas() {
                   Detalles del Reporte {formatFolio(verDetalle.folio, verDetalle.id)}
                 </h3>
                 <button
-                  onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }}
+                  onClick={() => { setVerDetalle(null); }}
                   style={{ background: 'none', border: 'none', fontSize: '1.2rem', color: '#6B7280', cursor: 'pointer' }}
                 >
                   ✕
@@ -881,14 +856,14 @@ export default function DashboardOficinas() {
                         marginRight: '0.5rem'
                       }}
                     >
-                      <FaCogs style={{ marginRight: '0.25rem' }}/> Reemplazar Periférico (Mayor)
+                      <FaCogs style={{ marginRight: '0.25rem' }}/> Reemplazar Equipo / Componente
                     </button>
                     <button
                       type="button"
-                      onClick={() => setMostrarInventario(!mostrarInventario)}
+                      onClick={() => setModalAsignacionAbierto(true)}
                       style={{
-                        backgroundColor: mostrarInventario ? '#691B31' : '#F3F4F6',
-                        color: mostrarInventario ? 'white' : '#374151',
+                        backgroundColor: '#F3F4F6',
+                        color: '#374151',
                         border: '1px solid #D1D5DB',
                         padding: '0.35rem 0.75rem',
                         borderRadius: '8px',
@@ -897,93 +872,11 @@ export default function DashboardOficinas() {
                         cursor: 'pointer'
                       }}
                     >
-                      {mostrarInventario ? 'Ocultar Inventario (Menor)' : '+ Asignar Pieza / Componente (Menor)'}
+                      '+ Asignar Equipo / Componente'
                     </button>
                   </div>
                   
-                  {mostrarInventario && (
-                    <div style={{ backgroundColor: '#F8FAFC', padding: '1rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid #E5E7EB' }}>
-                      <h4 style={{ margin: '0 0 0.65rem 0', fontSize: '0.85rem', color: '#4B5563', fontWeight: '700' }}>Seleccionar del Inventario Tecnológico (1 pieza por reemplazo)</h4>
-                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
-                        <div style={{ flex: '1', minWidth: '200px' }}>
-                          <CustomInventorySelect 
-                            value={componenteSeleccionado}
-                            onChange={setComponenteSeleccionado}
-                            inventario={inventario}
-                            piezasAsignadas={verDetalle.piezasAsignadas || []}
-                          />
-                        </div>
-                        <span style={{ backgroundColor: '#E2E8F0', padding: '0.65rem 0.85rem', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '700', color: '#334155', whiteSpace: 'nowrap' }}>
-                          Cant: 1 pieza
-                        </span>
-                        <button
-                          onClick={asignarPieza}
-                          style={{
-                            padding: '0.65rem 1.25rem',
-                            backgroundColor: '#691B31',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            fontWeight: '700',
-                            fontSize: '0.875rem',
-                            boxShadow: '0 2px 4px rgba(105,27,49,0.2)'
-                          }}
-                        >
-                          Asignar
-                        </button>
-                      </div>
-
-                      {/* Selector de estado/destino de la pieza reemplazada */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap', paddingTop: '0.6rem', borderTop: '1px dashed #D1D5DB' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#4B5563' }}>
-                          Destino de la pieza reemplazada:
-                        </span>
-                        <div style={{ display: 'flex', gap: '0.4rem' }}>
-                          <button
-                            type="button"
-                            onClick={() => setEstadoPiezaReemplazada('reparacion')}
-                            style={{
-                              padding: '0.3rem 0.65rem',
-                              borderRadius: '6px',
-                              border: estadoPiezaReemplazada === 'reparacion' ? '1.5px solid #2563EB' : '1px solid #D1D5DB',
-                              backgroundColor: estadoPiezaReemplazada === 'reparacion' ? '#EFF6FF' : 'white',
-                              color: estadoPiezaReemplazada === 'reparacion' ? '#1D4ED8' : '#6B7280',
-                              fontSize: '0.78rem',
-                              fontWeight: estadoPiezaReemplazada === 'reparacion' ? '700' : '500',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.3rem',
-                              transition: 'all 0.15s'
-                            }}
-                          >
-                            <span>🔧</span> A Reparación
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEstadoPiezaReemplazada('danada')}
-                            style={{
-                              padding: '0.3rem 0.65rem',
-                              borderRadius: '6px',
-                              border: estadoPiezaReemplazada === 'danada' ? '1.5px solid #DC2626' : '1px solid #D1D5DB',
-                              backgroundColor: estadoPiezaReemplazada === 'danada' ? '#FEF2F2' : 'white',
-                              color: estadoPiezaReemplazada === 'danada' ? '#B91C1C' : '#6B7280',
-                              fontSize: '0.78rem',
-                              fontWeight: estadoPiezaReemplazada === 'danada' ? '700' : '500',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.3rem',
-                              transition: 'all 0.15s'
-                            }}
-                          >
-                            <span>⚠️</span> Dañada / Para baja
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  
 
                   {verDetalle.piezasAsignadas && verDetalle.piezasAsignadas.length > 0 ? (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem' }}>
@@ -1175,7 +1068,7 @@ export default function DashboardOficinas() {
               </div>
 
               <button
-                onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); setCantidadSeleccionada(1); }}
+                onClick={() => { setVerDetalle(null); }}
                 style={{ marginTop: '1.5rem', padding: '0.75rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '10px', width: '100%', fontSize: '0.9rem', fontWeight: '700', cursor: 'pointer' }}
               >
                 Cerrar Detalles
@@ -1218,12 +1111,20 @@ export default function DashboardOficinas() {
 
       </div>
 
-      <ModalReemplazoPeriferico 
+      <ModalAsignacionEquipo 
+        isOpen={modalAsignacionAbierto}
+        onClose={() => setModalAsignacionAbierto(false)}
+        reporteId={verDetalle?.id}
+        onSuccess={() => {
+          cargarReportes();
+        }}
+      />
+
+      <ModalReemplazoEquipo 
         isOpen={modalReemplazoAbierto}
         onClose={() => setModalReemplazoAbierto(false)}
-        user={user}
+        reporteId={verDetalle?.id}
         onSuccess={() => {
-          cargarInventario();
           cargarReportes();
         }}
       />
@@ -1231,326 +1132,4 @@ export default function DashboardOficinas() {
   )
 }
 
-// Componente Customizado para el Inventario con 3 niveles (Categoría -> Artículo Único -> Modelos)
-const CustomInventorySelect = ({ value, onChange, inventario = [], piezasAsignadas = [] }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const [hoveredCategory, setHoveredCategory] = useState(null);
-  const [hoveredArticle, setHoveredArticle] = useState(null);
-  const selectRef = useRef(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (selectRef.current && !selectRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen]);
-
-  const assignedIds = new Set(
-    piezasAsignadas.map(p => Number(p.componenteId || p.componente?.id)).filter(Boolean)
-  );
-
-  const selectedOption = inventario.find(o => o.id === Number(value));
-
-  const filteredOptions = inventario.filter(o => {
-    const searchTerm = search.toLowerCase();
-    return (
-      (o.nombre && o.nombre.toLowerCase().includes(searchTerm)) ||
-      (o.numeroInventario && o.numeroInventario.toLowerCase().includes(searchTerm)) ||
-      (o.marca && o.marca.toLowerCase().includes(searchTerm)) ||
-      (o.modelo && o.modelo.toLowerCase().includes(searchTerm)) ||
-      (o.descripcion && o.descripcion.toLowerCase().includes(searchTerm))
-    );
-  });
-
-  // Agrupación jerárquica en 3 niveles
-  const jerarquia = useMemo(() => {
-    const data = {};
-    inventario.forEach(item => {
-      const cat = item.categoria || 'Sin Categoría';
-      const rawNombre = (item.nombre || item.descripcion || 'Sin Nombre').trim();
-      
-      if (!data[cat]) data[cat] = {};
-      if (!data[cat][rawNombre]) {
-        data[cat][rawNombre] = {
-          nombre: rawNombre,
-          categoria: cat,
-          items: [],
-          totalDisponible: 0
-        };
-      }
-      data[cat][rawNombre].items.push(item);
-      data[cat][rawNombre].totalDisponible += Number(item.cantidad || 0);
-    });
-    return data;
-  }, [inventario]);
-
-  const categorias = Object.keys(jerarquia);
-
-  const activeCategory = hoveredCategory || (categorias.length > 0 ? categorias[0] : null);
-  const articulosEnCategoria = activeCategory && jerarquia[activeCategory] ? Object.values(jerarquia[activeCategory]) : [];
-  const activeArticle = hoveredArticle && jerarquia[activeCategory]?.[hoveredArticle] 
-    ? jerarquia[activeCategory][hoveredArticle] 
-    : (articulosEnCategoria.length > 0 ? articulosEnCategoria[0] : null);
-
-  const modelosEnArticulo = activeArticle ? activeArticle.items : [];
-
-  return (
-    <div ref={selectRef} style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
-      <div
-        onClick={() => setIsOpen(!isOpen)}
-        style={{
-          padding: '0.65rem 1rem',
-          border: isOpen ? '1.5px solid #691B31' : '1px solid #D1D5DB',
-          borderRadius: '8px',
-          fontSize: '0.9rem',
-          backgroundColor: 'white',
-          cursor: 'pointer',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '0.75rem',
-          transition: 'all 0.2s'
-        }}
-      >
-        <span>
-          {selectedOption ? (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#111827', fontWeight: '600' }}>
-              {selectedOption.nombre || selectedOption.descripcion}
-              {selectedOption.modelo ? ` — Mod: ${selectedOption.modelo}` : (selectedOption.marca ? ` (${selectedOption.marca})` : '')}
-              <span style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 'normal' }}>
-                (Disp: {selectedOption.cantidad ?? 'N/A'})
-              </span>
-            </span>
-          ) : (
-            <span style={{ color: '#9CA3AF', fontWeight: '400' }}>-- Seleccionar componente --</span>
-          )}
-        </span>
-        <FaChevronRight size={12} style={{ transform: isOpen ? 'rotate(-90deg)' : 'rotate(90deg)', transition: '0.2s', color: '#6B7280' }} />
-      </div>
-
-      {isOpen && (
-        <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: '0.5rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 -6px 25px rgba(0,0,0,0.15)', zIndex: 50, border: '1px solid #E5E7EB', overflow: 'hidden', width: '100%', minWidth: '560px', maxWidth: '680px' }}>
-          <div style={{ padding: '0.6rem 0.8rem', borderBottom: '1px solid #E5E7EB', backgroundColor: '#ffffff' }}>
-            <input
-              type="text"
-              placeholder="Buscar componente por nombre, marca o modelo..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              autoFocus
-              style={{ width: '100%', padding: '0.55rem 0.85rem', borderRadius: '8px', border: '1px solid #D1D5DB', outline: 'none', fontSize: '0.85rem' }}
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-
-          <div style={{ display: 'flex', height: '260px' }}>
-            {search ? (
-              <div style={{ flex: 1, padding: '0.5rem', overflowY: 'auto' }}>
-                {filteredOptions.length > 0 ? filteredOptions.map(opcion => {
-                  const yaAsignada = assignedIds.has(opcion.id);
-                  const sinStock = Number(opcion.cantidad) <= 0;
-                  const deshabilitada = yaAsignada || sinStock;
-
-                  return (
-                    <div
-                      key={opcion.id}
-                      onClick={() => {
-                        if (deshabilitada) return;
-                        onChange(opcion.id);
-                        setIsOpen(false);
-                        setSearch('');
-                      }}
-                      style={{
-                        padding: '0.65rem 0.85rem',
-                        cursor: deshabilitada ? 'not-allowed' : 'pointer',
-                        opacity: deshabilitada ? 0.6 : 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem',
-                        borderRadius: '8px',
-                        backgroundColor: value === opcion.id ? '#FEF2F2' : 'transparent'
-                      }}
-                      onMouseOver={e => { if (!deshabilitada) e.currentTarget.style.backgroundColor = '#FFF1F2'; }}
-                      onMouseOut={e => { e.currentTarget.style.backgroundColor = value === opcion.id ? '#FEF2F2' : 'transparent'; }}
-                    >
-                      <FaCogs color="#691B31" size={16} />
-                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: '600', color: '#111827' }}>
-                            {opcion.nombre || opcion.descripcion} {opcion.modelo ? `— Mod: ${opcion.modelo}` : ''}
-                          </span>
-                          {yaAsignada && (
-                            <span style={{ fontSize: '0.7rem', color: '#B91C1C', backgroundColor: '#FEE2E2', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: '700' }}>
-                              Ya asignada
-                            </span>
-                          )}
-                        </div>
-                        <span style={{ fontSize: '0.75rem', color: '#6B7280' }}>
-                          Cat: {opcion.categoria || 'N/A'} | Disp: {opcion.cantidad ?? 'N/A'} {opcion.numeroInventario ? `| Inv: ${opcion.numeroInventario}` : ''}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                }) : (
-                  <div style={{ padding: '2rem', color: '#6B7280', textAlign: 'center', fontSize: '0.85rem' }}>
-                    No se encontraron componentes para "{search}"
-                  </div>
-                )}
-              </div>
-            ) : (
-              <>
-                {/* 1. Categorías */}
-                <div style={{ width: '28%', borderRight: '1px solid #E5E7EB', overflowY: 'auto', padding: '0.4rem', backgroundColor: '#ffffff' }}>
-                  <div style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', color: '#9CA3AF', padding: '0.3rem 0.5rem' }}>
-                    Categorías
-                  </div>
-                  {categorias.map((group) => (
-                    <div
-                      key={group}
-                      onMouseEnter={() => {
-                        setHoveredCategory(group);
-                        setHoveredArticle(null);
-                      }}
-                      style={{
-                        padding: '0.6rem 0.65rem',
-                        cursor: 'pointer',
-                        borderRadius: '8px',
-                        fontWeight: '600',
-                        fontSize: '0.825rem',
-                        color: activeCategory === group ? '#691B31' : '#4B5563',
-                        backgroundColor: activeCategory === group ? '#FEF2F2' : 'transparent',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                      }}
-                    >
-                      <span style={{ textTransform: 'capitalize' }}>{group}</span>
-                      <FaChevronRight size={9} style={{ opacity: activeCategory === group ? 1 : 0.3 }} />
-                    </div>
-                  ))}
-                </div>
-
-                {/* 2. Artículos Únicos */}
-                <div style={{ width: '36%', borderRight: '1px solid #E5E7EB', overflowY: 'auto', padding: '0.4rem', backgroundColor: '#F9FAFB' }}>
-                  <div style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', color: '#9CA3AF', padding: '0.3rem 0.5rem' }}>
-                    Artículos
-                  </div>
-                  {articulosEnCategoria.length > 0 ? (
-                    articulosEnCategoria.map((art) => {
-                      const isSelectedArt = activeArticle?.nombre === art.nombre;
-                      return (
-                        <div
-                          key={art.nombre}
-                          onMouseEnter={() => setHoveredArticle(art.nombre)}
-                          onClick={() => setHoveredArticle(art.nombre)}
-                          style={{
-                            padding: '0.55rem 0.65rem',
-                            cursor: 'pointer',
-                            borderRadius: '8px',
-                            backgroundColor: isSelectedArt ? '#FEF2F2' : 'transparent',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            marginBottom: '0.2rem'
-                          }}
-                          onMouseOver={e => { if (!isSelectedArt) e.currentTarget.style.backgroundColor = '#F3F4F6'; }}
-                          onMouseOut={e => { if (!isSelectedArt) e.currentTarget.style.backgroundColor = 'transparent'; }}
-                        >
-                          <FaCogs color={isSelectedArt ? '#691B31' : '#6B7280'} size={13} />
-                          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                            <span style={{ fontSize: '0.825rem', fontWeight: '600', color: isSelectedArt ? '#691B31' : '#1F2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {art.nombre}
-                            </span>
-                            <span style={{ fontSize: '0.7rem', color: '#6B7280' }}>
-                              Total Disp: {art.totalDisponible} {art.items.length > 1 ? `(${art.items.length} modelos)` : ''}
-                            </span>
-                          </div>
-                          <FaChevronRight size={9} style={{ opacity: isSelectedArt ? 1 : 0.3, color: '#691B31' }} />
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div style={{ padding: '2rem 0.5rem', textAlign: 'center', color: '#9CA3AF', fontSize: '0.75rem' }}>
-                      Sin artículos
-                    </div>
-                  )}
-                </div>
-
-                {/* 3. Modelos / Piezas */}
-                <div style={{ width: '36%', overflowY: 'auto', padding: '0.4rem', backgroundColor: '#ffffff' }}>
-                  <div style={{ fontSize: '0.7rem', fontWeight: '700', textTransform: 'uppercase', color: '#9CA3AF', padding: '0.3rem 0.5rem' }}>
-                    Modelos / Piezas
-                  </div>
-                  {modelosEnArticulo.length > 0 ? (
-                    modelosEnArticulo.map((opcion) => {
-                      const yaAsignada = assignedIds.has(opcion.id);
-                      const sinStock = Number(opcion.cantidad) <= 0;
-                      const deshabilitada = yaAsignada || sinStock;
-                      const isCurrentVal = value === opcion.id;
-
-                      const labelModelo = opcion.modelo || opcion.marca 
-                        ? `${opcion.marca ? opcion.marca + ' ' : ''}${opcion.modelo || ''}`.trim()
-                        : (opcion.numeroInventario ? `Inv: ${opcion.numeroInventario}` : (opcion.numeroSerie ? `S/N: ${opcion.numeroSerie}` : 'Modelo Estándar'));
-
-                      return (
-                        <div
-                          key={opcion.id}
-                          onClick={() => {
-                            if (deshabilitada) return;
-                            onChange(opcion.id);
-                            setIsOpen(false);
-                            setSearch('');
-                          }}
-                          style={{
-                            padding: '0.55rem 0.65rem',
-                            cursor: deshabilitada ? 'not-allowed' : 'pointer',
-                            opacity: deshabilitada ? 0.5 : 1,
-                            borderRadius: '8px',
-                            backgroundColor: isCurrentVal ? '#D1FAE5' : 'transparent',
-                            border: isCurrentVal ? '1px solid #10B981' : '1px solid transparent',
-                            marginBottom: '0.25rem',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '0.15rem'
-                          }}
-                          onMouseOver={e => { if (!deshabilitada && !isCurrentVal) e.currentTarget.style.backgroundColor = '#EFF6FF'; }}
-                          onMouseOut={e => { if (!deshabilitada && !isCurrentVal) e.currentTarget.style.backgroundColor = 'transparent'; }}
-                        >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: isCurrentVal ? '#065F46' : '#111827' }}>
-                              {labelModelo}
-                            </span>
-                            {yaAsignada && (
-                              <span style={{ fontSize: '0.65rem', color: '#B91C1C', backgroundColor: '#FEE2E2', padding: '0.05rem 0.3rem', borderRadius: '4px', fontWeight: '700' }}>
-                                Ya asignada
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.7rem', color: '#6B7280' }}>
-                            <span>Disp: {opcion.cantidad ?? 1}</span>
-                            {opcion.estadoFisico && <span style={{ color: '#059669' }}>{opcion.estadoFisico}</span>}
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div style={{ padding: '2rem 0.5rem', textAlign: 'center', color: '#9CA3AF', fontSize: '0.75rem' }}>
-                      Selecciona un artículo
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
