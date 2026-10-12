@@ -1,6 +1,6 @@
 // src/views/DashboardOficinas.jsx
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { FaEye, FaTrashAlt, FaChevronRight, FaCogs } from 'react-icons/fa'
+import { FaEye, FaTrashAlt, FaChevronRight, FaCogs, FaPlus, FaTimes } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { formatFolio } from '../utils/formatFolio'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -42,6 +42,32 @@ export default function DashboardOficinas() {
     return () => { document.body.style.overflow = '' }
   }, [verDetalle, confirmResuelto.visible])
 
+  const recargarDetalle = async (id) => {
+    const repId = id || verDetalle?.id;
+    if (!repId || !user?.token) return null;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/reportes/oficina/${repId}`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      });
+      const json = await res.json();
+      if (res.ok && json.ok && json.data) {
+        setVerDetalle(json.data);
+        setReportes(prev => prev.map(rep => rep.id === json.data.id ? { ...rep, ...json.data } : rep));
+        return json.data;
+      }
+    } catch (e) {
+      console.error('Error al recargar detalle:', e);
+    }
+    return null;
+  };
+
+  const abrirDetalle = async (reporte) => {
+    setVerDetalle(reporte);
+    if (reporte?.id && user?.token) {
+      recargarDetalle(reporte.id);
+    }
+  };
+
   // Abrir reporte automáticamente si se accede desde el centro de notificaciones (?id=...)
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -55,7 +81,7 @@ export default function DashboardOficinas() {
         (folioParam && String(r.folio).toLowerCase() === folioParam.toLowerCase())
       )
       if (encontrado) {
-        setVerDetalle(encontrado)
+        abrirDetalle(encontrado)
         setEstadoFiltro('Todos')
         return
       }
@@ -69,7 +95,7 @@ export default function DashboardOficinas() {
       .then(res => res.json())
       .then(json => {
         if (json.ok && json.data) {
-          setVerDetalle(json.data)
+          abrirDetalle(json.data)
           setEstadoFiltro('Todos')
         }
       })
@@ -248,6 +274,43 @@ export default function DashboardOficinas() {
       }
     } catch {
       Swal.fire('Error', 'Error de red al desasignar pieza', 'error');
+    }
+  };
+
+
+
+  const desasignarEquipo = async (operacionId) => {
+    const result = await Swal.fire({
+      title: '¿Revertir operación?',
+      text: 'Se revertirá el estatus del equipo al estado anterior y se desvinculará de este reporte.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#EF4444',
+      cancelButtonColor: '#6B7280',
+      confirmButtonText: 'Sí, revertir',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/admin/reportes/oficina/${verDetalle.id}/equipo/${operacionId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${user.token}`
+          }
+        });
+        const json = await response.json();
+        if (response.ok && json.ok) {
+          await recargarDetalle(verDetalle.id);
+          cargarReportes();
+          Swal.fire('Éxito', 'Operación revertida exitosamente', 'success');
+        } else {
+          Swal.fire('Error', json.error || 'No se pudo revertir la operación', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        Swal.fire('Error', 'Error de conexión', 'error');
+      }
     }
   };
 
@@ -685,7 +748,7 @@ export default function DashboardOficinas() {
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
                             <button
-                              onClick={() => setVerDetalle(r)}
+                              onClick={() => abrirDetalle(r)}
                               title="Ver detalles"
                               style={{
                                 backgroundColor: '#FEF3C7',
@@ -872,13 +935,67 @@ export default function DashboardOficinas() {
                         cursor: 'pointer'
                       }}
                     >
-                      '+ Asignar Equipo / Componente'
+                      <FaPlus style={{ marginRight: '0.25rem' }} /> Asignar Equipo / Componente
                     </button>
                   </div>
-                  
-                  
 
-                  {verDetalle.piezasAsignadas && verDetalle.piezasAsignadas.length > 0 ? (
+                  {/* MENSAJE SI NO HAY NI EQUIPOS NI PIEZAS */}
+                  {(!verDetalle.equiposAsignados || verDetalle.equiposAsignados.length === 0) &&
+                   (!verDetalle.piezasAsignadas || verDetalle.piezasAsignadas.length === 0) && (
+                    <div style={{ fontSize: '0.85rem', color: '#9CA3AF', fontStyle: 'italic', padding: '0.5rem 0' }}>
+                      No hay equipos o piezas asignadas a este reporte.
+                    </div>
+                  )}
+
+                  {/* EQUIPOS ASIGNADOS / REEMPLAZADOS */}
+                  {verDetalle.equiposAsignados && verDetalle.equiposAsignados.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
+                      {verDetalle.equiposAsignados.map((operacion, idx) => (
+                        <div key={'op-' + idx} style={{ 
+                          padding: '0.85rem 1rem', 
+                          backgroundColor: 'white', 
+                          border: '1px solid #E5E7EB', 
+                          borderRadius: '12px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'space-between',
+                          gap: '0.75rem',
+                          boxShadow: '0 2px 8px -2px rgba(0,0,0,0.05)',
+                          position: 'relative'
+                        }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                              <span style={{ backgroundColor: operacion.tipoOperacion === 'asignacion' ? '#E0F2FE' : '#FEF3C7', color: operacion.tipoOperacion === 'asignacion' ? '#0369A1' : '#B45309', padding: '0.15rem 0.5rem', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                                {operacion.tipoOperacion}
+                              </span>
+                            </div>
+                            
+                            {operacion.tipoOperacion === 'asignacion' ? (
+                              <div style={{ fontSize: '0.85rem', color: '#374151', lineHeight: '1.4' }}>
+                                <strong>NUEVO:</strong> {operacion.equipoNuevo?.tipo} {operacion.equipoNuevo?.marca} (Inv: {operacion.equipoNuevo?.numeroInventario})
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: '0.85rem', color: '#374151', lineHeight: '1.4' }}>
+                                <strong>VIEJO:</strong> {operacion.equipoViejo?.tipo} {operacion.equipoViejo?.marca} (Inv: {operacion.equipoViejo?.numeroInventario})<br/>
+                                <strong>NUEVO:</strong> {operacion.equipoNuevo?.tipo} {operacion.equipoNuevo?.marca} (Inv: {operacion.equipoNuevo?.numeroInventario})
+                              </div>
+                            )}
+                          </div>
+                          <button 
+                            onClick={() => desasignarEquipo(operacion.id)}
+                            style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '0.4rem', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                            title="Revertir operación"
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#FEE2E2'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <FaTimes />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {verDetalle.piezasAsignadas && verDetalle.piezasAsignadas.length > 0 && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem' }}>
                       {verDetalle.piezasAsignadas.map((asignacion, idx) => (
                         <div key={idx} style={{ 
@@ -945,8 +1062,6 @@ export default function DashboardOficinas() {
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <div style={{ fontSize: '0.85rem', color: '#9CA3AF', fontStyle: 'italic' }}>No hay componentes asignados a este reporte.</div>
                   )}
 
                   {/* SECCIÓN APARTE: PIEZAS REEMPLAZADAS */}
@@ -1115,7 +1230,9 @@ export default function DashboardOficinas() {
         isOpen={modalAsignacionAbierto}
         onClose={() => setModalAsignacionAbierto(false)}
         reporteId={verDetalle?.id}
-        onSuccess={() => {
+        onSuccess={async (repId) => {
+          const id = repId || verDetalle?.id;
+          await recargarDetalle(id);
           cargarReportes();
         }}
       />
@@ -1124,7 +1241,9 @@ export default function DashboardOficinas() {
         isOpen={modalReemplazoAbierto}
         onClose={() => setModalReemplazoAbierto(false)}
         reporteId={verDetalle?.id}
-        onSuccess={() => {
+        onSuccess={async (repId) => {
+          const id = repId || verDetalle?.id;
+          await recargarDetalle(id);
           cargarReportes();
         }}
       />

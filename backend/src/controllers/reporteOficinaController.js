@@ -45,6 +45,7 @@ const includeDetalle = {
   atendidoPor: { select: { id: true, nombre: true, username: true } },
   evidencias: true,
   piezasAsignadas: { include: { componente: true } },
+  equiposAsignados: { include: { equipoNuevo: true, equipoViejo: true } },
 };
 
 async function crear(req, res) {
@@ -613,6 +614,14 @@ async function asignarEquipoTecnologico(req, res) {
         comentario: `Se asignó el equipo tecnológico (Inv: ${equipoNuevo.numeroInventario || 'S/N'}, Serie: ${equipoNuevo.numeroSerie || 'S/N'}) a ${responsable || 'N/A'}.`
       }
     });
+
+    await tx.reporteOficinaEquipo.create({
+      data: {
+        reporteOficinaId: reporteId,
+        equipoNuevoId: equipoNuevo.id,
+        tipoOperacion: 'asignacion'
+      }
+    });
   });
 
   ok(res, { message: 'Equipo asignado correctamente' });
@@ -680,12 +689,87 @@ async function reemplazarEquipoTecnologico(req, res) {
         comentario: `Se reemplazó el equipo (Inv: ${equipoViejo.numeroInventario || 'S/N'}) por el equipo nuevo (Inv: ${equipoNuevo.numeroInventario || 'S/N'}). El equipo viejo pasó a estado: ${estadoViejo}.`
       }
     });
+
+    await tx.reporteOficinaEquipo.create({
+      data: {
+        reporteOficinaId: reporteId,
+        equipoNuevoId: equipoNuevo.id,
+        equipoViejoId: equipoViejo.id,
+        tipoOperacion: 'reemplazo',
+        estadoViejo: estadoViejo || 'Baja',
+        equipoViejoPrincipalId: equipoViejo.equipoPrincipalId
+      }
+    });
   });
 
   ok(res, { message: 'Reemplazo de equipo realizado correctamente' });
 }
 
+
+async function desasignarEquipoTecnologico(req, res) {
+  const reporteId = Number(req.params.id);
+  const operacionId = Number(req.params.operacionId);
+
+  const operacion = await prisma.reporteOficinaEquipo.findUnique({
+    where: { id: operacionId },
+    include: { equipoNuevo: true, equipoViejo: true }
+  });
+
+  if (!operacion || operacion.reporteOficinaId !== reporteId) {
+    return fail(res, 'Operación no encontrada', 404);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.equipoTecnologico.update({
+      where: { id: operacion.equipoNuevoId },
+      data: {
+        estatus: 'Stock',
+        responsable: null,
+        cargoResponsable: null,
+        areaUbicacion: null,
+        direccion: null,
+        equipoPrincipalId: null
+      }
+    });
+
+    if (operacion.tipoOperacion === 'reemplazo' && operacion.equipoViejoId) {
+      const viejosDetalles = typeof operacion.equipoViejo.detalles === 'object' && operacion.equipoViejo.detalles !== null 
+        ? { ...operacion.equipoViejo.detalles } : {};
+      
+      delete viejosDetalles.motivoBaja;
+      delete viejosDetalles.observacionesBaja;
+
+      await tx.equipoTecnologico.update({
+        where: { id: operacion.equipoViejoId },
+        data: {
+          estatus: 'Activo',
+          equipoPrincipalId: operacion.equipoViejoPrincipalId,
+          detalles: viejosDetalles
+        }
+      });
+    }
+
+    await tx.reporteOficinaEquipo.delete({
+      where: { id: operacion.id }
+    });
+
+    await tx.historialReporte.create({
+      data: {
+        usuarioId: req.usuario.id,
+        tipoReporte: 'oficina',
+        reporteId: reporteId,
+        estadoAnterior: 'en_proceso',
+        estadoNuevo: 'en_proceso',
+        comentario: `Se revirtió la operación de ${operacion.tipoOperacion} del equipo (Inv: ${operacion.equipoNuevo.numeroInventario || 'S/N'}).`
+      }
+    });
+  });
+
+  ok(res, { message: 'Operación revertida exitosamente' });
+}
+
 module.exports = {
+  desasignarEquipoTecnologico,
   crear,
   resumen,
   listar,

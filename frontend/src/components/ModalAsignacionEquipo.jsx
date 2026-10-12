@@ -10,6 +10,9 @@ export default function ModalAsignacionEquipo({ isOpen, onClose, reporteId, onSu
   const [cargando, setCargando] = useState(false);
   const [equiposStock, setEquiposStock] = useState([]);
   const [equiposActivos, setEquiposActivos] = useState([]);
+  const [cargosList, setCargosList] = useState([]);
+  const [ubicacionesList, setUbicacionesList] = useState([]);
+  const [areasList, setAreasList] = useState([]);
   
   const [form, setForm] = useState({
     equipoNuevoId: '',
@@ -23,6 +26,7 @@ export default function ModalAsignacionEquipo({ isOpen, onClose, reporteId, onSu
   useEffect(() => {
     if (isOpen) {
       cargarEquipos();
+      cargarCatalogos();
       setForm({
         equipoNuevoId: '',
         responsable: '',
@@ -33,6 +37,38 @@ export default function ModalAsignacionEquipo({ isOpen, onClose, reporteId, onSu
       });
     }
   }, [isOpen]);
+
+  
+  const cargarCatalogos = async () => {
+    try {
+      const resSedes = await fetch(`${API_BASE_URL}/api/catalogos/sedes`);
+      const resEstaciones = await fetch(`${API_BASE_URL}/api/catalogos/estaciones`);
+      let ubi = [];
+      if (resSedes.ok) {
+        const j = await resSedes.json();
+        if (j.data) ubi = [...ubi, ...j.data.map(s => s.nombre)];
+      }
+      if (resEstaciones.ok) {
+        const j = await resEstaciones.json();
+        if (j.data) ubi = [...ubi, ...j.data.map(e => e.nombre)];
+      }
+      setUbicacionesList(ubi);
+
+      const resCargos = await fetch(`${API_BASE_URL}/api/catalogos/cargos`);
+      if (resCargos.ok) {
+        const j = await resCargos.json();
+        if (j.data) setCargosList(j.data.map(c => c.nombre));
+      }
+
+      const resAreas = await fetch(`${API_BASE_URL}/api/catalogos/areas`);
+      if (resAreas.ok) {
+        const j = await resAreas.json();
+        if (j.data) setAreasList(j.data.map(a => a.nombre));
+      }
+    } catch (err) {
+      console.error('Error cargando catálogos:', err);
+    }
+  };
 
   const cargarEquipos = async () => {
     try {
@@ -70,7 +106,7 @@ export default function ModalAsignacionEquipo({ isOpen, onClose, reporteId, onSu
       const json = await res.json();
       if (res.ok) {
         Swal.fire('Éxito', 'Equipo asignado correctamente', 'success');
-        onSuccess();
+        if (onSuccess) onSuccess(reporteId);
         onClose();
       } else {
         Swal.fire('Error', json.error || 'Error al asignar equipo', 'error');
@@ -131,32 +167,29 @@ export default function ModalAsignacionEquipo({ isOpen, onClose, reporteId, onSu
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}>Cargo del Responsable</label>
-                <input 
-                  type="text" 
-                  value={form.cargoResponsable} 
-                  onChange={e => setForm({...form, cargoResponsable: e.target.value})} 
+                <SearchableSelect 
+                  value={form.cargoResponsable}
+                  onChange={(val) => setForm({...form, cargoResponsable: val})}
                   placeholder="Ej. Director, Analista..."
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', outline: 'none' }}
+                  options={[{value: '', label: '-- Seleccionar --'}, ...cargosList.map(c => ({ value: c, label: c, searchTerms: [c] }))]}
                 />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}><FaBuilding /> Ubicación / Sede</label>
-                <input 
-                  type="text" 
-                  value={form.areaUbicacion} 
-                  onChange={e => setForm({...form, areaUbicacion: e.target.value})} 
+                <SearchableSelect 
+                  value={form.areaUbicacion}
+                  onChange={(val) => setForm({...form, areaUbicacion: val})}
                   placeholder="Ej. Bicentenario"
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', outline: 'none' }}
+                  options={[{value: '', label: '-- Seleccionar --'}, ...ubicacionesList.map(u => ({ value: u, label: u, searchTerms: [u] }))]}
                 />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}>Área</label>
-                <input 
-                  type="text" 
-                  value={form.direccion} 
-                  onChange={e => setForm({...form, direccion: e.target.value})} 
+                <SearchableSelect 
+                  value={form.direccion}
+                  onChange={(val) => setForm({...form, direccion: val})}
                   placeholder="Ej. Recursos Humanos"
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', outline: 'none' }}
+                  options={[{value: '', label: '-- Seleccionar --'}, ...areasList.map(a => ({ value: a, label: a, searchTerms: [a] }))]}
                 />
               </div>
             </div>

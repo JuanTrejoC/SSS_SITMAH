@@ -185,6 +185,7 @@ model ReporteOficina {
   atendidoPor Usuario?    @relation("AtendidoOficina", fields: [atendidoPorId], references: [id])
   evidencias      Evidencia[]
   piezasAsignadas ReporteOficinaPieza[]
+  equiposAsignados ReporteOficinaEquipo[]
 
   @@index([estado])
   @@index([sedeId])
@@ -294,6 +295,8 @@ model EquipoTecnologico {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
   resguardos       Resguardo[]
+  asignacionesNuevas ReporteOficinaEquipo[] @relation("EquipoNuevo")
+  asignacionesViejas ReporteOficinaEquipo[] @relation("EquipoViejo")
 
   @@index([tipo])
   @@index([estatus])
@@ -442,4 +445,22 @@ model Resguardo {
   @@index([nombreResguardante])
   @@index([createdAt])
   @@map("resguardo")
+}
+
+
+model ReporteOficinaEquipo {
+  id                   Int               @id @default(autoincrement())
+  reporteOficinaId     Int               @map("reporte_oficina_id")
+  equipoNuevoId        Int               @map("equipo_nuevo_id")
+  equipoViejoId        Int?              @map("equipo_viejo_id")
+  tipoOperacion        String            @db.VarChar(50)
+  estadoViejo          String?           @map("estado_viejo") @db.VarChar(50)
+  equipoViejoPrincipalId Int?            @map("equipo_viejo_principal_id")
+  createdAt            DateTime          @default(now()) @map("created_at")
+
+  reporteOficina       ReporteOficina    @relation(fields: [reporteOficinaId], references: [id], onDelete: Cascade)
+  equipoNuevo          EquipoTecnologico @relation("EquipoNuevo", fields: [equipoNuevoId], references: [id])
+  equipoViejo          EquipoTecnologico? @relation("EquipoViejo", fields: [equipoViejoId], references: [id])
+
+  @@map("reporte_oficina_equipo")
 }
