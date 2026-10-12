@@ -66,7 +66,7 @@ export default function ModalReemplazoEquipo({ isOpen, onClose, reporteId, onSuc
       const json = await res.json();
       if (res.ok) {
         Swal.fire('Éxito', 'Equipo reemplazado correctamente', 'success');
-        onSuccess();
+        if (onSuccess) onSuccess(reporteId);
         onClose();
       } else {
         Swal.fire('Error', json.error || 'Error al reemplazar equipo', 'error');

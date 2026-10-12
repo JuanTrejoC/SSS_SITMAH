@@ -76,6 +76,7 @@ router.patch('/reportes/oficina/:id/piezas/:piezaId/estado-reemplazo', asyncHand
 router.delete('/reportes/oficina/:id/piezas/:piezaId', asyncHandler(reporteOficina.desasignarPieza));
 router.post('/reportes/oficina/:id/asignar-equipo', asyncHandler(reporteOficina.asignarEquipoTecnologico));
 router.post('/reportes/oficina/:id/reemplazar-equipo', asyncHandler(reporteOficina.reemplazarEquipoTecnologico));
+router.delete('/reportes/oficina/:id/equipo/:operacionId', asyncHandler(reporteOficina.desasignarEquipoTecnologico));
 
 // Reportes de Semáforos
 router.get('/reportes/semaforo/resumen', asyncHandler(reporteSemaforo.resumen));
