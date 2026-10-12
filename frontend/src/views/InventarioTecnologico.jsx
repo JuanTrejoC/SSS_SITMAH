@@ -9,10 +9,11 @@ import {
   FaLaptop, FaPlus, FaEdit, FaTrashAlt, FaLink, FaUnlink,
   FaChevronLeft, FaChevronRight, FaTimes, FaDesktop, FaMobileAlt, FaNetworkWired,
   FaServer, FaShieldAlt, FaWifi, FaVideo, FaHdd, FaBroadcastTower, FaPrint, FaTv, FaMemory,
-  FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone, FaFilePdf, FaFileExcel, FaPlug, FaTabletAlt,
+  FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone, FaFilePdf, FaFileExcel, FaFileWord, FaPlug, FaTabletAlt,
   FaCogs, FaBoxes, FaTools, FaWrench, FaCheckCircle, FaExclamationTriangle, FaExclamationCircle,
   FaMapMarkerAlt, FaSearch
 } from 'react-icons/fa';
+import { generarResguardoDocx } from '../utils/resguardoDocx';
 
 const TIPOS_EQUIPO = [
   { value: 'escritorio', label: 'Escritorio', icon: FaDesktop, group: 'Computadoras' },
@@ -798,6 +799,110 @@ export default function InventarioTecnologico() {
     } catch (err) {
       console.error('Error al generar ficha individual PDF:', err);
       Swal.fire('Error', 'No se pudo generar la ficha técnica en PDF', 'error');
+    }
+  };
+
+  const exportarResguardoWord = async (item) => {
+    try {
+      const resp = (item.responsable || '').trim();
+      let nombreParaDoc = resp;
+      let cargoParaDoc = item.cargoResponsable || '';
+      let direccionParaDoc = item.direccion || item.areaUbicacion || '';
+
+      if (!resp || resp.toUpperCase() === 'N/A') {
+        const { value: nombreManual, isConfirmed } = await Swal.fire({
+          title: 'Equipo sin Responsable Asignado',
+          text: 'Este equipo no tiene un responsable registrado en inventario. Puedes escribir el nombre para el resguardo o continuar en blanco para firmar a mano:',
+          input: 'text',
+          inputPlaceholder: 'Nombre completo del resguardante...',
+          showCancelButton: true,
+          confirmButtonText: 'Generar Word',
+          cancelButtonText: 'Cancelar',
+          confirmButtonColor: '#1d4ed8',
+          cancelButtonColor: '#64748b'
+        });
+
+        if (!isConfirmed) return;
+        nombreParaDoc = (nombreManual || '').trim();
+      }
+
+      Swal.fire({
+        title: 'Generando Word de Resguardo...',
+        text: 'Por favor espere un momento.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
+      const tipoMeta = TIPOS_EQUIPO.find(t => t.value === item.tipo);
+      const tipoLabel = tipoMeta?.label || (item.tipo ? item.tipo.replace(/_/g, ' ') : 'EQUIPO TECNOLÓGICO');
+      const tituloBien = `${tipoLabel} ${item.marca || ''} ${item.modelo || ''}`.replace(/\s+/g, ' ').trim().toUpperCase();
+
+      const lineasDetalle = [];
+      lineasDetalle.push(`${tipoLabel} MARCA ${item.marca || 'S/M'}, MODELO ${item.modelo || 'S/M'}`);
+      if (item.numeroInventario) {
+        lineasDetalle.push(`No. Inventario: ${item.numeroInventario}`);
+      }
+      if (item.areaUbicacion) {
+        lineasDetalle.push(`Ubicación: ${item.areaUbicacion}`);
+      }
+
+      if (item.detalles && typeof item.detalles === 'object') {
+        const specs = [];
+        if (item.detalles.procesador) specs.push(`Procesador: ${item.detalles.procesador}`);
+        if (item.detalles.ram) specs.push(`RAM: ${item.detalles.ram}`);
+        if (item.detalles.almacenamiento) {
+          specs.push(`Almacenamiento: ${item.detalles.almacenamiento}${item.detalles.tipoAlmacenamiento ? ` (${item.detalles.tipoAlmacenamiento})` : ''}`);
+        }
+        if (item.detalles.sistemaOperativo) specs.push(`SO: ${item.detalles.sistemaOperativo}`);
+        if (specs.length > 0) lineasDetalle.push(specs.join(' | '));
+
+        const perif = [];
+        if (item.detalles.monitores && Array.isArray(item.detalles.monitores) && item.detalles.monitores.length > 0) {
+          item.detalles.monitores.forEach((m, idx) => {
+            perif.push(`Monitor #${idx + 1}: ${m.marca || ''} ${m.modelo || ''} (S/N: ${m.serie || m.numeroSerie || 'S/S'})`.trim());
+          });
+        }
+        if (item.detalles.teclado && (item.detalles.teclado.marca || item.detalles.teclado.serie || item.detalles.teclado.numeroInventario)) {
+          perif.push(`Teclado: ${item.detalles.teclado.marca || ''} ${item.detalles.teclado.modelo || ''} (S/N: ${item.detalles.teclado.serie || 'S/S'})`.trim());
+        }
+        if (item.detalles.mouse && (item.detalles.mouse.marca || item.detalles.mouse.serie || item.detalles.mouse.numeroInventario)) {
+          perif.push(`Mouse: ${item.detalles.mouse.marca || ''} ${item.detalles.mouse.modelo || ''} (S/N: ${item.detalles.mouse.serie || 'S/S'})`.trim());
+        }
+        if (item.detalles.regulador && (item.detalles.regulador.marca || item.detalles.regulador.serie || item.detalles.regulador.numeroInventario)) {
+          perif.push(`No Break / Regulador: ${item.detalles.regulador.marca || ''} ${item.detalles.regulador.modelo || ''} (S/N: ${item.detalles.regulador.serie || 'S/S'})`.trim());
+        }
+        if (perif.length > 0) {
+          lineasDetalle.push(`Periféricos asociados:\n  • ${perif.join('\n  • ')}`);
+        }
+      }
+
+      if (item.componentes && Array.isArray(item.componentes) && item.componentes.length > 0) {
+        const compLineas = item.componentes.map(c => 
+          `${c.tipo}: ${c.marca || ''} ${c.modelo || ''} (Inv: ${c.numeroInventario || 'S/N'}, Serie: ${c.numeroSerie || 'S/S'})`
+        );
+        lineasDetalle.push(`Componentes vinculados:\n  • ${compLineas.join('\n  • ')}`);
+      }
+
+      if (item.observaciones) {
+        lineasDetalle.push(`Observaciones: ${item.observaciones}`);
+      }
+
+      const resguardoPayload = {
+        ...item,
+        nombreResguardante: nombreParaDoc,
+        cargo: cargoParaDoc,
+        direccion: direccionParaDoc,
+        tipoInventario: 'tecnologico',
+        descripcionPdf: `${tituloBien}\n\n${lineasDetalle.join('\n')}`,
+        numeroSeriePdf: item.numeroSerie || 'S/S',
+        fechaPrestamo: item.createdAt || new Date()
+      };
+
+      await generarResguardoDocx(resguardoPayload);
+      Swal.close();
+    } catch (err) {
+      console.error('Error al generar Word de resguardo:', err);
+      Swal.fire('Error Word', err.message || 'Error al exportar a Word', 'error');
     }
   };
 
@@ -1914,6 +2019,26 @@ export default function InventarioTecnologico() {
                             <FaLink size={16} />
                           </button>
                         )}
+                        <button
+                          onClick={() => exportarResguardoWord(item)}
+                          title="Generar Word de Resguardo (.docx)"
+                          style={{
+                            backgroundColor: '#eff6ff',
+                            border: '1px solid #bfdbfe',
+                            color: '#1d4ed8',
+                            cursor: 'pointer',
+                            padding: '0.5rem',
+                            borderRadius: '6px',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#dbeafe'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#eff6ff'}
+                        >
+                          <FaFileWord size={16} />
+                        </button>
                         <button onClick={() => handleEditar(item)} title="Editar" style={{ backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }}>
                           <FaEdit size={16} />
                         </button>

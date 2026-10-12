@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
-import { FaChair, FaPlus, FaEdit, FaTrashAlt, FaChevronLeft, FaChevronRight, FaTimes, FaFileExcel } from 'react-icons/fa';
+import { FaChair, FaPlus, FaEdit, FaTrashAlt, FaChevronLeft, FaChevronRight, FaTimes, FaFileExcel, FaFileWord } from 'react-icons/fa';
+import { generarResguardoDocx } from '../utils/resguardoDocx';
 
 export default function InventarioMobiliario() {
   const { user } = useAuth();
@@ -107,6 +108,44 @@ export default function InventarioMobiliario() {
     } catch (err) {
       console.error('Error exportando a Excel:', err);
       Swal.fire('Error', 'Error al exportar a Excel', 'error');
+    }
+  };
+
+  const exportarResguardoWord = async (item) => {
+    try {
+      Swal.fire({
+        title: 'Generando Word de Resguardo...',
+        text: 'Por favor espere un momento.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
+      const tituloBien = (item.bien || 'MOBILIARIO').toUpperCase();
+      const lineasDetalle = [];
+      if (item.marca || item.modelo) {
+        lineasDetalle.push(`MARCA ${item.marca || 'S/M'}, MODELO ${item.modelo || 'S/M'}`);
+      }
+      if (item.numeroInventario) {
+        lineasDetalle.push(`No. de Inventario: ${item.numeroInventario}`);
+      }
+      if (item.descripcion) {
+        lineasDetalle.push(item.descripcion);
+      }
+
+      await generarResguardoDocx({
+        ...item,
+        nombreResguardante: item.nombreResguardante,
+        cargo: item.cargo,
+        direccion: item.direccion,
+        tipoInventario: 'mobiliario',
+        descripcionPdf: `${tituloBien}\n\n${lineasDetalle.join('\n')}`,
+        numeroSeriePdf: item.numeroSerie || 'S/S',
+        fechaPrestamo: item.createdAt || new Date()
+      });
+      Swal.close();
+    } catch (err) {
+      console.error('Error al generar Word de resguardo mobiliario:', err);
+      Swal.fire('Error Word', err.message || 'Error al exportar a Word', 'error');
     }
   };
   
@@ -279,6 +318,9 @@ export default function InventarioMobiliario() {
                   {m.direccion && <><br/><span style={{ fontSize: '0.75rem', color: '#BC955B' }}>{m.direccion}</span></>}
                 </td>
                 <td style={{ padding: '1rem', textAlign: 'center' }}>
+                  <button onClick={() => exportarResguardoWord(m)} title="Generar Word de Resguardo (.docx)" style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', marginRight: '0.5rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <FaFileWord size={16} />
+                  </button>
                   <button onClick={() => handleEditar(m)} style={{ background: 'none', border: 'none', color: '#0ea5e9', cursor: 'pointer', marginRight: '0.5rem' }}>
                     <FaEdit size={18} />
                   </button>

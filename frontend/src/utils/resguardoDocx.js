@@ -42,6 +42,7 @@ export async function generarResguardoDocx(resguardo) {
   // Extraer datos de resguardante, cargo y dirección
   const nombreResguardante = (
     resguardo.nombreResguardante ||
+    resguardo.responsable ||
     resguardo.mobiliario?.nombreResguardante ||
     resguardo.equipoTecnologico?.responsable ||
     resguardo.existencia?.responsable ||
@@ -50,6 +51,7 @@ export async function generarResguardoDocx(resguardo) {
 
   const cargo = (
     resguardo.cargo ||
+    resguardo.cargoResponsable ||
     resguardo.mobiliario?.cargo ||
     resguardo.equipoTecnologico?.cargoResponsable ||
     resguardo.existencia?.cargoResponsable ||
@@ -59,6 +61,7 @@ export async function generarResguardoDocx(resguardo) {
   const direccion = (
     resguardo.direccion ||
     resguardo.area ||
+    resguardo.areaUbicacion ||
     resguardo.mobiliario?.direccion ||
     resguardo.equipoTecnologico?.direccion ||
     resguardo.equipoTecnologico?.areaUbicacion ||
@@ -71,22 +74,31 @@ export async function generarResguardoDocx(resguardo) {
   let tituloBien = '';
   let detalleDesc = '';
 
-  const rawDesc = (resguardo.descripcionPdf || resguardo.observaciones || '').trim();
+  const rawDesc = (resguardo.descripcionPdf || resguardo.descripcion || resguardo.observaciones || '').trim();
 
   if (rawDesc.includes('\n')) {
     const partes = rawDesc.split('\n').map(p => p.trim()).filter(Boolean);
     tituloBien = partes[0] || '';
-    detalleDesc = partes.slice(1).join(' ');
+    detalleDesc = partes.slice(1).join('\n');
   } else if (rawDesc) {
-    if (resguardo.tipoInventario === 'mobiliario' && resguardo.mobiliario?.bien) {
-      tituloBien = resguardo.mobiliario.bien.toUpperCase();
+    if ((resguardo.tipoInventario === 'mobiliario' || resguardo.bien) && (resguardo.mobiliario?.bien || resguardo.bien)) {
+      tituloBien = (resguardo.mobiliario?.bien || resguardo.bien).toUpperCase();
       detalleDesc = rawDesc;
-    } else if (resguardo.tipoInventario === 'tecnologico' && resguardo.equipoTecnologico?.tipo) {
-      tituloBien = `${resguardo.equipoTecnologico.tipo} ${resguardo.equipoTecnologico.marca || ''} ${resguardo.equipoTecnologico.modelo || ''}`.toUpperCase().trim();
+    } else if ((resguardo.tipoInventario === 'tecnologico' || resguardo.tipo) && (resguardo.equipoTecnologico?.tipo || resguardo.tipo)) {
+      const tipo = resguardo.equipoTecnologico?.tipo || resguardo.tipo;
+      const marca = resguardo.equipoTecnologico?.marca || resguardo.marca || '';
+      const modelo = resguardo.equipoTecnologico?.modelo || resguardo.modelo || '';
+      tituloBien = `${tipo.replace(/_/g, ' ')} ${marca} ${modelo}`.toUpperCase().trim();
       detalleDesc = rawDesc;
     } else {
       tituloBien = rawDesc;
     }
+  } else if (resguardo.bien) {
+    tituloBien = resguardo.bien.toUpperCase();
+    detalleDesc = `MARCA ${resguardo.marca || 'S/M'}, MODELO ${resguardo.modelo || 'S/M'}${resguardo.numeroInventario ? `, NO. INVENTARIO: ${resguardo.numeroInventario}` : ''}`;
+  } else if (resguardo.tipo) {
+    tituloBien = `${resguardo.tipo.replace(/_/g, ' ')} ${resguardo.marca || ''} ${resguardo.modelo || ''}`.toUpperCase().trim();
+    detalleDesc = `${resguardo.tipo.replace(/_/g, ' ')} MARCA ${resguardo.marca || 'S/M'}, MODELO ${resguardo.modelo || 'S/M'}${resguardo.numeroInventario ? `, NO. INVENTARIO: ${resguardo.numeroInventario}` : ''}`;
   } else {
     tituloBien = 'BIEN EN RESGUARDO';
   }
@@ -110,19 +122,22 @@ export async function generarResguardoDocx(resguardo) {
     );
   }
   if (detalleDesc) {
-    descripcionParagraphs.push(
-      new Paragraph({
-        spacing: { before: 0, after: 0 },
-        children: [
-          new TextRun({
-            text: detalleDesc,
-            font: 'Arial',
-            size: 19, // ~9.5pt
-            color: '000000'
-          })
-        ]
-      })
-    );
+    const lineas = detalleDesc.split('\n').map(l => l.trim()).filter(Boolean);
+    lineas.forEach((linea, index) => {
+      descripcionParagraphs.push(
+        new Paragraph({
+          spacing: { before: 0, after: index === lineas.length - 1 ? 0 : 60 },
+          children: [
+            new TextRun({
+              text: linea,
+              font: 'Arial',
+              size: 19, // ~9.5pt
+              color: '000000'
+            })
+          ]
+        })
+      );
+    });
   }
 
   const leyendaLinea1 = 'ESTE DISPOSITIVO SE DESTINA EXCLUSIVAMENTE A ACTIVIDADES LABORALES DE ENCIERRO. EN CASO DE DAÑO, EL USUARIO SERÁ RESPONSABLE DE SU REPOSICIÓN TOTAL, CUBRIENDO EL 100% DEL COSTO.';
