@@ -37,7 +37,8 @@ export async function generarResguardoDocx(resguardo) {
     console.warn('No se pudo cargar el logo de cabecera para Word', e);
   }
 
-  const fechaTexto = formatearFechaEspanol(resguardo.fechaPrestamo);
+  // La fecha del documento de resguardo debe ser la fecha en que se genera o descarga
+  const fechaTexto = formatearFechaEspanol(new Date());
 
   // Extraer datos de resguardante, cargo y dirección
   const nombreResguardante = (

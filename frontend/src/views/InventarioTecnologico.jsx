@@ -14,6 +14,7 @@ import {
   FaMapMarkerAlt, FaSearch
 } from 'react-icons/fa';
 import { generarResguardoDocx } from '../utils/resguardoDocx';
+import { registrarResguardo } from '../utils/registrarResguardo';
 import { buscarPersonalSitmah, PERSONAL_SITMAH, CARGOS_NORMALIZADOS, DIRECCIONES_SITMAH } from '../data/personalSitmah';
 import PersonalAutocomplete from '../components/PersonalAutocomplete';
 
@@ -813,19 +814,19 @@ export default function InventarioTecnologico() {
 
       if (!resp || resp.toUpperCase() === 'N/A') {
         const { value: nombreManual, isConfirmed } = await Swal.fire({
-          title: 'Equipo sin Responsable Asignado',
-          text: 'Este equipo no tiene un responsable registrado en inventario. Puedes escribir el nombre para el resguardo o continuar en blanco para firmar a mano:',
+          title: 'Asignar Nombre para el Resguardo',
+          text: `El equipo "${item.tipo || 'Equipo'} - ${item.marca || ''}" está Activo. Ingresa el nombre de la persona que lo resguarda o continúa para firmar a mano:`,
           input: 'text',
           inputPlaceholder: 'Nombre completo del resguardante...',
           showCancelButton: true,
-          confirmButtonText: 'Generar Word',
+          confirmButtonText: 'Generar y Registrar',
           cancelButtonText: 'Cancelar',
           confirmButtonColor: '#1d4ed8',
           cancelButtonColor: '#64748b'
         });
 
         if (!isConfirmed) return;
-        nombreParaDoc = (nombreManual || '').trim();
+        nombreParaDoc = (nombreManual || '').trim() || (item.areaUbicacion ? `Responsable ${item.areaUbicacion}` : 'Por Asignar');
       }
 
       Swal.fire({
@@ -891,17 +892,24 @@ export default function InventarioTecnologico() {
 
       const resguardoPayload = {
         ...item,
-        nombreResguardante: nombreParaDoc,
-        cargo: cargoParaDoc,
-        direccion: direccionParaDoc,
+        nombreResguardante: nombreParaDoc || (item.areaUbicacion ? `Responsable ${item.areaUbicacion}` : 'Por Asignar'),
+        cargo: cargoParaDoc || (item.areaUbicacion ? 'Responsable de Ubicación' : ''),
+        direccion: direccionParaDoc || 'Operación SITMAH',
         tipoInventario: 'tecnologico',
         descripcionPdf: `${tituloBien}\n\n${lineasDetalle.join('\n')}`,
         numeroSeriePdf: item.numeroSerie || 'S/S',
-        fechaPrestamo: item.createdAt || new Date()
+        fechaPrestamo: new Date()
       };
 
       await generarResguardoDocx(resguardoPayload);
-      Swal.close();
+      await registrarResguardo(user?.token, { ...resguardoPayload, itemId: item.id });
+      Swal.fire({
+        icon: 'success',
+        title: 'Word generado y Resguardo registrado',
+        text: 'El documento se descargó y ya aparece en el módulo de Resguardos listo para subir su imagen firmada.',
+        timer: 2500,
+        showConfirmButton: false
+      });
     } catch (err) {
       console.error('Error al generar Word de resguardo:', err);
       Swal.fire('Error Word', err.message || 'Error al exportar a Word', 'error');
@@ -2021,26 +2029,28 @@ export default function InventarioTecnologico() {
                             <FaLink size={16} />
                           </button>
                         )}
-                        <button
-                          onClick={() => exportarResguardoWord(item)}
-                          title="Generar Word de Resguardo (.docx)"
-                          style={{
-                            backgroundColor: '#eff6ff',
-                            border: '1px solid #bfdbfe',
-                            color: '#1d4ed8',
-                            cursor: 'pointer',
-                            padding: '0.5rem',
-                            borderRadius: '6px',
-                            transition: 'all 0.2s',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#dbeafe'}
-                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#eff6ff'}
-                        >
-                          <FaFileWord size={16} />
-                        </button>
+                        {item.estatus === 'Activo' && (
+                          <button
+                            onClick={() => exportarResguardoWord(item)}
+                            title="Generar Word de Resguardo (.docx)"
+                            style={{
+                              backgroundColor: '#eff6ff',
+                              border: '1px solid #bfdbfe',
+                              color: '#1d4ed8',
+                              cursor: 'pointer',
+                              padding: '0.5rem',
+                              borderRadius: '6px',
+                              transition: 'all 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#dbeafe'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#eff6ff'}
+                          >
+                            <FaFileWord size={16} />
+                          </button>
+                        )}
                         <button onClick={() => handleEditar(item)} title="Editar" style={{ backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }}>
                           <FaEdit size={16} />
                         </button>

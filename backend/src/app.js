@@ -18,7 +18,10 @@ const resguardoRoutes = require('./routes/resguardoRoutes');
 const app = express();
 
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' }
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginEmbedderPolicy: false,
+  xFrameOptions: false,
+  contentSecurityPolicy: false
 }));
 const allowedOrigins = [
   'https://stm-solicitudes.tuzobus.gob.mx',

@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   FaClipboardCheck, FaPlus, FaSearch, FaFileWord, FaCheck,
-  FaCouch, FaDesktop, FaTrafficLight, FaChevronDown, FaTimes
+  FaCouch, FaDesktop, FaTrafficLight, FaChevronDown, FaTimes, FaUpload,
+  FaDownload, FaUndo, FaTrashAlt, FaExchangeAlt, FaFilePdf
 } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
@@ -436,6 +437,10 @@ function Resguardos() {
   const [cargos, setCargos] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
+  const [filtroFirma, setFiltroFirma] = useState('todos');
+  const [subiendoId, setSubiendoId] = useState(null);
+  const inputFirmadoRef = useRef(null);
+  const resguardoSubirRef = useRef(null);
   
   const [modalAbierto, setModalAbierto] = useState(false);
   
@@ -765,15 +770,26 @@ function Resguardos() {
     }
   };
 
-  const marcarDevuelto = async (id) => {
+  const marcarDevuelto = async (id, itemNombre) => {
     const confirm = await Swal.fire({
-      title: '¿Marcar como devuelto?',
-      text: 'El equipo regresará a estar disponible y el resguardo pasará a historial.',
+      title: '¿Regresar a Stock?',
+      html: `
+        <div style="font-size: 0.95rem; color: #475569; text-align: left; line-height: 1.5;">
+          ${itemNombre ? `<p style="margin-bottom: 0.5rem;"><strong>Bien:</strong> ${itemNombre}</p>` : ''}
+          <div style="margin-top: 0.5rem; color: #166534; background: #dcfce7; padding: 0.65rem; border-radius: 8px; border: 1px solid #bbf7d0;">
+            ✔ El equipo regresará <strong>automáticamente a Stock</strong> en el inventario y se liberará su asignación.
+          </div>
+          <p style="margin-top: 0.65rem; font-size: 0.85rem; color: #64748b;">
+            El resguardo cambiará a estado <strong>Devuelto</strong> en el historial.
+          </p>
+        </div>
+      `,
       icon: 'question',
       showCancelButton: true,
-      confirmButtonText: 'Sí, devuelto',
+      confirmButtonText: 'Sí, regresar a Stock',
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#691B31'
+      confirmButtonColor: '#166534',
+      cancelButtonColor: '#64748b'
     });
 
     if (confirm.isConfirmed) {
@@ -790,11 +806,19 @@ function Resguardos() {
         });
         const data = await res.json();
         if (data.ok) {
-          Swal.fire('Actualizado', 'Resguardo marcado como devuelto', 'success');
+          Swal.fire({
+            icon: 'success',
+            title: 'Equipo devuelto a Stock',
+            text: 'El equipo ahora está disponible en Stock y el resguardo quedó registrado como devuelto.',
+            timer: 2000,
+            showConfirmButton: false
+          });
           cargarResguardos();
+        } else {
+          Swal.fire('Error', data.message || 'Ocurrió un problema', 'error');
         }
-      } catch {
-        Swal.fire('Error', 'Ocurrió un problema', 'error');
+      } catch (err) {
+        Swal.fire('Error', 'Ocurrió un problema: ' + err.message, 'error');
       }
     }
   };
@@ -808,10 +832,17 @@ function Resguardos() {
   };
 
   const resguardosFiltrados = useMemo(() => {
-    if (!busqueda.trim()) return resguardos;
+    const base = resguardos.filter(r =>
+      filtroFirma === 'firmados' ? !!r.archivoFirmado : filtroFirma === 'pendientes' ? !r.archivoFirmado : true
+    );
+    if (!busqueda.trim()) return base;
     const term = busqueda.toLowerCase().trim();
 
-    return resguardos.filter(r => {
+    return base.filter(r => {
+
+
+
+
       const nombreItem = getNombreItem(r).toLowerCase();
       const nombre = (r.nombreResguardante || '').toLowerCase();
       const cargo = (r.cargo || '').toLowerCase();
@@ -874,7 +905,111 @@ function Resguardos() {
         semMarca.includes(term)
       );
     });
-  }, [resguardos, busqueda]);
+  }, [resguardos, busqueda, filtroFirma]);
+
+  const tokenUrl = user?.token ? encodeURIComponent(user.token) : '';
+  const urlFirmado = (r) => `${API_BASE_URL}/api/resguardos/${r.id}/firmado?token=${tokenUrl}&v=${r.fechaFirmado ? new Date(r.fechaFirmado).getTime() : 0}`;
+
+  const esPdf = (r) => {
+    return (
+      r?.archivoFirmadoMime === 'application/pdf' ||
+      (r?.archivoFirmado && r.archivoFirmado.toLowerCase().endsWith('.pdf'))
+    );
+  };
+
+  const elegirArchivoFirmado = (id) => {
+    resguardoSubirRef.current = id;
+    inputFirmadoRef.current?.click();
+  };
+
+  const subirFirmado = async (e) => {
+    const archivo = e.target.files?.[0];
+    const id = resguardoSubirRef.current;
+    e.target.value = '';
+    if (!archivo || !id) return;
+
+    const esPdfFile = archivo.type === 'application/pdf' || archivo.name.toLowerCase().endsWith('.pdf');
+    if (!esPdfFile) {
+      return Swal.fire('Solo formato PDF', 'Por favor sube el resguardo firmado en formato PDF (.pdf).', 'warning');
+    }
+    if (archivo.size > 25 * 1024 * 1024) {
+      return Swal.fire('Archivo muy pesado', 'El tamaño máximo permitido es de 25 MB.', 'warning');
+    }
+
+    setSubiendoId(id);
+    try {
+      const fd = new FormData();
+      fd.append('archivo', archivo);
+      const res = await fetch(`${API_BASE_URL}/api/resguardos/${id}/firmado`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${user.token}` },
+        body: fd
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || 'No se pudo subir el archivo PDF');
+      setResguardos(prev => prev.map(r => (r.id === id ? { ...r, ...json.data } : r)));
+      Swal.fire({ icon: 'success', title: 'PDF firmado guardado', timer: 1500, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire('Error', err.message || 'No se pudo subir el archivo', 'error');
+    } finally {
+      setSubiendoId(null);
+    }
+  };
+
+  const eliminarFirmado = async (r) => {
+    const { isConfirmed } = await Swal.fire({
+      title: '¿Quitar el PDF firmado?',
+      text: 'Podrás subir otro documento PDF firmado en cualquier momento.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, quitar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626'
+    });
+    if (!isConfirmed) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/resguardos/${r.id}/firmado`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || 'No se pudo quitar el PDF firmado');
+      setResguardos(prev => prev.map(x => (x.id === r.id ? { ...x, ...json.data } : x)));
+    } catch (err) {
+      Swal.fire('Error', err.message || 'No se pudo quitar el PDF', 'error');
+    }
+  };
+
+  const descargarFirmado = async (r) => {
+    if (!r.archivoFirmado) return;
+    const nombre = (r.nombreResguardante || 'firmado').replace(/\s+/g, '_');
+    const url = `${API_BASE_URL}/api/resguardos/${r.id}/firmado?token=${tokenUrl}&download=1&v=${r.fechaFirmado ? new Date(r.fechaFirmado).getTime() : 0}`;
+
+    try {
+      const res = await fetch(url, {
+        headers: user?.token ? { Authorization: `Bearer ${user.token}` } : {}
+      });
+      if (!res.ok) throw new Error('Error al obtener el archivo');
+      const blob = await res.blob();
+      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+      const blobUrl = window.URL.createObjectURL(pdfBlob);
+
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `Resguardo_Firmado_${nombre}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+    } catch (e) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Resguardo_Firmado_${nombre}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  };
 
   const exportarDocx = async (resguardo) => {
     try {
@@ -918,104 +1053,252 @@ function Resguardos() {
         </button>
       </div>
 
-      <div style={{ backgroundColor: 'white', padding: '1.5rem', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', marginBottom: '2rem' }}>
+      {/* Barra de búsqueda y filtros estilo Inventario */}
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        <input ref={inputFirmadoRef} type="file" accept="application/pdf,.pdf" onChange={subirFirmado} style={{ display: 'none' }} />
         <input 
           type="text" 
-          placeholder="Buscar por dispositivo, no. inventario, nombre o dirección..." 
+          placeholder="Buscar en todos los campos (bien, responsable, inventario, serie, cargo)..." 
           value={busqueda}
           onChange={e => setBusqueda(e.target.value)}
-          style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none', boxSizing: 'border-box', fontSize: '1rem' }}
+          style={{ padding: '0.75rem 1.25rem', border: '1px solid #CBD5E1', borderRadius: '8px', flex: 1, minWidth: '300px', fontSize: '1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', backgroundColor: 'white' }}
         />
+        <div style={{ display: 'flex', gap: '0.35rem', backgroundColor: 'white', padding: '0.35rem', borderRadius: '8px', border: '1px solid #CBD5E1', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+          {[['todos', 'Todos'], ['firmados', 'Con firma'], ['pendientes', 'Sin firma']].map(([valor, etiqueta]) => (
+            <button
+              key={valor}
+              type="button"
+              onClick={() => setFiltroFirma(valor)}
+              style={{
+                padding: '0.45rem 1rem',
+                borderRadius: '6px',
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                border: 'none',
+                backgroundColor: filtroFirma === valor ? '#691B31' : 'transparent',
+                color: filtroFirma === valor ? 'white' : '#64748B',
+                transition: 'all 0.2s'
+              }}
+            >
+              {etiqueta}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div style={{ overflowX: 'auto', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+      <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)', overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '950px' }}>
+          <thead style={{ backgroundColor: '#f1f5f9', color: '#475569', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             <tr>
-              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>DISPOSITIVO / MUEBLE</th>
-              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>TIPO</th>
-              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>NOMBRE DEL RESGUARDANTE</th>
-              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>CARGO</th>
-              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>DIRECCIÓN</th>
-              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>FECHA PRÉSTAMO / DEVOLUCIÓN</th>
-              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600' }}>ESTADO</th>
-              <th style={{ padding: '1rem', color: '#64748B', fontWeight: '600', textAlign: 'center' }}>EXPORTAR / ACCIONES</th>
+              <th style={{ padding: '1.25rem' }}>Tipo</th>
+              <th style={{ padding: '1.25rem' }}>Bien / Equipo</th>
+              <th style={{ padding: '1.25rem' }}>Responsable</th>
+              <th style={{ padding: '1.25rem' }}>Identificación</th>
+              <th style={{ padding: '1.25rem' }}>Fecha</th>
+              <th style={{ padding: '1.25rem', textAlign: 'center' }}>Estatus</th>
+              <th style={{ padding: '1.25rem', textAlign: 'center' }}>Resguardo</th>
+              <th style={{ padding: '1.25rem', textAlign: 'center' }}>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {cargando ? (
-              <tr><td colSpan="8" style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>Cargando...</td></tr>
+              <tr><td colSpan="8" style={{ textAlign: 'center', padding: '3rem', color: '#64748b', fontSize: '1rem' }}>Cargando resguardos...</td></tr>
             ) : resguardosFiltrados.length === 0 ? (
               <tr>
-                <td colSpan="8" style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>
+                <td colSpan="8" style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontSize: '1.05rem' }}>
                   {busqueda.trim() ? 'No se encontraron resguardos que coincidan con la búsqueda.' : 'No hay resguardos registrados.'}
                 </td>
               </tr>
             ) : (
-              resguardosFiltrados.map(r => (
-                <tr key={r.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '1rem', color: '#1e293b', fontWeight: '500' }}>{getNombreItem(r)}</td>
-                  <td style={{ padding: '1rem', color: '#1e293b', textTransform: 'capitalize' }}>{r.tipoInventario}</td>
-                  <td style={{ padding: '1rem', color: '#1e293b', fontWeight: '600' }}>{r.nombreResguardante}</td>
-                  <td style={{ padding: '1rem', color: '#64748b', fontSize: '0.875rem' }}>
-                    {r.cargo ? <span style={{ fontWeight: '600', color: '#BC955B' }}>{r.cargo}</span> : '—'}
-                  </td>
-                  <td style={{ padding: '1rem', color: '#64748b', fontSize: '0.875rem' }}>
-                    {r.direccion || r.area || '—'}
-                  </td>
-                  <td style={{ padding: '1rem', color: '#1e293b' }}>
-                    <div>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>Préstamo: </span>
-                      <span>{new Date(r.fechaPrestamo).toLocaleDateString('es-MX')}</span>
-                    </div>
-                    {r.fechaDevolucion && (
-                      <div style={{ marginTop: '0.25rem' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#0369a1', fontWeight: '600' }}>Devolución: </span>
-                        <span style={{ color: '#0284c7', fontWeight: '500' }}>{new Date(r.fechaDevolucion).toLocaleDateString('es-MX')}</span>
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ padding: '1rem' }}>
-                    <span style={{ padding: '0.25rem 0.75rem', borderRadius: '9999px', fontSize: '0.75rem', fontWeight: '600', backgroundColor: r.estado === 'Activo' ? '#dcfce7' : '#f1f5f9', color: r.estado === 'Activo' ? '#166534' : '#475569' }}>
-                      {r.estado}
-                    </span>
-                  </td>
-                  <td style={{ padding: '1rem', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
-                      {r.estado === 'Activo' && (
-                        <button onClick={() => marcarDevuelto(r.id)} title="Marcar como Devuelto" style={{ background: 'none', border: 'none', color: '#10b981', cursor: 'pointer', padding: '0.4rem' }}>
-                          <FaCheck size={18} />
-                        </button>
+              resguardosFiltrados.map(r => {
+                const nombreItem = getNombreItem(r);
+                const invItem = r.mobiliario?.numeroInventario || r.equipoTecnologico?.numeroInventario || r.existencia?.numeroInventario;
+                const serieItem = r.numeroSeriePdf && r.numeroSeriePdf !== 'S/S' ? r.numeroSeriePdf : (r.mobiliario?.numeroSerie || r.equipoTecnologico?.numeroSerie || r.existencia?.numeroSerie);
+
+                return (
+                  <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#f8fafc'} onMouseOut={e => e.currentTarget.style.backgroundColor = 'transparent'}>
+                    {/* TIPO */}
+                    <td style={{ padding: '1.25rem' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        backgroundColor: '#e0e7ff',
+                        color: '#4338ca',
+                        padding: '0.35rem 0.75rem',
+                        borderRadius: '9999px',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        textTransform: 'capitalize'
+                      }}>
+                        {r.tipoInventario === 'mobiliario' ? <FaCouch size={14} /> : r.tipoInventario === 'tecnologico' ? <FaDesktop size={14} /> : <FaTrafficLight size={14} />}
+                        {r.tipoInventario}
+                      </span>
+                    </td>
+
+                    {/* BIEN / EQUIPO */}
+                    <td style={{ padding: '1.25rem' }}>
+                      <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '0.95rem' }}>{nombreItem}</div>
+                    </td>
+
+                    {/* RESPONSABLE */}
+                    <td style={{ padding: '1.25rem' }}>
+                      <div style={{ fontWeight: '600', color: '#1e293b' }}>{r.nombreResguardante}</div>
+                      {(r.cargo || r.direccion || r.area) && (
+                        <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.15rem' }}>
+                          {r.cargo ? `${r.cargo}${r.direccion ? ` • ${r.direccion}` : ''}` : (r.direccion || r.area)}
+                        </div>
                       )}
-                      <button
-                        title="Exportar a Word (.docx)"
-                        onClick={() => exportarDocx(r)}
-                        style={{
-                          background: '#EFF6FF',
-                          border: '1px solid #BFDBFE',
-                          color: '#1D4ED8',
-                          cursor: 'pointer',
-                          padding: '0.4rem 0.8rem',
-                          borderRadius: '8px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          fontWeight: '700',
-                          fontSize: '0.8rem'
-                        }}
-                      >
-                        <FaFileWord size={16} /> Word
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    </td>
+
+                    {/* IDENTIFICACIÓN */}
+                    <td style={{ padding: '1.25rem' }}>
+                      <div style={{ fontWeight: '600', color: '#1e293b' }}>Inv: {invItem || 'N/A'}</div>
+                      <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.15rem' }}>Serie: {serieItem || 'N/A'}</div>
+                    </td>
+
+                    {/* FECHA */}
+                    <td style={{ padding: '1.25rem', color: '#1e293b' }}>
+                      <div style={{ fontWeight: '500', fontSize: '0.9rem' }}>{new Date(r.fechaPrestamo).toLocaleDateString('es-MX')}</div>
+                      {r.fechaDevolucion && (
+                        <div style={{ fontSize: '0.8rem', color: '#0284c7', marginTop: '0.15rem' }}>
+                          Dev: {new Date(r.fechaDevolucion).toLocaleDateString('es-MX')}
+                        </div>
+                      )}
+                    </td>
+
+                    {/* ESTATUS */}
+                    <td style={{ padding: '1.25rem', textAlign: 'center' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: '9999px',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        backgroundColor: r.estado === 'Activo' ? '#dcfce7' : '#f1f5f9',
+                        color: r.estado === 'Activo' ? '#166534' : '#475569'
+                      }}>
+                        {r.estado || 'Activo'}
+                      </span>
+                    </td>
+
+                    {/* RESGUARDO */}
+                    <td style={{ padding: '1.25rem', textAlign: 'center' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        padding: '0.25rem 0.75rem',
+                        borderRadius: '9999px',
+                        fontSize: '0.82rem',
+                        fontWeight: '600',
+                        backgroundColor: r.archivoFirmado ? '#dcfce7' : '#fef3c7',
+                        color: r.archivoFirmado ? '#166534' : '#92400e'
+                      }}>
+                        <span style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          backgroundColor: r.archivoFirmado ? '#16a34a' : '#d97706'
+                        }} />
+                        {r.archivoFirmado ? 'Firmado' : 'Sin firma'}
+                      </span>
+                    </td>
+
+                    {/* ACCIONES */}
+                    <td style={{ padding: '1.25rem', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', alignItems: 'center' }}>
+                        {/* 1. Icono de PDF para descargar el firmado (solo si ya tiene PDF firmado) */}
+                        {r.archivoFirmado && (
+                          <button
+                            type="button"
+                            onClick={() => descargarFirmado(r)}
+                            title="Descargar resguardo firmado en PDF"
+                            style={{
+                              backgroundColor: '#fee2e2',
+                              border: '1px solid #fecaca',
+                              color: '#dc2626',
+                              cursor: 'pointer',
+                              padding: '0.5rem',
+                              borderRadius: '6px',
+                              transition: 'all 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '34px',
+                              height: '34px'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#fca5a5'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#fee2e2'}
+                          >
+                            <FaFilePdf size={16} />
+                          </button>
+                        )}
+
+                        {/* 2. Icono de + para agregar / subir el PDF ya firmado */}
+                        <button
+                          type="button"
+                          onClick={() => elegirArchivoFirmado(r.id)}
+                          disabled={subiendoId === r.id}
+                          title={r.archivoFirmado ? "Cambiar / actualizar PDF firmado" : "Agregar PDF firmado"}
+                          style={{
+                            backgroundColor: '#fef3c7',
+                            border: '1px solid #fde68a',
+                            color: '#d97706',
+                            cursor: subiendoId === r.id ? 'wait' : 'pointer',
+                            padding: '0.5rem',
+                            borderRadius: '6px',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '34px',
+                            height: '34px'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
+                        >
+                          <FaPlus size={14} />
+                        </button>
+
+                        {/* 3. Icono de devolver equipo (regresar a Stock) */}
+                        {r.estado === 'Activo' && (
+                          <button
+                            type="button"
+                            onClick={() => marcarDevuelto(r.id, nombreItem)}
+                            title="Devolver equipo y regresar automáticamente a Stock"
+                            style={{
+                              backgroundColor: '#dcfce7',
+                              border: '1px solid #bbf7d0',
+                              color: '#16a34a',
+                              cursor: 'pointer',
+                              padding: '0.5rem',
+                              borderRadius: '6px',
+                              transition: 'all 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '34px',
+                              height: '34px'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#bbf7d0'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#dcfce7'}
+                          >
+                            <FaUndo size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
         
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid #e2e8f0' }}>
-          <span style={{ color: '#64748b' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+          <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: '500' }}>
             Mostrando {resguardosFiltrados.length} {resguardosFiltrados.length === 1 ? 'resguardo' : 'resguardos'}
           </span>
         </div>

@@ -18,11 +18,11 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const permitidos = ['image/jpeg', 'image/png', 'image/webp'];
+  const permitidos = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
   if (permitidos.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Solo se permiten imágenes JPEG, PNG o WebP'));
+    cb(new Error('Solo se permiten imágenes (JPEG, PNG, WebP) o documentos PDF'));
   }
 };
 

@@ -432,6 +432,10 @@ model Resguardo {
   estado               String    @default("Activo") @db.VarChar(50) // Activo, Devuelto
   observaciones        String?   @db.Text
 
+  archivoFirmado       String?   @map("archivo_firmado") @db.VarChar(255)
+  archivoFirmadoMime   String?   @map("archivo_firmado_mime") @db.VarChar(100)
+  fechaFirmado         DateTime? @map("fecha_firmado")
+
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 

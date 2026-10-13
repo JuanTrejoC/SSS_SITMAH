@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { FaChair, FaPlus, FaEdit, FaTrashAlt, FaChevronLeft, FaChevronRight, FaTimes, FaFileExcel, FaFileWord } from 'react-icons/fa';
 import { generarResguardoDocx } from '../utils/resguardoDocx';
+import { registrarResguardo } from '../utils/registrarResguardo';
 import PersonalAutocomplete from '../components/PersonalAutocomplete';
 import { CARGOS_NORMALIZADOS, DIRECCIONES_SITMAH } from '../data/personalSitmah';
 
@@ -134,7 +135,7 @@ export default function InventarioMobiliario() {
         lineasDetalle.push(item.descripcion);
       }
 
-      await generarResguardoDocx({
+      const payloadResguardo = {
         ...item,
         nombreResguardante: item.nombreResguardante,
         cargo: item.cargo,
@@ -142,8 +143,11 @@ export default function InventarioMobiliario() {
         tipoInventario: 'mobiliario',
         descripcionPdf: `${tituloBien}\n\n${lineasDetalle.join('\n')}`,
         numeroSeriePdf: item.numeroSerie || 'S/S',
-        fechaPrestamo: item.createdAt || new Date()
-      });
+        fechaPrestamo: new Date()
+      };
+
+      await generarResguardoDocx(payloadResguardo);
+      await registrarResguardo(user?.token, { ...payloadResguardo, itemId: item.id });
       Swal.close();
     } catch (err) {
       console.error('Error al generar Word de resguardo mobiliario:', err);
@@ -320,9 +324,11 @@ export default function InventarioMobiliario() {
                   {m.direccion && <><br/><span style={{ fontSize: '0.75rem', color: '#BC955B' }}>{m.direccion}</span></>}
                 </td>
                 <td style={{ padding: '1rem', textAlign: 'center' }}>
-                  <button onClick={() => exportarResguardoWord(m)} title="Generar Word de Resguardo (.docx)" style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', marginRight: '0.5rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <FaFileWord size={16} />
-                  </button>
+                  {m.nombreResguardante && m.nombreResguardante.trim() !== '' && m.nombreResguardante !== 'N/A' && m.nombreResguardante !== 'S/N' && (
+                    <button onClick={() => exportarResguardoWord(m)} title="Generar Word de Resguardo (.docx)" style={{ background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', cursor: 'pointer', padding: '0.4rem', borderRadius: '6px', marginRight: '0.5rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <FaFileWord size={16} />
+                    </button>
+                  )}
                   <button onClick={() => handleEditar(m)} style={{ background: 'none', border: 'none', color: '#0ea5e9', cursor: 'pointer', marginRight: '0.5rem' }}>
                     <FaEdit size={18} />
                   </button>
