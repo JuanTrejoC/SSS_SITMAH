@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
 import { API_BASE_URL } from '../config'
 import { FaWrench, FaCamera, FaTrashAlt, FaPaperPlane, FaTimes } from 'react-icons/fa'
+import PersonalAutocomplete from '../components/PersonalAutocomplete'
+import { CARGOS_NORMALIZADOS } from '../data/personalSitmah'
 
 export default function FormInfraestructura({ usuarioActual }) {
   const fileInputRef = useRef(null)
@@ -465,26 +467,27 @@ export default function FormInfraestructura({ usuarioActual }) {
                 <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
                   <span>Nombre Completo <span style={{ color: '#DC2626' }}>*</span></span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="Ej. Juan Pérez Trejo"
+                <PersonalAutocomplete
                   value={formData.solicitante}
-                  onChange={(e) => {
-                    const val = soloLetras(e.target.value)
+                  onChange={(val) => {
                     setFormData(prev => ({ ...prev, solicitante: val }))
                     validarCampo('solicitante', val)
                   }}
-                  onBlur={(e) => validarCampo('solicitante', e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    boxSizing: 'border-box',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '8px',
-                    border: errores.solicitante ? '1.5px solid #DC2626' : (valido.solicitante ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
-                    outline: 'none',
-                    fontSize: '0.9rem'
+                  onSelect={(emp) => {
+                    const matchArea = listaAreas.find(a => 
+                      a.nombre.toLowerCase().trim() === (emp.direccion || '').toLowerCase().trim()
+                    );
+                    setFormData(prev => ({
+                      ...prev,
+                      solicitante: emp.nombre,
+                      cargo: emp.cargo || prev.cargo,
+                      area_id: matchArea ? String(matchArea.id) : prev.area_id
+                    }));
+                    if (emp.nombre) validarCampo('solicitante', emp.nombre);
+                    if (emp.cargo) validarCampo('cargo', emp.cargo);
+                    if (matchArea) validarCampo('area_id', String(matchArea.id));
                   }}
+                  placeholder="-- Seleccionar Solicitante --"
                 />
                 {errores.solicitante && <span style={{ color: '#DC2626', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>{errores.solicitante}</span>}
               </div>
@@ -526,10 +529,7 @@ export default function FormInfraestructura({ usuarioActual }) {
                 <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
                   <span>Cargo  <span style={{ color: '#DC2626' }}>*</span></span>
                 </label>
-                <input
-                  type="text"
-                  list="cargos-list"
-                  placeholder="Ej. Supervisor de Estaciones"
+                <select
                   value={formData.cargo}
                   onChange={(e) => {
                     setFormData(prev => ({ ...prev, cargo: e.target.value }))
@@ -544,12 +544,15 @@ export default function FormInfraestructura({ usuarioActual }) {
                     borderRadius: '8px',
                     border: errores.cargo ? '1.5px solid #DC2626' : (valido.cargo ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
                     outline: 'none',
-                    fontSize: '0.9rem'
+                    fontSize: '0.9rem',
+                    backgroundColor: 'white'
                   }}
-                />
-                <datalist id="cargos-list">
-                  {listaCargos.map(c => <option key={c.id} value={c.nombre} />)}
-                </datalist>
+                >
+                  <option value="">-- Seleccionar Cargo --</option>
+                  {CARGOS_NORMALIZADOS.map((cargo, idx) => (
+                    <option key={idx} value={cargo}>{cargo}</option>
+                  ))}
+                </select>
                 {errores.cargo && <span style={{ color: '#DC2626', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>{errores.cargo}</span>}
               </div>
 

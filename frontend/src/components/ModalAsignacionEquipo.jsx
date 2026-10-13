@@ -4,6 +4,8 @@ import { FaLaptop, FaUser, FaBuilding, FaLink, FaTimes, FaSave } from 'react-ico
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import SearchableSelect from './SearchableSelect';
+import PersonalAutocomplete from './PersonalAutocomplete';
+import { CARGOS_NORMALIZADOS, DIRECCIONES_SITMAH } from '../data/personalSitmah';
 
 export default function ModalAsignacionEquipo({ isOpen, onClose, reporteId, onSuccess }) {
   const { user } = useAuth();
@@ -157,22 +159,43 @@ export default function ModalAsignacionEquipo({ isOpen, onClose, reporteId, onSu
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}><FaUser /> Responsable</label>
-                <input 
-                  type="text" 
-                  value={form.responsable} 
-                  onChange={e => setForm({...form, responsable: e.target.value})} 
-                  placeholder="Nombre de la persona"
-                  style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #CBD5E1', outline: 'none' }}
+                <PersonalAutocomplete
+                  value={form.responsable}
+                  onChange={val => setForm(prev => ({ ...prev, responsable: val }))}
+                  onSelect={emp => {
+                    setForm(prev => ({
+                      ...prev,
+                      responsable: emp.nombre,
+                      cargoResponsable: emp.cargo || prev.cargoResponsable,
+                      direccion: emp.direccion || prev.direccion
+                    }));
+                  }}
+                  placeholder="-- Seleccionar Responsable --"
                 />
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}>Cargo del Responsable</label>
-                <SearchableSelect 
+                <select
                   value={form.cargoResponsable}
-                  onChange={(val) => setForm({...form, cargoResponsable: val})}
-                  placeholder="Ej. Director, Analista..."
-                  options={[{value: '', label: '-- Seleccionar --'}, ...cargosList.map(c => ({ value: c, label: c, searchTerms: [c] }))]}
-                />
+                  onChange={e => setForm(prev => ({ ...prev, cargoResponsable: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '0.95rem',
+                    color: '#1E293B',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                    minHeight: '45px',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <option value="">-- Seleccionar Cargo --</option>
+                  {CARGOS_NORMALIZADOS.map((c, idx) => (
+                    <option key={idx} value={c}>{c}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}><FaBuilding /> Ubicación / Sede</label>
@@ -184,13 +207,28 @@ export default function ModalAsignacionEquipo({ isOpen, onClose, reporteId, onSu
                 />
               </div>
               <div>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}>Área</label>
-                <SearchableSelect 
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#475569', marginBottom: '0.5rem' }}>Área (Dirección)</label>
+                <select
                   value={form.direccion}
-                  onChange={(val) => setForm({...form, direccion: val})}
-                  placeholder="Ej. Recursos Humanos"
-                  options={[{value: '', label: '-- Seleccionar --'}, ...areasList.map(a => ({ value: a, label: a, searchTerms: [a] }))]}
-                />
+                  onChange={e => setForm(prev => ({ ...prev, direccion: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    fontSize: '0.95rem',
+                    color: '#1E293B',
+                    backgroundColor: 'white',
+                    outline: 'none',
+                    minHeight: '45px',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <option value="">-- Seleccionar Área --</option>
+                  {DIRECCIONES_SITMAH.map((dir, idx) => (
+                    <option key={idx} value={dir}>{dir}</option>
+                  ))}
+                </select>
               </div>
             </div>
 

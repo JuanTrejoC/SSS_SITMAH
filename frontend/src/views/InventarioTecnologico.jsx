@@ -15,6 +15,7 @@ import {
 } from 'react-icons/fa';
 import { generarResguardoDocx } from '../utils/resguardoDocx';
 import { buscarPersonalSitmah, PERSONAL_SITMAH, CARGOS_NORMALIZADOS, DIRECCIONES_SITMAH } from '../data/personalSitmah';
+import PersonalAutocomplete from '../components/PersonalAutocomplete';
 
 const TIPOS_EQUIPO = [
   { value: 'escritorio', label: 'Escritorio', icon: FaDesktop, group: 'Computadoras' },
@@ -2201,7 +2202,7 @@ export default function InventarioTecnologico() {
                           required
                         >
                           <option value="">-- Seleccionar Área --</option>
-                          {[...new Set([...DIRECCIONES_SITMAH, ...areasList])].map(a => (
+                          {DIRECCIONES_SITMAH.map(a => (
                             <option key={a} value={a}>{a}</option>
                           ))}
                         </select>
@@ -2320,32 +2321,20 @@ export default function InventarioTecnologico() {
                     {/* Campos Responsable (Para todos los equipos) */}
                     <div>
                       <label style={labelStyle}>Responsable del equipo</label>
-                      <input
-                        type="text"
+                      <PersonalAutocomplete
                         value={form.responsable}
-                        onChange={e => {
-                          const val = e.target.value;
-                          const match = buscarPersonalSitmah(val);
-                          if (match) {
-                            setForm({
-                              ...form,
-                              responsable: val,
-                              cargoResponsable: match.cargo,
-                              direccion: match.direccion
-                            });
-                          } else {
-                            setForm({ ...form, responsable: val });
-                          }
+                        onChange={val => setForm(prev => ({ ...prev, responsable: val }))}
+                        onSelect={emp => {
+                          setForm(prev => ({
+                            ...prev,
+                            responsable: emp.nombre,
+                            cargoResponsable: emp.cargo || prev.cargoResponsable,
+                            direccion: emp.direccion || prev.direccion
+                          }));
                         }}
                         style={inputStyle}
-                        list="personal-sitmah-list"
                         placeholder="Escribe o selecciona un responsable..."
                       />
-                      <datalist id="personal-sitmah-list">
-                        {PERSONAL_SITMAH.map(p => (
-                          <option key={p.nombre} value={p.nombre}>{p.cargo} — {p.direccion}</option>
-                        ))}
-                      </datalist>
                     </div>
                     <div>
                       <label style={labelStyle}>Cargo del responsable</label>
@@ -2355,7 +2344,7 @@ export default function InventarioTecnologico() {
                         style={{ ...inputStyle, cursor: 'pointer' }}
                       >
                         <option value="">-- Seleccionar Cargo --</option>
-                        {[...new Set([...CARGOS_NORMALIZADOS, ...cargosList])].map(c => (
+                        {CARGOS_NORMALIZADOS.map(c => (
                           <option key={c} value={c}>{c}</option>
                         ))}
                       </select>

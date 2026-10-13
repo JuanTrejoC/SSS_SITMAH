@@ -6,6 +6,8 @@ import {
 import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
 import { generarResguardoDocx } from '../utils/resguardoDocx';
+import PersonalAutocomplete from '../components/PersonalAutocomplete';
+import { CARGOS_NORMALIZADOS, DIRECCIONES_SITMAH } from '../data/personalSitmah';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -1073,27 +1075,25 @@ function Resguardos() {
                   />
                 </div>
 
-                {/* 1. Primero: Nombre del Resguardante (con autocompletado inteligente de cargo y dirección) */}
+                {/* 1. Primero: Nombre del Resguardante */}
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>
                     1. Nombre del Resguardante *
                   </label>
-                  <input
-                    required
-                    type="text"
-                    list="lista-personas-resguardantes"
+                  <PersonalAutocomplete
                     value={form.nombreResguardante}
-                    onChange={e => handleNombreResguardanteChange(e.target.value)}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }}
-                    placeholder="Escriba o seleccione el nombre del resguardante"
+                    onChange={val => setForm(prev => ({ ...prev, nombreResguardante: val }))}
+                    onSelect={emp => {
+                      setForm(prev => ({
+                        ...prev,
+                        nombreResguardante: emp.nombre,
+                        cargo: emp.cargo || prev.cargo,
+                        direccion: emp.direccion || prev.direccion,
+                        area: emp.direccion || prev.area
+                      }));
+                    }}
+                    placeholder="-- Seleccionar Resguardante --"
                   />
-                  <datalist id="lista-personas-resguardantes">
-                    {personasConocidas.map((p, idx) => (
-                      <option key={idx} value={p.nombre}>
-                        {p.cargo ? `${p.cargo} — ${p.direccion || ''}` : p.direccion || ''}
-                      </option>
-                    ))}
-                  </datalist>
                 </div>
 
                 {/* 2. Segundo: Cargo */}
@@ -1101,17 +1101,16 @@ function Resguardos() {
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>
                     2. Cargo
                   </label>
-                  <input
-                    type="text"
-                    list="lista-cargos-resguardo"
+                  <select
                     value={form.cargo}
-                    onChange={e => setForm({...form, cargo: e.target.value})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }}
-                    placeholder="Cargo del resguardante"
-                  />
-                  <datalist id="lista-cargos-resguardo">
-                    {cargos.map(c => <option key={c.id} value={c.nombre} />)}
-                  </datalist>
+                    onChange={e => setForm({ ...form, cargo: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', backgroundColor: 'white', cursor: 'pointer', minHeight: '45px', fontSize: '0.95rem' }}
+                  >
+                    <option value="">-- Seleccionar Cargo --</option>
+                    {CARGOS_NORMALIZADOS.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* 3. Tercero: Dirección */}
@@ -1119,17 +1118,16 @@ function Resguardos() {
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>
                     3. Dirección
                   </label>
-                  <input
-                    type="text"
-                    list="lista-direcciones-resguardo"
+                  <select
                     value={form.direccion}
-                    onChange={e => setForm({...form, direccion: e.target.value, area: e.target.value})}
-                    style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }}
-                    placeholder="Dirección o área"
-                  />
-                  <datalist id="lista-direcciones-resguardo">
-                    {direcciones.map(d => <option key={d.id} value={d.nombre} />)}
-                  </datalist>
+                    onChange={e => setForm({ ...form, direccion: e.target.value, area: e.target.value })}
+                    style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', backgroundColor: 'white', cursor: 'pointer', minHeight: '45px', fontSize: '0.95rem' }}
+                  >
+                    <option value="">-- Seleccionar Dirección --</option>
+                    {DIRECCIONES_SITMAH.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
                 </div>
 
               </div>

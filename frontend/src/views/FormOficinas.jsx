@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
 import { API_BASE_URL } from '../config'
 import { FaBuilding } from 'react-icons/fa'
+import PersonalAutocomplete from '../components/PersonalAutocomplete'
+import { CARGOS_NORMALIZADOS } from '../data/personalSitmah'
 
 export default function FormOficinas({ usuarioActual }) {
   const fileInputRef = useRef(null)
@@ -575,19 +577,27 @@ export default function FormOficinas({ usuarioActual }) {
                 <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
                   Nombre Completo <span style={{ color: '#EF4444' }}>*</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="Ingrese nombre completo"
+                <PersonalAutocomplete
                   value={formData.solicitante}
-                  onChange={(e) => {
-                    const valor = soloLetras(e.target.value)
-                    setFormData({ ...formData, solicitante: valor })
-                    validarCampo('solicitante', valor)
+                  onChange={(val) => {
+                    setFormData(prev => ({ ...prev, solicitante: val }));
+                    validarCampo('solicitante', val);
                   }}
-                  className="premium-input"
-                  style={{
-                    border: `1.5px solid ${getBorderColor('solicitante')}`
+                  onSelect={(emp) => {
+                    const matchArea = listaAreas.find(a => 
+                      a.nombre.toLowerCase().trim() === (emp.direccion || '').toLowerCase().trim()
+                    );
+                    setFormData(prev => ({
+                      ...prev,
+                      solicitante: emp.nombre,
+                      cargo: emp.cargo || prev.cargo,
+                      area_id: matchArea ? String(matchArea.id) : prev.area_id
+                    }));
+                    if (emp.nombre) validarCampo('solicitante', emp.nombre);
+                    if (emp.cargo) validarCampo('cargo', emp.cargo);
+                    if (matchArea) validarCampo('area_id', String(matchArea.id));
                   }}
+                  placeholder="-- Seleccionar Solicitante --"
                 />
                 {errores.solicitante && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.solicitante}</span>}
               </div>
@@ -625,11 +635,9 @@ export default function FormOficinas({ usuarioActual }) {
                   }}
                 >
                   <option value="">Seleccione cargo</option>
-                  {listaCargos
-                    .filter((c) => c.nombre?.toLowerCase() !== 'jefatura de departamento')
-                    .map((cargo) => (
-                      <option key={cargo.id} value={cargo.nombre}>{cargo.nombre}</option>
-                    ))}
+                  {CARGOS_NORMALIZADOS.map((cargo, idx) => (
+                    <option key={idx} value={cargo}>{cargo}</option>
+                  ))}
                 </select>
                 {errores.cargo && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.cargo}</span>}
               </div>

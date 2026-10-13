@@ -977,15 +977,15 @@ function limpiarTexto(str) {
  * @returns {object|null} { nombre, cargo, direccion, areaFuncional } o null si no se encuentra
  */
 export function buscarPersonalSitmah(query) {
-  if (!query || query.trim().length < 3) return null;
+  if (!query || query.trim().length < 5) return null;
   const q = limpiarTexto(query);
 
   // 1. Coincidencia exacta limpia
   const matchExacto = PERSONAL_SITMAH.find(p => limpiarTexto(p.nombre) === q);
   if (matchExacto) return matchExacto;
 
-  // 2. Coincidencia por partes (ej. todos los tokens están presentes)
-  const tokens = q.split(/\s+/).filter(t => t.length > 1);
+  // 2. Coincidencia por partes: requiere al menos 2 palabras (nombre y apellido con mín. 3 letras cada una)
+  const tokens = q.split(/\s+/).filter(t => t.length >= 3);
   if (tokens.length >= 2) {
     const matchTokens = PERSONAL_SITMAH.find(p => {
       const nombreLimpio = limpiarTexto(p.nombre);
@@ -993,10 +993,6 @@ export function buscarPersonalSitmah(query) {
     });
     if (matchTokens) return matchTokens;
   }
-
-  // 3. Coincidencia si el nombre oficial incluye la búsqueda o viceversa
-  const matchParcial = PERSONAL_SITMAH.find(p => limpiarTexto(p.nombre).includes(q) || q.includes(limpiarTexto(p.nombre)));
-  if (matchParcial) return matchParcial;
 
   return null;
 }
