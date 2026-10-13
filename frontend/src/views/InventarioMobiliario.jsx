@@ -4,6 +4,8 @@ import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import { FaChair, FaPlus, FaEdit, FaTrashAlt, FaChevronLeft, FaChevronRight, FaTimes, FaFileExcel, FaFileWord } from 'react-icons/fa';
 import { generarResguardoDocx } from '../utils/resguardoDocx';
+import PersonalAutocomplete from '../components/PersonalAutocomplete';
+import { CARGOS_NORMALIZADOS, DIRECCIONES_SITMAH } from '../data/personalSitmah';
 
 export default function InventarioMobiliario() {
   const { user } = useAuth();
@@ -441,7 +443,17 @@ export default function InventarioMobiliario() {
                 {/* 1. Primero Nombre del Resguardante */}
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>Nombre del Resguardante *</label>
-                  <input required type="text" placeholder="Nombre completo del resguardante" value={form.nombreResguardante} onChange={e => setForm({...form, nombreResguardante: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }} />
+                  <PersonalAutocomplete
+                    value={form.nombreResguardante}
+                    onChange={val => setForm(prev => ({ ...prev, nombreResguardante: val }))}
+                    onSelect={emp => setForm(prev => ({
+                      ...prev,
+                      nombreResguardante: emp.nombre,
+                      cargo: emp.cargo || prev.cargo,
+                      direccion: emp.direccion || prev.direccion
+                    }))}
+                    placeholder="-- Seleccionar Resguardante --"
+                  />
                 </div>
 
                 {/* 2. Después Cargo */}
@@ -449,8 +461,7 @@ export default function InventarioMobiliario() {
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>Cargo *</label>
                   <select required value={form.cargo} onChange={e => setForm({...form, cargo: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', backgroundColor: 'white' }}>
                     <option value="">Seleccione un cargo</option>
-                    {catalogoCargos.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
-                    <option value="Otro">Otro</option>
+                    {CARGOS_NORMALIZADOS.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
 
@@ -460,7 +471,7 @@ export default function InventarioMobiliario() {
                   <select required value={form.direccion} onChange={e => setForm({...form, direccion: e.target.value})} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', backgroundColor: 'white' }}>
                     <option value="">Seleccione una dirección</option>
                     <option value="S/N">S/N</option>
-                    {catalogoDirecciones.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+                    {DIRECCIONES_SITMAH.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
               </div>
