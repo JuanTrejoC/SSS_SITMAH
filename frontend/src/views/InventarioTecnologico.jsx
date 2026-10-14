@@ -11,7 +11,7 @@ import {
   FaServer, FaShieldAlt, FaWifi, FaVideo, FaHdd, FaBroadcastTower, FaPrint, FaTv, FaMemory,
   FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone, FaFilePdf, FaFileExcel, FaFileWord, FaPlug, FaTabletAlt,
   FaCogs, FaBoxes, FaTools, FaWrench, FaCheckCircle, FaExclamationTriangle, FaExclamationCircle,
-  FaMapMarkerAlt, FaSearch
+  FaMapMarkerAlt, FaSearch, FaEye
 } from 'react-icons/fa';
 import { generarResguardoDocx } from '../utils/resguardoDocx';
 import { registrarResguardo } from '../utils/registrarResguardo';
@@ -543,10 +543,10 @@ export default function InventarioTecnologico() {
     }
   };
 
-  const exportarFichaIndividualPdf = async (item) => {
+  const exportarFichaIndividualPdf = async (item, visualizar = false) => {
     try {
       Swal.fire({
-        title: 'Generando Ficha Técnica...',
+        title: visualizar ? 'Visualizando Ficha...' : 'Generando Ficha Técnica...',
         text: 'Por favor espere un momento.',
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading()
@@ -797,8 +797,14 @@ export default function InventarioTecnologico() {
       doc.text('Página 1 de 1', pageWidth - 14, pageHeight - 2, { align: 'right' });
 
       const numId = (item.numeroInventario || item.numeroSerie || item.id).toString().replace(/[^a-zA-Z0-9]/g, '_');
-      doc.save(`Ficha_Tecnica_${item.tipo || 'equipo'}_${numId}.pdf`);
-      Swal.close();
+      if (visualizar) {
+        const blobUrl = doc.output('bloburl');
+        Swal.close();
+        window.open(blobUrl, '_blank');
+      } else {
+        doc.save(`Ficha_Tecnica_${item.tipo || 'equipo'}_${numId}.pdf`);
+        Swal.close();
+      }
     } catch (err) {
       console.error('Error al generar ficha individual PDF:', err);
       Swal.fire('Error', 'No se pudo generar la ficha técnica en PDF', 'error');
@@ -1463,6 +1469,16 @@ export default function InventarioTecnologico() {
     return <Icon size={16} />;
   };
 
+  const obtenerNombreOtro = (item) => {
+    if (!item) return '';
+    let det = item.detalles;
+    if (typeof det === 'string') {
+      try { det = JSON.parse(det); } catch { det = {}; }
+    }
+    return det?.nombre || det?.nombreEquipo || det?.especificarTipo || det?.otroTipo || '';
+  };
+
+
   // UI Helpers para agrupar campos
   const tieneMAC = ['switch', 'servidor', 'firewall', 'access_point', 'camara', 'dvr', 'antena', 'impresora', 'plotter', 'router'].includes(form.tipo);
   const tieneIP = ['switch', 'servidor', 'firewall', 'access_point', 'camara', 'dvr', 'antena', 'impresora', 'plotter', 'router'].includes(form.tipo);
@@ -1976,6 +1992,11 @@ export default function InventarioTecnologico() {
                       <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#e0e7ff', color: '#4338ca', padding: '0.35rem 0.75rem', borderRadius: '9999px', fontSize: '0.85rem', fontWeight: '600', width: 'fit-content' }}>
                         {getIconForTipo(item.tipo)} {TIPOS_EQUIPO.find(t => t.value === item.tipo)?.label || item.tipo}
                       </span>
+                      {item.tipo === 'otro' && Boolean(obtenerNombreOtro(item)) && (
+                        <div style={{ marginTop: '0.4rem', fontSize: '0.85rem', fontWeight: '600', color: '#1e293b', wordBreak: 'break-word', maxWidth: '180px' }}>
+                          {obtenerNombreOtro(item)}
+                        </div>
+                      )}
                       {item.equipoPrincipalId && (
                         <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: '#4338ca', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '500' }}>
                           <FaLink size={10} />
@@ -2051,6 +2072,26 @@ export default function InventarioTecnologico() {
                             <FaFileWord size={16} />
                           </button>
                         )}
+                        <button
+                          onClick={() => exportarFichaIndividualPdf(item, true)}
+                          title="Visualizar PDF (Ficha Técnica)"
+                          style={{
+                            backgroundColor: '#ede9fe',
+                            border: '1px solid #ddd6fe',
+                            color: '#6d28d9',
+                            cursor: 'pointer',
+                            padding: '0.5rem',
+                            borderRadius: '6px',
+                            transition: 'all 0.2s',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#ddd6fe'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#ede9fe'}
+                        >
+                          <FaEye size={16} />
+                        </button>
                         <button onClick={() => handleEditar(item)} title="Editar" style={{ backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }}>
                           <FaEdit size={16} />
                         </button>
@@ -2266,6 +2307,7 @@ export default function InventarioTecnologico() {
                         <option value="Donacion">Donación</option>
                         <option value="Fideicomiso">Fideicomiso</option>
                         <option value="Recurso Propio">Recurso Propio</option>
+                        <option value="Rentado">Rentado</option>
                       </select>
                     </div>
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   FaClipboardCheck, FaPlus, FaSearch, FaFileWord, FaCheck,
   FaCouch, FaDesktop, FaTrafficLight, FaChevronDown, FaTimes, FaUpload,
-  FaDownload, FaUndo, FaTrashAlt, FaExchangeAlt, FaFilePdf
+  FaDownload, FaUndo, FaTrashAlt, FaExchangeAlt, FaFilePdf, FaEye
 } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { useAuth } from '../context/AuthContext';
@@ -980,6 +980,25 @@ function Resguardos() {
     }
   };
 
+  const visualizarFirmado = async (r) => {
+    if (!r.archivoFirmado) return;
+    const url = `${API_BASE_URL}/api/resguardos/${r.id}/firmado?token=${tokenUrl}&v=${r.fechaFirmado ? new Date(r.fechaFirmado).getTime() : 0}`;
+
+    try {
+      const res = await fetch(url, {
+        headers: user?.token ? { Authorization: `Bearer ${user.token}` } : {}
+      });
+      if (!res.ok) throw new Error('Error al obtener el archivo');
+      const blob = await res.blob();
+      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+      const blobUrl = window.URL.createObjectURL(pdfBlob);
+      window.open(blobUrl, '_blank');
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 15000);
+    } catch (e) {
+      window.open(url, '_blank');
+    }
+  };
+
   const descargarFirmado = async (r) => {
     if (!r.archivoFirmado) return;
     const nombre = (r.nombreResguardante || 'firmado').replace(/\s+/g, '_');
@@ -1209,6 +1228,33 @@ function Resguardos() {
                     {/* ACCIONES */}
                     <td style={{ padding: '1.25rem', textAlign: 'center' }}>
                       <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', alignItems: 'center' }}>
+                        {/* 0. Icono de Ojo para visualizar el PDF firmado */}
+                        {r.archivoFirmado && (
+                          <button
+                            type="button"
+                            onClick={() => visualizarFirmado(r)}
+                            title="Visualizar documento PDF firmado"
+                            style={{
+                              backgroundColor: '#ede9fe',
+                              border: '1px solid #ddd6fe',
+                              color: '#6d28d9',
+                              cursor: 'pointer',
+                              padding: '0.5rem',
+                              borderRadius: '6px',
+                              transition: 'all 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '34px',
+                              height: '34px'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#ddd6fe'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#ede9fe'}
+                          >
+                            <FaEye size={15} />
+                          </button>
+                        )}
+
                         {/* 1. Icono de PDF para descargar el firmado (solo si ya tiene PDF firmado) */}
                         {r.archivoFirmado && (
                           <button

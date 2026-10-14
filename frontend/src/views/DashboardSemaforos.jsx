@@ -7,6 +7,7 @@ import { formatFolio } from '../utils/formatFolio'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { API_BASE_URL } from '../config'
 import AtencionReporte from '../components/AtencionReporte'
+import { marcarNotificacionLeida } from '../utils/notificacionesLeidas'
 
 export default function DashboardSemaforos() {
   const { user } = useAuth()
@@ -38,12 +39,64 @@ export default function DashboardSemaforos() {
     return () => { document.body.style.overflow = '' }
   }, [verDetalle, confirmResuelto.visible])
 
+  const detalleActivoRef = useRef(null)
+
+  const abrirDetalle = (reporte) => {
+    if (!reporte) return
+    detalleActivoRef.current = reporte.id
+    setVerDetalle(reporte)
+    if (reporte?.id) {
+      marcarNotificacionLeida(`semaforo-${reporte.id}`)
+      marcarNotificacionLeida(String(reporte.id))
+    }
+  }
+
+  const cerrarDetalle = () => {
+    detalleActivoRef.current = null
+    if (verDetalle?.id) {
+      marcarNotificacionLeida(`semaforo-${verDetalle.id}`)
+      marcarNotificacionLeida(String(verDetalle.id))
+    }
+    setVerDetalle(null)
+    setMostrarInventario(false)
+    setComponenteSeleccionado('')
+    const params = new URLSearchParams(location.search)
+    if (params.has('id') || params.has('folio')) {
+      params.delete('id')
+      params.delete('folio')
+      const search = params.toString() ? `?${params.toString()}` : ''
+      navigate(`${location.pathname}${search}`, { replace: true })
+    }
+  }
+
+  // Al abrir cualquier reporte, se descuenta de la campana de notificaciones
+  useEffect(() => {
+    if (verDetalle?.id) {
+      marcarNotificacionLeida(`semaforo-${verDetalle.id}`)
+      marcarNotificacionLeida(String(verDetalle.id))
+    }
+  }, [verDetalle?.id])
+
   // Abrir reporte automáticamente si se accede desde el centro de notificaciones (?id=...)
+  // Se procesa de forma segura evitando loops y limpiando la URL
+  const urlProcesadaRef = useRef(new Set())
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const reportId = params.get('id')
     const folioParam = params.get('folio')
     if (!reportId && !folioParam) return
+
+    const clave = reportId ? `id:${reportId}` : `folio:${folioParam}`
+    if (urlProcesadaRef.current.has(clave)) return
+    urlProcesadaRef.current.add(clave)
+
+    const limpiarUrl = () => {
+      const p = new URLSearchParams(location.search)
+      p.delete('id')
+      p.delete('folio')
+      const search = p.toString() ? `?${p.toString()}` : ''
+      navigate(`${location.pathname}${search}`, { replace: true })
+    }
 
     if (reportes.length > 0) {
       const encontrado = reportes.find(r => 
@@ -51,8 +104,9 @@ export default function DashboardSemaforos() {
         (folioParam && String(r.folio).toLowerCase() === folioParam.toLowerCase())
       )
       if (encontrado) {
-        setVerDetalle(encontrado)
+        abrirDetalle(encontrado)
         setEstadoFiltro('Todos')
+        limpiarUrl()
         return
       }
     }
@@ -65,11 +119,12 @@ export default function DashboardSemaforos() {
       .then(res => res.json())
       .then(json => {
         if (json.ok && json.data) {
-          setVerDetalle(json.data)
+          abrirDetalle(json.data)
           setEstadoFiltro('Todos')
         }
       })
       .catch(err => console.error('Error al cargar reporte de semáforo por URL:', err))
+      .finally(() => limpiarUrl())
     }
   }, [location.search, reportes, user?.token])
 
@@ -633,7 +688,7 @@ export default function DashboardSemaforos() {
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
                             <button
-                              onClick={() => setVerDetalle(r)}
+                              onClick={() => abrirDetalle(r)}
                               title="Ver detalles"
                               style={{
                                 backgroundColor: '#FEF3C7',
@@ -688,7 +743,7 @@ export default function DashboardSemaforos() {
                   Detalles del Reporte {formatFolio(verDetalle.folio, verDetalle.id)}
                 </h3>
                 <button
-                  onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }}
+                  onClick={cerrarDetalle}
                   style={{ background: 'none', border: 'none', fontSize: '1.2rem', color: '#6B7280', cursor: 'pointer' }}
                 >
                   ✕
@@ -1064,7 +1119,7 @@ export default function DashboardSemaforos() {
               </div>
 
               <button
-                onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }}
+                onClick={cerrarDetalle}
                 style={{ marginTop: '1.5rem', padding: '0.75rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '10px', width: '100%', fontSize: '0.9rem', fontWeight: '700', cursor: 'pointer' }}
               >
                 Cerrar Detalles

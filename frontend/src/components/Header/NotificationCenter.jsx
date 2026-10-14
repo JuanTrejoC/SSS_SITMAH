@@ -14,8 +14,14 @@ import {
   FaSpinner
 } from 'react-icons/fa';
 import './NotificationCenter.css';
+import {
+  EVENTO_NOTIF_LEIDA,
+  STORAGE_KEY_NOTIF,
+  obtenerNotificacionesLeidas,
+  guardarNotificacionesLeidas,
+  marcarNotificacionLeida
+} from '../../utils/notificacionesLeidas';
 
-const STORAGE_KEY = 'sitmah_read_notifications';
 
 function formatRelativeTime(dateString) {
   if (!dateString) return '';
@@ -46,40 +52,45 @@ export default function NotificationCenter() {
   const [notificaciones, setNotificaciones] = useState([]);
   const [resumen, setResumen] = useState({ totalPendientes: 0, pendientesOficina: 0, pendientesSemaforo: 0, pendientesInfra: 0 });
   const [activeTab, setActiveTab] = useState('todos'); // 'todos' | 'oficina' | 'semaforo' | 'infraestructura'
-  const [readIds, setReadIds] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [readIds, setReadIds] = useState(() => obtenerNotificacionesLeidas());
 
-  // Guardar IDs leídos en localStorage
-  const marcarComoLeido = (id) => {
-    setReadIds((prev) => {
-      if (prev.includes(id)) return prev;
-      const updated = [...prev, id];
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated.slice(-200)));
-      } catch (e) {
-        console.error('Error al guardar notificaciones leídas:', e);
-      }
-      return updated;
-    });
+  // Guardar IDs leídos en localStorage y emitir evento
+  const marcarComoLeido = (notifOrId) => {
+    if (!notifOrId) return;
+    const ids = [];
+    if (typeof notifOrId === 'string' || typeof notifOrId === 'number') {
+      ids.push(String(notifOrId));
+    } else {
+      if (notifOrId.id) ids.push(String(notifOrId.id));
+      if (notifOrId.reporteId) ids.push(String(notifOrId.reporteId));
+      if (notifOrId.tipo && notifOrId.reporteId) ids.push(`${notifOrId.tipo}-${notifOrId.reporteId}`);
+    }
+    marcarNotificacionLeida(ids);
+    setReadIds(obtenerNotificacionesLeidas());
   };
 
   const marcarTodasComoLeidas = (e) => {
     e?.stopPropagation();
-    const todosLosIds = notificaciones.map((n) => n.id);
-    const combinados = Array.from(new Set([...readIds, ...todosLosIds]));
-    setReadIds(combinados);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(combinados.slice(-200)));
-    } catch (e) {
-      console.error('Error al guardar notificaciones leídas:', e);
-    }
+    const todosLosIds = notificaciones.flatMap((n) => [
+      String(n.id),
+      ...(n.reporteId ? [String(n.reporteId), `${n.tipo}-${n.reporteId}`] : [])
+    ]);
+    marcarNotificacionLeida(todosLosIds);
+    setReadIds(obtenerNotificacionesLeidas());
   };
+
+
+  // Sincronizar cuando otra vista (o pestaña) marca una notificación como leída
+  useEffect(() => {
+    const sincronizar = () => setReadIds(obtenerNotificacionesLeidas());
+    const onStorage = (e) => { if (e.key === STORAGE_KEY_NOTIF) sincronizar(); };
+    window.addEventListener(EVENTO_NOTIF_LEIDA, sincronizar);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener(EVENTO_NOTIF_LEIDA, sincronizar);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
 
   // Cargar notificaciones del servidor
   const cargarNotificaciones = async () => {
@@ -121,36 +132,50 @@ export default function NotificationCenter() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Determina si una notificación ya fue leída considerando prefijos ('oficina-1', etc.) o IDs numéricos
+  const estaLeida = (n) => {
+    if (!n) return false;
+    const strId = String(n.id);
+    const repId = n.reporteId ? String(n.reporteId) : null;
+    const prefixed = n.tipo && repId ? `${n.tipo}-${repId}` : null;
+    return readIds.includes(strId) || (repId && readIds.includes(repId)) || (prefixed && readIds.includes(prefixed));
+  };
+
+  // Solo se muestran las notificaciones NO leídas (al abrir un reporte desaparece de la campana)
+  const notificacionesSinLeer = useMemo(() => {
+    return notificaciones.filter((n) => !estaLeida(n));
+  }, [notificaciones, readIds]);
+
   // Notificaciones filtradas según la pestaña activa
   const notificacionesFiltradas = useMemo(() => {
     if (activeTab === 'oficina') {
-      return notificaciones.filter((n) => n.tipo === 'oficina');
+      return notificacionesSinLeer.filter((n) => n.tipo === 'oficina');
     }
     if (activeTab === 'semaforo') {
-      return notificaciones.filter((n) => n.tipo === 'semaforo');
+      return notificacionesSinLeer.filter((n) => n.tipo === 'semaforo');
     }
     if (activeTab === 'infraestructura') {
-      return notificaciones.filter((n) => n.tipo === 'infraestructura');
+      return notificacionesSinLeer.filter((n) => n.tipo === 'infraestructura');
     }
-    return notificaciones;
-  }, [notificaciones, activeTab]);
+    return notificacionesSinLeer;
+  }, [notificacionesSinLeer, activeTab]);
 
   // Conteo de no leídas
   const sinLeerCount = useMemo(() => {
-    return notificaciones.filter((n) => !readIds.includes(n.id)).length;
-  }, [notificaciones, readIds]);
+    return notificacionesSinLeer.length;
+  }, [notificacionesSinLeer]);
 
   const sinLeerOficinas = useMemo(() => {
-    return notificaciones.filter((n) => n.tipo === 'oficina' && !readIds.includes(n.id)).length;
-  }, [notificaciones, readIds]);
+    return notificacionesSinLeer.filter((n) => n.tipo === 'oficina').length;
+  }, [notificacionesSinLeer]);
 
   const sinLeerSemaforos = useMemo(() => {
-    return notificaciones.filter((n) => n.tipo === 'semaforo' && !readIds.includes(n.id)).length;
-  }, [notificaciones, readIds]);
+    return notificacionesSinLeer.filter((n) => n.tipo === 'semaforo').length;
+  }, [notificacionesSinLeer]);
 
   // Manejar clic en una notificación
   const handleNotifClick = (notif) => {
-    marcarComoLeido(notif.id);
+    marcarComoLeido(notif);
     setIsOpen(false);
     navigate(notif.ruta);
   };
@@ -212,7 +237,7 @@ export default function NotificationCenter() {
               >
                 <FaWrench size={12} />
                 <span>Infraestructura</span>
-                <span className="notification-tab-count">{notificaciones.length}</span>
+                <span className="notification-tab-count">{sinLeerCount}</span>
               </button>
             </div>
           ) : (
@@ -223,7 +248,9 @@ export default function NotificationCenter() {
                 onClick={() => setActiveTab('todos')}
               >
                 <span>Todos</span>
-                <span className="notification-tab-count">{notificaciones.length}</span>
+                {sinLeerCount > 0 && (
+                  <span className="notification-tab-count">{sinLeerCount}</span>
+                )}
               </button>
               <button
                 type="button"
@@ -257,7 +284,7 @@ export default function NotificationCenter() {
                 <div className="notification-empty-icon">
                   <FaBell />
                 </div>
-                <p className="notification-empty-text">No hay notificaciones recientes</p>
+                <p className="notification-empty-text">No tienes notificaciones pendientes</p>
                 <p className="notification-empty-subtext">
                   Los nuevos reportes aparecerán aquí automáticamente.
                 </p>

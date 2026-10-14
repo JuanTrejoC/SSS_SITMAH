@@ -9,6 +9,7 @@ import Swal from 'sweetalert2'
 import AtencionReporte from '../components/AtencionReporte'
 import ModalAsignacionEquipo from '../components/ModalAsignacionEquipo'
 import ModalReemplazoEquipo from '../components/ModalReemplazoEquipo'
+import { marcarNotificacionLeida } from '../utils/notificacionesLeidas'
 
 export default function DashboardOficinas() {
   const { user } = useAuth()
@@ -42,6 +43,8 @@ export default function DashboardOficinas() {
     return () => { document.body.style.overflow = '' }
   }, [verDetalle, confirmResuelto.visible])
 
+  const detalleActivoRef = useRef(null)
+
   const recargarDetalle = async (id) => {
     const repId = id || verDetalle?.id;
     if (!repId || !user?.token) return null;
@@ -51,7 +54,9 @@ export default function DashboardOficinas() {
       });
       const json = await res.json();
       if (res.ok && json.ok && json.data) {
-        setVerDetalle(json.data);
+        if (detalleActivoRef.current === json.data.id) {
+          setVerDetalle(json.data);
+        }
         setReportes(prev => prev.map(rep => rep.id === json.data.id ? { ...rep, ...json.data } : rep));
         return json.data;
       }
@@ -61,29 +66,74 @@ export default function DashboardOficinas() {
     return null;
   };
 
-  const abrirDetalle = async (reporte) => {
+  const abrirDetalle = (reporte) => {
+    if (!reporte) return;
+    detalleActivoRef.current = reporte.id;
     setVerDetalle(reporte);
+    if (reporte?.id) {
+      marcarNotificacionLeida(`oficina-${reporte.id}`);
+      marcarNotificacionLeida(String(reporte.id));
+    }
     if (reporte?.id && user?.token) {
       recargarDetalle(reporte.id);
     }
   };
 
-  // Abrir reporte automáticamente si se accede desde el centro de notificaciones (?id=...)
+  const cerrarDetalle = () => {
+    detalleActivoRef.current = null;
+    if (verDetalle?.id) {
+      marcarNotificacionLeida(`oficina-${verDetalle.id}`);
+      marcarNotificacionLeida(String(verDetalle.id));
+    }
+    setVerDetalle(null);
+    const params = new URLSearchParams(location.search);
+    if (params.has('id') || params.has('folio')) {
+      params.delete('id');
+      params.delete('folio');
+      const search = params.toString() ? `?${params.toString()}` : '';
+      navigate(`${location.pathname}${search}`, { replace: true });
+    }
+  };
+
+  // Al abrir cualquier reporte, se descuenta de la campana de notificaciones
   useEffect(() => {
-    const params = new URLSearchParams(location.search)
-    const reportId = params.get('id')
-    const folioParam = params.get('folio')
-    if (!reportId && !folioParam) return
+    if (verDetalle?.id) {
+      marcarNotificacionLeida(`oficina-${verDetalle.id}`);
+      marcarNotificacionLeida(String(verDetalle.id));
+    }
+  }, [verDetalle?.id])
+
+  // Abrir reporte automáticamente si se accede desde el centro de notificaciones (?id=...)
+  // Se procesa de forma segura evitando loops y limpiando los query params
+  const urlProcesadaRef = useRef(new Set());
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const reportId = params.get('id');
+    const folioParam = params.get('folio');
+    if (!reportId && !folioParam) return;
+
+    const clave = reportId ? `id:${reportId}` : `folio:${folioParam}`;
+    if (urlProcesadaRef.current.has(clave)) return;
+    urlProcesadaRef.current.add(clave);
+
+    const limpiarUrl = () => {
+      const p = new URLSearchParams(location.search);
+      p.delete('id');
+      p.delete('folio');
+      const search = p.toString() ? `?${p.toString()}` : '';
+      navigate(`${location.pathname}${search}`, { replace: true });
+    };
 
     if (reportes.length > 0) {
       const encontrado = reportes.find(r => 
         (reportId && String(r.id) === String(reportId)) ||
         (folioParam && String(r.folio).toLowerCase() === folioParam.toLowerCase())
-      )
+      );
       if (encontrado) {
-        abrirDetalle(encontrado)
-        setEstadoFiltro('Todos')
-        return
+        abrirDetalle(encontrado);
+        setEstadoFiltro('Todos');
+        limpiarUrl();
+        return;
       }
     }
 
@@ -95,13 +145,15 @@ export default function DashboardOficinas() {
       .then(res => res.json())
       .then(json => {
         if (json.ok && json.data) {
-          abrirDetalle(json.data)
-          setEstadoFiltro('Todos')
+          abrirDetalle(json.data);
+          setEstadoFiltro('Todos');
         }
       })
       .catch(err => console.error('Error al cargar reporte por URL:', err))
+      .finally(() => limpiarUrl());
     }
-  }, [location.search, reportes, user?.token])
+  }, [location.search, reportes, user?.token]);
+
 
   // ✅ CARGAR DATOS DESDE EL BACKEND
   const cargarReportes = async () => {
@@ -803,7 +855,7 @@ export default function DashboardOficinas() {
                   Detalles del Reporte {formatFolio(verDetalle.folio, verDetalle.id)}
                 </h3>
                 <button
-                  onClick={() => { setVerDetalle(null); }}
+                  onClick={cerrarDetalle}
                   style={{ background: 'none', border: 'none', fontSize: '1.2rem', color: '#6B7280', cursor: 'pointer' }}
                 >
                   ✕
@@ -1183,7 +1235,7 @@ export default function DashboardOficinas() {
               </div>
 
               <button
-                onClick={() => { setVerDetalle(null); }}
+                onClick={cerrarDetalle}
                 style={{ marginTop: '1.5rem', padding: '0.75rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '10px', width: '100%', fontSize: '0.9rem', fontWeight: '700', cursor: 'pointer' }}
               >
                 Cerrar Detalles

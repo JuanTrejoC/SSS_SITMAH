@@ -2402,6 +2402,7 @@ export default function InventarioExistencias() {
                             <option value="Donacion">Donación</option>
                             <option value="Fideicomiso">Fideicomiso</option>
                             <option value="Recurso Propio">Recurso Propio</option>
+                            <option value="Rentado">Rentado</option>
                           </select>
                         </div>
 

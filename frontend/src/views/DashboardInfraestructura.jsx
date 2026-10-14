@@ -6,6 +6,7 @@ import { formatFolio } from '../utils/formatFolio'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { API_BASE_URL } from '../config'
 import AtencionReporte from '../components/AtencionReporte'
+import { marcarNotificacionLeida } from '../utils/notificacionesLeidas'
 
 export default function DashboardInfraestructura() {
   const { user } = useAuth()
@@ -36,12 +37,64 @@ export default function DashboardInfraestructura() {
     return () => { document.body.style.overflow = '' }
   }, [verDetalle, confirmResuelto.visible])
 
+  const detalleActivoRef = useRef(null)
+
+  const abrirDetalle = (reporte) => {
+    if (!reporte) return
+    detalleActivoRef.current = reporte.id
+    setVerDetalle(reporte)
+    if (reporte?.id) {
+      marcarNotificacionLeida(`infra-${reporte.id}`)
+      marcarNotificacionLeida(String(reporte.id))
+    }
+  }
+
+  const cerrarDetalle = () => {
+    detalleActivoRef.current = null
+    if (verDetalle?.id) {
+      marcarNotificacionLeida(`infra-${verDetalle.id}`)
+      marcarNotificacionLeida(String(verDetalle.id))
+    }
+    setVerDetalle(null)
+    setMostrarInventario(false)
+    setComponenteSeleccionado('')
+    const params = new URLSearchParams(location.search)
+    if (params.has('id') || params.has('folio')) {
+      params.delete('id')
+      params.delete('folio')
+      const search = params.toString() ? `?${params.toString()}` : ''
+      navigate(`${location.pathname}${search}`, { replace: true })
+    }
+  }
+
+  // Al abrir cualquier reporte, se descuenta de la campana de notificaciones
+  useEffect(() => {
+    if (verDetalle?.id) {
+      marcarNotificacionLeida(`infra-${verDetalle.id}`)
+      marcarNotificacionLeida(String(verDetalle.id))
+    }
+  }, [verDetalle?.id])
+
   // Abrir reporte automáticamente si se accede desde notificación (?id=...)
+  // Se procesa de forma segura evitando loops y limpiando la URL
+  const urlProcesadaRef = useRef(new Set())
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const reportId = params.get('id')
     const folioParam = params.get('folio')
     if (!reportId && !folioParam) return
+
+    const clave = reportId ? `id:${reportId}` : `folio:${folioParam}`
+    if (urlProcesadaRef.current.has(clave)) return
+    urlProcesadaRef.current.add(clave)
+
+    const limpiarUrl = () => {
+      const p = new URLSearchParams(location.search)
+      p.delete('id')
+      p.delete('folio')
+      const search = p.toString() ? `?${p.toString()}` : ''
+      navigate(`${location.pathname}${search}`, { replace: true })
+    }
 
     if (reportes.length > 0) {
       const encontrado = reportes.find(r =>
@@ -49,8 +102,9 @@ export default function DashboardInfraestructura() {
         (folioParam && String(r.folio).toLowerCase() === folioParam.toLowerCase())
       )
       if (encontrado) {
-        setVerDetalle(encontrado)
+        abrirDetalle(encontrado)
         setEstadoFiltro('Todos')
+        limpiarUrl()
         return
       }
     }
@@ -62,11 +116,12 @@ export default function DashboardInfraestructura() {
       .then(res => res.json())
       .then(json => {
         if (json.ok && json.data) {
-          setVerDetalle(json.data)
+          abrirDetalle(json.data)
           setEstadoFiltro('Todos')
         }
       })
       .catch(err => console.error('Error al cargar reporte de infraestructura:', err))
+      .finally(() => limpiarUrl())
     }
   }, [location.search, reportes, user?.token])
 
@@ -682,7 +737,7 @@ export default function DashboardInfraestructura() {
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                           <div style={{ display: 'inline-flex', gap: '0.45rem', alignItems: 'center', justifyContent: 'center' }}>
                             <button
-                              onClick={() => setVerDetalle(rep)}
+                              onClick={() => abrirDetalle(rep)}
                               title="Ver detalles completos y gestionar atención"
                               style={{
                                 backgroundColor: '#059669',
@@ -770,7 +825,7 @@ export default function DashboardInfraestructura() {
                   </h2>
                 </div>
                 <button
-                  onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }}
+                  onClick={cerrarDetalle}
                   style={{ backgroundColor: '#F3F4F6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontWeight: 'bold' }}
                 >
                   ✕
@@ -939,7 +994,7 @@ export default function DashboardInfraestructura() {
               </div>
 
               <button
-                onClick={() => { setVerDetalle(null); setMostrarInventario(false); setComponenteSeleccionado(''); }}
+                onClick={cerrarDetalle}
                 style={{ marginTop: '1.5rem', padding: '0.75rem', backgroundColor: '#059669', color: 'white', border: 'none', borderRadius: '10px', width: '100%', fontSize: '0.9rem', fontWeight: '700', cursor: 'pointer' }}
               >
                 Cerrar Detalles
