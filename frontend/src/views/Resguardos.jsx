@@ -958,11 +958,11 @@ function Resguardos() {
 
   const eliminarFirmado = async (r) => {
     const { isConfirmed } = await Swal.fire({
-      title: '¿Quitar el PDF firmado?',
-      text: 'Podrás subir otro documento PDF firmado en cualquier momento.',
+      title: '¿Eliminar el PDF firmado?',
+      text: 'Se retirará el archivo actual para que puedas volver a subir el documento correcto.',
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Sí, quitar',
+      confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
       confirmButtonColor: '#dc2626'
     });
@@ -973,10 +973,17 @@ function Resguardos() {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error || 'No se pudo quitar el PDF firmado');
+      if (!res.ok || !json.ok) throw new Error(json.error || 'No se pudo eliminar el PDF firmado');
       setResguardos(prev => prev.map(x => (x.id === r.id ? { ...x, ...json.data } : x)));
+      Swal.fire({
+        title: 'PDF eliminado',
+        text: 'El documento firmado ha sido retirado correctamente.',
+        icon: 'success',
+        timer: 1600,
+        showConfirmButton: false
+      });
     } catch (err) {
-      Swal.fire('Error', err.message || 'No se pudo quitar el PDF', 'error');
+      Swal.fire('Error', err.message || 'No se pudo eliminar el PDF', 'error');
     }
   };
 
@@ -1308,7 +1315,34 @@ function Resguardos() {
                           <FaPlus size={14} />
                         </button>
 
-                        {/* 3. Icono de devolver equipo (regresar a Stock) */}
+                        {/* 3. Icono de papelera para borrar el PDF firmado si se equivocaron al subirlo */}
+                        {r.archivoFirmado && (
+                          <button
+                            type="button"
+                            onClick={() => eliminarFirmado(r)}
+                            title="Eliminar PDF firmado (por si hubo una equivocación al subirlo)"
+                            style={{
+                              backgroundColor: '#fee2e2',
+                              border: '1px solid #fecaca',
+                              color: '#dc2626',
+                              cursor: 'pointer',
+                              padding: '0.5rem',
+                              borderRadius: '6px',
+                              transition: 'all 0.2s',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '34px',
+                              height: '34px'
+                            }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#fca5a5'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#fee2e2'}
+                          >
+                            <FaTrashAlt size={14} />
+                          </button>
+                        )}
+
+                        {/* 4. Icono de devolver equipo (regresar a Stock) */}
                         {r.estado === 'Activo' && (
                           <button
                             type="button"

@@ -11,7 +11,7 @@ import {
   FaServer, FaShieldAlt, FaWifi, FaVideo, FaHdd, FaBroadcastTower, FaPrint, FaTv, FaMemory,
   FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone, FaFilePdf, FaFileExcel, FaFileWord, FaPlug, FaTabletAlt,
   FaCogs, FaBoxes, FaTools, FaWrench, FaCheckCircle, FaExclamationTriangle, FaExclamationCircle,
-  FaMapMarkerAlt, FaSearch, FaEye
+  FaMapMarkerAlt, FaSearch
 } from 'react-icons/fa';
 import { generarResguardoDocx } from '../utils/resguardoDocx';
 import { registrarResguardo } from '../utils/registrarResguardo';
@@ -122,6 +122,148 @@ export default function InventarioTecnologico() {
       .map(eq => eq.numeroInventario)
       .filter(p => typeof p === 'string' && p.trim() !== '');
     return [...new Set(todos)].sort();
+  }, [todosLosEquipos]);
+
+  // Autocompletado de Marcas y Modelos para Periféricos
+  const marcasTecladoUnicas = useMemo(() => {
+    const comunes = ['Logitech', 'Dell', 'HP', 'Lenovo', 'Microsoft', 'Genius', 'Acteck', 'Vorago', 'Steren', 'Redragon', 'Corsair', 'Razer'];
+    const deEquipos = [];
+    (todosLosEquipos || []).forEach(eq => {
+      if ((eq.tipo || '').toLowerCase() === 'teclado' && eq.marca) deEquipos.push(eq.marca);
+      if (eq.detalles?.marcaTeclado) deEquipos.push(eq.detalles.marcaTeclado);
+      if (eq.marca) deEquipos.push(eq.marca);
+    });
+    return [...new Set([...comunes, ...deEquipos, ...marcasUnicas])]
+      .filter(p => typeof p === 'string' && p.trim() !== '')
+      .map(p => p.trim())
+      .sort((a, b) => a.localeCompare(b));
+  }, [todosLosEquipos, marcasUnicas]);
+
+  const modelosTecladoUnicos = useMemo(() => {
+    const comunes = ['MX Keys', 'K120', 'MK120', 'MK270', 'MK295', 'KB216', 'KM5221W', 'Craft', 'K380', 'G213'];
+    const deEquipos = [];
+    (todosLosEquipos || []).forEach(eq => {
+      if ((eq.tipo || '').toLowerCase() === 'teclado' && eq.modelo) deEquipos.push(eq.modelo);
+      if (eq.detalles?.modeloTeclado) deEquipos.push(eq.detalles.modeloTeclado);
+    });
+    return [...new Set([...comunes, ...deEquipos])]
+      .filter(p => typeof p === 'string' && p.trim() !== '')
+      .map(p => p.trim())
+      .sort((a, b) => a.localeCompare(b));
+  }, [todosLosEquipos]);
+
+  const marcasMouseUnicas = useMemo(() => {
+    const comunes = ['Logitech', 'Dell', 'HP', 'Lenovo', 'Microsoft', 'Genius', 'Acteck', 'Vorago', 'Steren', 'Redragon', 'Corsair', 'Razer'];
+    const deEquipos = [];
+    (todosLosEquipos || []).forEach(eq => {
+      if ((eq.tipo || '').toLowerCase() === 'mouse' && eq.marca) deEquipos.push(eq.marca);
+      if (eq.detalles?.marcaMouse) deEquipos.push(eq.detalles.marcaMouse);
+      if (eq.marca) deEquipos.push(eq.marca);
+    });
+    return [...new Set([...comunes, ...deEquipos, ...marcasUnicas])]
+      .filter(p => typeof p === 'string' && p.trim() !== '')
+      .map(p => p.trim())
+      .sort((a, b) => a.localeCompare(b));
+  }, [todosLosEquipos, marcasUnicas]);
+
+  const modelosMouseUnicos = useMemo(() => {
+    const comunes = ['MX Master', 'MX Master 3S', 'MX Anywhere', 'M170', 'M185', 'M190', 'M317', 'M705', 'MS116', 'WM126', 'G305', 'G502'];
+    const deEquipos = [];
+    (todosLosEquipos || []).forEach(eq => {
+      if ((eq.tipo || '').toLowerCase() === 'mouse' && eq.modelo) deEquipos.push(eq.modelo);
+      if (eq.detalles?.modeloMouse) deEquipos.push(eq.detalles.modeloMouse);
+    });
+    return [...new Set([...comunes, ...deEquipos])]
+      .filter(p => typeof p === 'string' && p.trim() !== '')
+      .map(p => p.trim())
+      .sort((a, b) => a.localeCompare(b));
+  }, [todosLosEquipos]);
+
+  const marcasMonitorUnicas = useMemo(() => {
+    const comunes = ['Dell', 'HP', 'Samsung', 'LG', 'Lenovo', 'BenQ', 'Asus', 'Acer', 'ViewSonic', 'AOC', 'Steren'];
+    const deEquipos = [];
+    (todosLosEquipos || []).forEach(eq => {
+      if ((eq.tipo || '').toLowerCase() === 'monitor' && eq.marca) deEquipos.push(eq.marca);
+      if (eq.detalles?.marcaMonitores) deEquipos.push(eq.detalles.marcaMonitores);
+      if (Array.isArray(eq.detalles?.monitores)) {
+        eq.detalles.monitores.forEach(m => { if (m?.marca) deEquipos.push(m.marca); });
+      }
+      if (eq.marca) deEquipos.push(eq.marca);
+    });
+    return [...new Set([...comunes, ...deEquipos, ...marcasUnicas])]
+      .filter(p => typeof p === 'string' && p.trim() !== '')
+      .map(p => p.trim())
+      .sort((a, b) => a.localeCompare(b));
+  }, [todosLosEquipos, marcasUnicas]);
+
+  const modelosMonitorUnicos = useMemo(() => {
+    const comunes = ['P2419H', 'P2219H', 'P2422H', 'P2722H', 'E2220H', 'E2420H', 'SE2422H', 'UltraSharp U2415', '24MK430H'];
+    const deEquipos = [];
+    (todosLosEquipos || []).forEach(eq => {
+      if ((eq.tipo || '').toLowerCase() === 'monitor' && eq.modelo) deEquipos.push(eq.modelo);
+      if (eq.detalles?.modeloMonitores) deEquipos.push(eq.detalles.modeloMonitores);
+      if (Array.isArray(eq.detalles?.monitores)) {
+        eq.detalles.monitores.forEach(m => { if (m?.modelo) deEquipos.push(m.modelo); });
+      }
+    });
+    return [...new Set([...comunes, ...deEquipos])]
+      .filter(p => typeof p === 'string' && p.trim() !== '')
+      .map(p => p.trim())
+      .sort((a, b) => a.localeCompare(b));
+  }, [todosLosEquipos]);
+
+  const marcasCargadorUnicas = useMemo(() => {
+    const comunes = ['Dell', 'HP', 'Lenovo', 'Apple', 'Asus', 'Acer', 'Samsung', 'Toshiba', 'Universal', 'Steren'];
+    const deEquipos = [];
+    (todosLosEquipos || []).forEach(eq => {
+      if (['cargador', 'eliminador'].includes((eq.tipo || '').toLowerCase()) && eq.marca) deEquipos.push(eq.marca);
+      if (eq.detalles?.marcaCargador) deEquipos.push(eq.detalles.marcaCargador);
+      if (eq.marca) deEquipos.push(eq.marca);
+    });
+    return [...new Set([...comunes, ...deEquipos, ...marcasUnicas])]
+      .filter(p => typeof p === 'string' && p.trim() !== '')
+      .map(p => p.trim())
+      .sort((a, b) => a.localeCompare(b));
+  }, [todosLosEquipos, marcasUnicas]);
+
+  const modelosCargadorUnicos = useMemo(() => {
+    const comunes = ['45W Type-C', '65W AC', '65W Type-C', '90W AC', '130W AC', '130W Type-C'];
+    const deEquipos = [];
+    (todosLosEquipos || []).forEach(eq => {
+      if (['cargador', 'eliminador'].includes((eq.tipo || '').toLowerCase()) && eq.modelo) deEquipos.push(eq.modelo);
+      if (eq.detalles?.modeloCargador) deEquipos.push(eq.detalles.modeloCargador);
+    });
+    return [...new Set([...comunes, ...deEquipos])]
+      .filter(p => typeof p === 'string' && p.trim() !== '')
+      .map(p => p.trim())
+      .sort((a, b) => a.localeCompare(b));
+  }, [todosLosEquipos]);
+
+  const marcasDiademaUnicas = useMemo(() => {
+    const comunes = ['Jabra', 'Plantronics', 'Poly', 'Logitech', 'HyperX', 'Sennheiser', 'Sony', 'Steren', 'Redragon'];
+    const deEquipos = [];
+    (todosLosEquipos || []).forEach(eq => {
+      if (['diadema', 'auricular'].includes((eq.tipo || '').toLowerCase()) && eq.marca) deEquipos.push(eq.marca);
+      if (eq.detalles?.marcaDiadema) deEquipos.push(eq.detalles.marcaDiadema);
+      if (eq.marca) deEquipos.push(eq.marca);
+    });
+    return [...new Set([...comunes, ...deEquipos, ...marcasUnicas])]
+      .filter(p => typeof p === 'string' && p.trim() !== '')
+      .map(p => p.trim())
+      .sort((a, b) => a.localeCompare(b));
+  }, [todosLosEquipos, marcasUnicas]);
+
+  const modelosDiademaUnicos = useMemo(() => {
+    const comunes = ['Evolve 20', 'Evolve 30 II', 'Evolve 40', 'Evolve 65', 'Blackwire 3220', 'Blackwire 3320', 'H390', 'H111'];
+    const deEquipos = [];
+    (todosLosEquipos || []).forEach(eq => {
+      if (['diadema', 'auricular'].includes((eq.tipo || '').toLowerCase()) && eq.modelo) deEquipos.push(eq.modelo);
+      if (eq.detalles?.modeloDiadema) deEquipos.push(eq.detalles.modeloDiadema);
+    });
+    return [...new Set([...comunes, ...deEquipos])]
+      .filter(p => typeof p === 'string' && p.trim() !== '')
+      .map(p => p.trim())
+      .sort((a, b) => a.localeCompare(b));
   }, [todosLosEquipos]);
 
   // Refacciones y Piezas de Repuesto State
@@ -1377,30 +1519,38 @@ export default function InventarioTecnologico() {
   };
 
   const handleVincular = async (item) => {
-    const { value: invPadre } = await Swal.fire({
+    const { value: seriePadre } = await Swal.fire({
       title: 'Vincular a equipo',
-      text: 'Ingresa el Número de Inventario del equipo principal (PC, Laptop, etc.):',
+      text: 'Ingresa el Número de Serie del equipo principal (PC, Laptop, etc.):',
       input: 'text',
-      inputPlaceholder: 'Ej: EC-9081-106',
+      inputPlaceholder: 'Ej: DL12345 o Número de Serie',
       showCancelButton: true,
       confirmButtonText: 'Buscar y Vincular',
       cancelButtonText: 'Cancelar',
       inputValidator: (value) => {
-        if (!value) return 'Debes ingresar un número de inventario';
+        if (!value || !value.trim()) return 'Debes ingresar un número de serie';
       }
     });
 
-    if (invPadre) {
+    if (seriePadre) {
+      const termino = seriePadre.trim().toLowerCase();
       try {
-        const resBusqueda = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?search=${invPadre}&limit=10`, {
+        const resBusqueda = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?search=${encodeURIComponent(seriePadre.trim())}&limit=20`, {
           headers: { 'Authorization': `Bearer ${user.token}` }
         });
         const dataBusqueda = await resBusqueda.json();
         const listaEquipos = dataBusqueda.data || dataBusqueda.items || [];
-        const padre = listaEquipos.find(i => i.numeroInventario?.toLowerCase() === invPadre.trim().toLowerCase());
+        let padre = listaEquipos.find(i => (i.numeroSerie || '').toLowerCase().trim() === termino);
+        if (!padre && Array.isArray(todosLosEquipos)) {
+          padre = todosLosEquipos.find(i => (i.numeroSerie || '').toLowerCase().trim() === termino);
+        }
 
         if (!padre) {
-          return Swal.fire('No encontrado', `No se encontró ningún equipo con inventario "${invPadre}". Verifica el número.`, 'error');
+          return Swal.fire('No encontrado', `No se encontró ningún equipo con el número de serie "${seriePadre}". Verifica el número.`, 'error');
+        }
+
+        if (padre.id === item.id) {
+          return Swal.fire('Aviso', 'No puedes vincular un equipo a sí mismo.', 'warning');
         }
 
         const res = await fetch(`${API_BASE_URL}/api/inventario-tecnologico/${item.id}`, {
@@ -1417,7 +1567,7 @@ export default function InventarioTecnologico() {
         });
 
         if (res.ok) {
-          Swal.fire('¡Vinculado!', 'El equipo fue vinculado y su ubicación actualizada.', 'success');
+          Swal.fire('¡Vinculado!', `El equipo fue vinculado exitosamente al equipo principal (${padre.tipo || 'Equipo'} - S/N: ${padre.numeroSerie || 'S/N'}).`, 'success');
           cargarEquipos();
         } else {
           const data = await res.json();
@@ -2072,26 +2222,6 @@ export default function InventarioTecnologico() {
                             <FaFileWord size={16} />
                           </button>
                         )}
-                        <button
-                          onClick={() => exportarFichaIndividualPdf(item, true)}
-                          title="Visualizar PDF (Ficha Técnica)"
-                          style={{
-                            backgroundColor: '#ede9fe',
-                            border: '1px solid #ddd6fe',
-                            color: '#6d28d9',
-                            cursor: 'pointer',
-                            padding: '0.5rem',
-                            borderRadius: '6px',
-                            transition: 'all 0.2s',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#ddd6fe'}
-                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#ede9fe'}
-                        >
-                          <FaEye size={16} />
-                        </button>
                         <button onClick={() => handleEditar(item)} title="Editar" style={{ backgroundColor: '#fef3c7', border: 'none', color: '#d97706', cursor: 'pointer', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }}>
                           <FaEdit size={16} />
                         </button>
@@ -2688,8 +2818,8 @@ export default function InventarioTecnologico() {
                         {form.detalles.tieneTeclado && (
                           <div className="inventario-grid-periferico-4">
                             <div><label style={labelStyle}>No. Inventario</label><input type="text" placeholder="Inv. Teclado" value={form.detalles.numeroInventarioTeclado || ''} onChange={e => handleDetalleChange('numeroInventarioTeclado', e.target.value)} style={inputStyle} /></div>
-                            <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Logitech" value={form.detalles.marcaTeclado || ''} onChange={e => handleDetalleChange('marcaTeclado', e.target.value)} style={inputStyle} /></div>
-                            <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: MX Keys" value={form.detalles.modeloTeclado || ''} onChange={e => handleDetalleChange('modeloTeclado', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Logitech" value={form.detalles.marcaTeclado || ''} onChange={e => handleDetalleChange('marcaTeclado', e.target.value)} style={inputStyle} list="marcas-teclado-list" /></div>
+                            <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: MX Keys" value={form.detalles.modeloTeclado || ''} onChange={e => handleDetalleChange('modeloTeclado', e.target.value)} style={inputStyle} list="modelos-teclado-list" /></div>
                             <div><label style={labelStyle}>No. Serie</label><input type="text" placeholder="Ej: SN1234" value={form.detalles.serieTeclado || ''} onChange={e => handleDetalleChange('serieTeclado', e.target.value)} style={inputStyle} /></div>
                           </div>
                         )}
@@ -2703,8 +2833,8 @@ export default function InventarioTecnologico() {
                         {form.detalles.tieneMouse && (
                           <div className="inventario-grid-periferico-4">
                             <div><label style={labelStyle}>No. Inventario</label><input type="text" placeholder="Inv. Mouse" value={form.detalles.numeroInventarioMouse || ''} onChange={e => handleDetalleChange('numeroInventarioMouse', e.target.value)} style={inputStyle} /></div>
-                            <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Logitech" value={form.detalles.marcaMouse || ''} onChange={e => handleDetalleChange('marcaMouse', e.target.value)} style={inputStyle} /></div>
-                            <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: MX Master" value={form.detalles.modeloMouse || ''} onChange={e => handleDetalleChange('modeloMouse', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Logitech" value={form.detalles.marcaMouse || ''} onChange={e => handleDetalleChange('marcaMouse', e.target.value)} style={inputStyle} list="marcas-mouse-list" /></div>
+                            <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: MX Master" value={form.detalles.modeloMouse || ''} onChange={e => handleDetalleChange('modeloMouse', e.target.value)} style={inputStyle} list="modelos-mouse-list" /></div>
                             <div><label style={labelStyle}>No. Serie</label><input type="text" placeholder="Ej: SN5678" value={form.detalles.serieMouse || ''} onChange={e => handleDetalleChange('serieMouse', e.target.value)} style={inputStyle} /></div>
                           </div>
                         )}
@@ -2765,12 +2895,12 @@ export default function InventarioTecnologico() {
                                       const nuevos = [...displayMonitores];
                                       nuevos[index] = { ...nuevos[index], marca: e.target.value };
                                       handleDetalleChange('monitores', nuevos);
-                                    }} style={inputStyle} /></div>
+                                    }} style={inputStyle} list="marcas-monitor-list" /></div>
                                     <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: P2419H" value={monitor.modelo || ''} onChange={e => {
                                       const nuevos = [...displayMonitores];
                                       nuevos[index] = { ...nuevos[index], modelo: e.target.value };
                                       handleDetalleChange('monitores', nuevos);
-                                    }} style={inputStyle} /></div>
+                                    }} style={inputStyle} list="modelos-monitor-list" /></div>
                                     <div><label style={labelStyle}>No. Serie</label><input type="text" placeholder="Ej: SN7890" value={monitor.serie || ''} onChange={e => {
                                       const nuevos = [...displayMonitores];
                                       nuevos[index] = { ...nuevos[index], serie: e.target.value };
@@ -2792,8 +2922,8 @@ export default function InventarioTecnologico() {
                         {form.detalles.tieneCargador && (
                           <div className="inventario-grid-periferico-4">
                             <div><label style={labelStyle}>No. Inventario</label><input type="text" placeholder="Inv. Cargador" value={form.detalles.numeroInventarioCargador || ''} onChange={e => handleDetalleChange('numeroInventarioCargador', e.target.value)} style={inputStyle} /></div>
-                            <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Dell" value={form.detalles.marcaCargador || ''} onChange={e => handleDetalleChange('marcaCargador', e.target.value)} style={inputStyle} /></div>
-                            <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: 65W AC" value={form.detalles.modeloCargador || ''} onChange={e => handleDetalleChange('modeloCargador', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Dell" value={form.detalles.marcaCargador || ''} onChange={e => handleDetalleChange('marcaCargador', e.target.value)} style={inputStyle} list="marcas-cargador-list" /></div>
+                            <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: 65W AC" value={form.detalles.modeloCargador || ''} onChange={e => handleDetalleChange('modeloCargador', e.target.value)} style={inputStyle} list="modelos-cargador-list" /></div>
                             <div><label style={labelStyle}>No. Serie</label><input type="text" placeholder="Ej: SN000" value={form.detalles.serieCargador || ''} onChange={e => handleDetalleChange('serieCargador', e.target.value)} style={inputStyle} /></div>
                           </div>
                         )}
@@ -2807,12 +2937,48 @@ export default function InventarioTecnologico() {
                         {form.detalles.tieneDiadema && (
                           <div className="inventario-grid-periferico-4">
                             <div><label style={labelStyle}>No. Inventario</label><input type="text" placeholder="Inv. Diadema" value={form.detalles.numeroInventarioDiadema || ''} onChange={e => handleDetalleChange('numeroInventarioDiadema', e.target.value)} style={inputStyle} /></div>
-                            <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Jabra" value={form.detalles.marcaDiadema || ''} onChange={e => handleDetalleChange('marcaDiadema', e.target.value)} style={inputStyle} /></div>
-                            <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: Evolve 20" value={form.detalles.modeloDiadema || ''} onChange={e => handleDetalleChange('modeloDiadema', e.target.value)} style={inputStyle} /></div>
+                            <div><label style={labelStyle}>Marca</label><input type="text" placeholder="Ej: Jabra" value={form.detalles.marcaDiadema || ''} onChange={e => handleDetalleChange('marcaDiadema', e.target.value)} style={inputStyle} list="marcas-diadema-list" /></div>
+                            <div><label style={labelStyle}>Modelo</label><input type="text" placeholder="Ej: Evolve 20" value={form.detalles.modeloDiadema || ''} onChange={e => handleDetalleChange('modeloDiadema', e.target.value)} style={inputStyle} list="modelos-diadema-list" /></div>
                             <div><label style={labelStyle}>No. Serie</label><input type="text" placeholder="Ej: SN111" value={form.detalles.serieDiadema || ''} onChange={e => handleDetalleChange('serieDiadema', e.target.value)} style={inputStyle} /></div>
                           </div>
                         )}
                       </div>
+
+                      {/* Datalists para autocompletado en Periféricos */}
+                      <datalist id="marcas-teclado-list">
+                        {marcasTecladoUnicas.map(m => <option key={m} value={m} />)}
+                      </datalist>
+                      <datalist id="modelos-teclado-list">
+                        {modelosTecladoUnicos.map(m => <option key={m} value={m} />)}
+                      </datalist>
+
+                      <datalist id="marcas-mouse-list">
+                        {marcasMouseUnicas.map(m => <option key={m} value={m} />)}
+                      </datalist>
+                      <datalist id="modelos-mouse-list">
+                        {modelosMouseUnicos.map(m => <option key={m} value={m} />)}
+                      </datalist>
+
+                      <datalist id="marcas-monitor-list">
+                        {marcasMonitorUnicas.map(m => <option key={m} value={m} />)}
+                      </datalist>
+                      <datalist id="modelos-monitor-list">
+                        {modelosMonitorUnicos.map(m => <option key={m} value={m} />)}
+                      </datalist>
+
+                      <datalist id="marcas-cargador-list">
+                        {marcasCargadorUnicas.map(m => <option key={m} value={m} />)}
+                      </datalist>
+                      <datalist id="modelos-cargador-list">
+                        {modelosCargadorUnicos.map(m => <option key={m} value={m} />)}
+                      </datalist>
+
+                      <datalist id="marcas-diadema-list">
+                        {marcasDiademaUnicas.map(m => <option key={m} value={m} />)}
+                      </datalist>
+                      <datalist id="modelos-diadema-list">
+                        {modelosDiademaUnicos.map(m => <option key={m} value={m} />)}
+                      </datalist>
 
                     </div>
                   )}
