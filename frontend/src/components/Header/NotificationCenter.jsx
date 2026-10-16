@@ -190,6 +190,13 @@ export default function NotificationCenter() {
   const handleNotifClick = (notif) => {
     marcarComoLeido(notif);
     setIsOpen(false);
+    window.dispatchEvent(new CustomEvent('sitmah:abrir-reporte', {
+      detail: {
+        id: notif.reporteId,
+        tipo: notif.tipo,
+        folio: notif.folio,
+      }
+    }));
     navigate(notif.ruta);
   };
 
@@ -197,7 +204,7 @@ export default function NotificationCenter() {
 
   return (
     <div className="notification-center" ref={dropdownRef}>
-      {/* Botón activador con campana e indicador de reportes activos */}
+      {/* Botón activador con campana: muestra insignia solo cuando hay nuevos/no leídos */}
       <button
         type="button"
         className={`notification-bell-btn ${isOpen ? 'notification-bell-btn--active' : ''}`}
@@ -209,9 +216,9 @@ export default function NotificationCenter() {
         aria-label="Centro de Notificaciones"
       >
         <FaBell className="notification-bell-icon" />
-        {conteoTodos > 0 && (
+        {sinLeerCount > 0 && (
           <span className="notification-badge">
-            {conteoTodos > 99 ? '99+' : conteoTodos}
+            {sinLeerCount > 99 ? '99+' : sinLeerCount}
           </span>
         )}
       </button>
@@ -224,11 +231,15 @@ export default function NotificationCenter() {
             <div className="notification-title-wrap">
               <FaBell className="notification-header-icon" />
               <h4 className="notification-title">Notificaciones</h4>
-              {conteoTodos > 0 && (
+              {sinLeerCount > 0 ? (
                 <span className="notification-unread-pill">
+                  {sinLeerCount} {sinLeerCount === 1 ? 'nueva' : 'nuevas'}
+                </span>
+              ) : conteoTodos > 0 ? (
+                <span className="notification-unread-pill" style={{ opacity: 0.9 }}>
                   {conteoTodos} {conteoTodos === 1 ? 'pendiente' : 'pendientes'}
                 </span>
-              )}
+              ) : null}
             </div>
             {sinLeerCount > 0 && (
               <button

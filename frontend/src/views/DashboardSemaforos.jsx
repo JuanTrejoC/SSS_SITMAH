@@ -60,6 +60,7 @@ export default function DashboardSemaforos() {
     setVerDetalle(null)
     setMostrarInventario(false)
     setComponenteSeleccionado('')
+    urlProcesadaRef.current.clear()
     const params = new URLSearchParams(location.search)
     if (params.has('id') || params.has('folio')) {
       params.delete('id')
@@ -96,6 +97,9 @@ export default function DashboardSemaforos() {
       p.delete('folio')
       const search = p.toString() ? `?${p.toString()}` : ''
       navigate(`${location.pathname}${search}`, { replace: true })
+      setTimeout(() => {
+        urlProcesadaRef.current.clear()
+      }, 350)
     }
 
     if (reportes.length > 0) {
@@ -127,6 +131,39 @@ export default function DashboardSemaforos() {
       .finally(() => limpiarUrl())
     }
   }, [location.search, reportes, user?.token])
+
+  // Escuchar evento directo desde el centro de notificaciones para abrir al instante
+  useEffect(() => {
+    const handleAbrirReporte = (e) => {
+      const { id, tipo } = e.detail || {}
+      if (tipo && tipo !== 'semaforo') return
+      urlProcesadaRef.current.clear()
+      if (id) {
+        const encontrado = reportes.find(r => String(r.id) === String(id))
+        if (encontrado) {
+          abrirDetalle(encontrado)
+          setEstadoFiltro('Todos')
+          return
+        }
+        if (user?.token) {
+          fetch(`${API_BASE_URL}/api/admin/reportes/semaforo/${id}`, {
+            headers: { 'Authorization': `Bearer ${user.token}` }
+          })
+          .then(res => res.json())
+          .then(json => {
+            if (json.ok && json.data) {
+              abrirDetalle(json.data)
+              setEstadoFiltro('Todos')
+            }
+          })
+          .catch(err => console.error('Error al abrir reporte por evento:', err))
+        }
+      }
+    }
+
+    window.addEventListener('sitmah:abrir-reporte', handleAbrirReporte)
+    return () => window.removeEventListener('sitmah:abrir-reporte', handleAbrirReporte)
+  }, [reportes, user?.token])
 
   // CARGAR DATOS DESDE EL BACKEND
   const cargarReportes = async () => {
