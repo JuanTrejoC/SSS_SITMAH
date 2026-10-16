@@ -1306,8 +1306,12 @@ export default function InventarioTecnologico() {
         const tableRows = [];
 
         registros.forEach(eq => {
+          const tipoMeta = TIPOS_EQUIPO.find(t => t.value === eq.tipo);
+          const tipoNombre = (eq.tipo === 'otro' && obtenerNombreOtro(eq))
+            ? `${obtenerNombreOtro(eq)} (Otro)`
+            : (tipoMeta?.label || (eq.tipo ? eq.tipo.charAt(0).toUpperCase() + eq.tipo.slice(1).replace(/_/g, ' ') : 'N/A'));
           tableRows.push([
-            eq.tipo || 'N/A',
+            tipoNombre,
             eq.responsable ? `${eq.responsable}${eq.cargoResponsable ? `\n${eq.cargoResponsable}` : ''}` : 'N/A',
             eq.numeroInventario || 'N/A',
             eq.numeroSerie || 'N/A',
@@ -1680,6 +1684,26 @@ export default function InventarioTecnologico() {
       try { det = JSON.parse(det); } catch { det = {}; }
     }
     return det?.nombre || det?.nombreEquipo || det?.especificarTipo || det?.otroTipo || '';
+  };
+
+  const obtenerResumenSpecs = (detalles) => {
+    if (!detalles) return '';
+    let det = detalles;
+    if (typeof det === 'string') {
+      try { det = JSON.parse(det); } catch { det = {}; }
+    }
+    if (!det || typeof det !== 'object') return '';
+    const partes = [];
+    if (det.procesador) partes.push(det.procesador);
+    if (det.ram) partes.push(`RAM ${det.ram}`);
+    if (det.almacenamiento) {
+      const alm = det.tipoAlmacenamiento ? `${det.almacenamiento} ${det.tipoAlmacenamiento}` : det.almacenamiento;
+      partes.push(alm);
+    }
+    if (det.sistemaOperativo) partes.push(det.sistemaOperativo);
+    if (det.tarjetaGrafica) partes.push(det.tarjetaGrafica);
+    if (det.red) partes.push(`Red: ${det.red}`);
+    return partes.join(' • ');
   };
 
 
@@ -2152,7 +2176,7 @@ export default function InventarioTecnologico() {
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
         <input
           type="text"
-          placeholder="Buscar en todos los campos..."
+          placeholder="Buscar por inv, serie, marca, modelo, procesador, RAM, almacenamiento, SO..."
           value={busqueda}
           onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }}
           style={{ padding: '0.75rem 1.25rem', border: '1px solid #CBD5E1', borderRadius: '8px', flex: 1, minWidth: '300px', fontSize: '1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
@@ -2223,6 +2247,21 @@ export default function InventarioTecnologico() {
                     <td style={{ padding: '1.25rem' }}>
                       <div style={{ fontWeight: '600', color: '#1e293b' }}>{item.marca || 'N/A'}</div>
                       <div style={{ fontSize: '0.9rem', color: '#64748b' }}>{item.modelo || 'N/A'}</div>
+                      {Boolean(obtenerResumenSpecs(item.detalles)) && (
+                        <div style={{
+                          marginTop: '0.35rem',
+                          fontSize: '0.75rem',
+                          color: '#0369a1',
+                          backgroundColor: '#f0f9ff',
+                          border: '1px solid #bae6fd',
+                          borderRadius: '4px',
+                          padding: '0.2rem 0.45rem',
+                          lineHeight: '1.3',
+                          maxWidth: '260px'
+                        }}>
+                          {obtenerResumenSpecs(item.detalles)}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '1.25rem' }}>
                       <div style={{ color: '#334155', fontWeight: '500' }}>{item.direccion || 'N/A'}</div>

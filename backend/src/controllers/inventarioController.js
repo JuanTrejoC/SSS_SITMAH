@@ -4,6 +4,54 @@ const { ok, fail } = require('../utils/response');
 const { parsePagination } = require('../utils/filters');
 const { exportarInventarioExistencias, exportarInventarioMobiliario, exportarHerramientasExcel } = require('../services/excelService');
 
+function construirCondicionesBusquedaEquipo(search) {
+  if (!search || !search.trim()) return [];
+  const raw = search.trim();
+  const terms = new Set([raw]);
+  const compacto = raw.replace(/\s+/g, '');
+  if (compacto) terms.add(compacto);
+  const conEspacio = raw.replace(/(\d+)(gb|tb|mb|ghz|mhz)/gi, '$1 $2');
+  if (conEspacio) terms.add(conEspacio);
+
+  const orConditions = [];
+  for (const term of terms) {
+    orConditions.push(
+      { tipo: { contains: term } },
+      { numeroInventario: { contains: term } },
+      { numeroSerie: { contains: term } },
+      { marca: { contains: term } },
+      { modelo: { contains: term } },
+      { responsable: { contains: term } },
+      { cargoResponsable: { contains: term } },
+      { areaUbicacion: { contains: term } },
+      { direccion: { contains: term } },
+      { procedencia: { contains: term } },
+      { estatus: { contains: term } },
+
+      // Especificaciones técnicas de escritorio y equipos en JSON detalles
+      { detalles: { path: '$.procesador', string_contains: term } },
+      { detalles: { path: '$.ram', string_contains: term } },
+      { detalles: { path: '$.almacenamiento', string_contains: term } },
+      { detalles: { path: '$.tipoAlmacenamiento', string_contains: term } },
+      { detalles: { path: '$.sistemaOperativo', string_contains: term } },
+      { detalles: { path: '$.tarjetaGrafica', string_contains: term } },
+      { detalles: { path: '$.red', string_contains: term } },
+      { detalles: { path: '$.mac', string_contains: term } },
+      { detalles: { path: '$.ipPredeterminada', string_contains: term } },
+      { detalles: { path: '$.nombre', string_contains: term } },
+      { detalles: { path: '$.especificarTipo', string_contains: term } },
+      { detalles: { path: '$.marcaTeclado', string_contains: term } },
+      { detalles: { path: '$.modeloTeclado', string_contains: term } },
+      { detalles: { path: '$.marcaMouse', string_contains: term } },
+      { detalles: { path: '$.modeloMouse', string_contains: term } },
+      { detalles: { path: '$.marcaRegulador', string_contains: term } },
+      { detalles: { path: '$.modeloRegulador', string_contains: term } },
+      { detalles: { path: '$.megapixeles', string_contains: term } }
+    );
+  }
+  return orConditions;
+}
+
 // Schema validation for mobiliario
 const mobiliarioSchema = z.object({
   numeroInventario: z.string().min(1, "El número de inventario es requerido"),
@@ -105,19 +153,7 @@ async function listarEquipoTecnologico(req, res) {
   if (area) where.areaUbicacion = { contains: area };
 
   if (search) {
-    where.OR = [
-      { tipo: { contains: search } },
-      { numeroInventario: { contains: search } },
-      { numeroSerie: { contains: search } },
-      { marca: { contains: search } },
-      { modelo: { contains: search } },
-      { responsable: { contains: search } },
-      { cargoResponsable: { contains: search } },
-      { areaUbicacion: { contains: search } },
-      { direccion: { contains: search } },
-      { procedencia: { contains: search } },
-      { estatus: { contains: search } },
-    ];
+    where.OR = construirCondicionesBusquedaEquipo(search);
   }
 
   const [items, total] = await Promise.all([
@@ -810,19 +846,7 @@ async function exportarEquipoTecnologicoExcel(req, res) {
   if (area) where.areaUbicacion = { contains: area };
 
   if (search) {
-    where.OR = [
-      { tipo: { contains: search } },
-      { numeroInventario: { contains: search } },
-      { numeroSerie: { contains: search } },
-      { marca: { contains: search } },
-      { modelo: { contains: search } },
-      { responsable: { contains: search } },
-      { cargoResponsable: { contains: search } },
-      { areaUbicacion: { contains: search } },
-      { direccion: { contains: search } },
-      { procedencia: { contains: search } },
-      { estatus: { contains: search } },
-    ];
+    where.OR = construirCondicionesBusquedaEquipo(search);
   }
   
   if (mes) {

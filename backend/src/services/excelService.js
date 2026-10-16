@@ -486,23 +486,121 @@ async function exportarReportesSemaforo(reportes, incluirImagenes = false) {
   return workbook.xlsx.writeBuffer();
 }
 
+const MAPA_TIPOS_EQUIPO = {
+  escritorio: 'Escritorio',
+  laptop: 'Laptop',
+  tableta: 'Tableta',
+  servidor: 'Servidor',
+  teclado: 'Teclado',
+  mouse: 'Mouse',
+  adaptador: 'Adaptador / Hub USB',
+  antena_wifi: 'Antena / Adaptador WiFi',
+  cargador: 'Cargador / Eliminador',
+  cable: 'Cable (HDMI, Red, DisplayPort)',
+  router: 'Router',
+  switch: 'Switch',
+  firewall: 'Firewall',
+  access_point: 'Access Point',
+  antena: 'Antena Microonda',
+  internet: 'Internet / Módem',
+  camara: 'Cámara de Videovigilancia',
+  dvr: 'DVR',
+  impresora: 'Impresora',
+  plotter: 'Plotter',
+  pantalla: 'Pantalla',
+  monitor: 'Monitor',
+  videowall: 'Controlador de Videowall',
+  celular: 'Celular',
+  telefono: 'Teléfono',
+  radio: 'Radio',
+  aire: 'Aire Acondicionado',
+  no_break: 'No Break (UPS)',
+  regulador: 'Regulador',
+  lectora_tags: 'Lectora de Tags',
+  controladora: 'Controladora',
+  terminal_multibiometrica: 'Terminal Multibiométrica',
+  ram: 'Memoria RAM',
+  almacenamiento: 'Disco Duro / SSD',
+  cabezal: 'Cabezal de Impresión',
+  refaccion: 'Refacción',
+  herramienta_tec: 'Herramienta Tecnológica',
+  herramienta_infra: 'Herramienta de Infraestructura',
+  otro: 'Otro'
+};
+
+function formatearTipoEquipo(tipo, detalles) {
+  if (!tipo) return 'N/A';
+  const tipoNorm = String(tipo).toLowerCase().trim();
+  
+  if (tipoNorm === 'otro') {
+    const custom = detalles?.nombre || detalles?.nombreEquipo || detalles?.especificarTipo || detalles?.otroTipo;
+    if (custom && String(custom).trim()) {
+      const customTrim = String(custom).trim();
+      const customCap = customTrim.charAt(0).toUpperCase() + customTrim.slice(1);
+      return `${customCap} (Otro)`;
+    }
+    return 'Otro';
+  }
+
+  if (MAPA_TIPOS_EQUIPO[tipoNorm]) {
+    return MAPA_TIPOS_EQUIPO[tipoNorm];
+  }
+
+  return tipoNorm
+    .replace(/_/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+function formatearEstatus(estatus) {
+  if (!estatus) return 'Activo';
+  const estNorm = String(estatus).toLowerCase().trim();
+  const mapa = {
+    activo: 'Activo',
+    operando: 'Operando',
+    stock: 'Stock',
+    refacciones: 'Refacciones',
+    mantenimiento: 'Mantenimiento',
+    baja: 'Baja',
+    'en reparacion': 'En Reparación',
+    'en reparación': 'En Reparación',
+    'por reparar': 'Por Reparar',
+    'buen estado': 'Buen Estado',
+    regular: 'Regular',
+    dañada: 'Dañada',
+    danada: 'Dañada',
+    dañado: 'Dañado',
+    danado: 'Dañado'
+  };
+  return mapa[estNorm] || (estatus.charAt(0).toUpperCase() + estatus.slice(1));
+}
+
+function formatearTextoCapitalizado(texto) {
+  if (!texto) return 'N/A';
+  const str = String(texto).trim();
+  if (str === '' || str.toUpperCase() === 'N/A') return 'N/A';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 async function exportarInventarioExistencias(existencias, incluirImagenes = false) {
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('Inventario Herramientas');
+  const sheet = workbook.addWorksheet('Inventario Tecnológico');
 
   const tieneImagenes = incluirImagenes && existencias.some(e => e.evidencias && e.evidencias.some(ev => ev.mimetype?.startsWith('image/')));
 
   sheet.columns = [
-    { header: 'Tipo', key: 'tipo', width: 20 },
-    { header: 'Responsable', key: 'responsable', width: 25 },
-    { header: 'No. Inventario', key: 'numeroInventario', width: 22 },
-    { header: 'No. Serie', key: 'numeroSerie', width: 22 },
-    { header: 'Marca / Modelo', key: 'marcaModelo', width: 25 },
-    { header: 'Área', key: 'direccion', width: 22 },
-    { header: 'Ubicación', key: 'areaUbicacion', width: 22 },
+    { header: 'Tipo de Equipo', key: 'tipo', width: 22 },
+    { header: 'Responsable', key: 'responsable', width: 28 },
+    { header: 'No. de Inventario', key: 'numeroInventario', width: 22 },
+    { header: 'No. de Serie', key: 'numeroSerie', width: 22 },
+    { header: 'Marca / Modelo', key: 'marcaModelo', width: 26 },
+    { header: 'Área', key: 'direccion', width: 24 },
+    { header: 'Ubicación', key: 'areaUbicacion', width: 24 },
     { header: 'Procedencia', key: 'procedencia', width: 20 },
-    { header: 'Estatus', key: 'estatus', width: 15 },
-    { header: 'Especificaciones Técnicas', key: 'especificaciones', width: 35 },
+    { header: 'Estatus', key: 'estatus', width: 16 },
+    { header: 'Especificaciones Técnicas', key: 'especificaciones', width: 36 },
     { header: 'Monitores', key: 'monitores', width: 35 },
     { header: 'Teclado', key: 'teclado', width: 25 },
     { header: 'Mouse', key: 'mouse', width: 25 },
@@ -514,6 +612,11 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
   for (let i = 0; i < existencias.length; i++) {
     const e = existencias[i];
     
+    let det = e.detalles;
+    if (typeof det === 'string') {
+      try { det = JSON.parse(det); } catch { det = {}; }
+    }
+
     let especificacionesStr = '';
     let monitoresStr = '';
     let tecladoStr = '';
@@ -521,24 +624,43 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
     let cargadorStr = '';
     let diademaStr = '';
 
-    if (e.detalles && typeof e.detalles === 'object') {
+    if (det && typeof det === 'object') {
        const espPartes = [];
        const mapKeys = {
-         ipPredeterminada: 'IP',
-         sistemaOperativo: 'OS',
-         tarjetaGrafica: 'Gráfica',
-         pantallasAsignadas: 'Pantallas',
-         numeroTelefono: 'Teléfono',
+         procesador: 'Procesador',
+         ram: 'Memoria RAM',
+         almacenamiento: 'Almacenamiento',
+         tipoAlmacenamiento: 'Tipo de Almacenamiento',
+         sistemaOperativo: 'Sistema Operativo',
+         tarjetaGrafica: 'Tarjeta Gráfica',
+         red: 'Conectividad de Red',
+         mac: 'Dirección MAC',
+         ipPredeterminada: 'Dirección IP',
+         pantallasAsignadas: 'Pantallas Asignadas',
+         numeroTelefono: 'Número Telefónico',
+         puertos: 'Puertos',
+         puertosRed: 'Puertos de Red',
+         especificarTipo: 'Tipo Especificado',
+         observaciones: 'Observaciones',
+         capacidad: 'Capacidad',
+         voltaje: 'Voltaje',
+         amperaje: 'Amperaje',
+         resolucion: 'Resolución',
+         megapixeles: 'Megapíxeles',
+         tipoToner: 'Tipo de Tóner',
+         modeloToner: 'Modelo de Tóner',
+         colorToner: 'Color de Tóner',
+         rendimiento: 'Rendimiento'
        };
 
-       for (let k in e.detalles) {
-         if (e.detalles[k] !== undefined && e.detalles[k] !== null && typeof e.detalles[k] !== 'boolean') {
-            if (k === 'monitores' && Array.isArray(e.detalles[k])) {
-               const mons = e.detalles[k];
+       for (let k in det) {
+         if (det[k] !== undefined && det[k] !== null && typeof det[k] !== 'boolean') {
+            if (k === 'monitores' && Array.isArray(det[k])) {
+               const mons = det[k];
                const mPartes = [];
                mons.forEach((m, idx) => {
-                 if(m.marca || m.modelo || m.serie || m.numeroInventario) {
-                   mPartes.push(`Monitor ${idx + 1}:\nMarca: ${m.marca||'N/A'}\nModelo: ${m.modelo||'N/A'}\nSN: ${m.serie||'N/A'}\nInv: ${m.numeroInventario||'N/A'}\n`);
+                 if (m.marca || m.modelo || m.serie || m.numeroInventario) {
+                   mPartes.push(`Monitor ${idx + 1}:\nMarca: ${m.marca || 'N/A'}\nModelo: ${m.modelo || 'N/A'}\nNo. Serie: ${m.serie || 'N/A'}\nNo. Inventario: ${m.numeroInventario || 'N/A'}\n`);
                  }
                });
                monitoresStr = mPartes.join('\n').trim();
@@ -550,40 +672,47 @@ async function exportarInventarioExistencias(existencias, incluirImagenes = fals
                // Procesado abajo
             } else if (k.startsWith('marcaDiadema') || k.startsWith('modeloDiadema') || k.startsWith('serieDiadema') || k.startsWith('numeroInventarioDiadema')) {
                // Procesado abajo
-            } else if (k === 'cantidadMonitores' || k === 'tieneMonitores' || k === 'tieneCargador' || k === 'tieneDiadema') {
-               // Omitir
+            } else if (k === 'cantidadMonitores' || k === 'tieneMonitores' || k === 'tieneCargador' || k === 'tieneDiadema' || k === 'tieneTeclado' || k === 'tieneMouse') {
+               // Omitir booleanos/flags
             } else {
                const label = mapKeys[k] || k.charAt(0).toUpperCase() + k.slice(1).replace(/([A-Z])/g, ' $1');
-               espPartes.push(`${label}: ${e.detalles[k]}`);
+               let valStr = String(det[k]);
+               if (k === 'red') {
+                 const rLow = valStr.toLowerCase();
+                 if (rLow === 'wifi') valStr = 'WiFi';
+                 else if (rLow === 'ethernet') valStr = 'Ethernet';
+                 else if (rLow === 'ambos') valStr = 'Ethernet y WiFi';
+               }
+               espPartes.push(`${label}: ${valStr}`);
             }
          }
        }
        especificacionesStr = espPartes.join('\n');
 
-       if (e.detalles.tieneTeclado || e.detalles.marcaTeclado || e.detalles.serieTeclado || e.detalles.numeroInventarioTeclado) {
-          tecladoStr = `Marca: ${e.detalles.marcaTeclado || 'N/A'}\nModelo: ${e.detalles.modeloTeclado || 'N/A'}\nSN: ${e.detalles.serieTeclado || 'N/A'}\nInv: ${e.detalles.numeroInventarioTeclado || 'N/A'}`;
+       if (det.tieneTeclado || det.marcaTeclado || det.serieTeclado || det.numeroInventarioTeclado || det.modeloTeclado) {
+          tecladoStr = `Marca: ${det.marcaTeclado || 'N/A'}\nModelo: ${det.modeloTeclado || 'N/A'}\nNo. Serie: ${det.serieTeclado || 'N/A'}\nNo. Inventario: ${det.numeroInventarioTeclado || 'N/A'}`;
        }
-       if (e.detalles.tieneMouse || e.detalles.marcaMouse || e.detalles.serieMouse || e.detalles.numeroInventarioMouse) {
-          mouseStr = `Marca: ${e.detalles.marcaMouse || 'N/A'}\nModelo: ${e.detalles.modeloMouse || 'N/A'}\nSN: ${e.detalles.serieMouse || 'N/A'}\nInv: ${e.detalles.numeroInventarioMouse || 'N/A'}`;
+       if (det.tieneMouse || det.marcaMouse || det.serieMouse || det.numeroInventarioMouse || det.modeloMouse) {
+          mouseStr = `Marca: ${det.marcaMouse || 'N/A'}\nModelo: ${det.modeloMouse || 'N/A'}\nNo. Serie: ${det.serieMouse || 'N/A'}\nNo. Inventario: ${det.numeroInventarioMouse || 'N/A'}`;
        }
-       if (e.detalles.tieneCargador || e.detalles.marcaCargador || e.detalles.serieCargador || e.detalles.numeroInventarioCargador) {
-          cargadorStr = `Marca: ${e.detalles.marcaCargador || 'N/A'}\nModelo: ${e.detalles.modeloCargador || 'N/A'}\nSN: ${e.detalles.serieCargador || 'N/A'}\nInv: ${e.detalles.numeroInventarioCargador || 'N/A'}`;
+       if (det.tieneCargador || det.marcaCargador || det.serieCargador || det.numeroInventarioCargador || det.modeloCargador) {
+          cargadorStr = `Marca: ${det.marcaCargador || 'N/A'}\nModelo: ${det.modeloCargador || 'N/A'}\nNo. Serie: ${det.serieCargador || 'N/A'}\nNo. Inventario: ${det.numeroInventarioCargador || 'N/A'}`;
        }
-       if (e.detalles.tieneDiadema || e.detalles.marcaDiadema || e.detalles.serieDiadema || e.detalles.numeroInventarioDiadema) {
-          diademaStr = `Marca: ${e.detalles.marcaDiadema || 'N/A'}\nModelo: ${e.detalles.modeloDiadema || 'N/A'}\nSN: ${e.detalles.serieDiadema || 'N/A'}\nInv: ${e.detalles.numeroInventarioDiadema || 'N/A'}`;
+       if (det.tieneDiadema || det.marcaDiadema || det.serieDiadema || det.numeroInventarioDiadema || det.modeloDiadema) {
+          diademaStr = `Marca: ${det.marcaDiadema || 'N/A'}\nModelo: ${det.modeloDiadema || 'N/A'}\nNo. Serie: ${det.serieDiadema || 'N/A'}\nNo. Inventario: ${det.numeroInventarioDiadema || 'N/A'}`;
        }
     }
 
     const rowData = {
-      tipo: e.tipo || 'N/A',
+      tipo: formatearTipoEquipo(e.tipo, det),
       responsable: e.responsable ? `${e.responsable}${e.cargoResponsable ? `\n${e.cargoResponsable}` : ''}` : 'N/A',
       numeroInventario: e.numeroInventario || 'N/A',
       numeroSerie: e.numeroSerie || 'N/A',
       marcaModelo: `${e.marca || 'N/A'} \n ${e.modelo || 'N/A'}`,
       direccion: e.direccion || 'N/A',
       areaUbicacion: e.areaUbicacion || 'N/A',
-      procedencia: e.procedencia || 'N/A',
-      estatus: e.estatus || 'Activo',
+      procedencia: formatearTextoCapitalizado(e.procedencia),
+      estatus: formatearEstatus(e.estatus),
       especificaciones: especificacionesStr,
       monitores: monitoresStr,
       teclado: tecladoStr,
