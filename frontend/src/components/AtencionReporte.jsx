@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react'
 import Swal from 'sweetalert2'
 import { FaCheckCircle, FaCamera, FaSignature, FaTrash, FaCalendarAlt, FaUserCheck, FaTools, FaEdit, FaLock, FaTimes, FaSave, FaExclamationTriangle } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
+import { notificarCambioReporte } from '../utils/notificacionesLeidas'
 
 export default function AtencionReporte({ reporte, tipo, user: propUser, onActualizado, apiBaseUrl }) {
   const { user: contextUser } = useAuth() || {}
@@ -295,6 +296,7 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
 
       if (res.ok && json.ok) {
         Swal.fire('¡Reporte Resuelto!', 'La atención, evidencia y firma han sido registradas exitosamente.', 'success')
+        notificarCambioReporte()
         if (onActualizado) {
           onActualizado(json.data)
         }

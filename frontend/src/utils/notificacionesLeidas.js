@@ -52,3 +52,8 @@ export function marcarNotificacionLeida(idOrIds) {
   window.dispatchEvent(new CustomEvent(EVENTO_NOTIF_LEIDA, { detail: { id: idOrIds } }));
 }
 
+export const EVENTO_NOTIF_RECARGAR = 'sitmah:notificacion-recargar';
+
+export function notificarCambioReporte() {
+  window.dispatchEvent(new CustomEvent(EVENTO_NOTIF_RECARGAR));
+}

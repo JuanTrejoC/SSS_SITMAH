@@ -83,9 +83,161 @@ const normalizarEstado = (est) => {
 const obtenerGrupoBase = (item) => {
   const nombreRaw = (item.nombre || '').trim();
   const n = nombreRaw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const catRaw = (item.categoria || item.tipo || '').toLowerCase();
+  const catRaw = (item.tipo || item.categoria || '').toLowerCase().trim();
+  const marcaRaw = (item.marca || '').toLowerCase().trim();
+  const modeloRaw = (item.modelo || '').toLowerCase().trim();
 
-  // Detección por palabras clave para agrupar todos los teclados, mouses, rams, etc.
+  // 1. Detección de No Break / Regulador / UPS (incluyendo marcas reconocidas como APC)
+  if (
+    catRaw === 'no_break' ||
+    catRaw === 'regulador' ||
+    n.includes('no break') ||
+    n.includes('nobreak') ||
+    n.includes('regulador') ||
+    n.includes('ups') ||
+    marcaRaw === 'apc' ||
+    n.startsWith('apc') ||
+    n.includes('apc ') ||
+    n.includes('be850') ||
+    modeloRaw.includes('be850') ||
+    n.includes('back-ups') ||
+    n.includes('smart-ups')
+  ) {
+    const esRegulador = catRaw === 'regulador' || n.includes('regulador');
+    return {
+      nombreBase: esRegulador ? 'Regulador de Voltaje' : 'No Break (UPS)',
+      categoria: esRegulador ? 'regulador' : 'no_break',
+      tipoKey: esRegulador ? 'regulador' : 'no_break'
+    };
+  }
+
+  // 2. Detección de Access Point (SOLO equipos de red reales, NO subcadenas como APC o laptop)
+  if (
+    catRaw === 'access_point' ||
+    n.includes('access point') ||
+    n.includes('accesspoint') ||
+    n.includes('fortiap') ||
+    n.includes('unifi ap') ||
+    /\bap\b/i.test(nombreRaw) ||
+    /\bfap[-\s]/i.test(nombreRaw) ||
+    /\bfap\b/i.test(modeloRaw)
+  ) {
+    return {
+      nombreBase: 'Access Point',
+      categoria: 'access_point',
+      tipoKey: 'access_point'
+    };
+  }
+
+  // 3. Switch de Red
+  if (catRaw === 'switch' || n.includes('switch') || modeloRaw.startsWith('sf110') || modeloRaw.startsWith('sg110') || modeloRaw.startsWith('catalyst')) {
+    return {
+      nombreBase: 'Switch de Red',
+      categoria: 'switch',
+      tipoKey: 'switch'
+    };
+  }
+
+  // 4. Router
+  if (catRaw === 'router' || n.includes('router')) {
+    return {
+      nombreBase: 'Router',
+      categoria: 'router',
+      tipoKey: 'router'
+    };
+  }
+
+  // 5. Firewall
+  if (catRaw === 'firewall' || n.includes('firewall') || n.includes('fortigate') || modeloRaw.startsWith('faz-') || modeloRaw.includes('fortigate')) {
+    return {
+      nombreBase: 'Firewall',
+      categoria: 'firewall',
+      tipoKey: 'firewall'
+    };
+  }
+
+  // 6. Cámara de Videovigilancia
+  if (catRaw === 'camara' || n.includes('camara') || modeloRaw.startsWith('ds-2') || modeloRaw.startsWith('ds-1')) {
+    return {
+      nombreBase: 'Cámara de Videovigilancia',
+      categoria: 'camara',
+      tipoKey: 'camara'
+    };
+  }
+
+  // 7. DVR / NVR
+  if (catRaw === 'dvr' || n.includes('dvr') || n.includes('nvr') || modeloRaw.startsWith('ds-7')) {
+    return {
+      nombreBase: 'DVR / NVR',
+      categoria: 'dvr',
+      tipoKey: 'dvr'
+    };
+  }
+
+  // 8. Computadora de Escritorio
+  if (
+    catRaw === 'escritorio' ||
+    n.includes('escritorio') ||
+    n.includes('elitedesk') ||
+    n.includes('prodesk') ||
+    n.includes('optiplex') ||
+    n.includes('desktop') ||
+    modeloRaw.includes('d13s') ||
+    modeloRaw.includes('d15s') ||
+    modeloRaw.includes('pro sff')
+  ) {
+    return {
+      nombreBase: 'Computadora de Escritorio',
+      categoria: 'escritorio',
+      tipoKey: 'escritorio'
+    };
+  }
+
+  // 9. Laptop
+  if (catRaw === 'laptop' || n.includes('laptop') || n.includes('notebook') || n.includes('thinkpad') || n.includes('latitude') || n.includes('probook')) {
+    return {
+      nombreBase: 'Laptop',
+      categoria: 'laptop',
+      tipoKey: 'laptop'
+    };
+  }
+
+  // 10. Monitor / Pantalla
+  if (
+    catRaw === 'monitor' ||
+    catRaw === 'pantalla' ||
+    n.includes('monitor') ||
+    n.includes('pantalla') ||
+    modeloRaw.includes('elitedisplay') ||
+    modeloRaw.includes('e2016hv') ||
+    modeloRaw.includes('lv1911')
+  ) {
+    return {
+      nombreBase: 'Monitor',
+      categoria: 'monitor',
+      tipoKey: 'monitor'
+    };
+  }
+
+  // 11. Impresora / Plotter
+  if (catRaw === 'impresora' || catRaw === 'plotter' || n.includes('impresora') || n.includes('laserjet') || n.includes('plotter')) {
+    return {
+      nombreBase: 'Impresora',
+      categoria: 'impresora',
+      tipoKey: 'impresora'
+    };
+  }
+
+  // 12. Servidor
+  if (catRaw === 'servidor' || n.includes('servidor') || n.includes('poweredge') || n.includes('proliant')) {
+    return {
+      nombreBase: 'Servidor',
+      categoria: 'servidor',
+      tipoKey: 'servidor'
+    };
+  }
+
+  // 13. Periféricos y componentes comunes (Teclado, Mouse, RAM, Discos, Cables, etc.)
   if (n.includes('teclado') || n.includes('keyboard') || catRaw.includes('teclado')) {
     return {
       nombreBase: 'Teclado USB',
@@ -215,20 +367,6 @@ const obtenerGrupoBase = (item) => {
       nombreBase: 'Pila CR2032',
       categoria: 'componente',
       tipoKey: 'pila_cr2032'
-    };
-  }
-  if (n.includes('switch')) {
-    return {
-      nombreBase: 'Switch de Red',
-      categoria: 'equipo',
-      tipoKey: 'switch'
-    };
-  }
-  if (n.includes('access point') || n.includes('ap')) {
-    return {
-      nombreBase: 'Access Point',
-      categoria: 'equipo',
-      tipoKey: 'access_point'
     };
   }
   if (n.includes('lector')) {
@@ -375,6 +513,7 @@ export default function InventarioExistencias() {
             return {
               id: item.id,
               origen: 'equipo',
+              tipo: item.tipo,
               nombre: item.detalles?.nombre || `${item.marca || ''} ${item.modelo || ''}`.trim() || item.tipo,
               categoria: item.detalles?.categoria || item.tipo,
               cantidad: item.detalles?.cantidad ? Math.max(1, parseInt(item.detalles.cantidad, 10) || 1) : 1,
@@ -641,14 +780,43 @@ export default function InventarioExistencias() {
   };
 
   const getCategoriaLabel = (cat) => {
+    if (!cat) return 'General';
+    const c = String(cat).toLowerCase().trim();
     const categories = {
       componente: 'Componente',
       accesorio: 'Accesorio',
       periferico: 'Periférico',
       equipo: 'Equipo',
-      herramienta: 'Herramienta'
+      herramienta: 'Herramienta',
+      no_break: 'No Break (UPS)',
+      regulador: 'Regulador',
+      switch: 'Switch',
+      router: 'Router',
+      firewall: 'Firewall',
+      access_point: 'Access Point',
+      antena: 'Antena',
+      antena_wifi: 'Antena WiFi',
+      camara: 'Cámara',
+      dvr: 'DVR',
+      impresora: 'Impresora',
+      plotter: 'Plotter',
+      pantalla: 'Pantalla',
+      monitor: 'Monitor',
+      videowall: 'Videowall',
+      celular: 'Celular',
+      telefono: 'Teléfono',
+      radio: 'Radio',
+      aire: 'Aire Acond.',
+      servidor: 'Servidor',
+      escritorio: 'Escritorio',
+      laptop: 'Laptop',
+      tableta: 'Tableta',
+      ram: 'Memoria RAM',
+      almacenamiento: 'Almacenamiento',
+      otro: 'Otro'
     };
-    return categories[cat?.toLowerCase()] || cat || 'General';
+    if (categories[c]) return categories[c];
+    return c.replace(/_/g, ' ').toUpperCase();
   };
 
   const getCategoriaBg = (cat) => {
@@ -680,6 +848,26 @@ export default function InventarioExistencias() {
       case 'periferico': return <FaHdd style={{ color: '#ea580c' }} />;
       case 'equipo': return <FaTools style={{ color: '#ca8a04' }} />;
       case 'herramienta': return <FaWrench style={{ color: '#475569' }} />;
+      case 'no_break':
+      case 'regulador': return <FaPlug style={{ color: '#d97706' }} />;
+      case 'switch':
+      case 'router': return <FaNetworkWired style={{ color: '#2563eb' }} />;
+      case 'access_point':
+      case 'antena_wifi': return <FaWifi style={{ color: '#0284c7' }} />;
+      case 'firewall': return <FaShieldAlt style={{ color: '#dc2626' }} />;
+      case 'camara': return <FaVideo style={{ color: '#059669' }} />;
+      case 'dvr': return <FaHdd style={{ color: '#0284c7' }} />;
+      case 'monitor':
+      case 'pantalla': return <FaDesktop style={{ color: '#4f46e5' }} />;
+      case 'impresora':
+      case 'plotter': return <FaPrint style={{ color: '#7c3aed' }} />;
+      case 'escritorio': return <FaDesktop style={{ color: '#6366f1' }} />;
+      case 'laptop': return <FaLaptop style={{ color: '#4338ca' }} />;
+      case 'servidor': return <FaServer style={{ color: '#334155' }} />;
+      case 'tableta': return <FaTabletAlt style={{ color: '#0d9488' }} />;
+      case 'celular': return <FaMobileAlt style={{ color: '#e11d48' }} />;
+      case 'telefono': return <FaPhone style={{ color: '#2563eb' }} />;
+      case 'radio': return <FaMicrophone style={{ color: '#d97706' }} />;
       default: return <FaBoxes style={{ color: '#64748b' }} />;
     }
   };
@@ -1919,7 +2107,7 @@ export default function InventarioExistencias() {
           }
 
           return (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
               {(() => {
                 // AGRUPAR itemsFiltrados por tipo base, estadoFisico Y modelo específico
                 const gruposObj = {};
@@ -1966,10 +2154,18 @@ export default function InventarioExistencias() {
                     const colorQtyText = esStock ? '#047857' : esBaja ? '#b91c1c' : '#b45309';
                     const bgQtyPill = esStock ? '#ecfdf5' : esBaja ? '#fef2f2' : '#fffbeb';
 
+                    // Limpieza de marcas duplicadas como "HP HP..." o "Cisco Cisco..."
+                    const limpiarDuplicados = (str) => {
+                      if (!str) return '';
+                      return str.replace(/^(\b[a-zA-Z0-9]+\b)(?:\s+\1\b)+/i, '$1').trim();
+                    };
+
                     // Subtítulo muestra el modelo y marca correspondiente
-                    const subtitulo = grupo.modelo
+                    let subtitulo = grupo.modelo
                       ? `${grupo.marca && !grupo.modelo.toLowerCase().includes(grupo.marca.toLowerCase()) ? `${grupo.marca} ` : ''}${grupo.modelo}`
                       : (grupo.marca || '');
+                    subtitulo = limpiarDuplicados(subtitulo);
+                    const tituloLimpio = limpiarDuplicados(grupo.nombre);
 
                   return (
                     <div
@@ -2057,23 +2253,23 @@ export default function InventarioExistencias() {
                       {/* Middle: Title & Subtitle */}
                       <div style={{ paddingLeft: '0.5rem', flex: 1, minHeight: '55px' }}>
                         <h3 style={{
-                          fontSize: '1.1rem',
+                          fontSize: '1.05rem',
                           margin: '0 0 0.25rem 0',
                           fontWeight: '800',
                           color: '#0f172a',
-                          textTransform: 'capitalize'
+                          lineHeight: '1.3'
                         }}>
-                          {grupo.nombre}
+                          {tituloLimpio}
                         </h3>
-                        {subtitulo ? (
+                        {subtitulo && subtitulo.toLowerCase() !== tituloLimpio.toLowerCase() ? (
                           <div style={{ fontSize: '0.85rem', color: '#0369a1', fontWeight: '600' }}>
                             {subtitulo}
                           </div>
-                        ) : (
+                        ) : !subtitulo ? (
                           <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
                             Sin modelo
                           </div>
-                        )}
+                        ) : null}
                       </div>
 
                       {/* Bottom Row: Adjust Stock & Quantity */}

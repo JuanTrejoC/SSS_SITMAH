@@ -6,7 +6,7 @@ import { formatFolio } from '../utils/formatFolio'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { API_BASE_URL } from '../config'
 import AtencionReporte from '../components/AtencionReporte'
-import { marcarNotificacionLeida } from '../utils/notificacionesLeidas'
+import { marcarNotificacionLeida, notificarCambioReporte } from '../utils/notificacionesLeidas'
 
 export default function DashboardInfraestructura() {
   const { user } = useAuth()
@@ -328,6 +328,7 @@ export default function DashboardInfraestructura() {
       if (response.ok && json.ok) {
         Swal.fire('Actualizado', `El estado ha cambiado a ${obtenerNombreEstado(nuevoEstado)}`, 'success')
         cargarReportes()
+        notificarCambioReporte()
         if (verDetalle && verDetalle.id === id) {
           setVerDetalle(json.data)
         }
@@ -361,6 +362,7 @@ export default function DashboardInfraestructura() {
         if (response.ok && json.ok) {
           Swal.fire('Eliminado', 'Reporte eliminado correctamente', 'success')
           cargarReportes()
+          notificarCambioReporte()
         } else {
           Swal.fire('Error', 'Error al eliminar reporte: ' + (json.error || 'Desconocido'), 'error')
         }
@@ -988,6 +990,7 @@ export default function DashboardInfraestructura() {
                     onActualizado={(reporteActualizado) => {
                       setVerDetalle(reporteActualizado)
                       cargarReportes()
+                      notificarCambioReporte()
                     }}
                   />
                 </div>

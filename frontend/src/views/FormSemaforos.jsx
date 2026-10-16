@@ -350,9 +350,13 @@ export default function FormSemaforos({ usuarioActual }) {
       const horaSiniestro = formData.hora_dano || obtenerHoraActual()
       const horaCompleta = `${fechaSiniestro} ${horaSiniestro}:00`
 
-      let descripcionFinal = formData.descripcion?.trim() || ''
+      let descripcionFinal = ''
       if (mostrarOtro && formData.descripcion_otro?.trim()) {
-        descripcionFinal = `TIPO DE FALLA: ${formData.descripcion_otro}. ${descripcionFinal}`
+        const otroTxt = formData.descripcion_otro.trim()
+        const notasTxt = formData.descripcion?.trim() || ''
+        descripcionFinal = notasTxt ? `TIPO DE FALLA: ${otroTxt}. ${notasTxt}` : `TIPO DE FALLA: ${otroTxt}`
+      } else {
+        descripcionFinal = formData.descripcion?.trim() || ''
       }
 
       // Asegurar que no supere 250 caracteres en caso de concatenación
@@ -779,8 +783,16 @@ export default function FormSemaforos({ usuarioActual }) {
                     const v = e.target.value
                     setFormData({ ...formData, tipo_falla_id: v, descripcion_otro: '' })
                     const fallaObj = listaTiposFalla.find(f => String(f.id) === String(v))
-                    setMostrarOtro(fallaObj?.nombre?.toLowerCase().includes('otro') || false)
+                    const esOtro = fallaObj?.nombre?.toLowerCase().includes('otro') || v === 'otro' || v === '6'
+                    setMostrarOtro(esOtro)
                     validarCampo('tipo_falla_id', v)
+                    if (!esOtro) {
+                      setErrores(prev => {
+                        const copia = { ...prev }
+                        delete copia.descripcion_otro
+                        return copia
+                      })
+                    }
                   }}
                   className="premium-select"
                   style={{
@@ -791,11 +803,17 @@ export default function FormSemaforos({ usuarioActual }) {
                   {listaTiposFalla.map((tf, i) => (
                     <option key={i} value={tf.id}>{tf.nombre}</option>
                   ))}
+                  {!listaTiposFalla.some(f => f.nombre?.toLowerCase().includes('otro')) && (
+                    <option value="6">Otro</option>
+                  )}
                 </select>
                 {errores.tipo_falla_id && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.tipo_falla_id}</span>}
 
                 {mostrarOtro && (
                   <div style={{ marginTop: '0.75rem' }}>
+                    <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.35rem' }}>
+                      Especifique el Tipo de Falla <span style={{ color: '#EF4444' }}>*</span>
+                    </label>
                     <input
                       type="text"
                       placeholder="Especifique cuál es la falla observada..."
@@ -808,7 +826,7 @@ export default function FormSemaforos({ usuarioActual }) {
                       }}
                       className="premium-input"
                       style={{
-                        border: `1.5px solid ${errores.descripcion_otro ? '#EF4444' : '#D1D5DB'}`
+                        border: `1.5px solid ${errores.descripcion_otro ? '#EF4444' : formData.descripcion_otro?.trim() ? '#10B981' : '#D1D5DB'}`
                       }}
                     />
                     {errores.descripcion_otro && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.descripcion_otro}</span>}

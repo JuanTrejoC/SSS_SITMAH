@@ -7,7 +7,7 @@ import { formatFolio } from '../utils/formatFolio'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { API_BASE_URL } from '../config'
 import AtencionReporte from '../components/AtencionReporte'
-import { marcarNotificacionLeida } from '../utils/notificacionesLeidas'
+import { marcarNotificacionLeida, notificarCambioReporte } from '../utils/notificacionesLeidas'
 
 export default function DashboardSemaforos() {
   const { user } = useAuth()
@@ -340,6 +340,7 @@ export default function DashboardSemaforos() {
       const json = await response.json()
       if (response.ok && json.ok) {
         cargarReportes()
+        notificarCambioReporte()
       } else {
         Swal.fire('Error', 'Error al cambiar el estado: ' + (json.error || 'Desconocido'), 'error');
       }
@@ -373,6 +374,7 @@ export default function DashboardSemaforos() {
         if (response.ok && json.ok) {
           Swal.fire('Eliminado', 'Reporte eliminado correctamente', 'success');
           cargarReportes()
+          notificarCambioReporte()
         } else {
           Swal.fire('Error', 'Error al eliminar reporte: ' + (json.error || 'Desconocido'), 'error');
         }
@@ -437,6 +439,20 @@ export default function DashboardSemaforos() {
       case 'resuelto': return 'Resuelto'
       default: return estado
     }
+  }
+
+  const obtenerTextoFalla = (rep) => {
+    if (!rep) return '—'
+    const nombre = rep.tipoFalla?.nombre
+    if (!nombre) return '—'
+    if (nombre.toLowerCase().startsWith('otro')) {
+      const match = (rep.descripcion || '').match(/TIPO DE FALLA:\s*([^.]+)/i)
+      if (match && match[1]) {
+        return `Otro (${match[1].trim()})`
+      }
+      return 'Otro'
+    }
+    return nombre
   }
 
   return (
@@ -650,7 +666,7 @@ export default function DashboardSemaforos() {
                         <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>
                           {r.crucero?.nombre || '—'}
                         </td>
-                        <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>{r.tipoFalla?.nombre || '—'}</td>
+                        <td style={{ padding: '0.85rem 1rem', color: '#4B5563' }}>{obtenerTextoFalla(r)}</td>
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>
                           <select
                             value={r.estado}
@@ -754,7 +770,7 @@ export default function DashboardSemaforos() {
                 <div><strong>Nombre de quien reporta:</strong> {verDetalle.jefeTurno || verDetalle.jefe_turno || '—'}</div>
                 <div><strong>Origen del Reporte:</strong> {verDetalle.origen || '—'}</div>
                 <div><strong>Crucero Afectado:</strong> {verDetalle.crucero?.nombre || '—'}</div>
-                <div><strong>Tipo de Falla:</strong> {verDetalle.tipoFalla?.nombre || '—'}</div>
+                <div><strong>Tipo de Falla:</strong> {obtenerTextoFalla(verDetalle)}</div>
                 <div><strong>Fecha y Hora del Siniestro:</strong> {verDetalle.horaDano ? new Date(verDetalle.horaDano).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' }) : '—'}</div>
                 <div>
                   <strong>Estado:</strong> {obtenerNombreEstado(verDetalle.estado)}
@@ -1112,6 +1128,7 @@ export default function DashboardSemaforos() {
                     onActualizado={(reporteActualizado) => {
                       setVerDetalle(reporteActualizado)
                       cargarReportes()
+                      notificarCambioReporte()
                     }}
                   />
                 </div>

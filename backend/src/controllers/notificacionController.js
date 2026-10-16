@@ -22,10 +22,15 @@ async function obtenerNotificaciones(req, res) {
     const rolUsuario = req.usuario?.rol;
 
     if (rolUsuario === 'infraestructura') {
+      const filtroInfraActivos = {
+        ...filtroSoloInfra,
+        estado: { in: ['abierto', 'en_proceso'] }
+      };
+
       const [reportesInfra, pendientesInfra] = await Promise.all([
         prisma.reporteOficina.findMany({
-          where: filtroSoloInfra,
-          take: 20,
+          where: filtroInfraActivos,
+          take: 50,
           orderBy: { id: 'desc' },
           select: {
             id: true,
@@ -41,7 +46,7 @@ async function obtenerNotificaciones(req, res) {
           },
         }),
         prisma.reporteOficina.count({
-          where: { ...filtroSoloInfra, estado: { in: ['abierto', 'en_proceso'] } },
+          where: filtroInfraActivos,
         }),
       ]);
 
@@ -69,10 +74,19 @@ async function obtenerNotificaciones(req, res) {
       });
     }
 
+    const filtroOficinaActivos = {
+      ...filtroExcluirInfra,
+      estado: { in: ['abierto', 'en_proceso'] }
+    };
+
+    const filtroSemaforoActivos = {
+      estado: { in: ['abierto', 'en_proceso'] }
+    };
+
     const [reportesOficina, reportesSemaforo, pendientesOficina, pendientesSemaforo] = await Promise.all([
       prisma.reporteOficina.findMany({
-        where: filtroExcluirInfra,
-        take: 20,
+        where: filtroOficinaActivos,
+        take: 50,
         orderBy: { id: 'desc' },
         select: {
           id: true,
@@ -88,7 +102,8 @@ async function obtenerNotificaciones(req, res) {
         },
       }),
       prisma.reporteSemaforo.findMany({
-        take: 20,
+        where: filtroSemaforoActivos,
+        take: 50,
         orderBy: { id: 'desc' },
         select: {
           id: true,
@@ -104,10 +119,10 @@ async function obtenerNotificaciones(req, res) {
         },
       }),
       prisma.reporteOficina.count({
-        where: { ...filtroExcluirInfra, estado: { in: ['abierto', 'en_proceso'] } },
+        where: filtroOficinaActivos,
       }),
       prisma.reporteSemaforo.count({
-        where: { estado: { in: ['abierto', 'en_proceso'] } },
+        where: filtroSemaforoActivos,
       }),
     ]);
 

@@ -93,7 +93,7 @@ async function main() {
     "B. JUÁREZ - BOCANEGRA",
     "B. JUÁREZ - 16 DE ENERO"
   ];
-  const fallas = ['Falla Eléctrica', 'Luz Fundida', 'Controlador Apagado', 'Vandalismo', 'Cortocircuito'];
+  const fallas = ['Falla Eléctrica', 'Luz Fundida', 'Controlador Apagado', 'Vandalismo', 'Cortocircuito', 'Otro'];
 
   const cargos = [
     { id: 1, nombre: "Técnico Especializado", activo: true },

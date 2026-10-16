@@ -9,7 +9,7 @@ import Swal from 'sweetalert2'
 import AtencionReporte from '../components/AtencionReporte'
 import ModalAsignacionEquipo from '../components/ModalAsignacionEquipo'
 import ModalReemplazoEquipo from '../components/ModalReemplazoEquipo'
-import { marcarNotificacionLeida } from '../utils/notificacionesLeidas'
+import { marcarNotificacionLeida, notificarCambioReporte } from '../utils/notificacionesLeidas'
 
 export default function DashboardOficinas() {
   const { user } = useAuth()
@@ -384,6 +384,7 @@ export default function DashboardOficinas() {
       const json = await response.json()
       if (response.ok && json.ok) {
         cargarReportes()
+        notificarCambioReporte()
       } else {
         Swal.fire('Error', 'Error al cambiar el estado: ' + (json.error || 'Desconocido'), 'error');
       }
@@ -418,6 +419,7 @@ export default function DashboardOficinas() {
         if (response.ok && json.ok) {
           Swal.fire('Eliminado', 'Reporte eliminado correctamente', 'success');
           cargarReportes()
+          notificarCambioReporte()
         } else {
           Swal.fire('Error', 'Error al eliminar reporte: ' + (json.error || 'Desconocido'), 'error');
         }
@@ -1228,6 +1230,7 @@ export default function DashboardOficinas() {
                     onActualizado={(reporteActualizado) => {
                       setVerDetalle(reporteActualizado)
                       cargarReportes()
+                      notificarCambioReporte()
                     }}
                   />
                 </div>
