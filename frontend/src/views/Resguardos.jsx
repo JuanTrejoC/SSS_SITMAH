@@ -555,13 +555,18 @@ function Resguardos() {
         if (dataTec.ok && dataTec.data) {
           const arrTec = Array.isArray(dataTec.data) ? dataTec.data : (dataTec.data.items || []);
           items = [...items, ...arrTec.map(i => {
-            const titulo = `EQUIPO ${i.tipo || 'TECNOLÓGICO'} ${i.marca || ''} ${i.modelo || ''}`.replace(/\s+/g, ' ').trim().toUpperCase();
+            const esOtro = (i.tipo || '').toLowerCase() === 'otro';
+            const det = i.detalles;
+            const nombreReal = esOtro
+              ? ((typeof det === 'object' && det) ? (det.nombre || det.nombreEquipo || det.especificarTipo || '') : '') || i.modelo || 'EQUIPO ESPECIAL'
+              : (i.tipo || 'TECNOLÓGICO');
+            const titulo = `${nombreReal} ${i.marca || ''} ${i.modelo || ''}`.replace(/\s+/g, ' ').trim().toUpperCase();
             const detalle = i.observaciones || i.caracteristicas || `MARCA ${i.marca || 'S/M'}, MODELO ${i.modelo || 'S/M'}`;
             const desc = detalle ? `${titulo}\n\n${detalle}` : titulo;
             return {
               ...i,
               __formTipo: 'tecnologico',
-              label: `[Tecnológico] ${i.tipo} - ${i.numeroInventario || i.marca || ''}`,
+              label: `[Tecnológico] ${nombreReal} - ${i.numeroInventario || i.marca || i.modelo || ''}`,
               desc: desc,
               sn: i.numeroSerie || 'S/S',
               nombreResguardante: i.responsable || '',
@@ -825,7 +830,15 @@ function Resguardos() {
 
   const getNombreItem = (r) => {
     if (r.tipoInventario === 'mobiliario' && r.mobiliario) return `${r.mobiliario.bien} - ${r.mobiliario.numeroInventario || ''}`;
-    if (r.tipoInventario === 'tecnologico' && r.equipoTecnologico) return `${r.equipoTecnologico.tipo} - ${r.equipoTecnologico.numeroInventario || r.equipoTecnologico.marca}`;
+    if (r.tipoInventario === 'tecnologico' && r.equipoTecnologico) {
+      const eq = r.equipoTecnologico;
+      const esOtro = (eq.tipo || '').toLowerCase() === 'otro';
+      const det = eq.detalles;
+      const nombreReal = esOtro
+        ? ((typeof det === 'object' && det) ? (det.nombre || det.nombreEquipo || det.especificarTipo || '') : '') || eq.modelo || 'Equipo Especial'
+        : eq.tipo;
+      return `${nombreReal} - ${eq.numeroInventario || eq.marca || eq.modelo || ''}`;
+    }
     if (r.tipoInventario === 'existencia' && r.existencia) return `${r.existencia.nombre} - ${r.existencia.marca || ''}`;
     if (r.tipoInventario === 'semaforos' && r.controladorSemaforo) return `Controlador ${r.controladorSemaforo.modelo}`;
     return 'Desconocido';
@@ -1501,8 +1514,59 @@ function Resguardos() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.85rem' }}>
                   <div>
                     <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: '600', color: '#475569', fontSize: '0.85rem' }}>Descripción (Detalle del Bien)</label>
-                    <textarea value={form.descripcionPdf} onChange={e => setForm({...form, descripcionPdf: e.target.value})} style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', minHeight: '75px', resize: 'vertical' }} />
+                    <textarea value={form.descripcionPdf} onChange={e => setForm({...form, descripcionPdf: e.target.value})} style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', minHeight: '85px', resize: 'vertical' }} />
                   </div>
+
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: '600', color: '#475569', fontSize: '0.82rem' }}>
+                      + Agregar accesorios / equipamiento incluido rápidamente a la descripción:
+                    </label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                      {[
+                        'Cargador original',
+                        'Cable de corriente',
+                        'Cable HDMI',
+                        'Lápiz óptico / Stylus',
+                        'Funda protectora',
+                        'Mochila / Maletín',
+                        'Mouse y Teclado',
+                        'Adaptador de corriente',
+                        'Batería adicional'
+                      ].map(acc => (
+                        <button
+                          key={acc}
+                          type="button"
+                          onClick={() => {
+                            setForm(prev => {
+                              const curr = prev.descripcionPdf || '';
+                              const seccion = 'Accesorios y equipamiento incluido:';
+                              if (curr.includes(seccion)) {
+                                return { ...prev, descripcionPdf: `${curr}\n• ${acc}` };
+                              } else {
+                                return { ...prev, descripcionPdf: `${curr}${curr ? '\n\n' : ''}${seccion}\n• ${acc}` };
+                              }
+                            });
+                          }}
+                          style={{
+                            padding: '0.3rem 0.65rem',
+                            fontSize: '0.78rem',
+                            fontWeight: '600',
+                            borderRadius: '6px',
+                            border: '1px solid #cbd5e1',
+                            backgroundColor: '#f1f5f9',
+                            color: '#334155',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                          onMouseOver={e => { e.currentTarget.style.backgroundColor = '#e2e8f0'; e.currentTarget.style.borderColor = '#94a3b8'; }}
+                          onMouseOut={e => { e.currentTarget.style.backgroundColor = '#f1f5f9'; e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                        >
+                          + {acc}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div>
                     <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: '600', color: '#475569', fontSize: '0.85rem' }}>Número de Serie</label>
                     <input type="text" value={form.numeroSeriePdf} onChange={e => setForm({...form, numeroSeriePdf: e.target.value})} style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }} />

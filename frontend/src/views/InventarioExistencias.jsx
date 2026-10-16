@@ -377,7 +377,7 @@ export default function InventarioExistencias() {
               origen: 'equipo',
               nombre: item.detalles?.nombre || `${item.marca || ''} ${item.modelo || ''}`.trim() || item.tipo,
               categoria: item.detalles?.categoria || item.tipo,
-              cantidad: 1,
+              cantidad: item.detalles?.cantidad ? Math.max(1, parseInt(item.detalles.cantidad, 10) || 1) : 1,
               estadoFisico: normalizarEstado(item.estatus || item.detalles?.estadoFisico),
               areaUbicacion: item.areaUbicacion || item.detalles?.areaUbicacion || 'Almacén de Sistemas',
               marca: item.marca || '',
@@ -483,7 +483,10 @@ export default function InventarioExistencias() {
         responsable: form.responsable || null,
         cargoResponsable: form.cargoResponsable || null,
         direccion: form.direccion || null,
-        detalles: { ...form.detalles }
+        detalles: {
+          ...form.detalles,
+          cantidad: Math.max(1, parseInt(form.detalles?.cantidad, 10) || 1)
+        }
       };
 
       const url = editandoId
@@ -523,6 +526,7 @@ export default function InventarioExistencias() {
     setEditandoId(item.id);
     setItemOrigen(item.origen || 'existencia');
     const original = item.equipoOriginal || item;
+    const cant = original.detalles?.cantidad ?? item.cantidad ?? 1;
     setForm({
       tipo: original.tipo || '',
       numeroInventario: original.numeroInventario || '',
@@ -535,7 +539,10 @@ export default function InventarioExistencias() {
       areaUbicacion: original.areaUbicacion || 'Almacén de Sistemas',
       procedencia: original.procedencia || '',
       estatus: original.estatus || 'Stock',
-      detalles: original.detalles || { cantidad: original.cantidad || 1 }
+      detalles: {
+        ...(original.detalles || {}),
+        cantidad: cant
+      }
     });
     setMostrarDetallesForm(true);
     setEsClonIndividual(false);
@@ -589,12 +596,18 @@ export default function InventarioExistencias() {
   };
 
   const handleEliminar = async (item) => {
+    const desc = item.numeroInventario
+      ? `${item.nombre} (Inv: ${item.numeroInventario})`
+      : item.numeroSerie
+      ? `${item.nombre} (S/N: ${item.numeroSerie})`
+      : item.nombre;
+
     const confirmacion = await Swal.fire({
-      title: '¿Está seguro?',
-      text: `Se eliminará "${item.nombre}" del stock.`,
+      title: '¿Está seguro de eliminar?',
+      text: `Se eliminará "${desc}" del inventario. Esta acción no se puede deshacer.`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonColor: '#A02142',
+      confirmButtonColor: '#dc2626',
       cancelButtonColor: '#6F7271',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar'
@@ -1908,50 +1921,55 @@ export default function InventarioExistencias() {
           return (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
               {(() => {
-                // AGRUPAR itemsFiltrados por tipo base Y estadoFisico (todos los teclados juntos, mouses juntos, etc.)
+                // AGRUPAR itemsFiltrados por tipo base, estadoFisico Y modelo específico
                 const gruposObj = {};
                 itemsFiltrados.forEach(item => {
                   const estNorm = normalizarEstado(item.estadoFisico);
                   const baseInfo = obtenerGrupoBase(item);
-                  const key = `${baseInfo.tipoKey}_${estNorm}`;
+                  const modeloNorm = (item.modelo || '').trim();
+                  const modeloKey = modeloNorm ? modeloNorm.toLowerCase().replace(/[^a-z0-9]/g, '_') : 'sin_modelo';
+                  const marcaNorm = (item.marca || '').trim();
+
+                  // La clave única separa por tipo, estatus y modelo
+                  const key = `${baseInfo.tipoKey}_${estNorm}_${modeloKey}`;
 
                   if (!gruposObj[key]) {
                     gruposObj[key] = {
                       key,
                       nombre: baseInfo.nombreBase,
+                      modelo: modeloNorm,
+                      marca: marcaNorm,
                       categoria: baseInfo.categoria || item.categoria,
                       estadoFisico: estNorm,
                       cantidadTotal: 0,
-                      items: [],
-                      marcasModelosSet: new Set()
+                      items: []
                     };
                   }
                   const cant = Number(item.cantidad) || 1;
                   gruposObj[key].items.push(item);
                   gruposObj[key].cantidadTotal += cant;
-
-                  const mm = `${item.marca || ''} ${item.modelo || ''}`.trim() || item.nombre;
-                  if (mm && mm !== baseInfo.nombreBase) {
-                    gruposObj[key].marcasModelosSet.add(mm);
-                  }
                 });
                 
-                return Object.values(gruposObj).map(grupo => {
-                  const isExpanded = !!expandedGroups[grupo.key];
-                  const toggleExpand = () => setExpandedGroups(prev => ({...prev, [grupo.key]: !prev[grupo.key]}));
-                  
-                  const esStock = grupo.estadoFisico === 'Stock';
-                  const esBaja = grupo.estadoFisico === 'Baja';
-                  const colorStripe = esStock ? '#10b981' : esBaja ? '#ef4444' : '#f59e0b';
-                  const colorQtyText = esStock ? '#047857' : esBaja ? '#b91c1c' : '#b45309';
-                  const bgQtyPill = esStock ? '#ecfdf5' : esBaja ? '#fef2f2' : '#fffbeb';
+                return Object.values(gruposObj)
+                  .sort((a, b) => {
+                    const compNombre = (a.nombre || '').localeCompare(b.nombre || '');
+                    if (compNombre !== 0) return compNombre;
+                    return (a.modelo || '').localeCompare(b.modelo || '');
+                  })
+                  .map(grupo => {
+                    const isExpanded = !!expandedGroups[grupo.key];
+                    const toggleExpand = () => setExpandedGroups(prev => ({...prev, [grupo.key]: !prev[grupo.key]}));
+                    
+                    const esStock = grupo.estadoFisico === 'Stock';
+                    const esBaja = grupo.estadoFisico === 'Baja';
+                    const colorStripe = esStock ? '#10b981' : esBaja ? '#ef4444' : '#f59e0b';
+                    const colorQtyText = esStock ? '#047857' : esBaja ? '#b91c1c' : '#b45309';
+                    const bgQtyPill = esStock ? '#ecfdf5' : esBaja ? '#fef2f2' : '#fffbeb';
 
-                  const modelosDistintos = Array.from(grupo.marcasModelosSet);
-                  const subtitulo = modelosDistintos.length === 1
-                    ? modelosDistintos[0]
-                    : modelosDistintos.length > 1
-                    ? `${modelosDistintos.length} modelos (${modelosDistintos.slice(0, 2).join(', ')}${modelosDistintos.length > 2 ? '...' : ''})`
-                    : '';
+                    // Subtítulo muestra el modelo y marca correspondiente
+                    const subtitulo = grupo.modelo
+                      ? `${grupo.marca && !grupo.modelo.toLowerCase().includes(grupo.marca.toLowerCase()) ? `${grupo.marca} ` : ''}${grupo.modelo}`
+                      : (grupo.marca || '');
 
                   return (
                     <div
@@ -2047,9 +2065,13 @@ export default function InventarioExistencias() {
                         }}>
                           {grupo.nombre}
                         </h3>
-                        {subtitulo && (
-                          <div style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '500' }}>
+                        {subtitulo ? (
+                          <div style={{ fontSize: '0.85rem', color: '#0369a1', fontWeight: '600' }}>
                             {subtitulo}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '0.8rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                            Sin modelo
                           </div>
                         )}
                       </div>
@@ -2149,15 +2171,29 @@ export default function InventarioExistencias() {
                                   position: 'relative'
                                 }}>
                                   {mostrarNombreItem && (
-                                    <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#1e293b', marginBottom: '0.35rem' }}>
+                                    <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#1e293b', marginBottom: '0.35rem', paddingRight: '5.5rem' }}>
                                       {nombreModeloItem}
                                     </div>
                                   )}
 
-                                  <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                                  <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.15rem', paddingRight: '5.5rem' }}>
                                     {item.numeroSerie && <span><strong style={{color:'#64748b'}}>S/N:</strong> {item.numeroSerie}</span>}
                                     {item.numeroInventario && <span><strong style={{color:'#64748b'}}>Inv:</strong> {item.numeroInventario}</span>}
-                                    {item.cantidad > 1 && <span><strong style={{color:'#64748b'}}>Cantidad:</strong> {item.cantidad} uds.</span>}
+                                    {item.cantidad > 1 && (
+                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.1rem' }}>
+                                        <strong style={{color:'#64748b'}}>Cantidad:</strong>
+                                        <span style={{
+                                          backgroundColor: '#dcfce7',
+                                          color: '#166534',
+                                          fontSize: '0.75rem',
+                                          fontWeight: '700',
+                                          padding: '0.1rem 0.45rem',
+                                          borderRadius: '4px'
+                                        }}>
+                                          {item.cantidad} uds.
+                                        </span>
+                                      </span>
+                                    )}
                                   </div>
 
                                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
@@ -2176,53 +2212,77 @@ export default function InventarioExistencias() {
                                     )}
                                   </div>
                                   
-                                  <button
-                                    onClick={() => handleClonarIndividual(item)}
-                                    title="Clonar / Agregar otra pieza igual"
-                                    style={{
-                                      position: 'absolute',
-                                      top: '0.5rem',
-                                      right: '2.3rem',
-                                      backgroundColor: '#e0f2fe',
-                                      border: 'none',
-                                      color: '#0284c7',
-                                      cursor: 'pointer',
-                                      padding: '0.35rem',
-                                      borderRadius: '6px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      transition: 'background-color 0.2s'
-                                    }}
-                                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
-                                    onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
-                                  >
-                                    <FaPlus size={12} />
-                                  </button>
-                                  
-                                  <button
-                                    onClick={() => handleEditar(item)}
-                                    title="Editar pieza"
-                                    style={{
-                                      position: 'absolute',
-                                      top: '0.5rem',
-                                      right: '0.5rem',
-                                      backgroundColor: '#fef3c7',
-                                      border: 'none',
-                                      color: '#d97706',
-                                      cursor: 'pointer',
-                                      padding: '0.35rem',
-                                      borderRadius: '6px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      transition: 'background-color 0.2s'
-                                    }}
-                                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
-                                    onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
-                                  >
-                                    <FaEdit size={12} />
-                                  </button>
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '0.5rem',
+                                    right: '0.5rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.35rem'
+                                  }}>
+                                    <button
+                                      onClick={() => handleClonarIndividual(item)}
+                                      title="Clonar / Agregar otra pieza igual"
+                                      style={{
+                                        backgroundColor: '#e0f2fe',
+                                        border: 'none',
+                                        color: '#0284c7',
+                                        cursor: 'pointer',
+                                        padding: '0.35rem',
+                                        borderRadius: '6px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'background-color 0.2s'
+                                      }}
+                                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
+                                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
+                                    >
+                                      <FaPlus size={12} />
+                                    </button>
+                                    
+                                    <button
+                                      onClick={() => handleEditar(item)}
+                                      title="Editar pieza"
+                                      style={{
+                                        backgroundColor: '#fef3c7',
+                                        border: 'none',
+                                        color: '#d97706',
+                                        cursor: 'pointer',
+                                        padding: '0.35rem',
+                                        borderRadius: '6px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'background-color 0.2s'
+                                      }}
+                                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
+                                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
+                                    >
+                                      <FaEdit size={12} />
+                                    </button>
+
+                                    <button
+                                      onClick={() => handleEliminar(item)}
+                                      title="Eliminar pieza"
+                                      style={{
+                                        backgroundColor: '#fee2e2',
+                                        border: 'none',
+                                        color: '#dc2626',
+                                        cursor: 'pointer',
+                                        padding: '0.35rem',
+                                        borderRadius: '6px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'background-color 0.2s'
+                                      }}
+                                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#fca5a5'}
+                                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#fee2e2'}
+                                    >
+                                      <FaTrashAlt size={12} />
+                                    </button>
+                                  </div>
                                 </div>
                               );
                             })}
@@ -2324,8 +2384,8 @@ export default function InventarioExistencias() {
 
                     {!sinInventario && (
                       <div>
-                        <label style={labelStyle}>No. Inventario {form.tipo === 'router' ? '*' : ''}</label>
-                        <input type="text" value={form.numeroInventario} onChange={e => setForm({ ...form, numeroInventario: e.target.value })} style={inputStyle} required={form.tipo === 'router'} list="inventarios-list" />
+                        <label style={labelStyle}>No. Inventario</label>
+                        <input type="text" value={form.numeroInventario} onChange={e => setForm({ ...form, numeroInventario: e.target.value })} style={inputStyle} list="inventarios-list" />
                         <datalist id="inventarios-list">
                           {inventariosUnicos.filter(i => i.toLowerCase().includes(form.numeroInventario?.toLowerCase() || '')).slice(0, 5).map(i => <option key={i} value={i} />)}
                         </datalist>
@@ -2337,6 +2397,38 @@ export default function InventarioExistencias() {
                       <datalist id="series-list">
                         {seriesUnicas.filter(s => s.toLowerCase().includes(form.numeroSerie?.toLowerCase() || '')).slice(0, 5).map(s => <option key={s} value={s} />)}
                       </datalist>
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Cantidad *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={form.detalles?.cantidad ?? 1}
+                        onChange={e => {
+                          const val = e.target.value;
+                          handleDetalleChange('cantidad', val === '' ? '' : Math.max(1, parseInt(val, 10) || 1));
+                        }}
+                        style={inputStyle}
+                        placeholder="1"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>Estatus</label>
+                      <select
+                        value={form.estatus}
+                        onChange={e => setForm({ ...form, estatus: e.target.value })}
+                        style={{ ...inputStyle, cursor: 'pointer', backgroundColor: esClonIndividual && !mostrarDetallesForm ? '#f1f5f9' : 'white' }}
+                        disabled={esClonIndividual && !mostrarDetallesForm}
+                      >
+                        <option value="Activo">Activo</option>
+                        <option value="Stock">Stock</option>
+                        <option value="Refacciones">Refacciones</option>
+                        <option value="Baja">Baja</option>
+                        <option value="Mantenimiento">Mantenimiento</option>
+                      </select>
                     </div>
 
                     {(!esClonIndividual || mostrarDetallesForm) && (
@@ -2403,22 +2495,6 @@ export default function InventarioExistencias() {
                             <option value="Fideicomiso">Fideicomiso</option>
                             <option value="Recurso Propio">Recurso Propio</option>
                             <option value="Rentado">Rentado</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label style={labelStyle}>Estatus</label>
-                          <select
-                            value={form.estatus}
-                            onChange={e => setForm({ ...form, estatus: e.target.value })}
-                            style={{ ...inputStyle, cursor: 'pointer', backgroundColor: esClonIndividual ? '#f1f5f9' : 'white' }}
-                            disabled={esClonIndividual && !mostrarDetallesForm}
-                          >
-                            <option value="Activo">Activo</option>
-                            <option value="Stock">Stock</option>
-                            <option value="Refacciones">Refacciones</option>
-                            <option value="Baja">Baja</option>
-                            <option value="Mantenimiento">Mantenimiento</option>
                           </select>
                         </div>
                       </>

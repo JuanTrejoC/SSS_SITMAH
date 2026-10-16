@@ -109,31 +109,17 @@ const crearEquipo = async (req, res) => {
       return res.status(400).json({ ok: false, error: 'El tipo de equipo es obligatorio.' });
     }
 
-    // Validación de duplicados (ignorando marcadores genéricos como S/N, INF-S/N, etc.)
+    // Validación de duplicados únicamente en número de inventario (ignora marcadores genéricos)
     const ignorarUnicos = ['S/N', 'INF-S/N', 'S/S', 'N/A', 'SIN NUMERO', 'SIN SERIE', 'S/M', 'SN'];
-    const condicionesBusqueda = [];
     const invTrim = (numeroInventario || '').trim().toUpperCase();
-    const serieTrim = (numeroSerie || '').trim().toUpperCase();
 
     if (numeroInventario && !ignorarUnicos.includes(invTrim)) {
-      condicionesBusqueda.push({ numeroInventario: numeroInventario.trim() });
-    }
-    if (numeroSerie && !ignorarUnicos.includes(serieTrim)) {
-      condicionesBusqueda.push({ numeroSerie: numeroSerie.trim() });
-    }
-
-    if (condicionesBusqueda.length > 0) {
       const existe = await prisma.equipoTecnologico.findFirst({
-        where: { OR: condicionesBusqueda }
+        where: { numeroInventario: numeroInventario.trim() }
       });
 
       if (existe) {
-        if (existe.numeroInventario && existe.numeroInventario.toLowerCase() === numeroInventario.trim().toLowerCase()) {
-          return res.status(400).json({ ok: false, error: `El número de inventario "${numeroInventario}" ya está registrado en otro equipo.` });
-        }
-        if (existe.numeroSerie && existe.numeroSerie.toLowerCase() === numeroSerie.trim().toLowerCase()) {
-          return res.status(400).json({ ok: false, error: `El número de serie "${numeroSerie}" ya está registrado en otro equipo.` });
-        }
+        return res.status(400).json({ ok: false, error: `El número de inventario "${numeroInventario}" ya está registrado en otro equipo.` });
       }
     }
 
@@ -208,34 +194,20 @@ const actualizarEquipo = async (req, res) => {
       return res.status(404).json({ ok: false, error: 'Equipo no encontrado' });
     }
 
-    // Validación de duplicados, excluyendo el equipo actual (ignorando marcadores genéricos como S/N, INF-S/N, etc.)
+    // Validación de duplicados, excluyendo el equipo actual (únicamente número de inventario)
     const ignorarUnicos = ['S/N', 'INF-S/N', 'S/S', 'N/A', 'SIN NUMERO', 'SIN SERIE', 'S/M', 'SN'];
-    const condicionesBusqueda = [];
     const invTrim = (numeroInventario || '').trim().toUpperCase();
-    const serieTrim = (numeroSerie || '').trim().toUpperCase();
 
     if (numeroInventario && !ignorarUnicos.includes(invTrim)) {
-      condicionesBusqueda.push({ numeroInventario: numeroInventario.trim() });
-    }
-    if (numeroSerie && !ignorarUnicos.includes(serieTrim)) {
-      condicionesBusqueda.push({ numeroSerie: numeroSerie.trim() });
-    }
-
-    if (condicionesBusqueda.length > 0) {
       const existe = await prisma.equipoTecnologico.findFirst({
         where: {
           id: { not: parseInt(id) },
-          OR: condicionesBusqueda
+          numeroInventario: numeroInventario.trim()
         }
       });
 
       if (existe) {
-        if (existe.numeroInventario && existe.numeroInventario.toLowerCase() === numeroInventario.trim().toLowerCase()) {
-          return res.status(400).json({ ok: false, error: `El número de inventario "${numeroInventario}" ya está registrado en otro equipo.` });
-        }
-        if (existe.numeroSerie && existe.numeroSerie.toLowerCase() === numeroSerie.trim().toLowerCase()) {
-          return res.status(400).json({ ok: false, error: `El número de serie "${numeroSerie}" ya está registrado en otro equipo.` });
-        }
+        return res.status(400).json({ ok: false, error: `El número de inventario "${numeroInventario}" ya está registrado en otro equipo.` });
       }
     }
 
@@ -332,6 +304,12 @@ const eliminarEquipo = async (req, res) => {
     res.json({ ok: true, message: 'Equipo eliminado correctamente' });
   } catch (error) {
     console.error('Error al eliminar equipo:', error);
+    if (error.code === 'P2003') {
+      return res.status(400).json({
+        ok: false,
+        error: 'No se puede eliminar el equipo porque tiene registros asociados (resguardos, componentes o reportes).'
+      });
+    }
     res.status(500).json({ ok: false, error: 'Error interno del servidor' });
   }
 };

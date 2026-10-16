@@ -73,6 +73,18 @@ export default function InventarioTecnologico() {
   const [editandoId, setEditandoId] = useState(null);
   const [equipoPrincipalInfo, setEquipoPrincipalInfo] = useState(null);
   const [form, setForm] = useState(getInitialForm());
+  const [modalWordResguardo, setModalWordResguardo] = useState({
+    abierto: false,
+    item: null,
+    tituloEquipo: '',
+    resguardante: '',
+    cargo: '',
+    direccion: '',
+    accesorios: '',
+    observaciones: '',
+    accesoriosSugeridos: []
+  });
+  const [generandoWord, setGenerandoWord] = useState(false);
   const [todosLosEquipos, setTodosLosEquipos] = useState([]);
   const [dashboardTipo, setDashboardTipo] = useState(null);
   const [dashboardArea, setDashboardArea] = useState(null);
@@ -953,48 +965,82 @@ export default function InventarioTecnologico() {
     }
   };
 
-  const exportarResguardoWord = async (item) => {
+  const exportarResguardoWord = (item) => {
     try {
       const resp = (item.responsable || '').trim();
-      let nombreParaDoc = resp;
-      let cargoParaDoc = item.cargoResponsable || '';
-      let direccionParaDoc = item.direccion || item.areaUbicacion || '';
+      const cargoActual = item.cargoResponsable || '';
+      const direccionActual = item.direccion || item.areaUbicacion || '';
 
-      if (!resp || resp.toUpperCase() === 'N/A') {
-        const { value: nombreManual, isConfirmed } = await Swal.fire({
-          title: 'Asignar Nombre para el Resguardo',
-          text: `El equipo "${item.tipo || 'Equipo'} - ${item.marca || ''}" está Activo. Ingresa el nombre de la persona que lo resguarda o continúa para firmar a mano:`,
-          input: 'text',
-          inputPlaceholder: 'Nombre completo del resguardante...',
-          showCancelButton: true,
-          confirmButtonText: 'Generar y Registrar',
-          cancelButtonText: 'Cancelar',
-          confirmButtonColor: '#1d4ed8',
-          cancelButtonColor: '#64748b'
-        });
+      // Resolver nombre real del equipo (si es 'otro', tomar el nombre personalizado para no poner "OTRO")
+      const nombrePersonalizado = (item.tipo === 'otro' || !item.tipo) ? obtenerNombreOtro(item) : '';
+      const tipoMeta = TIPOS_EQUIPO.find(t => t.value === item.tipo);
+      const tipoLabel = nombrePersonalizado || tipoMeta?.label || (item.tipo ? item.tipo.replace(/_/g, ' ') : 'EQUIPO TECNOLÓGICO');
+      const tituloEquipo = `${tipoLabel} ${item.marca || ''} ${item.modelo || ''}`.replace(/\s+/g, ' ').trim();
 
-        if (!isConfirmed) return;
-        nombreParaDoc = (nombreManual || '').trim() || (item.areaUbicacion ? `Responsable ${item.areaUbicacion}` : 'Por Asignar');
+      // Accesorios sugeridos rápidos según el tipo de equipo
+      let accesoriosSugeridos = ['Cargador original', 'Cable de corriente / USB', 'Funda protectora'];
+      const tipoLower = (item.tipo || '').toLowerCase();
+      if (tipoLower.includes('tableta') || tipoLower.includes('tablet')) {
+        accesoriosSugeridos = ['Cargador original y cable', 'Lápiz óptico / Stylus', 'Funda protectora', 'Teclado para tablet', 'Mica de cristal'];
+      } else if (tipoLower.includes('laptop') || tipoLower.includes('escritorio')) {
+        accesoriosSugeridos = ['Cargador / Eliminador', 'Mouse USB', 'Teclado USB', 'Mochila / Maletín', 'Cable de red'];
+      } else if (tipoLower.includes('celular') || tipoLower.includes('movil')) {
+        accesoriosSugeridos = ['Cargador y cable USB', 'Funda de uso rudo', 'Mica de pantalla', 'Llave bandeja SIM'];
+      } else if (tipoLower.includes('radio')) {
+        accesoriosSugeridos = ['Cargador de base', 'Batería recargable', 'Clip de cinturón', 'Antena', 'Manos libres'];
       }
 
-      Swal.fire({
-        title: 'Generando Word de Resguardo...',
-        text: 'Por favor espere un momento.',
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading()
+      setModalWordResguardo({
+        abierto: true,
+        item,
+        tituloEquipo,
+        resguardante: resp && resp !== 'N/A' ? resp : '',
+        cargo: cargoActual,
+        direccion: direccionActual,
+        accesorios: '',
+        observaciones: '',
+        accesoriosSugeridos
       });
+    } catch (err) {
+      console.error('Error al abrir modal de resguardo Word:', err);
+      Swal.fire('Error', 'No se pudo abrir el generador de Word', 'error');
+    }
+  };
 
-      const tipoMeta = TIPOS_EQUIPO.find(t => t.value === item.tipo);
-      const tipoLabel = tipoMeta?.label || (item.tipo ? item.tipo.replace(/_/g, ' ') : 'EQUIPO TECNOLÓGICO');
-      const tituloBien = `${tipoLabel} ${item.marca || ''} ${item.modelo || ''}`.replace(/\s+/g, ' ').trim().toUpperCase();
+  const cerrarModalWord = () => {
+    setModalWordResguardo({
+      abierto: false,
+      item: null,
+      tituloEquipo: '',
+      resguardante: '',
+      cargo: '',
+      direccion: '',
+      accesorios: '',
+      observaciones: '',
+      accesoriosSugeridos: []
+    });
+  };
+
+  const handleConfirmarWord = async (e) => {
+    if (e) e.preventDefault();
+    const { item, tituloEquipo, resguardante, cargo, direccion, accesorios, observaciones } = modalWordResguardo;
+
+    if (!resguardante || !resguardante.trim()) {
+      Swal.fire('Campo requerido', 'Debe ingresar el nombre de la persona que recibe el equipo en resguardo.', 'warning');
+      return;
+    }
+
+    setGenerandoWord(true);
+    try {
+      const tituloBien = tituloEquipo.toUpperCase();
 
       const lineasDetalle = [];
-      lineasDetalle.push(`${tipoLabel} MARCA ${item.marca || 'S/M'}, MODELO ${item.modelo || 'S/M'}`);
+      lineasDetalle.push(`MARCA ${item.marca || 'S/M'}, MODELO ${item.modelo || 'S/M'}`);
       if (item.numeroInventario) {
         lineasDetalle.push(`No. Inventario: ${item.numeroInventario}`);
       }
-      if (item.areaUbicacion) {
-        lineasDetalle.push(`Ubicación: ${item.areaUbicacion}`);
+      if (direccion || item.areaUbicacion) {
+        lineasDetalle.push(`Ubicación: ${direccion || item.areaUbicacion}`);
       }
 
       if (item.detalles && typeof item.detalles === 'object') {
@@ -1034,15 +1080,20 @@ export default function InventarioTecnologico() {
         lineasDetalle.push(`Componentes vinculados:\n  • ${compLineas.join('\n  • ')}`);
       }
 
-      if (item.observaciones) {
-        lineasDetalle.push(`Observaciones: ${item.observaciones}`);
+      // Agregar accesorios seleccionados o escritos por el usuario
+      if (accesorios && accesorios.trim()) {
+        lineasDetalle.push(`\nAccesorios y equipamiento incluido:\n${accesorios.trim()}`);
+      }
+
+      if (observaciones && observaciones.trim()) {
+        lineasDetalle.push(`\nObservaciones: ${observaciones.trim()}`);
       }
 
       const resguardoPayload = {
         ...item,
-        nombreResguardante: nombreParaDoc || (item.areaUbicacion ? `Responsable ${item.areaUbicacion}` : 'Por Asignar'),
-        cargo: cargoParaDoc || (item.areaUbicacion ? 'Responsable de Ubicación' : ''),
-        direccion: direccionParaDoc || 'Operación SITMAH',
+        nombreResguardante: resguardante.trim(),
+        cargo: cargo || '',
+        direccion: direccion || 'Operación SITMAH',
         tipoInventario: 'tecnologico',
         descripcionPdf: `${tituloBien}\n\n${lineasDetalle.join('\n')}`,
         numeroSeriePdf: item.numeroSerie || 'S/S',
@@ -1051,16 +1102,19 @@ export default function InventarioTecnologico() {
 
       await generarResguardoDocx(resguardoPayload);
       await registrarResguardo(user?.token, { ...resguardoPayload, itemId: item.id });
+      cerrarModalWord();
       Swal.fire({
         icon: 'success',
         title: 'Word generado y Resguardo registrado',
-        text: 'El documento se descargó y ya aparece en el módulo de Resguardos listo para subir su imagen firmada.',
+        text: 'El documento se descargó con sus accesorios y ya aparece en el módulo de Resguardos.',
         timer: 2500,
         showConfirmButton: false
       });
     } catch (err) {
       console.error('Error al generar Word de resguardo:', err);
       Swal.fire('Error Word', err.message || 'Error al exportar a Word', 'error');
+    } finally {
+      setGenerandoWord(false);
     }
   };
 
@@ -2255,6 +2309,352 @@ export default function InventarioTecnologico() {
         </div>
       )}
 
+      {/* MODAL GENERAR RESGUARDO WORD */}
+      {modalWordResguardo.abierto && modalWordResguardo.item && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 2500,
+          padding: '1.25rem'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '760px',
+            maxHeight: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            overflow: 'hidden',
+            position: 'relative'
+          }}>
+            {/* Header del Modal */}
+            <div style={{
+              padding: '1.25rem 1.75rem',
+              backgroundColor: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{
+                  backgroundColor: '#691B31',
+                  color: 'white',
+                  padding: '0.75rem',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 6px rgba(105, 27, 49, 0.2)'
+                }}>
+                  <FaFileWord size={22} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+                    Generar Resguardo Oficial (.docx)
+                  </h2>
+                  <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0.2rem 0 0 0' }}>
+                    Configure los datos del resguardante y accesorios incluidos para el documento oficial.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={cerrarModalWord}
+                style={{
+                  background: '#f1f5f9',
+                  border: 'none',
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  transition: 'all 0.2s'
+                }}
+                onMouseOver={e => { e.currentTarget.style.backgroundColor = '#e2e8f0'; e.currentTarget.style.color = '#1e293b'; }}
+                onMouseOut={e => { e.currentTarget.style.backgroundColor = '#f1f5f9'; e.currentTarget.style.color = '#64748b'; }}
+              >
+                <FaTimes size={16} />
+              </button>
+            </div>
+
+            {/* Contenido / Formulario */}
+            <form onSubmit={handleConfirmarWord} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+              <div style={{ padding: '1.5rem 1.75rem', overflowY: 'auto', flex: 1 }}>
+                
+                {/* Banner informativo del equipo */}
+                <div style={{
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '1rem 1.25rem',
+                  marginBottom: '1.25rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '1rem'
+                }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
+                      <span style={{
+                        backgroundColor: '#e0e7ff',
+                        color: '#3730a3',
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        padding: '0.2rem 0.55rem',
+                        borderRadius: '6px',
+                        textTransform: 'uppercase'
+                      }}>
+                        {modalWordResguardo.item.tipo || 'EQUIPO'}
+                      </span>
+                      <span style={{ fontWeight: 800, color: '#1e293b', fontSize: '1rem', wordBreak: 'break-word' }}>
+                        {modalWordResguardo.tituloEquipo}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                      <span>Serie: <strong style={{ color: '#1e293b' }}>{modalWordResguardo.item.numeroSerie || 'S/S'}</strong></span>
+                      <span>•</span>
+                      <span>Inv: <strong style={{ color: '#1e293b' }}>{modalWordResguardo.item.numeroInventario || 'S/N'}</strong></span>
+                      {modalWordResguardo.item.areaUbicacion && (
+                        <>
+                          <span>•</span>
+                          <span>Ubicación: <strong style={{ color: '#1e293b' }}>{modalWordResguardo.item.areaUbicacion}</strong></span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 1. Resguardante con Autocomplete oficial */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label style={labelStyle}>
+                    1. Persona que recibe en resguardo *
+                  </label>
+                  <PersonalAutocomplete
+                    value={modalWordResguardo.resguardante}
+                    onChange={val => setModalWordResguardo(prev => ({ ...prev, resguardante: val }))}
+                    onSelect={emp => {
+                      setModalWordResguardo(prev => ({
+                        ...prev,
+                        resguardante: emp.nombre,
+                        cargo: emp.cargo || prev.cargo,
+                        direccion: emp.direccion || prev.direccion
+                      }));
+                    }}
+                    placeholder="Buscar o escribir nombre del resguardante..."
+                  />
+                </div>
+
+                {/* 2 y 3. Cargo y Dirección en 2 columnas */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                  <div>
+                    <label style={labelStyle}>2. Cargo</label>
+                    <select
+                      value={modalWordResguardo.cargo}
+                      onChange={e => setModalWordResguardo(prev => ({ ...prev, cargo: e.target.value }))}
+                      style={{ ...inputStyle, cursor: 'pointer' }}
+                    >
+                      <option value="">-- Seleccionar Cargo --</option>
+                      {CARGOS_NORMALIZADOS.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                      {modalWordResguardo.cargo && !CARGOS_NORMALIZADOS.includes(modalWordResguardo.cargo) && (
+                        <option value={modalWordResguardo.cargo}>{modalWordResguardo.cargo}</option>
+                      )}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>3. Dirección / Área</label>
+                    <select
+                      value={modalWordResguardo.direccion}
+                      onChange={e => setModalWordResguardo(prev => ({ ...prev, direccion: e.target.value }))}
+                      style={{ ...inputStyle, cursor: 'pointer' }}
+                    >
+                      <option value="">-- Seleccionar Dirección --</option>
+                      {DIRECCIONES_SITMAH.map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                      {modalWordResguardo.direccion && !DIRECCIONES_SITMAH.includes(modalWordResguardo.direccion) && (
+                        <option value={modalWordResguardo.direccion}>{modalWordResguardo.direccion}</option>
+                      )}
+                    </select>
+                  </div>
+                </div>
+
+                {/* 4. Accesorios y Equipamiento incluido con chips interactivos */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.4rem' }}>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>
+                      4. Accesorios y equipamiento incluido
+                    </label>
+                    <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                      (Haz clic en los botones para agregar rápido)
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.6rem' }}>
+                    {modalWordResguardo.accesoriosSugeridos.map(acc => {
+                      const yaAgregado = modalWordResguardo.accesorios.includes(`• ${acc}`);
+                      return (
+                        <button
+                          key={acc}
+                          type="button"
+                          onClick={() => {
+                            const line = `• ${acc}`;
+                            setModalWordResguardo(prev => {
+                              if (prev.accesorios.includes(line)) {
+                                const nuevo = prev.accesorios
+                                  .split('\n')
+                                  .filter(l => l.trim() !== line)
+                                  .join('\n')
+                                  .trim();
+                                return { ...prev, accesorios: nuevo };
+                              } else {
+                                return {
+                                  ...prev,
+                                  accesorios: prev.accesorios.trim() ? `${prev.accesorios.trim()}\n${line}` : line
+                                };
+                              }
+                            });
+                          }}
+                          style={{
+                            padding: '0.35rem 0.75rem',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            borderRadius: '6px',
+                            border: yaAgregado ? '1.5px solid #691B31' : '1px solid #cbd5e1',
+                            backgroundColor: yaAgregado ? '#fdf2f4' : '#f8fafc',
+                            color: yaAgregado ? '#691B31' : '#334155',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem'
+                          }}
+                          onMouseOver={e => {
+                            if (!yaAgregado) {
+                              e.currentTarget.style.backgroundColor = '#f1f5f9';
+                              e.currentTarget.style.borderColor = '#94a3b8';
+                            }
+                          }}
+                          onMouseOut={e => {
+                            if (!yaAgregado) {
+                              e.currentTarget.style.backgroundColor = '#f8fafc';
+                              e.currentTarget.style.borderColor = '#cbd5e1';
+                            }
+                          }}
+                        >
+                          {yaAgregado ? '✓' : '+'} {acc}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <textarea
+                    value={modalWordResguardo.accesorios}
+                    onChange={e => setModalWordResguardo(prev => ({ ...prev, accesorios: e.target.value }))}
+                    style={{
+                      ...inputStyle,
+                      minHeight: '85px',
+                      resize: 'vertical',
+                      fontFamily: 'inherit',
+                      lineHeight: '1.5'
+                    }}
+                    placeholder="Ej.&#10;• Cargador original y cable USB&#10;• Lápiz óptico (Stylus)&#10;• Funda protectora"
+                  />
+                </div>
+
+                {/* 5. Observaciones adicionales */}
+                <div>
+                  <label style={labelStyle}>5. Observaciones adicionales (Opcional)</label>
+                  <textarea
+                    value={modalWordResguardo.observaciones}
+                    onChange={e => setModalWordResguardo(prev => ({ ...prev, observaciones: e.target.value }))}
+                    style={{
+                      ...inputStyle,
+                      minHeight: '60px',
+                      resize: 'vertical',
+                      fontFamily: 'inherit',
+                      lineHeight: '1.5'
+                    }}
+                    placeholder="Ej. Equipo en buen estado, pantalla sin rayaduras..."
+                  />
+                </div>
+
+              </div>
+
+              {/* Footer con botones oficiales del sistema */}
+              <div style={{
+                padding: '1.25rem 1.75rem',
+                backgroundColor: '#f8fafc',
+                borderTop: '1px solid #e2e8f0',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem',
+                alignItems: 'center'
+              }}>
+                <button
+                  type="button"
+                  onClick={cerrarModalWord}
+                  style={{
+                    padding: '0.75rem 1.75rem',
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: 'white',
+                    color: '#475569',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: '0.95rem',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = 'white'}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={generandoWord}
+                  style={{
+                    padding: '0.75rem 2rem',
+                    border: 'none',
+                    backgroundColor: '#691B31',
+                    color: 'white',
+                    borderRadius: '8px',
+                    cursor: generandoWord ? 'not-allowed' : 'pointer',
+                    fontWeight: '600',
+                    fontSize: '0.95rem',
+                    boxShadow: '0 4px 6px rgba(105, 27, 49, 0.25)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.55rem',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => { if (!generandoWord) e.currentTarget.style.backgroundColor = '#8a2441'; }}
+                  onMouseOut={e => { if (!generandoWord) e.currentTarget.style.backgroundColor = '#691B31'; }}
+                >
+                  <FaFileWord size={18} />
+                  {generandoWord ? 'Generando Word...' : 'Generar y Descargar Word'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL DE REGISTRO */}
       {modalAbierto && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '1rem' }}>
@@ -2358,8 +2758,8 @@ export default function InventarioTecnologico() {
 
                     {!sinInventario && (
                       <div>
-                        <label style={labelStyle}>No. Inventario {form.tipo === 'router' ? '*' : ''}</label>
-                        <input type="text" value={form.numeroInventario} onChange={e => setForm({ ...form, numeroInventario: e.target.value })} style={inputStyle} required={form.tipo === 'router'} list="inventarios-list" />
+                        <label style={labelStyle}>No. Inventario</label>
+                        <input type="text" value={form.numeroInventario} onChange={e => setForm({ ...form, numeroInventario: e.target.value })} style={inputStyle} list="inventarios-list" />
                         <datalist id="inventarios-list">
                           {inventariosUnicos.filter(i => i.toLowerCase().includes(form.numeroInventario?.toLowerCase() || '')).slice(0, 5).map(i => <option key={i} value={i} />)}
                         </datalist>

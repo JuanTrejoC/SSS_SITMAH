@@ -104,6 +104,31 @@ export async function generarResguardoDocx(resguardo) {
     tituloBien = 'BIEN EN RESGUARDO';
   }
 
+  // Limpieza de cualquier palabra "OTRO" residual en título y detalle
+  if (tituloBien.toUpperCase().startsWith('OTRO ') || tituloBien.toUpperCase().startsWith('EQUIPO OTRO ')) {
+    const det = resguardo.equipoTecnologico?.detalles || resguardo.detalles;
+    const nombreOtro = (typeof det === 'object' && det) ? (det.nombre || det.nombreEquipo || det.especificarTipo || det.otroTipo || '') : '';
+    if (nombreOtro) {
+      tituloBien = tituloBien
+        .replace(/^EQUIPO\s+OTRO\s+/i, `${nombreOtro.toUpperCase()} `)
+        .replace(/^OTRO\s+/i, `${nombreOtro.toUpperCase()} `)
+        .trim();
+    } else {
+      tituloBien = tituloBien
+        .replace(/^EQUIPO\s+OTRO\s+/i, '')
+        .replace(/^OTRO\s+/i, '')
+        .trim();
+    }
+  }
+
+  if (detalleDesc) {
+    detalleDesc = detalleDesc
+      .replace(/^Otro MARCA/im, 'MARCA')
+      .replace(/^OTRO MARCA/im, 'MARCA')
+      .replace(/\bOtro\s+MARCA\b/g, 'MARCA')
+      .replace(/\bOTRO\s+MARCA\b/g, 'MARCA');
+  }
+
   // Párrafos para la celda de DESCRIPCIÓN
   const descripcionParagraphs = [];
   if (tituloBien) {
