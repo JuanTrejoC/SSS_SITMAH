@@ -6,7 +6,7 @@ import autoTable from 'jspdf-autotable';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
 import {
-  FaBoxes, FaPlus, FaEdit, FaTimes, FaSearch, FaCogs, FaWrench, FaTools, FaHdd, FaChevronRight,
+  FaBoxes, FaPlus, FaEdit, FaEye, FaTimes, FaSearch, FaCogs, FaWrench, FaTools, FaHdd, FaChevronRight,
   FaCheckCircle, FaExclamationTriangle, FaMapMarkerAlt, FaFilter, FaArrowLeft, FaRedoAlt,
   FaFilePdf, FaDownload, FaFileAlt, FaChevronDown,
   FaDesktop, FaLaptop, FaMobileAlt, FaNetworkWired, FaServer, FaShieldAlt, FaWifi, FaVideo,
@@ -411,7 +411,7 @@ export default function InventarioExistencias() {
   const [existencias, setExistencias] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
-  const [expandedGroups, setExpandedGroups] = useState({});
+  const [grupoModalKey, setGrupoModalKey] = useState(null);
   const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('Stock'); // 'Stock' | 'Mantenimiento' | 'Baja' | ''
   const [filtroOrigen, setFiltroOrigen] = useState(''); // '' | 'reemplazadas' | 'almacen'
@@ -592,7 +592,7 @@ export default function InventarioExistencias() {
   }, [user]);
 
   useEffect(() => {
-    if (modalAbierto) {
+    if (modalAbierto || grupoModalKey) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -600,7 +600,7 @@ export default function InventarioExistencias() {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [modalAbierto]);
+  }, [modalAbierto, grupoModalKey]);
 
   const handleGuardar = async (e) => {
     e.preventDefault();
@@ -2106,66 +2106,65 @@ export default function InventarioExistencias() {
             );
           }
 
+          // AGRUPAR itemsFiltrados por tipo base, estadoFisico Y modelo específico
+          const gruposObj = {};
+          itemsFiltrados.forEach(item => {
+            const estNorm = normalizarEstado(item.estadoFisico);
+            const baseInfo = obtenerGrupoBase(item);
+            const modeloNorm = (item.modelo || '').trim();
+            const modeloKey = modeloNorm ? modeloNorm.toLowerCase().replace(/[^a-z0-9]/g, '_') : 'sin_modelo';
+            const marcaNorm = (item.marca || '').trim();
+
+            // La clave única separa por tipo, estatus y modelo
+            const key = `${baseInfo.tipoKey}_${estNorm}_${modeloKey}`;
+
+            if (!gruposObj[key]) {
+              gruposObj[key] = {
+                key,
+                nombre: baseInfo.nombreBase,
+                modelo: modeloNorm,
+                marca: marcaNorm,
+                categoria: baseInfo.categoria || item.categoria,
+                estadoFisico: estNorm,
+                cantidadTotal: 0,
+                items: []
+              };
+            }
+            const cant = Number(item.cantidad) || 1;
+            gruposObj[key].items.push(item);
+            gruposObj[key].cantidadTotal += cant;
+          });
+
+          const gruposList = Object.values(gruposObj).sort((a, b) => {
+            const compNombre = (a.nombre || '').localeCompare(b.nombre || '');
+            if (compNombre !== 0) return compNombre;
+            return (a.modelo || '').localeCompare(b.modelo || '');
+          });
+
+          const grupoModal = grupoModalKey ? gruposObj[grupoModalKey] : null;
+
           return (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
-              {(() => {
-                // AGRUPAR itemsFiltrados por tipo base, estadoFisico Y modelo específico
-                const gruposObj = {};
-                itemsFiltrados.forEach(item => {
-                  const estNorm = normalizarEstado(item.estadoFisico);
-                  const baseInfo = obtenerGrupoBase(item);
-                  const modeloNorm = (item.modelo || '').trim();
-                  const modeloKey = modeloNorm ? modeloNorm.toLowerCase().replace(/[^a-z0-9]/g, '_') : 'sin_modelo';
-                  const marcaNorm = (item.marca || '').trim();
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
+                {gruposList.map(grupo => {
+                  const esStock = grupo.estadoFisico === 'Stock';
+                  const esBaja = grupo.estadoFisico === 'Baja';
+                  const colorStripe = esStock ? '#10b981' : esBaja ? '#ef4444' : '#f59e0b';
+                  const colorQtyText = esStock ? '#047857' : esBaja ? '#b91c1c' : '#b45309';
+                  const bgQtyPill = esStock ? '#ecfdf5' : esBaja ? '#fef2f2' : '#fffbeb';
 
-                  // La clave única separa por tipo, estatus y modelo
-                  const key = `${baseInfo.tipoKey}_${estNorm}_${modeloKey}`;
+                  // Limpieza de marcas duplicadas como "HP HP..." o "Cisco Cisco..."
+                  const limpiarDuplicados = (str) => {
+                    if (!str) return '';
+                    return str.replace(/^(\b[a-zA-Z0-9]+\b)(?:\s+\1\b)+/i, '$1').trim();
+                  };
 
-                  if (!gruposObj[key]) {
-                    gruposObj[key] = {
-                      key,
-                      nombre: baseInfo.nombreBase,
-                      modelo: modeloNorm,
-                      marca: marcaNorm,
-                      categoria: baseInfo.categoria || item.categoria,
-                      estadoFisico: estNorm,
-                      cantidadTotal: 0,
-                      items: []
-                    };
-                  }
-                  const cant = Number(item.cantidad) || 1;
-                  gruposObj[key].items.push(item);
-                  gruposObj[key].cantidadTotal += cant;
-                });
-                
-                return Object.values(gruposObj)
-                  .sort((a, b) => {
-                    const compNombre = (a.nombre || '').localeCompare(b.nombre || '');
-                    if (compNombre !== 0) return compNombre;
-                    return (a.modelo || '').localeCompare(b.modelo || '');
-                  })
-                  .map(grupo => {
-                    const isExpanded = !!expandedGroups[grupo.key];
-                    const toggleExpand = () => setExpandedGroups(prev => ({...prev, [grupo.key]: !prev[grupo.key]}));
-                    
-                    const esStock = grupo.estadoFisico === 'Stock';
-                    const esBaja = grupo.estadoFisico === 'Baja';
-                    const colorStripe = esStock ? '#10b981' : esBaja ? '#ef4444' : '#f59e0b';
-                    const colorQtyText = esStock ? '#047857' : esBaja ? '#b91c1c' : '#b45309';
-                    const bgQtyPill = esStock ? '#ecfdf5' : esBaja ? '#fef2f2' : '#fffbeb';
-
-                    // Limpieza de marcas duplicadas como "HP HP..." o "Cisco Cisco..."
-                    const limpiarDuplicados = (str) => {
-                      if (!str) return '';
-                      return str.replace(/^(\b[a-zA-Z0-9]+\b)(?:\s+\1\b)+/i, '$1').trim();
-                    };
-
-                    // Subtítulo muestra el modelo y marca correspondiente
-                    let subtitulo = grupo.modelo
-                      ? `${grupo.marca && !grupo.modelo.toLowerCase().includes(grupo.marca.toLowerCase()) ? `${grupo.marca} ` : ''}${grupo.modelo}`
-                      : (grupo.marca || '');
-                    subtitulo = limpiarDuplicados(subtitulo);
-                    const tituloLimpio = limpiarDuplicados(grupo.nombre);
+                  // Subtítulo muestra el modelo y marca correspondiente
+                  let subtitulo = grupo.modelo
+                    ? `${grupo.marca && !grupo.modelo.toLowerCase().includes(grupo.marca.toLowerCase()) ? `${grupo.marca} ` : ''}${grupo.modelo}`
+                    : (grupo.marca || '');
+                  subtitulo = limpiarDuplicados(subtitulo);
+                  const tituloLimpio = limpiarDuplicados(grupo.nombre);
 
                   return (
                     <div
@@ -2226,26 +2225,27 @@ export default function InventarioExistencias() {
                           </span>
                         </div>
 
-                        {/* Top right toggle button */}
+                        {/* Top right view button */}
                         <div style={{ display: 'flex', gap: '0.4rem' }}>
                           <button 
-                            onClick={toggleExpand}
-                            title={isExpanded ? "Ocultar piezas" : "Ver piezas"}
+                            onClick={() => setGrupoModalKey(grupo.key)}
+                            title="Ver piezas de este grupo"
                             style={{
                               backgroundColor: '#e0f2fe',
                               border: 'none',
                               color: '#0284c7',
                               cursor: 'pointer',
-                              padding: '0.4rem',
+                              padding: '0.4rem 0.55rem',
                               borderRadius: '6px',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              transition: 'background-color 0.2s',
-                              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
+                              transition: 'all 0.2s'
                             }}
+                            onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
+                            onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
                           >
-                            ▼
+                            <FaChevronRight size={11} />
                           </button>
                         </div>
                       </div>
@@ -2272,7 +2272,7 @@ export default function InventarioExistencias() {
                         ) : null}
                       </div>
 
-                      {/* Bottom Row: Adjust Stock & Quantity */}
+                      {/* Bottom Row: Actions & Quantity */}
                       <div style={{
                         display: 'flex',
                         justifyContent: 'space-between',
@@ -2282,7 +2282,7 @@ export default function InventarioExistencias() {
                       }}>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <button 
-                            onClick={toggleExpand}
+                            onClick={() => setGrupoModalKey(grupo.key)}
                             style={{
                               padding: '0.35rem 0.75rem',
                               backgroundColor: '#f1f5f9',
@@ -2294,12 +2294,13 @@ export default function InventarioExistencias() {
                               fontSize: '0.75rem',
                               display: 'inline-flex',
                               alignItems: 'center',
+                              gap: '0.35rem',
                               transition: 'background-color 0.2s'
                             }}
                             onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'}
                             onMouseOut={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
                           >
-                            {isExpanded ? 'Ocultar' : 'Ver Piezas'}
+                            <FaEye size={12} /> Ver Piezas
                           </button>
 
                           <button 
@@ -2344,159 +2345,396 @@ export default function InventarioExistencias() {
                           {grupo.cantidadTotal}
                         </span>
                       </div>
-
-                      {/* Expanded View with individual item cards */}
-                      {isExpanded && (
-                        <div style={{ 
-                          marginTop: '1.5rem', 
-                          paddingTop: '1rem', 
-                          borderTop: '1px solid #e2e8f0',
-                          paddingLeft: '0.5rem'
-                        }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                            {grupo.items.map((item, idx) => {
-                              const nombreModeloItem = `${item.marca || ''} ${item.modelo || ''}`.trim() || item.nombre;
-                              const mostrarNombreItem = nombreModeloItem && nombreModeloItem.toLowerCase() !== grupo.nombre.toLowerCase();
-
-                              return (
-                                <div key={item.id || idx} style={{
-                                  backgroundColor: '#f8fafc', 
-                                  border: '1px solid #e2e8f0', 
-                                  borderRadius: '8px', 
-                                  padding: '0.75rem',
-                                  position: 'relative'
-                                }}>
-                                  {mostrarNombreItem && (
-                                    <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#1e293b', marginBottom: '0.35rem', paddingRight: '5.5rem' }}>
-                                      {nombreModeloItem}
-                                    </div>
-                                  )}
-
-                                  <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.15rem', paddingRight: '5.5rem' }}>
-                                    {item.numeroSerie && <span><strong style={{color:'#64748b'}}>S/N:</strong> {item.numeroSerie}</span>}
-                                    {item.numeroInventario && <span><strong style={{color:'#64748b'}}>Inv:</strong> {item.numeroInventario}</span>}
-                                    {item.cantidad > 1 && (
-                                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.1rem' }}>
-                                        <strong style={{color:'#64748b'}}>Cantidad:</strong>
-                                        <span style={{
-                                          backgroundColor: '#dcfce7',
-                                          color: '#166534',
-                                          fontSize: '0.75rem',
-                                          fontWeight: '700',
-                                          padding: '0.1rem 0.45rem',
-                                          borderRadius: '4px'
-                                        }}>
-                                          {item.cantidad} uds.
-                                        </span>
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
-                                    <span style={{
-                                      backgroundColor: (item.estadoFisico === 'Stock' || item.estadoFisico === 'Buen Estado') ? '#ecfdf5' : (item.estadoFisico === 'Baja' || item.estadoFisico === 'Dañado') ? '#fef2f2' : '#fffbeb',
-                                      color: (item.estadoFisico === 'Stock' || item.estadoFisico === 'Buen Estado') ? '#047857' : (item.estadoFisico === 'Baja' || item.estadoFisico === 'Dañado') ? '#b91c1c' : '#b45309',
-                                      padding: '0.15rem 0.4rem', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold'
-                                    }}>
-                                      {item.estadoFisico === 'Refacciones' || item.estadoFisico === 'reparacion' ? 'Mantenimiento' : item.estadoFisico}
-                                    </span>
-
-                                    {(item.areaUbicacion || item.equipoOriginal?.responsable || item.equipoOriginal?.area) && (
-                                      <span style={{ fontSize: '0.7rem', color: '#475569', backgroundColor: '#e2e8f0', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
-                                        {item.equipoOriginal?.responsable || item.equipoOriginal?.area || item.areaUbicacion}
-                                      </span>
-                                    )}
-                                  </div>
-                                  
-                                  <div style={{
-                                    position: 'absolute',
-                                    top: '0.5rem',
-                                    right: '0.5rem',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.35rem'
-                                  }}>
-                                    <button
-                                      onClick={() => handleClonarIndividual(item)}
-                                      title="Clonar / Agregar otra pieza igual"
-                                      style={{
-                                        backgroundColor: '#e0f2fe',
-                                        border: 'none',
-                                        color: '#0284c7',
-                                        cursor: 'pointer',
-                                        padding: '0.35rem',
-                                        borderRadius: '6px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transition: 'background-color 0.2s'
-                                      }}
-                                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
-                                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
-                                    >
-                                      <FaPlus size={12} />
-                                    </button>
-                                    
-                                    <button
-                                      onClick={() => handleEditar(item)}
-                                      title="Editar pieza"
-                                      style={{
-                                        backgroundColor: '#fef3c7',
-                                        border: 'none',
-                                        color: '#d97706',
-                                        cursor: 'pointer',
-                                        padding: '0.35rem',
-                                        borderRadius: '6px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transition: 'background-color 0.2s'
-                                      }}
-                                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
-                                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
-                                    >
-                                      <FaEdit size={12} />
-                                    </button>
-
-                                    <button
-                                      onClick={() => handleEliminar(item)}
-                                      title="Eliminar pieza"
-                                      style={{
-                                        backgroundColor: '#fee2e2',
-                                        border: 'none',
-                                        color: '#dc2626',
-                                        cursor: 'pointer',
-                                        padding: '0.35rem',
-                                        borderRadius: '6px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transition: 'background-color 0.2s'
-                                      }}
-                                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#fca5a5'}
-                                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#fee2e2'}
-                                    >
-                                      <FaTrashAlt size={12} />
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   );
-                });
+                })}
+              </div>
+
+              {/* MODAL DETALLES DEL GRUPO DE PIEZAS */}
+              {grupoModal && (() => {
+                const esStock = grupoModal.estadoFisico === 'Stock';
+                const esBaja = grupoModal.estadoFisico === 'Baja';
+                const colorStripe = esStock ? '#10b981' : esBaja ? '#ef4444' : '#f59e0b';
+                const colorQtyText = esStock ? '#047857' : esBaja ? '#b91c1c' : '#b45309';
+                const bgQtyPill = esStock ? '#ecfdf5' : esBaja ? '#fef2f2' : '#fffbeb';
+
+                const limpiarDuplicados = (str) => {
+                  if (!str) return '';
+                  return str.replace(/^(\b[a-zA-Z0-9]+\b)(?:\s+\1\b)+/i, '$1').trim();
+                };
+
+                let subtitulo = grupoModal.modelo
+                  ? `${grupoModal.marca && !grupoModal.modelo.toLowerCase().includes(grupoModal.marca.toLowerCase()) ? `${grupoModal.marca} ` : ''}${grupoModal.modelo}`
+                  : (grupoModal.marca || '');
+                subtitulo = limpiarDuplicados(subtitulo);
+                const tituloLimpio = limpiarDuplicados(grupoModal.nombre);
+
+                return (
+                  <div 
+                    style={{ 
+                      position: 'fixed', 
+                      top: 0, 
+                      left: 0, 
+                      width: '100vw', 
+                      height: '100vh', 
+                      backgroundColor: 'rgba(15, 23, 42, 0.65)', 
+                      backdropFilter: 'blur(5px)', 
+                      display: 'flex', 
+                      justifyContent: 'center', 
+                      alignItems: 'center', 
+                      zIndex: 2500, 
+                      padding: '1rem' 
+                    }}
+                    onClick={() => setGrupoModalKey(null)}
+                  >
+                    <div 
+                      style={{ 
+                        backgroundColor: 'white', 
+                        borderRadius: '16px', 
+                        width: '100%', 
+                        maxWidth: '720px', 
+                        maxHeight: '85vh', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', 
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {/* Top accent bar */}
+                      <div style={{ height: '5px', backgroundColor: colorStripe, width: '100%' }}></div>
+
+                      {/* Header */}
+                      <div style={{ 
+                        padding: '1.25rem 1.5rem', 
+                        borderBottom: '1px solid #e2e8f0', 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'flex-start',
+                        gap: '1rem'
+                      }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              fontSize: '0.7rem',
+                              fontWeight: '800',
+                              color: '#475569',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              backgroundColor: '#f1f5f9',
+                              padding: '0.2rem 0.55rem',
+                              borderRadius: '6px'
+                            }}>
+                              {getCategoriaIcon(grupoModal.categoria)}
+                              {getCategoriaLabel(grupoModal.categoria)}
+                            </span>
+
+                            <span style={{
+                              fontSize: '0.68rem',
+                              fontWeight: '700',
+                              padding: '0.2rem 0.5rem',
+                              borderRadius: '6px',
+                              backgroundColor: bgQtyPill,
+                              color: colorQtyText
+                            }}>
+                              {esStock ? '🟢 Stock' : esBaja ? '🔴 Baja' : '🟡 Mantenimiento'}
+                            </span>
+
+                            <span style={{
+                              fontSize: '0.72rem',
+                              fontWeight: '700',
+                              color: '#64748b',
+                              backgroundColor: '#f8fafc',
+                              padding: '0.2rem 0.5rem',
+                              borderRadius: '6px',
+                              border: '1px solid #e2e8f0'
+                            }}>
+                              {grupoModal.cantidadTotal} {grupoModal.cantidadTotal === 1 ? 'unidad' : 'unidades'} en total
+                            </span>
+                          </div>
+
+                          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '800', color: '#0f172a' }}>
+                            {tituloLimpio}
+                          </h3>
+                          {subtitulo && (
+                            <div style={{ fontSize: '0.9rem', color: '#0369a1', fontWeight: '600', marginTop: '0.15rem' }}>
+                              {subtitulo}
+                            </div>
+                          )}
+                        </div>
+
+                        <button 
+                          type="button" 
+                          onClick={() => setGrupoModalKey(null)} 
+                          style={{ 
+                            border: 'none', 
+                            background: '#f1f5f9', 
+                            width: '32px', 
+                            height: '32px', 
+                            borderRadius: '50%', 
+                            display: 'flex', 
+                            justifyContent: 'center', 
+                            alignItems: 'center', 
+                            cursor: 'pointer', 
+                            color: '#64748b', 
+                            transition: 'background-color 0.2s',
+                            flexShrink: 0
+                          }} 
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'} 
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}
+                        >
+                          <FaTimes size={15} />
+                        </button>
+                      </div>
+
+                      {/* Action Bar inside Modal */}
+                      <div style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: '#f8fafc',
+                        borderBottom: '1px solid #e2e8f0',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        flexWrap: 'wrap'
+                      }}>
+                        <span style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: '600' }}>
+                          Piezas y números de serie registrados ({grupoModal.items.length}):
+                        </span>
+
+                        <button 
+                          onClick={() => {
+                            if (grupoModal.items && grupoModal.items.length > 0) {
+                              handleClonar(grupoModal.items[0]);
+                            }
+                          }}
+                          title="Clonar / Agregar otra pieza igual"
+                          style={{
+                            padding: '0.4rem 0.85rem',
+                            backgroundColor: '#e0f2fe',
+                            border: 'none',
+                            borderRadius: '7px',
+                            cursor: 'pointer',
+                            color: '#0284c7',
+                            fontWeight: '700',
+                            fontSize: '0.8rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
+                        >
+                          <FaPlus size={11} /> Agregar otra pieza igual
+                        </button>
+                      </div>
+
+                      {/* Pieces List */}
+                      <div style={{ 
+                        padding: '1.25rem 1.5rem', 
+                        overflowY: 'auto', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '0.75rem',
+                        maxHeight: '52vh'
+                      }}>
+                        {grupoModal.items.map((item, idx) => {
+                          const nombreModeloItem = `${item.marca || ''} ${item.modelo || ''}`.trim() || item.nombre;
+                          const mostrarNombreItem = nombreModeloItem && nombreModeloItem.toLowerCase() !== grupoModal.nombre.toLowerCase();
+
+                          return (
+                            <div 
+                              key={item.id || idx} 
+                              style={{
+                                backgroundColor: '#ffffff', 
+                                border: '1px solid #e2e8f0', 
+                                borderRadius: '10px', 
+                                padding: '0.85rem 1rem',
+                                position: 'relative',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                                transition: 'all 0.15s'
+                              }}
+                              onMouseOver={e => {
+                                e.currentTarget.style.borderColor = '#cbd5e1';
+                                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.05)';
+                              }}
+                              onMouseOut={e => {
+                                e.currentTarget.style.borderColor = '#e2e8f0';
+                                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.02)';
+                              }}
+                            >
+                              {mostrarNombreItem && (
+                                <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#1e293b', marginBottom: '0.35rem', paddingRight: '6.5rem' }}>
+                                  {nombreModeloItem}
+                                </div>
+                              )}
+
+                              <div style={{ fontSize: '0.85rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.2rem', paddingRight: '6.5rem' }}>
+                                {item.numeroSerie && (
+                                  <span><strong style={{color:'#64748b'}}>S/N:</strong> <code style={{ backgroundColor: '#f1f5f9', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.82rem' }}>{item.numeroSerie}</code></span>
+                                )}
+                                {item.numeroInventario && (
+                                  <span><strong style={{color:'#64748b'}}>Inv:</strong> <code style={{ backgroundColor: '#f1f5f9', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '0.82rem' }}>{item.numeroInventario}</code></span>
+                                )}
+                                {!item.numeroSerie && !item.numeroInventario && (
+                                  <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.8rem' }}>Sin número de serie ni inventario</span>
+                                )}
+                                {item.cantidad > 1 && (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.1rem' }}>
+                                    <strong style={{color:'#64748b'}}>Cantidad:</strong>
+                                    <span style={{
+                                      backgroundColor: '#dcfce7',
+                                      color: '#166534',
+                                      fontSize: '0.75rem',
+                                      fontWeight: '700',
+                                      padding: '0.1rem 0.45rem',
+                                      borderRadius: '4px'
+                                    }}>
+                                      {item.cantidad} uds.
+                                    </span>
+                                  </span>
+                                )}
+                              </div>
+
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.6rem' }}>
+                                <span style={{
+                                  backgroundColor: (item.estadoFisico === 'Stock' || item.estadoFisico === 'Buen Estado') ? '#ecfdf5' : (item.estadoFisico === 'Baja' || item.estadoFisico === 'Dañado') ? '#fef2f2' : '#fffbeb',
+                                  color: (item.estadoFisico === 'Stock' || item.estadoFisico === 'Buen Estado') ? '#047857' : (item.estadoFisico === 'Baja' || item.estadoFisico === 'Dañado') ? '#b91c1c' : '#b45309',
+                                  padding: '0.18rem 0.45rem', borderRadius: '5px', fontSize: '0.72rem', fontWeight: 'bold'
+                                }}>
+                                  {item.estadoFisico === 'Refacciones' || item.estadoFisico === 'reparacion' ? 'Mantenimiento' : item.estadoFisico}
+                                </span>
+
+                                {(item.areaUbicacion || item.equipoOriginal?.responsable || item.equipoOriginal?.area) && (
+                                  <span style={{ fontSize: '0.72rem', color: '#475569', backgroundColor: '#f1f5f9', padding: '0.18rem 0.45rem', borderRadius: '5px', border: '1px solid #e2e8f0' }}>
+                                    {item.equipoOriginal?.responsable || item.equipoOriginal?.area || item.areaUbicacion}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {/* Botones de acción */}
+                              <div style={{
+                                position: 'absolute',
+                                top: '0.75rem',
+                                right: '0.75rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.35rem'
+                              }}>
+                                <button
+                                  onClick={() => handleClonarIndividual(item)}
+                                  title="Clonar / Agregar otra pieza igual"
+                                  style={{
+                                    backgroundColor: '#e0f2fe',
+                                    border: 'none',
+                                    color: '#0284c7',
+                                    cursor: 'pointer',
+                                    padding: '0.45rem',
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'background-color 0.2s'
+                                  }}
+                                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#bae6fd'}
+                                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#e0f2fe'}
+                                >
+                                  <FaPlus size={12} />
+                                </button>
+                                
+                                <button
+                                  onClick={() => handleEditar(item)}
+                                  title="Editar pieza"
+                                  style={{
+                                    backgroundColor: '#fef3c7',
+                                    border: 'none',
+                                    color: '#d97706',
+                                    cursor: 'pointer',
+                                    padding: '0.45rem',
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'background-color 0.2s'
+                                  }}
+                                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#fde68a'}
+                                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#fef3c7'}
+                                >
+                                  <FaEdit size={12} />
+                                </button>
+
+                                <button
+                                  onClick={() => handleEliminar(item)}
+                                  title="Eliminar pieza"
+                                  style={{
+                                    backgroundColor: '#fee2e2',
+                                    border: 'none',
+                                    color: '#dc2626',
+                                    cursor: 'pointer',
+                                    padding: '0.45rem',
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'background-color 0.2s'
+                                  }}
+                                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#fca5a5'}
+                                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#fee2e2'}
+                                >
+                                  <FaTrashAlt size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Footer */}
+                      <div style={{
+                        padding: '1rem 1.5rem',
+                        borderTop: '1px solid #e2e8f0',
+                        backgroundColor: '#f8fafc',
+                        display: 'flex',
+                        justifyContent: 'flex-end',
+                        gap: '0.75rem'
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => setGrupoModalKey(null)}
+                          style={{
+                            padding: '0.55rem 1.4rem',
+                            backgroundColor: '#691B31',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontWeight: '700',
+                            fontSize: '0.875rem',
+                            cursor: 'pointer',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseOver={e => e.currentTarget.style.backgroundColor = '#831f3d'}
+                          onMouseOut={e => e.currentTarget.style.backgroundColor = '#691B31'}
+                        >
+                          Cerrar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
               })()}
-            </div>
+            </>
           );
         })()
       )}
 
       {/* FORM MODAL */}
       {modalAbierto && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, padding: '1rem' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 3000, padding: '1rem' }}>
           <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '2.5rem', width: '100%', maxWidth: '850px', display: 'flex', flexDirection: 'column', minHeight: '620px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)', position: 'relative' }}>
             <button type="button" onClick={() => setModalAbierto(false)} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', border: 'none', background: '#f1f5f9', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', color: '#64748b', transition: 'background-color 0.2s' }} onMouseOver={e => e.currentTarget.style.backgroundColor = '#e2e8f0'} onMouseOut={e => e.currentTarget.style.backgroundColor = '#f1f5f9'}>
               <FaTimes size={16} />
