@@ -2616,6 +2616,12 @@ export default function InventarioExistencias() {
                                   </span>
                                 )}
                               </div>
+
+                              {(item.equipoOriginal?.detalles?.descripcionOtro) && (
+                                <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.4rem', fontStyle: 'italic', wordBreak: 'break-word', paddingRight: '5rem', backgroundColor: '#f8fafc', padding: '0.25rem 0.5rem', borderRadius: '4px', borderLeft: '3px solid #cbd5e1' }}>
+                                  {item.equipoOriginal.detalles.descripcionOtro}
+                                </div>
+                              )}
                               
                               {/* Botones de acción */}
                               <div style={{
@@ -3274,23 +3280,19 @@ export default function InventarioExistencias() {
                         </>
                       )}
 
-                      {['otro', 'antena_wifi', 'monitor', 'cabezal'].includes(form.tipo) && (
-                        <div style={{ gridColumn: '1 / -1' }}>
-                          <label style={labelStyle}>Detalles / Descripción Adicional</label>
-                          <textarea
-                            value={form.detalles.descripcionOtro || ''}
-                            onChange={e => handleDetalleChange('descripcionOtro', e.target.value)}
-                            style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
-                            placeholder="Escribe detalles o características adicionales..."
-                          />
-                        </div>
-                      )}
-
                     </div>
                   </div>
                   )}
 
-
+                  <div style={{ marginTop: '1.25rem', marginBottom: '0.75rem' }}>
+                    <label style={labelStyle}>Detalles / Descripción Adicional</label>
+                    <textarea
+                      value={form.detalles?.descripcionOtro || ''}
+                      onChange={e => handleDetalleChange('descripcionOtro', e.target.value)}
+                      style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
+                      placeholder="Escribe detalles, notas o características adicionales del equipo o stock..."
+                    />
+                  </div>
 
                 </>
               ) : (
