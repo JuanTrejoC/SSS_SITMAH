@@ -1544,9 +1544,15 @@ export default function InventarioTecnologico() {
   };
 
   const handleDesvincular = async (item) => {
+    const tieneComponentes = item.componentes && item.componentes.length > 0;
+    
+    const texto = tieneComponentes
+      ? `¿Estás seguro que deseas desvincular este equipo y sus ${item.componentes.length} periféricos asociados? Pasarán a ser independientes.`
+      : `¿Estás seguro que deseas desvincular este equipo del equipo principal?`;
+
     const result = await Swal.fire({
       title: '¿Desvincular equipo?',
-      text: `¿Estás seguro que deseas desvincular este equipo del equipo principal?`,
+      text: texto,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#4f46e5',
@@ -1560,7 +1566,11 @@ export default function InventarioTecnologico() {
         const res = await fetch(`${API_BASE_URL}/api/inventario-tecnologico/${item.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token}` },
-          body: JSON.stringify({ ...item, equipoPrincipalId: null })
+          body: JSON.stringify({ 
+            ...item, 
+            equipoPrincipalId: null,
+            desvincularComponentes: true 
+          })
         });
 
         if (res.ok) {
@@ -1576,56 +1586,117 @@ export default function InventarioTecnologico() {
     }
   };
 
+  const handleDesvincularComponentes = async (item) => {
+    const nombres = (item.componentes || []).map(c => `• ${c.tipo}: ${c.marca || ''} ${c.modelo || ''} (Inv: ${c.numeroInventario || c.numeroSerie || 'S/N'})`).join('<br/>');
+    
+    const result = await Swal.fire({
+      title: '¿Desvincular periféricos?',
+      html: `<p>¿Deseas desvincular todos los periféricos asociados a este <strong>${item.tipo}</strong>?</p>
+             <div style="text-align: left; background: #f8fafc; padding: 0.75rem; border-radius: 8px; font-size: 0.85rem; margin-top: 0.5rem; color: #334155; max-height: 150px; overflow-y: auto;">
+               ${nombres || 'Periféricos asociados'}
+             </div>
+             <p style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem;">Los periféricos pasarán a ser equipos independientes en el inventario.</p>`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#4f46e5',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Sí, desvincular periféricos',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/inventario-tecnologico/${item.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token}` },
+          body: JSON.stringify({ ...item, desvincularComponentes: true })
+        });
+
+        if (res.ok) {
+          Swal.fire('¡Periféricos Desvinculados!', 'Los periféricos ahora son independientes.', 'success');
+          cargarEquipos();
+        } else {
+          const data = await res.json();
+          Swal.fire('Error', data.error || 'No se pudieron desvincular los periféricos', 'error');
+        }
+      } catch (error) {
+        Swal.fire('Error', 'Ocurrió un error al intentar desvincular los periféricos', 'error');
+      }
+    }
+  };
+
   const handleVincular = async (item) => {
-    const { value: seriePadre } = await Swal.fire({
-      title: 'Vincular a equipo',
-      text: 'Ingresa el Número de Serie del equipo principal (PC, Laptop, etc.):',
+    const esPrincipal = ['escritorio', 'laptop', 'servidor'].includes((item.tipo || '').toLowerCase());
+    
+    const titulo = esPrincipal
+      ? `Vincular Periférico a ${item.tipo || 'Equipo'}`
+      : 'Vincular a Equipo Principal';
+      
+    const texto = esPrincipal
+      ? `Ingresa el Número de Inventario o Serie del periférico (Monitor, Teclado, etc.) que deseas vincular a este ${item.tipo || 'equipo'} (${item.marca || ''} - Inv: ${item.numeroInventario || item.numeroSerie || 'S/N'}):`
+      : 'Ingresa el Número de Inventario o Serie del equipo principal (PC, Laptop, etc.):';
+
+    const { value: identificador } = await Swal.fire({
+      title: titulo,
+      text: texto,
       input: 'text',
-      inputPlaceholder: 'Ej: DL12345 o Número de Serie',
+      inputPlaceholder: 'Ej: INV-1234 o Número de Serie',
       showCancelButton: true,
       confirmButtonText: 'Buscar y Vincular',
       cancelButtonText: 'Cancelar',
       inputValidator: (value) => {
-        if (!value || !value.trim()) return 'Debes ingresar un número de serie';
+        if (!value || !value.trim()) return 'Debes ingresar un número de inventario o serie';
       }
     });
 
-    if (seriePadre) {
-      const termino = seriePadre.trim().toLowerCase();
+    if (identificador) {
+      const termino = identificador.trim().toLowerCase();
       try {
-        const resBusqueda = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?search=${encodeURIComponent(seriePadre.trim())}&limit=20`, {
+        const resBusqueda = await fetch(`${API_BASE_URL}/api/inventario-tecnologico?search=${encodeURIComponent(identificador.trim())}&limit=50`, {
           headers: { 'Authorization': `Bearer ${user.token}` }
         });
         const dataBusqueda = await resBusqueda.json();
-        const listaEquipos = dataBusqueda.data || dataBusqueda.items || [];
-        let padre = listaEquipos.find(i => (i.numeroSerie || '').toLowerCase().trim() === termino);
-        if (!padre && Array.isArray(todosLosEquipos)) {
-          padre = todosLosEquipos.find(i => (i.numeroSerie || '').toLowerCase().trim() === termino);
+        const listaEquipos = Array.isArray(dataBusqueda.data) ? dataBusqueda.data : (dataBusqueda.items || []);
+        
+        let coincidencia = listaEquipos.find(i => 
+          (i.numeroSerie || '').toLowerCase().trim() === termino ||
+          (i.numeroInventario || '').toLowerCase().trim() === termino
+        );
+        
+        if (!coincidencia && Array.isArray(todosLosEquipos)) {
+          coincidencia = todosLosEquipos.find(i => 
+            (i.numeroSerie || '').toLowerCase().trim() === termino ||
+            (i.numeroInventario || '').toLowerCase().trim() === termino
+          );
         }
 
-        if (!padre) {
-          return Swal.fire('No encontrado', `No se encontró ningún equipo con el número de serie "${seriePadre}". Verifica el número.`, 'error');
+        if (!coincidencia) {
+          return Swal.fire('No encontrado', `No se encontró ningún equipo con el inventario o serie "${identificador}". Verifica los datos.`, 'error');
         }
 
-        if (padre.id === item.id) {
+        if (coincidencia.id === item.id) {
           return Swal.fire('Aviso', 'No puedes vincular un equipo a sí mismo.', 'warning');
         }
 
-        const res = await fetch(`${API_BASE_URL}/api/inventario-tecnologico/${item.id}`, {
+        const equipoHijo = esPrincipal ? coincidencia : item;
+        const equipoPadre = esPrincipal ? item : coincidencia;
+
+        const res = await fetch(`${API_BASE_URL}/api/inventario-tecnologico/${equipoHijo.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token}` },
           body: JSON.stringify({ 
-            ...item, 
-            equipoPrincipalId: padre.id,
-            responsable: padre.responsable,
-            cargoResponsable: padre.cargoResponsable,
-            areaUbicacion: padre.areaUbicacion,
-            direccion: padre.direccion
+            ...equipoHijo, 
+            equipoPrincipalId: equipoPadre.id,
+            responsable: equipoPadre.responsable,
+            cargoResponsable: equipoPadre.cargoResponsable,
+            areaUbicacion: equipoPadre.areaUbicacion,
+            direccion: equipoPadre.direccion,
+            estatus: 'Activo'
           })
         });
 
         if (res.ok) {
-          Swal.fire('¡Vinculado!', `El equipo fue vinculado exitosamente al equipo principal (${padre.tipo || 'Equipo'} - S/N: ${padre.numeroSerie || 'S/N'}).`, 'success');
+          Swal.fire('¡Vinculado!', `El equipo "${equipoHijo.tipo || 'Equipo'} (${equipoHijo.numeroInventario || equipoHijo.numeroSerie || 'S/N'})" fue vinculado exitosamente a "${equipoPadre.tipo || 'Equipo'} (${equipoPadre.numeroInventario || equipoPadre.numeroSerie || 'S/N'})".`, 'success');
           cargarEquipos();
         } else {
           const data = await res.json();
@@ -2231,6 +2302,12 @@ export default function InventarioTecnologico() {
                           {item.equipoPrincipal ? `Vinculado a ${item.equipoPrincipal.tipo || 'equipo'}` : 'Vinculado'}
                         </div>
                       )}
+                      {item.componentes && item.componentes.length > 0 && (
+                        <div style={{ marginTop: '0.35rem', fontSize: '0.75rem', color: '#047857', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }} title={item.componentes.map(c => `${c.tipo}: ${c.marca || ''} ${c.modelo || ''} (Inv: ${c.numeroInventario || c.numeroSerie || 'S/N'})`).join('\n')}>
+                          <FaDesktop size={10} />
+                          {item.componentes.length} periférico{item.componentes.length > 1 ? 's' : ''} vinculado{item.componentes.length > 1 ? 's' : ''}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '1.25rem' }}>
                       <div>
@@ -2288,8 +2365,17 @@ export default function InventarioTecnologico() {
                           <button onClick={() => handleDesvincular(item)} title="Desvincular de equipo principal" style={{ backgroundColor: '#e0e7ff', border: 'none', color: '#4338ca', cursor: 'pointer', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }}>
                             <FaUnlink size={16} />
                           </button>
+                        ) : item.componentes && item.componentes.length > 0 ? (
+                          <>
+                            <button onClick={() => handleVincular(item)} title="Vincular más periféricos a este equipo" style={{ backgroundColor: '#dcfce7', border: 'none', color: '#16a34a', cursor: 'pointer', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }}>
+                              <FaLink size={16} />
+                            </button>
+                            <button onClick={() => handleDesvincularComponentes(item)} title="Desvincular periféricos asociados" style={{ backgroundColor: '#fee2e2', border: 'none', color: '#b91c1c', cursor: 'pointer', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }}>
+                              <FaUnlink size={16} />
+                            </button>
+                          </>
                         ) : (
-                          <button onClick={() => handleVincular(item)} title="Vincular a equipo principal" style={{ backgroundColor: '#dcfce7', border: 'none', color: '#16a34a', cursor: 'pointer', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }}>
+                          <button onClick={() => handleVincular(item)} title={['escritorio', 'laptop', 'servidor'].includes((item.tipo || '').toLowerCase()) ? "Vincular periféricos a este equipo" : "Vincular a equipo principal"} style={{ backgroundColor: '#dcfce7', border: 'none', color: '#16a34a', cursor: 'pointer', padding: '0.5rem', borderRadius: '6px', transition: 'background-color 0.2s' }}>
                             <FaLink size={16} />
                           </button>
                         )}

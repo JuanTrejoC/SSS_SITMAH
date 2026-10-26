@@ -28,7 +28,7 @@ export default function ModalReemplazoPeriferico({ isOpen, onClose, user, onSucc
       });
       const json = await res.json();
       if (res.ok && json.ok) {
-        const items = json.data.items || [];
+        const items = Array.isArray(json.data) ? json.data : (json.data?.items || []);
         
         // Equipos que pueden ser principales (que tengan o puedan tener componentes)
         const principales = items.filter(i => !['mouse', 'teclado', 'monitor', 'regulador'].includes(i.tipo.toLowerCase()));

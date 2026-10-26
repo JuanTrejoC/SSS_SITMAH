@@ -266,6 +266,13 @@ const actualizarEquipo = async (req, res) => {
       datosActualizar.equipoPrincipalId = equipoPrincipalId ? parseInt(equipoPrincipalId) : null;
     }
 
+    if (req.body.desvincularComponentes) {
+      await prisma.equipoTecnologico.updateMany({
+        where: { equipoPrincipalId: parseInt(id) },
+        data: { equipoPrincipalId: null }
+      });
+    }
+
     const equipoActualizado = await prisma.equipoTecnologico.update({
       where: { id: parseInt(id) },
       data: datosActualizar,
@@ -279,7 +286,8 @@ const actualizarEquipo = async (req, res) => {
             numeroInventario: true,
             numeroSerie: true
           }
-        }
+        },
+        componentes: true
       }
     });
 
@@ -307,7 +315,8 @@ const actualizarEquipo = async (req, res) => {
               numeroInventario: true,
               numeroSerie: true
             }
-          }
+          },
+          componentes: true
         }
       });
       return res.json({ ok: true, data: eqAc2 });
@@ -332,6 +341,12 @@ const eliminarEquipo = async (req, res) => {
     if (!equipoExistente) {
       return res.status(404).json({ ok: false, error: 'Equipo no encontrado' });
     }
+
+    // Desvincular periféricos asociados para que no queden bloqueados por llave foránea ni huérfanos
+    await prisma.equipoTecnologico.updateMany({
+      where: { equipoPrincipalId: parseInt(id) },
+      data: { equipoPrincipalId: null }
+    });
 
     await prisma.equipoTecnologico.delete({
       where: { id: parseInt(id) }
@@ -418,8 +433,48 @@ async function procesarPerifericosDeDetalles(detalles, equipoPrincipalId, respon
           }
         });
       } else if (marca || modelo || serie || inventario) {
-        // Si no existía y tiene datos, crear nuevo
-        perifericosAcrear.push({ tipo, marca, modelo, serie, inventario });
+        // Verificar si el periférico ya existe en BD por número de inventario o número de serie
+        let coincidenciaEnBd = null;
+        if (inventario && inventario.trim() !== '') {
+          coincidenciaEnBd = await prisma.equipoTecnologico.findFirst({
+            where: {
+              numeroInventario: inventario.trim(),
+              id: { not: parseInt(equipoPrincipalId) }
+            }
+          });
+        }
+        if (!coincidenciaEnBd && serie && serie.trim() !== '') {
+          const ignorarSeries = ['S/N', 'SIN SERIE', 'S/S', 'N/A', 'SN', 'SIN NUMERO'];
+          if (!ignorarSeries.includes(serie.trim().toUpperCase())) {
+            coincidenciaEnBd = await prisma.equipoTecnologico.findFirst({
+              where: {
+                numeroSerie: serie.trim(),
+                id: { not: parseInt(equipoPrincipalId) }
+              }
+            });
+          }
+        }
+
+        if (coincidenciaEnBd) {
+          // Si ya existe en inventario, lo vinculamos al equipo principal en lugar de duplicarlo
+          await prisma.equipoTecnologico.update({
+            where: { id: coincidenciaEnBd.id },
+            data: {
+              equipoPrincipalId: parseInt(equipoPrincipalId),
+              marca: marca && marca.trim() !== '' ? String(marca) : coincidenciaEnBd.marca,
+              modelo: modelo && modelo.trim() !== '' ? String(modelo) : coincidenciaEnBd.modelo,
+              responsable: responsable || coincidenciaEnBd.responsable,
+              cargoResponsable: cargoResponsable || coincidenciaEnBd.cargoResponsable,
+              areaUbicacion: areaUbicacion || coincidenciaEnBd.areaUbicacion,
+              direccion: direccion || coincidenciaEnBd.direccion,
+              procedencia: procedencia || coincidenciaEnBd.procedencia,
+              estatus: 'Activo'
+            }
+          });
+        } else {
+          // Si no existía y tiene datos, crear nuevo
+          perifericosAcrear.push({ tipo, marca, modelo, serie, inventario });
+        }
       }
     }
 
@@ -463,13 +518,55 @@ async function procesarPerifericosDeDetalles(detalles, equipoPrincipalId, respon
             }
           });
         } else {
-          perifericosAcrear.push({
-            tipo: 'Monitor',
-            marca: monitor.marca,
-            modelo: monitor.modelo,
-            serie: monitor.serie,
-            inventario: monitor.numeroInventario ? String(monitor.numeroInventario) : null
-          });
+          // Verificar si el monitor ya existe en inventario por inventario o serie
+          let coincidenciaEnBd = null;
+          const invMon = monitor.numeroInventario ? String(monitor.numeroInventario).trim() : null;
+          const serMon = monitor.serie ? String(monitor.serie).trim() : null;
+          if (invMon) {
+            coincidenciaEnBd = await prisma.equipoTecnologico.findFirst({
+              where: {
+                numeroInventario: invMon,
+                id: { not: parseInt(equipoPrincipalId) }
+              }
+            });
+          }
+          if (!coincidenciaEnBd && serMon) {
+            const ignorarSeries = ['S/N', 'SIN SERIE', 'S/S', 'N/A', 'SN', 'SIN NUMERO'];
+            if (!ignorarSeries.includes(serMon.toUpperCase())) {
+              coincidenciaEnBd = await prisma.equipoTecnologico.findFirst({
+                where: {
+                  numeroSerie: serMon,
+                  id: { not: parseInt(equipoPrincipalId) }
+                }
+              });
+            }
+          }
+
+          if (coincidenciaEnBd) {
+            // Vincular el monitor existente al equipo principal
+            await prisma.equipoTecnologico.update({
+              where: { id: coincidenciaEnBd.id },
+              data: {
+                equipoPrincipalId: parseInt(equipoPrincipalId),
+                marca: monitor.marca?.trim() || coincidenciaEnBd.marca,
+                modelo: monitor.modelo?.trim() || coincidenciaEnBd.modelo,
+                responsable: responsable || coincidenciaEnBd.responsable,
+                cargoResponsable: cargoResponsable || coincidenciaEnBd.cargoResponsable,
+                areaUbicacion: areaUbicacion || coincidenciaEnBd.areaUbicacion,
+                direccion: direccion || coincidenciaEnBd.direccion,
+                procedencia: procedencia || coincidenciaEnBd.procedencia,
+                estatus: 'Activo'
+              }
+            });
+          } else {
+            perifericosAcrear.push({
+              tipo: 'Monitor',
+              marca: monitor.marca,
+              modelo: monitor.modelo,
+              serie: monitor.serie,
+              inventario: invMon
+            });
+          }
         }
       }
     }

@@ -18,23 +18,63 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
   const [modoEdicionResuelto, setModoEdicionResuelto] = useState(false)
   const [cambiarFirma, setCambiarFirma] = useState(false)
 
-  const obtenerFechaHoy = () => new Date().toISOString().slice(0, 10)
+  const pad2 = (n) => String(n).padStart(2, '0')
+
+  const obtenerFechaHoy = () => {
+    const d = new Date()
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+  }
+
+  const obtenerHoraAhora = () => {
+    const d = new Date()
+    return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+  }
+
+  const extraerFechaYHora = (fechaIso) => {
+    if (!fechaIso) {
+      return { fecha: obtenerFechaHoy(), hora: obtenerHoraAhora() }
+    }
+    const d = new Date(fechaIso)
+    if (isNaN(d.getTime())) {
+      return { fecha: obtenerFechaHoy(), hora: obtenerHoraAhora() }
+    }
+    return {
+      fecha: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`,
+      hora: `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+    }
+  }
+
+  const construirFechaResolucion = (fechaStr, horaStr) => {
+    const fecha = fechaStr || obtenerFechaHoy()
+    let hora = horaStr || obtenerHoraAhora()
+    if (hora.length === 5) {
+      hora = `${hora}:00`
+    }
+    return `${fecha} ${hora}`
+  }
+
   const obtenerNombreSesion = () => currentUser?.nombre || currentUser?.username || ''
 
-  const [datosCierre, setDatosCierre] = useState({
-    tecnicoAtendio: reporte?.tecnicoAtendio || obtenerNombreSesion(),
-    fechaAtencion: reporte?.fechaResolucion ? new Date(reporte.fechaResolucion).toISOString().slice(0, 10) : obtenerFechaHoy(),
-    diagnostico: reporte?.diagnosticoSolucion || '',
-    descripcion: reporte?.descripcion || '',
-    evidenciasSolucion: []
+  const [datosCierre, setDatosCierre] = useState(() => {
+    const fh = extraerFechaYHora(reporte?.fechaResolucion)
+    return {
+      tecnicoAtendio: reporte?.tecnicoAtendio || obtenerNombreSesion(),
+      fechaAtencion: fh.fecha,
+      horaAtencion: fh.hora,
+      diagnostico: reporte?.diagnosticoSolucion || '',
+      descripcion: reporte?.descripcion || '',
+      evidenciasSolucion: []
+    }
   })
   const [vistasPreviasEvidencia, setVistasPreviasEvidencia] = useState([])
 
   // Sincronizar campos cuando cambia el reporte o el usuario
   useEffect(() => {
+    const fh = extraerFechaYHora(reporte?.fechaResolucion)
     setDatosCierre({
       tecnicoAtendio: reporte?.tecnicoAtendio || obtenerNombreSesion(),
-      fechaAtencion: reporte?.fechaResolucion ? new Date(reporte.fechaResolucion).toISOString().slice(0, 10) : obtenerFechaHoy(),
+      fechaAtencion: fh.fecha,
+      horaAtencion: fh.hora,
       diagnostico: reporte?.diagnosticoSolucion || '',
       descripcion: reporte?.descripcion || '',
       evidenciasSolucion: []
@@ -49,7 +89,7 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
-  }, [reporte?.id, currentUser?.nombre, currentUser?.username])
+  }, [reporte?.id, reporte?.fechaResolucion, currentUser?.nombre, currentUser?.username])
 
   // Inicializar canvas de firma
   useEffect(() => {
@@ -267,7 +307,7 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
       const formData = new FormData()
       formData.append('estado', 'resuelto')
       formData.append('tecnico_atendio', datosCierre.tecnicoAtendio.trim())
-      formData.append('fecha_resolucion', `${datosCierre.fechaAtencion} 12:00:00`)
+      formData.append('fecha_resolucion', construirFechaResolucion(datosCierre.fechaAtencion, datosCierre.horaAtencion))
       formData.append('diagnostico_solucion', datosCierre.diagnostico.trim() || 'Reporte resuelto satisfactoriamente.')
       formData.append('comentario', datosCierre.diagnostico.trim() || 'Reporte finalizado y resuelto')
       if (firmaBase64) {
@@ -341,7 +381,7 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
 
       const formData = new FormData()
       formData.append('tecnico_atendio', datosCierre.tecnicoAtendio.trim())
-      formData.append('fecha_resolucion', `${datosCierre.fechaAtencion} 12:00:00`)
+      formData.append('fecha_resolucion', construirFechaResolucion(datosCierre.fechaAtencion, datosCierre.horaAtencion))
       formData.append('diagnostico_solucion', datosCierre.diagnostico.trim() || 'Reporte resuelto satisfactoriamente.')
       if (datosCierre.descripcion) {
         formData.append('descripcion', datosCierre.descripcion.trim())
@@ -417,8 +457,8 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             
-            {/* CAMPOS: QUIÉN ATENDIÓ Y FECHA */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.85rem', alignItems: 'start' }}>
+            {/* CAMPOS: QUIÉN ATENDIÓ, FECHA Y HORA */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', alignItems: 'start' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#374151', margin: 0 }}>
                   Quién Atendió <span style={{ color: '#DC2626' }}>*</span>
@@ -448,6 +488,26 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
                   type="date"
                   value={datosCierre.fechaAtencion}
                   onChange={(e) => setDatosCierre({ ...datosCierre, fechaAtencion: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '8px',
+                    border: '1px solid #D1D5DB',
+                    fontSize: '0.875rem',
+                    backgroundColor: '#FFFFFF',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#374151', margin: 0 }}>
+                  Hora de Atención <span style={{ color: '#DC2626' }}>*</span>
+                </label>
+                <input
+                  type="time"
+                  value={datosCierre.horaAtencion}
+                  onChange={(e) => setDatosCierre({ ...datosCierre, horaAtencion: e.target.value })}
                   style={{
                     width: '100%',
                     padding: '0.65rem 0.85rem',
@@ -856,8 +916,8 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         
-        {/* CAMPOS: QUIÉN ATENDIÓ Y FECHA */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.85rem', alignItems: 'start' }}>
+        {/* CAMPOS: QUIÉN ATENDIÓ, FECHA Y HORA */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', alignItems: 'start' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
             <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#374151', minHeight: '1.3rem', display: 'flex', alignItems: 'center', gap: '0.25rem', margin: 0 }}>
               <span>Quién Atendió</span>
@@ -890,6 +950,28 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
               type="date"
               value={datosCierre.fechaAtencion}
               onChange={(e) => setDatosCierre({ ...datosCierre, fechaAtencion: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '0.65rem 0.85rem',
+                borderRadius: '8px',
+                border: '1px solid #D1D5DB',
+                fontSize: '0.875rem',
+                backgroundColor: '#FFFFFF',
+                height: '42px',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <label style={{ fontSize: '0.85rem', fontWeight: '700', color: '#374151', minHeight: '1.3rem', display: 'flex', alignItems: 'center', gap: '0.25rem', margin: 0 }}>
+              <span>Hora de Atención</span>
+              <span style={{ color: '#DC2626' }}>*</span>
+            </label>
+            <input
+              type="time"
+              value={datosCierre.horaAtencion}
+              onChange={(e) => setDatosCierre({ ...datosCierre, horaAtencion: e.target.value })}
               style={{
                 width: '100%',
                 padding: '0.65rem 0.85rem',
