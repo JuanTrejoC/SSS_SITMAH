@@ -212,6 +212,16 @@ async function actualizar(req, res) {
             cargoResponsable: null
           }
         }).catch(err => console.warn('Error regresando equipo a Stock:', err));
+
+        // Regresar también los periféricos vinculados a Stock y limpiar su responsable
+        await prisma.equipoTecnologico.updateMany({
+          where: { equipoPrincipalId: resguardoActualizado.equipoTecnologicoId },
+          data: {
+            estatus: 'Stock',
+            responsable: null,
+            cargoResponsable: null
+          }
+        }).catch(err => console.warn('Error regresando periféricos a Stock:', err));
       }
       if (resguardoActualizado.mobiliarioId) {
         await prisma.inventarioMobiliario.update({

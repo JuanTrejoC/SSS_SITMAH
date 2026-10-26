@@ -8,7 +8,13 @@ export default function FormSemaforos({ usuarioActual }) {
   const fileInputRef = useRef(null)
   const cruceroDropdownRef = useRef(null)
 
-  const obtenerFechaHoy = () => new Date().toISOString().slice(0, 10)
+  const obtenerFechaHoy = () => {
+    const d = new Date()
+    const anio = d.getFullYear()
+    const mes = String(d.getMonth() + 1).padStart(2, '0')
+    const dia = String(d.getDate()).padStart(2, '0')
+    return `${anio}-${mes}-${dia}`
+  }
   const obtenerHoraActual = () => {
     const ahora = new Date()
     return `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`
