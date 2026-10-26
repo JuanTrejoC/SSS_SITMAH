@@ -3315,18 +3315,6 @@ export default function InventarioTecnologico() {
                         </>
                       )}
 
-                      {['otro', 'antena_wifi', 'monitor', 'cabezal'].includes(form.tipo) && (
-                        <div style={{ gridColumn: '1 / -1' }}>
-                          <label style={labelStyle}>Detalles / Descripción Adicional</label>
-                          <textarea
-                            value={form.detalles.descripcionOtro || ''}
-                            onChange={e => handleDetalleChange('descripcionOtro', e.target.value)}
-                            style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
-                            placeholder="Escribe detalles o características adicionales..."
-                          />
-                        </div>
-                      )}
-
                     </div>
                   </div>
 
@@ -3507,6 +3495,16 @@ export default function InventarioTecnologico() {
 
                     </div>
                   )}
+
+                  <div style={{ marginTop: '1.25rem', marginBottom: '0.75rem' }}>
+                    <label style={labelStyle}>Detalles / Descripción Adicional</label>
+                    <textarea
+                      value={form.detalles?.descripcionOtro || ''}
+                      onChange={e => handleDetalleChange('descripcionOtro', e.target.value)}
+                      style={{ ...inputStyle, minHeight: '80px', resize: 'vertical' }}
+                      placeholder="Escribe detalles, notas o características adicionales del equipo..."
+                    />
+                  </div>
 
                 </>
               ) : (
