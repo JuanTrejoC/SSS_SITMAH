@@ -441,9 +441,9 @@ function Resguardos() {
   const [subiendoId, setSubiendoId] = useState(null);
   const inputFirmadoRef = useRef(null);
   const resguardoSubirRef = useRef(null);
-  
+
   const [modalAbierto, setModalAbierto] = useState(false);
-  
+
   const [form, setForm] = useState({
     tipoOpcion: 'mobiliario',
     tipoInventario: 'mobiliario', // actual type for db
@@ -551,7 +551,7 @@ function Resguardos() {
         ]);
         const dataTec = await resTec.json();
         const dataExis = await resExis.json();
-        
+
         if (dataTec.ok && dataTec.data) {
           const arrTec = Array.isArray(dataTec.data) ? dataTec.data : (dataTec.data.items || []);
           items = [...items, ...arrTec.map(i => {
@@ -566,7 +566,7 @@ function Resguardos() {
             return {
               ...i,
               __formTipo: 'tecnologico',
-              label: `[Tecnológico] ${nombreReal} - ${i.numeroInventario || i.marca || i.modelo || ''}`,
+              label: `[Tecnológico] ${nombreReal} - ${[i.marca, i.modelo].filter(Boolean).join(' ')} (${i.numeroInventario ? `Inv: ${i.numeroInventario}` : ''}${i.numeroInventario && i.numeroSerie ? ' | ' : ''}${i.numeroSerie ? `Serie: ${i.numeroSerie}` : (!i.numeroInventario ? 'Sin Inv / Sin Serie' : '')})`.trim(),
               desc: desc,
               sn: i.numeroSerie || 'S/S',
               nombreResguardante: i.responsable || '',
@@ -575,7 +575,7 @@ function Resguardos() {
             };
           })];
         } else { debugInfo.push('Tec not ok: ' + JSON.stringify(dataTec)); }
-        
+
         if (dataExis.ok && dataExis.data) {
           const arrExis = Array.isArray(dataExis.data) ? dataExis.data : (dataExis.data.items || []);
           const exisTi = arrExis.filter(i => i.tipoInventario !== 'semaforos' && (i.categoria === 'herramienta' || i.categoria === 'equipo' || i.categoria === 'accesorio'));
@@ -615,7 +615,7 @@ function Resguardos() {
           });
         } else { debugInfo.push('Semaforos not ok: ' + JSON.stringify(data)); }
       }
-      
+
       setItemsDisponibles(items);
       actualizarPersonasConocidas(resguardos, items);
     } catch (err) {
@@ -1077,7 +1077,7 @@ function Resguardos() {
             Gestión de préstamos y asignaciones de dispositivos y mobiliario con exportación de documentos oficiales.
           </p>
         </div>
-        <button 
+        <button
           onClick={abrirNuevoResguardo}
           style={{
             display: 'flex', alignItems: 'center', gap: '0.5rem',
@@ -1095,9 +1095,9 @@ function Resguardos() {
       {/* Barra de búsqueda y filtros estilo Inventario */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <input ref={inputFirmadoRef} type="file" accept="application/pdf,.pdf" onChange={subirFirmado} style={{ display: 'none' }} />
-        <input 
-          type="text" 
-          placeholder="Buscar en todos los campos (bien, responsable, inventario, serie, cargo)..." 
+        <input
+          type="text"
+          placeholder="Buscar en todos los campos (bien, responsable, inventario, serie, cargo)..."
           value={busqueda}
           onChange={e => setBusqueda(e.target.value)}
           style={{ padding: '0.75rem 1.25rem', border: '1px solid #CBD5E1', borderRadius: '8px', flex: 1, minWidth: '300px', fontSize: '1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', backgroundColor: 'white' }}
@@ -1389,7 +1389,7 @@ function Resguardos() {
             )}
           </tbody>
         </table>
-        
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1.25rem', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
           <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: '500' }}>
             Mostrando {resguardosFiltrados.length} {resguardosFiltrados.length === 1 ? 'resguardo' : 'resguardos'}
@@ -1405,10 +1405,10 @@ function Resguardos() {
               <h2 style={{ margin: 0, color: '#1e293b', fontSize: '1.25rem', fontWeight: '700' }}>Nuevo Resguardo</h2>
               <button onClick={() => setModalAbierto(false)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: '#64748b', cursor: 'pointer' }}>&times;</button>
             </div>
-            
+
             <form onSubmit={handleGuardar} style={{ padding: '1.5rem' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
-                
+
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#475569', fontSize: '0.9rem' }}>Categoría *</label>
                   <select required value={form.tipoOpcion} onChange={handleOpcionChange} style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', backgroundColor: 'white' }}>
@@ -1423,8 +1423,8 @@ function Resguardos() {
                     {form.tipoOpcion === 'mobiliario'
                       ? 'Mueble / Bien *'
                       : form.tipoOpcion === 'ti'
-                      ? 'Equipo Tecnológico *'
-                      : 'Controlador Semafórico *'}
+                        ? 'Equipo Tecnológico *'
+                        : 'Controlador Semafórico *'}
                   </label>
                   <SelectorEquipoResguardo
                     items={itemsDisponibles}
@@ -1510,11 +1510,11 @@ function Resguardos() {
 
               <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '10px', marginBottom: '1.25rem', border: '1px solid #e2e8f0' }}>
                 <h3 style={{ marginTop: 0, color: '#334155', fontSize: '0.95rem', fontWeight: '700', marginBottom: '0.75rem' }}>Datos para el Documento Word (Editables)</h3>
-                
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.85rem' }}>
                   <div>
                     <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: '600', color: '#475569', fontSize: '0.85rem' }}>Descripción (Detalle del Bien)</label>
-                    <textarea value={form.descripcionPdf} onChange={e => setForm({...form, descripcionPdf: e.target.value})} style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', minHeight: '85px', resize: 'vertical' }} />
+                    <textarea value={form.descripcionPdf} onChange={e => setForm({ ...form, descripcionPdf: e.target.value })} style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', minHeight: '85px', resize: 'vertical' }} />
                   </div>
 
                   <div>
@@ -1569,14 +1569,14 @@ function Resguardos() {
 
                   <div>
                     <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: '600', color: '#475569', fontSize: '0.85rem' }}>Número de Serie</label>
-                    <input type="text" value={form.numeroSeriePdf} onChange={e => setForm({...form, numeroSeriePdf: e.target.value})} style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }} />
+                    <input type="text" value={form.numeroSeriePdf} onChange={e => setForm({ ...form, numeroSeriePdf: e.target.value })} style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31' }} />
                   </div>
                 </div>
               </div>
-              
+
               <div>
                 <label style={{ display: 'block', marginBottom: '0.35rem', fontWeight: '600', color: '#475569', fontSize: '0.85rem' }}>Observaciones del préstamo</label>
-                <textarea value={form.observaciones} onChange={e => setForm({...form, observaciones: e.target.value})} style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', minHeight: '55px', resize: 'vertical' }} placeholder="Opcional. Ej. Pantalla intacta, incluye cargador..." />
+                <textarea value={form.observaciones} onChange={e => setForm({ ...form, observaciones: e.target.value })} style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', outlineColor: '#691B31', minHeight: '55px', resize: 'vertical' }} placeholder="Opcional. Ej. Pantalla intacta, incluye cargador..." />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem', borderTop: '1px solid #e2e8f0', paddingTop: '1.25rem' }}>

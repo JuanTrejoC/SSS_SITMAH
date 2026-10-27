@@ -123,7 +123,7 @@ export default function ModalReemplazoPeriferico({ isOpen, onClose, user, onSucc
                   <option value="">-- Seleccionar Equipo Principal --</option>
                   {equiposPrincipales.map(eq => (
                     <option key={eq.id} value={eq.id}>
-                      {eq.tipo.toUpperCase()} - {eq.marca || ''} {eq.modelo || ''} (Inv: {eq.numeroInventario || 'S/N'})
+                      {eq.tipo.toUpperCase()} - {eq.marca || ''} {eq.modelo || ''} (Inv: {eq.numeroInventario || 'S/N'}, Serie: {eq.numeroSerie || 'S/S'})
                     </option>
                   ))}
                 </select>
@@ -145,7 +145,7 @@ export default function ModalReemplazoPeriferico({ isOpen, onClose, user, onSucc
                       <option value="">-- Seleccionar Periférico --</option>
                       {componentesViejos.map(p => (
                         <option key={p.id} value={p.id}>
-                          {p.tipo} - {p.marca || ''} {p.modelo || ''} (Inv: {p.numeroInventario || 'S/N'})
+                          {p.tipo} - {p.marca || ''} {p.modelo || ''} (Inv: {p.numeroInventario || 'S/N'}, Serie: {p.numeroSerie || 'S/S'})
                         </option>
                       ))}
                     </select>
@@ -172,7 +172,7 @@ export default function ModalReemplazoPeriferico({ isOpen, onClose, user, onSucc
                       .filter(p => p.tipo.toLowerCase() === componentesViejos.find(c => c.id === Number(perifericoViejoSeleccionado))?.tipo.toLowerCase())
                       .map(p => (
                       <option key={p.id} value={p.id}>
-                        {p.tipo} - {p.marca || ''} {p.modelo || ''} (Inv: {p.numeroInventario || 'S/N'})
+                        {p.tipo} - {p.marca || ''} {p.modelo || ''} (Inv: {p.numeroInventario || 'S/N'}, Serie: {p.numeroSerie || 'S/S'})
                       </option>
                     ))}
                   </select>

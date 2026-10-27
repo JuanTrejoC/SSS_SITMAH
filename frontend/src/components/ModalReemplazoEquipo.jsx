@@ -78,6 +78,27 @@ export default function ModalReemplazoEquipo({ isOpen, onClose, reporteId, onSuc
     }
   };
 
+  const formatearEquipoLabel = (eq) => {
+    const tipo = (eq.tipo || 'EQUIPO').toUpperCase();
+    const marcaModelo = [eq.marca, eq.modelo].filter(Boolean).join(' ');
+    
+    const tieneInv = eq.numeroInventario && eq.numeroInventario !== 'S/N' && eq.numeroInventario !== 'N/A';
+    const tieneSerie = eq.numeroSerie && eq.numeroSerie !== 'S/S' && eq.numeroSerie !== 'N/A';
+
+    let idText = '';
+    if (tieneInv && tieneSerie) {
+      idText = `(Inv: ${eq.numeroInventario} | Serie: ${eq.numeroSerie})`;
+    } else if (tieneSerie) {
+      idText = `(Serie: ${eq.numeroSerie})`;
+    } else if (tieneInv) {
+      idText = `(Inv: ${eq.numeroInventario})`;
+    } else {
+      idText = `(Sin Inv / Sin Serie)`;
+    }
+
+    return `${tipo} - ${marcaModelo} ${idText}`.trim();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -111,7 +132,7 @@ export default function ModalReemplazoEquipo({ isOpen, onClose, reporteId, onSuc
                 placeholder='-- Buscar Equipo Activo --'
                 options={equiposActivos.map(eq => ({
                   value: eq.id,
-                  label: eq.tipo.toUpperCase() + ' - ' + eq.marca + ' ' + eq.modelo + ' (Inv: ' + (eq.numeroInventario || 'S/N') + ') - Resp: ' + eq.responsable,
+                  label: `${formatearEquipoLabel(eq)} - Resp: ${eq.responsable || 'Sin asignar'}`,
                   searchTerms: [eq.tipo, eq.marca, eq.modelo, eq.numeroInventario, eq.numeroSerie, eq.responsable].filter(Boolean)
                 }))}
               />
@@ -132,7 +153,7 @@ export default function ModalReemplazoEquipo({ isOpen, onClose, reporteId, onSuc
                 placeholder='-- Buscar Equipo en Stock --'
                 options={equiposStock.map(eq => ({
                   value: eq.id,
-                  label: eq.tipo.toUpperCase() + ' - ' + eq.marca + ' ' + eq.modelo + ' (Inv: ' + (eq.numeroInventario || 'S/N') + ')',
+                  label: formatearEquipoLabel(eq),
                   searchTerms: [eq.tipo, eq.marca, eq.modelo, eq.numeroInventario, eq.numeroSerie].filter(Boolean)
                 }))}
               />
