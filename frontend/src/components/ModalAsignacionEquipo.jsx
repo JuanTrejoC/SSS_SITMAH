@@ -120,6 +120,27 @@ export default function ModalAsignacionEquipo({ isOpen, onClose, reporteId, onSu
     }
   };
 
+  const formatearEquipoLabel = (eq) => {
+    const tipo = (eq.tipo || 'EQUIPO').toUpperCase();
+    const marcaModelo = [eq.marca, eq.modelo].filter(Boolean).join(' ');
+    
+    const tieneInv = eq.numeroInventario && eq.numeroInventario !== 'S/N' && eq.numeroInventario !== 'N/A';
+    const tieneSerie = eq.numeroSerie && eq.numeroSerie !== 'S/S' && eq.numeroSerie !== 'N/A';
+
+    let idText = '';
+    if (tieneInv && tieneSerie) {
+      idText = `(Inv: ${eq.numeroInventario} | Serie: ${eq.numeroSerie})`;
+    } else if (tieneSerie) {
+      idText = `(Serie: ${eq.numeroSerie})`;
+    } else if (tieneInv) {
+      idText = `(Inv: ${eq.numeroInventario})`;
+    } else {
+      idText = `(Sin Inv / Sin Serie)`;
+    }
+
+    return `${tipo} - ${marcaModelo} ${idText}`.trim();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -149,10 +170,22 @@ export default function ModalAsignacionEquipo({ isOpen, onClose, reporteId, onSu
                 placeholder='-- Buscar Equipo en Stock --'
                 options={equiposStock.map(eq => ({
                   value: eq.id,
-                  label: eq.tipo.toUpperCase() + ' - ' + eq.marca + ' ' + eq.modelo + ' (Inv: ' + (eq.numeroInventario || 'S/N') + ')',
+                  label: formatearEquipoLabel(eq),
                   searchTerms: [eq.tipo, eq.marca, eq.modelo, eq.numeroInventario, eq.numeroSerie].filter(Boolean)
                 }))}
               />
+              {form.equipoNuevoId && (() => {
+                const sel = equiposStock.find(e => String(e.id) === String(form.equipoNuevoId));
+                if (!sel) return null;
+                return (
+                  <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.75rem', backgroundColor: '#E0F2FE', borderRadius: '6px', fontSize: '0.8rem', color: '#0369A1', display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <span><strong>Tipo:</strong> {(sel.tipo || 'Equipo').toUpperCase()}</span>
+                    <span><strong>Marca/Modelo:</strong> {sel.marca} {sel.modelo}</span>
+                    <span><strong>Inv:</strong> {sel.numeroInventario || 'S/N'}</span>
+                    <span><strong>Número de Serie:</strong> <strong style={{ color: '#0284C7' }}>{sel.numeroSerie || 'S/S'}</strong></span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* DATOS DE ASIGNACIÓN */}
@@ -243,7 +276,7 @@ export default function ModalAsignacionEquipo({ isOpen, onClose, reporteId, onSu
                   placeholder='-- Ninguno --'
                   options={[{ value: '', label: '-- Ninguno --' }, ...equiposActivos.map(eq => ({
                     value: eq.id,
-                    label: eq.tipo.toUpperCase() + ' - ' + eq.marca + ' ' + eq.modelo + ' (Inv: ' + (eq.numeroInventario || 'S/N') + ') - Resp: ' + eq.responsable,
+                    label: `${formatearEquipoLabel(eq)} - Resp: ${eq.responsable || 'Sin asignar'}`,
                     searchTerms: [eq.tipo, eq.marca, eq.modelo, eq.numeroInventario, eq.numeroSerie, eq.responsable].filter(Boolean)
                   }))]}
                 />

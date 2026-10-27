@@ -1063,12 +1063,12 @@ export default function DashboardOficinas() {
                             
                             {operacion.tipoOperacion === 'asignacion' ? (
                               <div style={{ fontSize: '0.85rem', color: '#374151', lineHeight: '1.4' }}>
-                                <strong>NUEVO:</strong> {operacion.equipoNuevo?.tipo} {operacion.equipoNuevo?.marca} (Inv: {operacion.equipoNuevo?.numeroInventario})
+                                <strong>NUEVO:</strong> {(operacion.equipoNuevo?.tipo || 'Equipo').toUpperCase()} {operacion.equipoNuevo?.marca || ''} {operacion.equipoNuevo?.modelo || ''} (Inv: {operacion.equipoNuevo?.numeroInventario || 'S/N'}, Serie: {operacion.equipoNuevo?.numeroSerie || 'S/S'})
                               </div>
                             ) : (
                               <div style={{ fontSize: '0.85rem', color: '#374151', lineHeight: '1.4' }}>
-                                <strong>VIEJO:</strong> {operacion.equipoViejo?.tipo} {operacion.equipoViejo?.marca} (Inv: {operacion.equipoViejo?.numeroInventario})<br/>
-                                <strong>NUEVO:</strong> {operacion.equipoNuevo?.tipo} {operacion.equipoNuevo?.marca} (Inv: {operacion.equipoNuevo?.numeroInventario})
+                                <strong>VIEJO:</strong> {(operacion.equipoViejo?.tipo || 'Equipo').toUpperCase()} {operacion.equipoViejo?.marca || ''} {operacion.equipoViejo?.modelo || ''} (Inv: {operacion.equipoViejo?.numeroInventario || 'S/N'}, Serie: {operacion.equipoViejo?.numeroSerie || 'S/S'})<br/>
+                                <strong>NUEVO:</strong> {(operacion.equipoNuevo?.tipo || 'Equipo').toUpperCase()} {operacion.equipoNuevo?.marca || ''} {operacion.equipoNuevo?.modelo || ''} (Inv: {operacion.equipoNuevo?.numeroInventario || 'S/N'}, Serie: {operacion.equipoNuevo?.numeroSerie || 'S/S'})
                               </div>
                             )}
                           </div>
