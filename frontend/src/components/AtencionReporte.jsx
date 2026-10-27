@@ -11,6 +11,7 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
 
   const canvasRef = useRef(null)
   const fileInputRef = useRef(null)
+  const cameraInputRef = useRef(null)
   // Estado de cámara
   const [camaraAbierta, setCamaraAbierta] = useState(false)
 

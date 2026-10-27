@@ -1,8 +1,19 @@
-// src/views/FormOficinas.jsx
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Swal from 'sweetalert2'
 import { API_BASE_URL } from '../config'
-import { FaBuilding } from 'react-icons/fa'
+import {
+  FaBuilding,
+  FaLaptop,
+  FaDesktop,
+  FaTv,
+  FaKeyboard,
+  FaPrint,
+  FaTools,
+  FaCheckCircle,
+  FaTimes,
+  FaSearch,
+  FaBoxes
+} from 'react-icons/fa'
 import PersonalAutocomplete from '../components/PersonalAutocomplete'
 import { CARGOS_NORMALIZADOS } from '../data/personalSitmah'
 import ModalCamara from '../components/ModalCamara'
@@ -39,6 +50,162 @@ export default function FormOficinas({ usuarioActual }) {
   const [listaCargos, setListaCargos] = useState([])
   const [listaSedes, setListaSedes] = useState([])
   const [listaCategorias, setListaCategorias] = useState([])
+
+  // Equipos asignados al solicitante
+  const [equiposDelResponsable, setEquiposDelResponsable] = useState([])
+  const [buscandoEquipos, setBuscandoEquipos] = useState(false)
+  const [equipoSeleccionadoKey, setEquipoSeleccionadoKey] = useState('')
+  const [modalEquiposAbierto, setModalEquiposAbierto] = useState(false)
+  const [filtroModalEquipos, setFiltroModalEquipos] = useState('')
+
+  // Buscar equipos asignados cuando cambia el solicitante
+  useEffect(() => {
+    const solicitante = (formData.solicitante || '').trim()
+    if (solicitante.length < 3) {
+      setEquiposDelResponsable([])
+      setBuscandoEquipos(false)
+      setEquipoSeleccionadoKey('')
+      return
+    }
+
+    let isMounted = true
+    const timer = setTimeout(async () => {
+      try {
+        setBuscandoEquipos(true)
+        const res = await fetch(`${API_BASE_URL}/api/catalogos/equipos-responsable?nombre=${encodeURIComponent(solicitante)}`)
+        if (res.ok) {
+          const json = await res.json()
+          if (isMounted) {
+            if (json.ok && Array.isArray(json.data)) {
+              setEquiposDelResponsable(json.data)
+            } else {
+              setEquiposDelResponsable([])
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error al consultar equipos asignados:', err)
+        if (isMounted) setEquiposDelResponsable([])
+      } finally {
+        if (isMounted) setBuscandoEquipos(false)
+      }
+    }, 350)
+
+    return () => {
+      isMounted = false
+      clearTimeout(timer)
+    }
+  }, [formData.solicitante])
+
+  // Opciones formateadas de equipos asignados (incluyendo periféricos/componentes)
+  const opcionesEquipos = useMemo(() => {
+    const opciones = []
+    equiposDelResponsable.forEach((eq) => {
+      const tipoStr = (eq.tipo || 'Equipo').toUpperCase()
+      const desc = `${eq.marca || ''} ${eq.modelo || ''}`.trim()
+      const invStr = eq.numeroInventario ? `Inv: ${eq.numeroInventario}` : 'Sin Inv.'
+      const serStr = eq.numeroSerie ? `Serie: ${eq.numeroSerie}` : 'Sin Serie'
+
+      opciones.push({
+        key: `main-${eq.id}`,
+        id: eq.id,
+        nombre: `${tipoStr} ${desc}`.trim(),
+        label: `${tipoStr} ${desc ? `(${desc})` : ''} — [${invStr} | ${serStr}]`,
+        numeroInventario: eq.numeroInventario,
+        numeroSerie: eq.numeroSerie,
+        tipo: eq.tipo,
+        marca: eq.marca,
+        modelo: eq.modelo,
+        esComponente: false
+      })
+
+      if (eq.componentes && Array.isArray(eq.componentes) && eq.componentes.length > 0) {
+        eq.componentes.forEach((comp) => {
+          const compTipo = (comp.tipo || 'Periférico').toUpperCase()
+          const compDesc = `${comp.marca || ''} ${comp.modelo || ''}`.trim()
+          const compInv = comp.numeroInventario ? `Inv: ${comp.numeroInventario}` : 'Sin Inv.'
+          const compSer = comp.numeroSerie ? `Serie: ${comp.numeroSerie}` : 'Sin Serie'
+
+          opciones.push({
+            key: `comp-${comp.id}`,
+            id: comp.id,
+            nombre: `${compTipo} ${compDesc}`.trim(),
+            label: `   ↳ [Periférico] ${compTipo} ${compDesc ? `(${compDesc})` : ''} — [${compInv} | ${compSer}]`,
+            numeroInventario: comp.numeroInventario,
+            numeroSerie: comp.numeroSerie,
+            tipo: comp.tipo,
+            marca: comp.marca,
+            modelo: comp.modelo,
+            esComponente: true,
+            padreId: eq.id
+          })
+        })
+      }
+    })
+    return opciones
+  }, [equiposDelResponsable])
+
+  const manejarSeleccionarEquipo = (key) => {
+    setEquipoSeleccionadoKey(key)
+    if (!key) return
+
+    const opcion = opcionesEquipos.find(o => o.key === key)
+    if (opcion) {
+      const nuevoEquipo = opcion.numeroInventario || opcion.nombre || ''
+      const nuevoSerie = opcion.numeroSerie || ''
+
+      setFormData(prev => ({
+        ...prev,
+        equipo: nuevoEquipo,
+        numero_serie: nuevoSerie
+      }))
+
+      validarCampo('equipo', nuevoEquipo)
+      validarCampo('numero_serie', nuevoSerie)
+    }
+  }
+
+  const limpiarEquipoSeleccionado = () => {
+    setEquipoSeleccionadoKey('')
+    setFormData(prev => ({
+      ...prev,
+      equipo: '',
+      numero_serie: ''
+    }))
+    validarCampo('equipo', '')
+    validarCampo('numero_serie', '')
+  }
+
+  // Filtrado de equipos dentro del modal
+  const equiposFiltradosModal = useMemo(() => {
+    if (!filtroModalEquipos.trim()) return opcionesEquipos
+    const term = filtroModalEquipos.toLowerCase().trim()
+    return opcionesEquipos.filter(op =>
+      (op.label || '').toLowerCase().includes(term) ||
+      (op.numeroInventario || '').toLowerCase().includes(term) ||
+      (op.numeroSerie || '').toLowerCase().includes(term) ||
+      (op.tipo || '').toLowerCase().includes(term) ||
+      (op.marca || '').toLowerCase().includes(term) ||
+      (op.modelo || '').toLowerCase().includes(term)
+    )
+  }, [opcionesEquipos, filtroModalEquipos])
+
+  const seleccionarDesdeModal = (key) => {
+    manejarSeleccionarEquipo(key)
+    setModalEquiposAbierto(false)
+    setFiltroModalEquipos('')
+  }
+
+  const getIconoEquipo = (tipo) => {
+    const t = String(tipo || '').toLowerCase()
+    if (t.includes('laptop') || t.includes('portatil')) return <FaLaptop />
+    if (t.includes('escritorio') || t.includes('pc') || t.includes('computadora')) return <FaDesktop />
+    if (t.includes('pantalla') || t.includes('monitor') || t.includes('tv')) return <FaTv />
+    if (t.includes('teclado') || t.includes('mouse')) return <FaKeyboard />
+    if (t.includes('impresora') || t.includes('scanner')) return <FaPrint />
+    if (t.includes('herramienta')) return <FaTools />
+    return <FaBoxes />
+  }
 
   // Cargar catálogos desde el backend al montar el componente
   useEffect(() => {
@@ -517,6 +684,8 @@ export default function FormOficinas({ usuarioActual }) {
         setVistasPrevias([])
 
         setFormData({ solicitante: '', area_id: '', cargo: '', email: '', telefono: '', sede_id: '', equipo: '', numero_serie: '', categoria_id: '', descripcion_otro: '', prioridad: '', descripcion: '', evidencias: [], estado: 'abierto', tipo_usuario: 'solicitante' })
+        setEquiposDelResponsable([])
+        setEquipoSeleccionadoKey('')
         if (fileInputRef.current) {
           fileInputRef.current.value = ''
         }
@@ -715,11 +884,13 @@ export default function FormOficinas({ usuarioActual }) {
               </h2>
             </div>
 
+            {/* Fila 1: Contacto y Sede */}
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-                gap: '1.15rem'
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                gap: '1.15rem',
+                marginBottom: '1.15rem'
               }}
             >
               {/* Teléfono */}
@@ -735,6 +906,7 @@ export default function FormOficinas({ usuarioActual }) {
                   maxLength={10}
                   className="premium-input"
                   style={{
+                    height: '45px',
                     border: `1.5px solid ${getBorderColor('telefono')}`
                   }}
                 />
@@ -751,6 +923,7 @@ export default function FormOficinas({ usuarioActual }) {
                   onChange={(e) => { const valor = e.target.value; setFormData({ ...formData, sede_id: valor }); validarCampo('sede_id', valor) }}
                   className="premium-select"
                   style={{
+                    height: '45px',
                     border: `1.5px solid ${getBorderColor('sede_id')}`
                   }}
                 >
@@ -759,8 +932,17 @@ export default function FormOficinas({ usuarioActual }) {
                 </select>
                 {errores.sede_id && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.sede_id}</span>}
               </div>
+            </div>
 
-              {/* Equipo Relacionado */}
+            {/* Fila 2: Inventario, Serie y Búsqueda (100% Simétricas) */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '1.15rem'
+              }}
+            >
+              {/* Número de Inventario */}
               <div>
                 <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
                   Número de Inventario <span style={{ color: '#6B7280', fontWeight: 'normal' }}>(Opcional)</span>
@@ -772,6 +954,7 @@ export default function FormOficinas({ usuarioActual }) {
                   onChange={(e) => { const valor = e.target.value; setFormData({ ...formData, equipo: valor }); validarCampo('equipo', valor) }}
                   className="premium-input"
                   style={{
+                    height: '45px',
                     border: `1.5px solid ${getBorderColor('equipo')}`
                   }}
                 />
@@ -790,11 +973,111 @@ export default function FormOficinas({ usuarioActual }) {
                   onChange={(e) => { const valor = e.target.value; setFormData({ ...formData, numero_serie: valor }); validarCampo('numero_serie', valor) }}
                   className="premium-input"
                   style={{
+                    height: '45px',
                     border: `1.5px solid ${getBorderColor('numero_serie')}`
                   }}
                 />
                 {errores.numero_serie && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.numero_serie}</span>}
               </div>
+
+              {/* Casilla Simétrica de Búsqueda de Equipos */}
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                  Buscar en Inventario <span style={{ color: '#6B7280', fontWeight: 'normal' }}>(Opcional)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setModalEquiposAbierto(true)}
+                  style={{
+                    width: '100%',
+                    height: '45px',
+                    backgroundColor: '#691B31',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '0.75rem 1rem',
+                    fontSize: '0.9rem',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.55rem',
+                    boxShadow: '0 2px 5px rgba(105, 27, 49, 0.2)',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#7D213B'
+                    e.currentTarget.style.boxShadow = '0 4px 10px rgba(105, 27, 49, 0.3)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#691B31'
+                    e.currentTarget.style.boxShadow = '0 2px 5px rgba(105, 27, 49, 0.2)'
+                  }}
+                  title="Buscar y desplegar equipos asignados al solicitante"
+                >
+                  <FaSearch size={14} />
+                  <span>Buscar equipo</span>
+                  {opcionesEquipos.length > 0 && (
+                    <span style={{
+                      backgroundColor: '#BC955B',
+                      color: 'white',
+                      borderRadius: '9999px',
+                      padding: '0.15rem 0.55rem',
+                      fontSize: '0.75rem',
+                      fontWeight: '800'
+                    }}>
+                      {opcionesEquipos.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Indicador de equipo seleccionado (elegante y compacto) */}
+              {equipoSeleccionadoKey && (
+                <div style={{
+                  gridColumn: '1 / -1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: '#F0FDF4',
+                  border: '1px solid #BBF7D0',
+                  borderRadius: '10px',
+                  padding: '0.55rem 0.85rem',
+                  fontSize: '0.825rem',
+                  color: '#166534',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
+                    <FaCheckCircle size={14} color="#16A34A" style={{ flexShrink: 0 }} />
+                    <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                      <strong>Equipo asignado:</strong> {opcionesEquipos.find(o => o.key === equipoSeleccionadoKey)?.label || formData.equipo}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={limpiarEquipoSeleccionado}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#DC2626',
+                      cursor: 'pointer',
+                      fontWeight: '700',
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      flexShrink: 0,
+                      padding: '0.2rem 0.4rem',
+                      borderRadius: '4px'
+                    }}
+                    title="Desvincular equipo y limpiar campos"
+                  >
+                    <FaTimes size={11} /> Quitar
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1251,6 +1534,351 @@ export default function FormOficinas({ usuarioActual }) {
         onFallbackNativo={() => cameraInputRef.current?.click()}
         titulo="Tomar Evidencia del Fallo"
       />
+
+      {/* Modal Desplegable de Búsqueda de Equipos Asignados */}
+      {modalEquiposAbierto && (
+        <div
+          onClick={() => setModalEquiposAbierto(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+            animation: 'fadeIn 0.2s ease-out'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '16px',
+              maxWidth: '620px',
+              width: '100%',
+              maxHeight: '85vh',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden',
+              border: '1px solid #E2E8F0'
+            }}
+          >
+            {/* Cabecera del Modal */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid #E2E8F0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#F8FAFC'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{
+                  backgroundColor: '#691B31',
+                  color: 'white',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.95rem'
+                }}>
+                  <FaSearch />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '800', color: '#1E293B' }}>
+                    Buscar Equipos Asignados
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '0.775rem', color: '#64748B' }}>
+                    {formData.solicitante?.trim()
+                      ? `Equipos a nombre de: ${formData.solicitante}`
+                      : 'Equipos tecnológicos del solicitante'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalEquiposAbierto(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94A3B8',
+                  fontSize: '1.1rem',
+                  cursor: 'pointer',
+                  padding: '0.4rem',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <FaTimes />
+              </button>
+            </div>
+
+            {/* Buscador interno si hay equipos */}
+            {opcionesEquipos.length > 0 && (
+              <div style={{ padding: '0.85rem 1.25rem', borderBottom: '1px solid #F1F5F9', backgroundColor: 'white' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <FaSearch style={{ position: 'absolute', left: '12px', color: '#94A3B8', fontSize: '0.85rem' }} />
+                  <input
+                    type="text"
+                    placeholder="Filtrar por tipo, marca, modelo, serie o inventario..."
+                    value={filtroModalEquipos}
+                    onChange={(e) => setFiltroModalEquipos(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '0.6rem 0.85rem 0.6rem 2.25rem',
+                      fontSize: '0.85rem',
+                      borderRadius: '8px',
+                      border: '1px solid #CBD5E1',
+                      outline: 'none',
+                      backgroundColor: '#F8FAFC'
+                    }}
+                    autoFocus
+                  />
+                  {filtroModalEquipos && (
+                    <button
+                      type="button"
+                      onClick={() => setFiltroModalEquipos('')}
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        background: 'none',
+                        border: 'none',
+                        color: '#94A3B8',
+                        cursor: 'pointer',
+                        padding: '4px'
+                      }}
+                    >
+                      <FaTimes size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Lista de Equipos */}
+            <div style={{
+              padding: '1rem 1.25rem',
+              overflowY: 'auto',
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.65rem'
+            }}>
+              {buscandoEquipos ? (
+                <div style={{ padding: '2.5rem', textAlign: 'center', color: '#64748B' }}>
+                  <div className="spinner-border spinner-border-sm text-danger" style={{ width: '24px', height: '24px', borderWidth: '3px', marginBottom: '0.75rem' }} />
+                  <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>Consultando inventario tecnológico...</div>
+                </div>
+              ) : !formData.solicitante?.trim() ? (
+                <div style={{
+                  padding: '2.5rem 1.5rem',
+                  textAlign: 'center',
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: '12px',
+                  border: '1px dashed #CBD5E1'
+                }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>💡</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1E293B', marginBottom: '0.35rem' }}>
+                    Seleccione un solicitante en el Paso 1
+                  </div>
+                  <div style={{ fontSize: '0.825rem', color: '#64748B', maxWidth: '380px', margin: '0 auto 1.25rem auto' }}>
+                    Para desplegar automáticamente los equipos que están a nombre de una persona, elija primero el solicitante en la sección de datos.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setModalEquiposAbierto(false)}
+                    style={{
+                      backgroundColor: '#691B31',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '0.6rem 1.25rem',
+                      fontWeight: '700',
+                      fontSize: '0.825rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Entendido, ir al Paso 1
+                  </button>
+                </div>
+              ) : opcionesEquipos.length === 0 ? (
+                <div style={{
+                  padding: '2.5rem 1.5rem',
+                  textAlign: 'center',
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: '12px',
+                  border: '1px dashed #CBD5E1'
+                }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📦</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1E293B', marginBottom: '0.35rem' }}>
+                    Sin equipos registrados
+                  </div>
+                  <div style={{ fontSize: '0.825rem', color: '#64748B', maxWidth: '380px', margin: '0 auto 1.25rem auto' }}>
+                    No se encontraron equipos o periféricos asignados a <strong>{formData.solicitante}</strong> en el inventario tecnológico. Puede escribir el número de inventario o serie directamente en el formulario.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setModalEquiposAbierto(false)}
+                    style={{
+                      backgroundColor: '#691B31',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '0.6rem 1.25rem',
+                      fontWeight: '700',
+                      fontSize: '0.825rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Ingresar datos manualmente
+                  </button>
+                </div>
+              ) : equiposFiltradosModal.length === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: '#64748B', fontSize: '0.85rem' }}>
+                  No se encontraron coincidencias para "{filtroModalEquipos}".
+                </div>
+              ) : (
+                equiposFiltradosModal.map((op) => {
+                  const estaSeleccionado = op.key === equipoSeleccionadoKey
+                  return (
+                    <div
+                      key={op.key}
+                      onClick={() => seleccionarDesdeModal(op.key)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.85rem 1rem',
+                        borderRadius: '12px',
+                        border: estaSeleccionado ? '1.5px solid #10B981' : '1px solid #E2E8F0',
+                        backgroundColor: estaSeleccionado ? '#F0FDF4' : 'white',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        gap: '0.75rem',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!estaSeleccionado) {
+                          e.currentTarget.style.backgroundColor = '#F8FAFC'
+                          e.currentTarget.style.borderColor = '#CBD5E1'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!estaSeleccionado) {
+                          e.currentTarget.style.backgroundColor = 'white'
+                          e.currentTarget.style.borderColor = '#E2E8F0'
+                        }
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '10px',
+                          backgroundColor: op.esComponente ? '#EEF2FF' : '#FDF2F8',
+                          color: op.esComponente ? '#4F46E5' : '#691B31',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1.1rem',
+                          flexShrink: 0
+                        }}>
+                          {getIconoEquipo(op.tipo)}
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#1E293B' }}>
+                              {op.nombre}
+                            </span>
+                            {op.esComponente && (
+                              <span style={{
+                                fontSize: '0.675rem',
+                                fontWeight: '700',
+                                backgroundColor: '#EEF2FF',
+                                color: '#4F46E5',
+                                padding: '0.1rem 0.4rem',
+                                borderRadius: '4px'
+                              }}>
+                                Periférico
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem', fontSize: '0.775rem', color: '#64748B', flexWrap: 'wrap' }}>
+                            <span><strong>No. Inv:</strong> {op.numeroInventario || 'Sin inventario'}</span>
+                            <span>•</span>
+                            <span><strong>Serie:</strong> {op.numeroSerie || 'Sin serie'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        style={{
+                          padding: '0.45rem 0.85rem',
+                          backgroundColor: estaSeleccionado ? '#10B981' : '#691B31',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontSize: '0.775rem',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        {estaSeleccionado ? <><FaCheckCircle size={11} /> Seleccionado</> : 'Elegir'}
+                      </button>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Pie del Modal */}
+            <div style={{
+              padding: '0.85rem 1.25rem',
+              borderTop: '1px solid #E2E8F0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#F8FAFC'
+            }}>
+              <span style={{ fontSize: '0.775rem', color: '#64748B', fontWeight: '600' }}>
+                {opcionesEquipos.length > 0 ? `${equiposFiltradosModal.length} de ${opcionesEquipos.length} equipo(s)` : '0 equipos'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setModalEquiposAbierto(false)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: 'white',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '8px',
+                  fontSize: '0.825rem',
+                  fontWeight: '600',
+                  color: '#475569',
+                  cursor: 'pointer'
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
