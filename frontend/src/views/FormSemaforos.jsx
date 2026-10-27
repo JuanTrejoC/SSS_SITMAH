@@ -3,9 +3,12 @@ import { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
 import { API_BASE_URL } from '../config'
 import { FaTrafficLight, FaSearch, FaTimes, FaCheck, FaChevronDown } from 'react-icons/fa'
+import ModalCamara from '../components/ModalCamara'
 
 export default function FormSemaforos({ usuarioActual }) {
   const fileInputRef = useRef(null)
+  const cameraInputRef = useRef(null)
+  const [camaraAbierta, setCamaraAbierta] = useState(false)
   const cruceroDropdownRef = useRef(null)
 
   const obtenerFechaHoy = () => {
@@ -221,6 +224,45 @@ export default function FormSemaforos({ usuarioActual }) {
     })
   }
 
+  const MAX_FOTOS_SEMAFORO = 10
+
+  const abrirCamara = () => {
+    const espacioDisponible = MAX_FOTOS_SEMAFORO - (formData.evidencias?.length || 0)
+    if (espacioDisponible <= 0) {
+      Swal.fire('Límite alcanzado', `Solo se permite un máximo de ${MAX_FOTOS_SEMAFORO} fotografías como evidencia.`, 'warning')
+      return
+    }
+    setCamaraAbierta(true)
+  }
+
+  const cerrarCamara = () => {
+    setCamaraAbierta(false)
+  }
+
+  const onFotoCapturada = async (archivo) => {
+    let procesado = archivo
+    try {
+      procesado = await comprimirImagen(archivo)
+    } catch {
+      procesado = archivo
+    }
+
+    const nuevaVista = {
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      url: URL.createObjectURL(procesado),
+      name: procesado.name,
+      size: (procesado.size / (1024 * 1024)).toFixed(2)
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      evidencias: [...(prev.evidencias || []), procesado]
+    }))
+
+    setVistasPrevias((prev) => [...prev, nuevaVista])
+    if (cameraInputRef.current) cameraInputRef.current.value = ''
+  }
+
   // Manejo de múltiples archivos de evidencia
   const manejarArchivos = async (e) => {
     const archivos = Array.from(e.target.files || [])
@@ -300,6 +342,9 @@ export default function FormSemaforos({ usuarioActual }) {
     setFormData((prev) => ({ ...prev, evidencias: [] }))
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
+    }
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = ''
     }
   }
 
@@ -926,6 +971,15 @@ export default function FormSemaforos({ usuarioActual }) {
               style={{ display: 'none' }}
               id="input-evidencia-semaforos"
             />
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={manejarArchivos}
+              style={{ display: 'none' }}
+              id="input-camera-fallback-semaforos"
+            />
 
             <div
               style={{
@@ -948,29 +1002,55 @@ export default function FormSemaforos({ usuarioActual }) {
                       Cargar fotos de la falla en semáforo
                     </span>
                     <span style={{ fontSize: '0.8rem', color: '#64748B', display: 'block', marginTop: '0.2rem' }}>
-                      Puedes seleccionar múltiples fotografías (JPG, PNG, WEBP — Máximo 10 MB c/u)
+                      Toma una foto al instante o sube múltiples imágenes (JPG, PNG, WEBP — Máximo 10 MB c/u)
                     </span>
                   </div>
-                  <label
-                    htmlFor="input-evidencia-semaforos"
-                    style={{
-                      backgroundColor: '#691B31',
-                      color: 'white',
-                      padding: '0.6rem 1.3rem',
-                      borderRadius: '8px',
-                      fontSize: '0.875rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      marginTop: '0.5rem',
-                      boxShadow: '0 2px 6px rgba(105, 27, 49, 0.25)',
-                      transition: 'background-color 0.2s'
-                    }}
-                  >
-                    <i className="fa-solid fa-upload"></i> Subir Fotografías
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={abrirCamara}
+                      style={{
+                        backgroundColor: '#0284C7',
+                        color: 'white',
+                        padding: '0.6rem 1.3rem',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        border: 'none',
+                        boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#0369A1'}
+                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#0284C7'}
+                    >
+                      <i className="fa-solid fa-camera"></i> Tomar Foto Directa
+                    </button>
+                    <label
+                      htmlFor="input-evidencia-semaforos"
+                      style={{
+                        backgroundColor: '#691B31',
+                        color: 'white',
+                        padding: '0.6rem 1.3rem',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        boxShadow: '0 2px 6px rgba(105, 27, 49, 0.25)',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#8a2441'}
+                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#691B31'}
+                    >
+                      <i className="fa-solid fa-upload"></i> Subir Fotografías
+                    </label>
+                  </div>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -979,7 +1059,26 @@ export default function FormSemaforos({ usuarioActual }) {
                     <span style={{ backgroundColor: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', padding: '0.3rem 0.85rem', borderRadius: '20px', fontWeight: '700', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
                       <i className="fa-solid fa-images"></i> {vistasPrevias.length} {vistasPrevias.length === 1 ? 'foto seleccionada' : 'fotos seleccionadas'}
                     </span>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={abrirCamara}
+                        style={{
+                          backgroundColor: '#0284C7',
+                          color: 'white',
+                          border: 'none',
+                          padding: '0.4rem 0.85rem',
+                          borderRadius: '6px',
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem'
+                        }}
+                      >
+                        <i className="fa-solid fa-camera"></i> Tomar otra foto
+                      </button>
                       <label
                         htmlFor="input-evidencia-semaforos"
                         style={{
@@ -1171,6 +1270,15 @@ export default function FormSemaforos({ usuarioActual }) {
         </form>
 
       </div>
+
+      {/* Modal de Cámara en Vivo */}
+      <ModalCamara
+        isOpen={camaraAbierta}
+        onClose={cerrarCamara}
+        onFotoCapturada={onFotoCapturada}
+        onFallbackNativo={() => cameraInputRef.current?.click()}
+        titulo="Tomar Evidencia del Semáforo"
+      />
     </div>
   )
 }

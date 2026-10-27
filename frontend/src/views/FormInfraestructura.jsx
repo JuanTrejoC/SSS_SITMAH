@@ -2,12 +2,15 @@
 import { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
 import { API_BASE_URL } from '../config'
-import { FaWrench, FaCamera, FaTrashAlt, FaPaperPlane, FaTimes } from 'react-icons/fa'
+import { FaWrench, FaCamera, FaTrashAlt, FaPaperPlane, FaTimes, FaImages } from 'react-icons/fa'
 import PersonalAutocomplete from '../components/PersonalAutocomplete'
 import { CARGOS_NORMALIZADOS } from '../data/personalSitmah'
+import ModalCamara from '../components/ModalCamara'
 
 export default function FormInfraestructura({ usuarioActual }) {
   const fileInputRef = useRef(null)
+  const cameraInputRef = useRef(null)
+  const [camaraAbierta, setCamaraAbierta] = useState(false)
   const [formData, setFormData] = useState({
     solicitante: '',
     area_id: '',
@@ -196,6 +199,43 @@ export default function FormInfraestructura({ usuarioActual }) {
 
   const MAX_FOTOS = 3
 
+  const abrirCamara = () => {
+    const espacioDisponible = MAX_FOTOS - (formData.evidencias?.length || 0)
+    if (espacioDisponible <= 0) {
+      Swal.fire('Límite alcanzado', `Solo se permite un máximo de ${MAX_FOTOS} fotografías como evidencia.`, 'warning')
+      return
+    }
+    setCamaraAbierta(true)
+  }
+
+  const cerrarCamara = () => {
+    setCamaraAbierta(false)
+  }
+
+  const onFotoCapturada = async (archivo) => {
+    let procesado = archivo
+    try {
+      procesado = await comprimirImagen(archivo)
+    } catch {
+      procesado = archivo
+    }
+
+    const nuevaVista = {
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      url: URL.createObjectURL(procesado),
+      name: procesado.name,
+      size: (procesado.size / (1024 * 1024)).toFixed(2)
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      evidencias: [...(prev.evidencias || []), procesado]
+    }))
+
+    setVistasPrevias((prev) => [...prev, nuevaVista])
+    if (cameraInputRef.current) cameraInputRef.current.value = ''
+  }
+
   const manejarArchivos = async (e) => {
     const archivos = Array.from(e.target.files || [])
     if (archivos.length === 0) return
@@ -204,6 +244,7 @@ export default function FormInfraestructura({ usuarioActual }) {
     if (espacioDisponible <= 0) {
       Swal.fire('Límite alcanzado', `Solo se permite un máximo de ${MAX_FOTOS} fotografías como evidencia.`, 'warning')
       if (fileInputRef.current) fileInputRef.current.value = ''
+      if (cameraInputRef.current) cameraInputRef.current.value = ''
       return
     }
 
@@ -839,36 +880,91 @@ export default function FormInfraestructura({ usuarioActual }) {
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <input
+                type="file"
+                ref={fileInputRef}
+                multiple
+                accept="image/*"
+                onChange={manejarArchivos}
+                style={{ display: 'none' }}
+                id="input-evidencia-infraestructura"
+              />
+              <input
+                type="file"
+                ref={cameraInputRef}
+                accept="image/*"
+                capture="environment"
+                onChange={manejarArchivos}
+                style={{ display: 'none' }}
+                id="input-camera-fallback-infraestructura"
+              />
+
               {vistasPrevias.length < MAX_FOTOS && (
                 <div
-                  onClick={() => fileInputRef.current?.click()}
                   style={{
                     border: '2px dashed #D1D5DB',
                     borderRadius: '12px',
                     padding: '1.5rem',
                     textAlign: 'center',
-                    cursor: 'pointer',
-                    backgroundColor: '#F9FAFB',
-                    transition: 'all 0.2s ease'
+                    backgroundColor: '#F9FAFB'
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#691B31'; e.currentTarget.style.backgroundColor = '#FFF1F2' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#D1D5DB'; e.currentTarget.style.backgroundColor = '#F9FAFB' }}
                 >
                   <FaCamera size={28} color="#691B31" style={{ marginBottom: '0.5rem' }} />
                   <div style={{ fontWeight: '600', fontSize: '0.9rem', color: '#374151' }}>
-                    Haz clic para seleccionar imágenes
+                    Adjuntar fotografías del daño o afectación física
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: '0.25rem' }}>
-                    JPG, PNG o WEBP (máx. 10 MB cada una) · {MAX_FOTOS - vistasPrevias.length} disponible(s)
+                  <div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: '0.25rem', marginBottom: '1rem' }}>
+                    Toma una foto al instante o sube imágenes JPG, PNG o WEBP (máx. 10 MB cada una) · {MAX_FOTOS - vistasPrevias.length} disponible(s)
                   </div>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    multiple
-                    accept="image/*"
-                    onChange={manejarArchivos}
-                    style={{ display: 'none' }}
-                  />
+                  
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={abrirCamara}
+                      style={{
+                        backgroundColor: '#0284C7',
+                        color: 'white',
+                        padding: '0.6rem 1.3rem',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        border: 'none',
+                        boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#0369A1'}
+                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#0284C7'}
+                    >
+                      <FaCamera /> Tomar Foto Directa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        backgroundColor: '#691B31',
+                        color: 'white',
+                        padding: '0.6rem 1.3rem',
+                        borderRadius: '8px',
+                        fontSize: '0.875rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        border: 'none',
+                        boxShadow: '0 2px 6px rgba(105, 27, 49, 0.25)',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#8a2441'}
+                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#691B31'}
+                    >
+                      <FaImages /> Seleccionar de Galería / Archivo
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -958,6 +1054,15 @@ export default function FormInfraestructura({ usuarioActual }) {
         </form>
 
       </div>
+
+      {/* Modal de Cámara en Vivo */}
+      <ModalCamara
+        isOpen={camaraAbierta}
+        onClose={cerrarCamara}
+        onFotoCapturada={onFotoCapturada}
+        onFallbackNativo={() => cameraInputRef.current?.click()}
+        titulo="Tomar Evidencia de Infraestructura"
+      />
     </div>
   )
 }

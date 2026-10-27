@@ -1,9 +1,9 @@
-// src/components/AtencionReporte.jsx
 import { useState, useRef, useEffect } from 'react'
 import Swal from 'sweetalert2'
-import { FaCheckCircle, FaCamera, FaSignature, FaTrash, FaCalendarAlt, FaUserCheck, FaTools, FaEdit, FaLock, FaTimes, FaSave, FaExclamationTriangle } from 'react-icons/fa'
+import { FaCheckCircle, FaCamera, FaSignature, FaTrash, FaCalendarAlt, FaUserCheck, FaTools, FaEdit, FaLock, FaTimes, FaSave, FaExclamationTriangle, FaSyncAlt, FaImages } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { notificarCambioReporte } from '../utils/notificacionesLeidas'
+import ModalCamara from './ModalCamara'
 
 export default function AtencionReporte({ reporte, tipo, user: propUser, onActualizado, apiBaseUrl }) {
   const { user: contextUser } = useAuth() || {}
@@ -11,6 +11,8 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
 
   const canvasRef = useRef(null)
   const fileInputRef = useRef(null)
+  // Estado de cámara
+  const [camaraAbierta, setCamaraAbierta] = useState(false)
 
   const [dibujando, setDibujando] = useState(false)
   const [hayFirma, setHayFirma] = useState(false)
@@ -86,8 +88,12 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
     setHayFirma(false)
     setModoEdicionResuelto(false)
     setCambiarFirma(false)
+    setCamaraAbierta(false)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
+    }
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = ''
     }
   }, [reporte?.id, reporte?.fechaResolucion, currentUser?.nombre, currentUser?.username])
 
@@ -156,17 +162,30 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
     }
   }
 
+  const abrirCamara = () => {
+    const espacioDisponible = MAX_FOTOS - (datosCierre.evidenciasSolucion?.length || 0)
+    if (espacioDisponible <= 0) {
+      Swal.fire('Límite alcanzado', `Solo se permite un máximo de ${MAX_FOTOS} fotografías como evidencia.`, 'warning')
+      return
+    }
+    setCamaraAbierta(true)
+  }
+
+  const cerrarCamara = () => {
+    setCamaraAbierta(false)
+  }
+
   // Manejo de nuevas fotos de evidencia de solución
   const MAX_FOTOS = tipo === 'oficina' ? 3 : 10
 
-  const manejarFotosSolucion = (e) => {
-    const archivos = Array.from(e.target.files || [])
-    if (archivos.length === 0) return
+  const agregarArchivosEvidencia = (archivos) => {
+    if (!archivos || archivos.length === 0) return
 
     const espacioDisponible = MAX_FOTOS - (datosCierre.evidenciasSolucion?.length || 0)
     if (espacioDisponible <= 0) {
       Swal.fire('Límite alcanzado', `Solo se permite un máximo de ${MAX_FOTOS} fotografías como evidencia.`, 'warning')
       if (fileInputRef.current) fileInputRef.current.value = ''
+      if (cameraInputRef.current) cameraInputRef.current.value = ''
       return
     }
 
@@ -195,6 +214,7 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
 
     if (archivosValidos.length === 0) {
       if (fileInputRef.current) fileInputRef.current.value = ''
+      if (cameraInputRef.current) cameraInputRef.current.value = ''
       return
     }
 
@@ -214,6 +234,14 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = ''
+    }
+  }
+
+  const manejarFotosSolucion = (e) => {
+    const archivos = Array.from(e.target.files || [])
+    agregarArchivosEvidencia(archivos)
   }
 
   const eliminarFotoSolucion = (index) => {
@@ -241,6 +269,9 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
     setDatosCierre(prev => ({ ...prev, evidenciasSolucion: [] }))
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
+    }
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = ''
     }
   }
 
@@ -589,43 +620,104 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
                 style={{ display: 'none' }}
                 id={`input-evidencia-modificar-${reporte.id}`}
               />
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={manejarFotosSolucion}
+                style={{ display: 'none' }}
+                id={`input-camera-fallback-modificar-${reporte.id}`}
+              />
 
               {vistasPreviasEvidencia.length === 0 ? (
                 <div style={{ border: '2px dashed #CBD5E1', borderRadius: '10px', padding: '1rem', backgroundColor: '#F8FAFC', textAlign: 'center' }}>
-                  <label
-                    htmlFor={`input-evidencia-modificar-${reporte.id}`}
-                    style={{
-                      backgroundColor: tipo === 'semaforo' ? '#BC955B' : '#691B31',
-                      color: 'white',
-                      padding: '0.5rem 1.1rem',
-                      borderRadius: '8px',
-                      fontSize: '0.85rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.45rem'
-                    }}
-                  >
-                    <FaCamera /> Subir Fotografía(s) Adicionales
-                  </label>
-                  <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748B', marginTop: '0.35rem' }}>
-                    Opcional. Se sumarán a las evidencias existentes.
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={abrirCamara}
+                      style={{
+                        backgroundColor: '#0284C7',
+                        color: 'white',
+                        padding: '0.5rem 1.1rem',
+                        borderRadius: '8px',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        border: 'none',
+                        boxShadow: '0 2px 5px rgba(2, 132, 199, 0.25)',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#0369A1'}
+                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#0284C7'}
+                    >
+                      <FaCamera /> Tomar Foto Directa
+                    </button>
+                    <label
+                      htmlFor={`input-evidencia-modificar-${reporte.id}`}
+                      style={{
+                        backgroundColor: tipo === 'semaforo' ? '#BC955B' : '#691B31',
+                        color: 'white',
+                        padding: '0.5rem 1.1rem',
+                        borderRadius: '8px',
+                        fontSize: '0.85rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseOver={e => e.currentTarget.style.backgroundColor = tipo === 'semaforo' ? '#977745' : '#8A2441'}
+                      onMouseOut={e => e.currentTarget.style.backgroundColor = tipo === 'semaforo' ? '#BC955B' : '#691B31'}
+                    >
+                      <FaImages /> Subir de Archivo
+                    </label>
+                  </div>
+                  <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748B', marginTop: '0.4rem' }}>
+                    Opcional. Toma una foto con tu cámara o sube imágenes para sumarlas a las existentes.
                   </span>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', backgroundColor: '#F8FAFC', padding: '0.85rem', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
                     <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#065F46' }}>
                       ✓ {vistasPreviasEvidencia.length} nueva(s) foto(s) seleccionada(s)
                     </span>
-                    <button
-                      type="button"
-                      onClick={eliminarTodasFotosSolucion}
-                      style={{ backgroundColor: '#FEE2E2', color: '#DC2626', border: '1px solid #FCA5A5', padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}
-                    >
-                      <FaTrash /> Quitar
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      {vistasPreviasEvidencia.length < MAX_FOTOS && (
+                        <button
+                          type="button"
+                          onClick={abrirCamara}
+                          style={{
+                            backgroundColor: '#0284C7',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.25rem 0.6rem',
+                            borderRadius: '6px',
+                            fontSize: '0.75rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.3rem'
+                          }}
+                        >
+                          <FaCamera /> + Tomar otra
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={eliminarTodasFotosSolucion}
+                        style={{ backgroundColor: '#FEE2E2', color: '#DC2626', border: '1px solid #FCA5A5', padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '600', cursor: 'pointer' }}
+                      >
+                        <FaTrash /> Quitar
+                      </button>
+                    </div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '0.65rem' }}>
                     {vistasPreviasEvidencia.map((item, index) => (
@@ -1031,31 +1123,68 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
             style={{ display: 'none' }}
             id={`input-evidencia-solucion-${reporte.id}`}
           />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={manejarFotosSolucion}
+            style={{ display: 'none' }}
+            id={`input-camera-fallback-${reporte.id}`}
+          />
 
           {vistasPreviasEvidencia.length === 0 ? (
             <div style={{ border: '2px dashed #CBD5E1', borderRadius: '10px', padding: '1.25rem', backgroundColor: '#F8FAFC', textAlign: 'center' }}>
-              <label
-                htmlFor={`input-evidencia-solucion-${reporte.id}`}
-                style={{
-                  backgroundColor: tipo === 'semaforo' ? '#BC955B' : '#691B31',
-                  color: 'white',
-                  padding: '0.55rem 1.2rem',
-                  borderRadius: '8px',
-                  fontSize: '0.85rem',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-                }}
-              >
-                <FaCamera /> Subir Fotografía{tipo === 'semaforo' ? 's' : 's'} de Solución
-              </label>
-              <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748B', marginTop: '0.35rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={abrirCamara}
+                  style={{
+                    backgroundColor: '#0284C7',
+                    color: 'white',
+                    padding: '0.6rem 1.3rem',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    border: 'none',
+                    boxShadow: '0 2px 5px rgba(2, 132, 199, 0.25)',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = '#0369A1'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = '#0284C7'}
+                >
+                  <FaCamera /> Tomar Foto Directa
+                </button>
+                <label
+                  htmlFor={`input-evidencia-solucion-${reporte.id}`}
+                  style={{
+                    backgroundColor: tipo === 'semaforo' ? '#BC955B' : '#691B31',
+                    color: 'white',
+                    padding: '0.6rem 1.3rem',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseOver={e => e.currentTarget.style.backgroundColor = tipo === 'semaforo' ? '#977745' : '#8A2441'}
+                  onMouseOut={e => e.currentTarget.style.backgroundColor = tipo === 'semaforo' ? '#BC955B' : '#691B31'}
+                >
+                  <FaImages /> Subir de Galería / Archivo
+                </label>
+              </div>
+              <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748B', marginTop: '0.5rem' }}>
                 {tipo === 'oficina'
-                  ? 'Formatos JPG, PNG o WEBP (hasta 3 fotografías, máx. 10 MB c/u)'
-                  : 'Formatos JPG, PNG o WEBP (puedes subir varias fotografías, máx. 10 MB c/u)'}
+                  ? 'Toma una foto al instante con tu cámara o sube imágenes (hasta 3 fotografías, máx. 10 MB c/u)'
+                  : 'Toma fotos al instante con tu cámara o sube imágenes (puedes subir varias fotografías, máx. 10 MB c/u)'}
               </span>
             </div>
           ) : (
@@ -1067,25 +1196,46 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
                     ? `✓ ${vistasPreviasEvidencia.length} de ${MAX_FOTOS} foto(s) de solución`
                     : `✓ ${vistasPreviasEvidencia.length} foto(s) de solución seleccionada(s)`}
                 </span>
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                   {vistasPreviasEvidencia.length < MAX_FOTOS && (
-                    <label
-                      htmlFor={`input-evidencia-solucion-${reporte.id}`}
-                      style={{
-                        backgroundColor: tipo === 'semaforo' ? '#BC955B' : '#691B31',
-                        color: 'white',
-                        padding: '0.3rem 0.7rem',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.3rem'
-                      }}
-                    >
-                      + Agregar más
-                    </label>
+                    <>
+                      <button
+                        type="button"
+                        onClick={abrirCamara}
+                        style={{
+                          backgroundColor: '#0284C7',
+                          color: 'white',
+                          border: 'none',
+                          padding: '0.3rem 0.7rem',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <FaCamera /> + Tomar otra foto
+                      </button>
+                      <label
+                        htmlFor={`input-evidencia-solucion-${reporte.id}`}
+                        style={{
+                          backgroundColor: tipo === 'semaforo' ? '#BC955B' : '#691B31',
+                          color: 'white',
+                          padding: '0.3rem 0.7rem',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <FaImages /> + Subir más
+                      </label>
+                    </>
                   )}
                   <button
                     type="button"
@@ -1280,6 +1430,19 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
         </div>
 
       </div>
+
+      {/* MODAL DE CÁMARA REUTILIZABLE */}
+      <ModalCamara
+        isOpen={camaraAbierta}
+        onClose={cerrarCamara}
+        onFotoCapturada={(archivo) => {
+          agregarArchivosEvidencia([archivo])
+        }}
+        onFallbackNativo={() => {
+          if (cameraInputRef.current) cameraInputRef.current.click()
+        }}
+        titulo="Tomar Evidencia Fotográfica"
+      />
     </div>
   )
 }
