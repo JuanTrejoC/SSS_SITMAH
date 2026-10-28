@@ -215,13 +215,38 @@ export default function StockInfraestructura() {
 
   // Filtrado
   const stockFiltrado = stock.filter(item => {
-    const coincideBusqueda =
-      (item.nombre && item.nombre.toLowerCase().includes(busqueda.toLowerCase())) ||
-      (item.marca && item.marca.toLowerCase().includes(busqueda.toLowerCase())) ||
-      (item.modelo && item.modelo.toLowerCase().includes(busqueda.toLowerCase())) ||
-      (item.numeroInventario && item.numeroInventario.toLowerCase().includes(busqueda.toLowerCase())) ||
-      (item.numeroSerie && item.numeroSerie.toLowerCase().includes(busqueda.toLowerCase())) ||
-      (item.categoria && item.categoria.toLowerCase().includes(busqueda.toLowerCase()));
+    let coincideBusqueda = true;
+    if (busqueda && busqueda.trim()) {
+      const normalizar = (txt) =>
+        (txt || '')
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .trim();
+
+      const rawNorm = normalizar(busqueda);
+      const conectores = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'en', 'con', 'para', 'y', 'o', 'un', 'una']);
+      const tokens = rawNorm
+        .split(/\s+/)
+        .filter(t => t.length > 0 && (rawNorm.split(/\s+/).length === 1 || !conectores.has(t)));
+
+      const pool = [
+        item.nombre,
+        item.marca,
+        item.modelo,
+        item.numeroInventario,
+        item.numeroSerie,
+        item.categoria,
+        item.ubicacion,
+        item.areaUbicacion,
+        item.observaciones
+      ]
+        .filter(Boolean)
+        .map(normalizar)
+        .join(' ');
+
+      coincideBusqueda = tokens.every(token => pool.includes(token));
+    }
 
     const coincideCategoria = filtroCategoria === 'Todas' || item.categoria === filtroCategoria;
     const coincideEstado = filtroEstado === 'Todos' || item.estadoFisico === filtroEstado;

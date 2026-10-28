@@ -1,50 +1,150 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+const MAPA_TIPOS_FRIENDLY = {
+  camara: ['camara', 'videovigilancia', 'vigilancia'],
+  escritorio: ['escritorio', 'computadora', 'pc', 'desktop'],
+  laptop: ['laptop', 'portatil', 'notebook'],
+  servidor: ['servidor', 'server'],
+  teclado: ['teclado', 'keyboard'],
+  mouse: ['mouse', 'raton'],
+  monitor: ['monitor', 'pantalla'],
+  impresora: ['impresora', 'printer'],
+  plotter: ['plotter'],
+  access_point: ['access point', 'accesspoint', 'ap'],
+  antena_wifi: ['antena wifi', 'adaptador wifi'],
+  cargador: ['cargador', 'eliminador'],
+  cable: ['cable'],
+  router: ['router'],
+  switch: ['switch'],
+  firewall: ['firewall', 'fortigate'],
+  antena: ['antena microonda', 'antena'],
+  internet: ['internet', 'modem'],
+  dvr: ['dvr', 'nvr'],
+  celular: ['celular', 'smartphone'],
+  telefono: ['telefono'],
+  radio: ['radio'],
+  aire: ['aire acondicionado', 'clima'],
+  no_break: ['no break', 'nobreak', 'ups'],
+  regulador: ['regulador'],
+  lectora_tags: ['lectora de tags', 'lectora tags'],
+  controladora: ['controladora'],
+  terminal_multibiometrica: ['terminal multibiometrica', 'biometrico', 'biometrica'],
+  ram: ['memoria ram', 'ram'],
+  almacenamiento: ['disco duro', 'ssd', 'hdd', 'almacenamiento'],
+  cabezal: ['cabezal']
+};
+
+function normalizarTermino(str) {
+  return (str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+}
+
+function generarCamposOrParaTermino(t, tiposDetectados = []) {
+  const orFields = [
+    { tipo: { contains: t } },
+    { numeroInventario: { contains: t } },
+    { numeroSerie: { contains: t } },
+    { marca: { contains: t } },
+    { modelo: { contains: t } },
+    { responsable: { contains: t } },
+    { cargoResponsable: { contains: t } },
+    { areaUbicacion: { contains: t } },
+    { direccion: { contains: t } },
+    { procedencia: { contains: t } },
+    { estatus: { contains: t } },
+
+    // Especificaciones técnicas de escritorio y equipos en JSON detalles
+    { detalles: { path: '$.procesador', string_contains: t } },
+    { detalles: { path: '$.ram', string_contains: t } },
+    { detalles: { path: '$.almacenamiento', string_contains: t } },
+    { detalles: { path: '$.tipoAlmacenamiento', string_contains: t } },
+    { detalles: { path: '$.sistemaOperativo', string_contains: t } },
+    { detalles: { path: '$.tarjetaGrafica', string_contains: t } },
+    { detalles: { path: '$.red', string_contains: t } },
+    { detalles: { path: '$.mac', string_contains: t } },
+    { detalles: { path: '$.ipPredeterminada', string_contains: t } },
+    { detalles: { path: '$.nombre', string_contains: t } },
+    { detalles: { path: '$.especificarTipo', string_contains: t } },
+    { detalles: { path: '$.marcaMonitor', string_contains: t } },
+    { detalles: { path: '$.modeloMonitor', string_contains: t } },
+    { detalles: { path: '$.numeroSerieMonitor', string_contains: t } },
+    { detalles: { path: '$.numeroInventarioMonitor', string_contains: t } },
+    { detalles: { path: '$.marcaTeclado', string_contains: t } },
+    { detalles: { path: '$.modeloTeclado', string_contains: t } },
+    { detalles: { path: '$.numeroSerieTeclado', string_contains: t } },
+    { detalles: { path: '$.marcaMouse', string_contains: t } },
+    { detalles: { path: '$.modeloMouse', string_contains: t } },
+    { detalles: { path: '$.numeroSerieMouse', string_contains: t } },
+    { detalles: { path: '$.marcaRegulador', string_contains: t } },
+    { detalles: { path: '$.modeloRegulador', string_contains: t } },
+    { detalles: { path: '$.numeroSerieRegulador', string_contains: t } },
+    { detalles: { path: '$.megapixeles', string_contains: t } },
+    { detalles: { path: '$.serie', string_contains: t } },
+    { detalles: { path: '$.discoDuro', string_contains: t } }
+  ];
+
+  if (tiposDetectados && tiposDetectados.length > 0) {
+    tiposDetectados.forEach(tipo => {
+      orFields.push({ tipo: { equals: tipo } });
+    });
+  }
+
+  return orFields;
+}
+
 function construirCondicionesBusqueda(search) {
   if (!search || !search.trim()) return [];
+
   const raw = search.trim();
-  const terms = new Set([raw]);
+  const rawNorm = normalizarTermino(raw);
+  const conectores = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'en', 'con', 'para', 'y', 'o', 'un', 'una']);
+
+  const palabras = rawNorm
+    .replace(/[^a-z0-9\s\-_]/g, ' ')
+    .split(/\s+/)
+    .filter(p => p.length > 0 && !conectores.has(p));
+
+  // Detectar tipos de equipo friendly asociados a la búsqueda completa o palabras
+  const tiposDetectados = new Set();
+  for (const [tipoKey, sinonimos] of Object.entries(MAPA_TIPOS_FRIENDLY)) {
+    if (sinonimos.some(s => rawNorm.includes(s) || palabras.includes(s))) {
+      tiposDetectados.add(tipoKey);
+    }
+  }
+
+  const terminos = new Set([raw, rawNorm]);
   const compacto = raw.replace(/\s+/g, '');
-  if (compacto) terms.add(compacto);
+  if (compacto) terminos.add(compacto);
   const conEspacio = raw.replace(/(\d+)(gb|tb|mb|ghz|mhz)/gi, '$1 $2');
-  if (conEspacio) terms.add(conEspacio);
+  if (conEspacio) terminos.add(conEspacio);
 
+  palabras.forEach(p => {
+    if (p.length >= 2) terminos.add(p);
+  });
+  tiposDetectados.forEach(t => terminos.add(t));
+
+  // Si son múltiples palabras (ej. "camara epcom", "teclado logitech", "dell optiplex 7090")
+  if (palabras.length > 1) {
+    const andGroup = palabras.map(palabra => {
+      const tiposDePalabra = [];
+      for (const [tipoKey, sinonimos] of Object.entries(MAPA_TIPOS_FRIENDLY)) {
+        if (sinonimos.includes(palabra)) tiposDePalabra.push(tipoKey);
+      }
+      return { OR: generarCamposOrParaTermino(palabra, tiposDePalabra) };
+    });
+
+    const directOrs = Array.from(terminos).flatMap(t => generarCamposOrParaTermino(t, Array.from(tiposDetectados)));
+    return [{ AND: andGroup }, ...directOrs];
+  }
+
+  // Una sola palabra o término directo
   const orConditions = [];
-  for (const term of terms) {
-    orConditions.push(
-      { tipo: { contains: term } },
-      { numeroInventario: { contains: term } },
-      { numeroSerie: { contains: term } },
-      { marca: { contains: term } },
-      { modelo: { contains: term } },
-      { responsable: { contains: term } },
-      { cargoResponsable: { contains: term } },
-      { areaUbicacion: { contains: term } },
-      { direccion: { contains: term } },
-      { procedencia: { contains: term } },
-      { estatus: { contains: term } },
-
-      // Especificaciones técnicas de escritorio y equipos en JSON detalles
-      { detalles: { path: '$.procesador', string_contains: term } },
-      { detalles: { path: '$.ram', string_contains: term } },
-      { detalles: { path: '$.almacenamiento', string_contains: term } },
-      { detalles: { path: '$.tipoAlmacenamiento', string_contains: term } },
-      { detalles: { path: '$.sistemaOperativo', string_contains: term } },
-      { detalles: { path: '$.tarjetaGrafica', string_contains: term } },
-      { detalles: { path: '$.red', string_contains: term } },
-      { detalles: { path: '$.mac', string_contains: term } },
-      { detalles: { path: '$.ipPredeterminada', string_contains: term } },
-      { detalles: { path: '$.nombre', string_contains: term } },
-      { detalles: { path: '$.especificarTipo', string_contains: term } },
-      { detalles: { path: '$.marcaTeclado', string_contains: term } },
-      { detalles: { path: '$.modeloTeclado', string_contains: term } },
-      { detalles: { path: '$.marcaMouse', string_contains: term } },
-      { detalles: { path: '$.modeloMouse', string_contains: term } },
-      { detalles: { path: '$.marcaRegulador', string_contains: term } },
-      { detalles: { path: '$.modeloRegulador', string_contains: term } },
-      { detalles: { path: '$.megapixeles', string_contains: term } }
-    );
+  for (const term of terminos) {
+    orConditions.push(...generarCamposOrParaTermino(term, Array.from(tiposDetectados)));
   }
   return orConditions;
 }

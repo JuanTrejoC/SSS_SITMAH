@@ -157,7 +157,16 @@ const obtenerGrupoBase = (item) => {
   }
 
   // 6. Cámara de Videovigilancia
-  if (catRaw === 'camara' || n.includes('camara') || modeloRaw.startsWith('ds-2') || modeloRaw.startsWith('ds-1')) {
+  if (
+    catRaw === 'camara' ||
+    catRaw.includes('camara') ||
+    n.includes('camara') ||
+    n.includes('vigilancia') ||
+    catRaw.includes('vigilancia') ||
+    modeloRaw.startsWith('ds-2') ||
+    modeloRaw.startsWith('ds-1') ||
+    (marcaRaw === 'epcom' && (modeloRaw.startsWith('b') || n.includes('turbo')))
+  ) {
     return {
       nombreBase: 'Cámara de Videovigilancia',
       categoria: 'camara',
@@ -403,6 +412,62 @@ function getInitialForm() {
     }
   };
 }
+
+const coincideBusquedaExistencia = (item, busquedaStr) => {
+  if (!busquedaStr || !busquedaStr.trim()) return true;
+
+  const normalizar = (str) =>
+    (str || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const queryNorm = normalizar(busquedaStr);
+  if (!queryNorm) return true;
+
+  const baseInfo = obtenerGrupoBase(item);
+
+  const campos = [
+    item.nombre,
+    baseInfo?.nombreBase,
+    baseInfo?.categoria,
+    item.tipo,
+    item.categoria,
+    item.marca,
+    item.modelo,
+    item.numeroSerie,
+    item.numeroInventario,
+    item.areaUbicacion,
+    item.detalles?.nombre,
+    item.detalles?.especificarTipo,
+    item.detalles?.procesador,
+    item.detalles?.ram,
+    item.detalles?.almacenamiento,
+    item.observaciones
+  ];
+
+  const textoCompleto = normalizar(campos.filter(Boolean).join(' '));
+
+  // 1. Coincidencia directa completa
+  if (textoCompleto.includes(queryNorm)) return true;
+
+  // 2. Coincidencia compacta alfanumérica (ideal para No. Serie y Modelos con o sin guiones/espacios)
+  const queryCompacto = queryNorm.replace(/\s+/g, '');
+  const textoCompacto = textoCompleto.replace(/\s+/g, '');
+  if (queryCompacto.length >= 3 && textoCompacto.includes(queryCompacto)) return true;
+
+  // 3. Coincidencia por palabras clave (ignorando palabras conectoras como "de", "el", "la")
+  const conectores = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'en', 'con', 'para', 'y', 'o', 'un', 'una']);
+  const palabras = queryNorm.split(' ').filter(p => p.length > 0 && !conectores.has(p));
+
+  if (palabras.length === 0) return true;
+
+  // Cada palabra clave debe estar contenida en el texto compuesto del item
+  return palabras.every(palabra => textoCompleto.includes(palabra));
+};
 
 export default function InventarioExistencias() {
   const { user } = useAuth();
@@ -907,14 +972,7 @@ export default function InventarioExistencias() {
       } else {
         // 'actual' (con filtros aplicados)
         registros = existencias.filter(item => {
-          const coincideTexto = (
-            (item.nombre || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-            (item.marca || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-            (item.modelo || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-            (item.numeroSerie || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-            (item.numeroInventario || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-            (item.areaUbicacion || '').toLowerCase().includes(busqueda.toLowerCase())
-          );
+          const coincideTexto = coincideBusquedaExistencia(item, busqueda);
           const coincideEstado = !filtroEstado || normalizarEstado(item.estadoFisico) === normalizarEstado(filtroEstado);
           const coincideOrigen = !filtroOrigen || (
               filtroOrigen === 'reemplazadas'
@@ -2043,14 +2101,7 @@ export default function InventarioExistencias() {
       ) : (
         (() => {
           const itemsFiltrados = existencias.filter(item => {
-            const coincideTexto = (
-              (item.nombre || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-              (item.marca || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-              (item.modelo || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-              (item.numeroSerie || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-              (item.numeroInventario || '').toLowerCase().includes(busqueda.toLowerCase()) ||
-              (item.areaUbicacion || '').toLowerCase().includes(busqueda.toLowerCase())
-            );
+            const coincideTexto = coincideBusquedaExistencia(item, busqueda);
             const estadoItem = normalizarEstado(item.estadoFisico);
             const coincideEstado = !filtroEstado || estadoItem === filtroEstado;
             const coincideOrigen = !filtroOrigen || (

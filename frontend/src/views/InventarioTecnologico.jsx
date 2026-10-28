@@ -3721,16 +3721,24 @@ export default function InventarioTecnologico() {
                   </div>
                 ) : (() => {
                   const itemsFiltrados = refacciones.filter(item => {
-                    const texto = busquedaRefaccion.toLowerCase();
-                    const cumpleBusqueda = busquedaRefaccion === '' ||
-                      (item.nombre && item.nombre.toLowerCase().includes(texto)) ||
-                      (item.categoria && item.categoria.toLowerCase().includes(texto)) ||
-                      (item.marca && item.marca.toLowerCase().includes(texto)) ||
-                      (item.modelo && item.modelo.toLowerCase().includes(texto)) ||
-                      (item.areaUbicacion && item.areaUbicacion.toLowerCase().includes(texto)) ||
-                      (item.numeroSerie && item.numeroSerie.toLowerCase().includes(texto)) ||
-                      (item.numeroInventario && item.numeroInventario.toLowerCase().includes(texto)) ||
-                      (item.observaciones && item.observaciones.toLowerCase().includes(texto));
+                    let cumpleBusqueda = true;
+                    if (busquedaRefaccion.trim()) {
+                      const normalizar = (txt) => (txt || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+                      const rawNorm = normalizar(busquedaRefaccion);
+                      const conectores = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'en', 'con', 'para', 'y', 'o', 'un', 'una']);
+                      const tokens = rawNorm.split(/\s+/).filter(t => t.length > 0 && (rawNorm.split(/\s+/).length === 1 || !conectores.has(t)));
+                      const pool = [
+                        item.nombre,
+                        item.categoria,
+                        item.marca,
+                        item.modelo,
+                        item.areaUbicacion,
+                        item.numeroSerie,
+                        item.numeroInventario,
+                        item.observaciones
+                      ].filter(Boolean).map(normalizar).join(' ');
+                      cumpleBusqueda = tokens.every(token => pool.includes(token));
+                    }
 
                     const cumpleEstado = filtroEstadoRefaccion === '' ||
                       (filtroEstadoRefaccion === 'Dañada' ? (item.estadoFisico === 'Dañada' || item.estadoFisico === 'Dañado') : item.estadoFisico === filtroEstadoRefaccion);

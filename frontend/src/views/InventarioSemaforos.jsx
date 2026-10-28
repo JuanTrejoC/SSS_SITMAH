@@ -174,6 +174,59 @@ export default function InventarioSemaforos() {
     return Object.values(gruposMap);
   };
 
+  const coincideBusquedaSemaforo = (item, busquedaTexto) => {
+    if (!busquedaTexto || !busquedaTexto.trim()) return true;
+
+    const normalizar = (txt) =>
+      (txt || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+
+    const rawNorm = normalizar(busquedaTexto);
+    const conectores = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'en', 'con', 'para', 'y', 'o', 'un', 'una']);
+    const tokens = rawNorm
+      .split(/\s+/)
+      .filter(t => t.length > 0 && (rawNorm.split(/\s+/).length === 1 || !conectores.has(t)));
+
+    const obtenerTextosDeItem = (target) => {
+      return [
+        target.nombre,
+        target.marca,
+        target.modelo,
+        target.numeroSerie,
+        target.numeroInventario,
+        target.categoria,
+        target.ubicacion,
+        target.estadoFisico,
+        target.cruceroOrigen,
+        target.observaciones
+      ]
+        .filter(Boolean)
+        .map(normalizar)
+        .join(' ');
+    };
+
+    if (item.esGrupo) {
+      const textosGrupo = [item.nombre, item.marca, item.categoria, item.key]
+        .filter(Boolean)
+        .map(normalizar)
+        .join(' ');
+
+      const coincideCabecera = tokens.every(token => textosGrupo.includes(token));
+      if (coincideCabecera) return true;
+
+      return item.subItems && item.subItems.some(sub => {
+        const textosSub = obtenerTextosDeItem(sub) + ' ' + textosGrupo;
+        return tokens.every(token => textosSub.includes(token));
+      });
+    }
+
+    const pool = obtenerTextosDeItem(item);
+    return tokens.every(token => pool.includes(token));
+  };
+
   // ==========================================
   // ESTADOS - CONTROLADORES INSTALADOS
   // ==========================================
@@ -969,7 +1022,7 @@ export default function InventarioSemaforos() {
             <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
               <input
                 type="text"
-                placeholder="Buscar refacción disponible..."
+                placeholder="Buscar por refacción, marca, modelo, no. serie..."
                 value={busquedaExistencias}
                 onChange={(e) => setBusquedaExistencias(e.target.value)}
                 style={{
@@ -1004,36 +1057,25 @@ export default function InventarioSemaforos() {
 
           {cargandoExistencias ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#6F7271' }}>Cargando existencias de componentes...</div>
-          ) : agruparExistenciasDisponibles(existencias.filter(item => !((item.nombre || '').toLowerCase().includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes((item.estadoFisico || '').toLowerCase())))).length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', color: '#6F7271' }}>
-              No se han encontrado refacciones disponibles en el stock.
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
-              {agruparExistenciasDisponibles(
-                existencias.filter(item => !((item.nombre || '').toLowerCase().includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes((item.estadoFisico || '').toLowerCase())))
-              )
-                .filter((item) => {
-                  if (!busquedaExistencias.trim()) return true;
-                  const q = busquedaExistencias.toLowerCase();
-                  if (item.esGrupo) {
-                    if (item.nombre.toLowerCase().includes(q) || (item.marca && item.marca.toLowerCase().includes(q))) return true;
-                    return item.subItems.some(sub =>
-                      (sub.nombre || '').toLowerCase().includes(q) ||
-                      (sub.numeroSerie || '').toLowerCase().includes(q) ||
-                      (sub.numeroInventario || '').toLowerCase().includes(q) ||
-                      (sub.modelo || '').toLowerCase().includes(q)
-                    );
-                  }
-                  return (
-                    (item.nombre || '').toLowerCase().includes(q) ||
-                    (item.marca || '').toLowerCase().includes(q) ||
-                    (item.modelo || '').toLowerCase().includes(q) ||
-                    (item.numeroSerie || '').toLowerCase().includes(q) ||
-                    (item.numeroInventario || '').toLowerCase().includes(q)
-                  );
-                })
-                .map((item) => (
+          ) : (() => {
+            const gruposDisponibles = agruparExistenciasDisponibles(
+              existencias.filter(item => !((item.nombre || '').toLowerCase().includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes((item.estadoFisico || '').toLowerCase())))
+            );
+            const filtrados = gruposDisponibles.filter(item => coincideBusquedaSemaforo(item, busquedaExistencias));
+
+            if (filtrados.length === 0) {
+              return (
+                <div style={{ textAlign: 'center', padding: '3rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', color: '#6F7271' }}>
+                  {busquedaExistencias.trim()
+                    ? `No se encontraron refacciones disponibles para "${busquedaExistencias}".`
+                    : 'No se han encontrado refacciones disponibles en el stock.'}
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                {filtrados.map((item) => (
                   <div
                     key={item.id}
                     style={{
@@ -1148,8 +1190,9 @@ export default function InventarioSemaforos() {
                     </div>
                   </div>
                 ))}
-            </div>
-          )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -1166,7 +1209,7 @@ export default function InventarioSemaforos() {
             <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
               <input
                 type="text"
-                placeholder="Buscar pieza dañada o reemplazada..."
+                placeholder="Buscar pieza, marca, modelo, serie o crucero..."
                 value={busquedaExistencias}
                 onChange={(e) => setBusquedaExistencias(e.target.value)}
                 style={{
@@ -1201,16 +1244,23 @@ export default function InventarioSemaforos() {
 
           {cargandoExistencias ? (
             <div style={{ textAlign: 'center', padding: '3rem', color: '#6F7271' }}>Cargando piezas dañadas...</div>
-          ) : existencias.filter(item => (item.nombre || '').toLowerCase().includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes((item.estadoFisico || '').toLowerCase())).length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', color: '#6F7271' }}>
-              No hay piezas dañadas o reemplazadas registradas actualmente.
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
-              {existencias
-                .filter(item => (item.nombre || '').toLowerCase().includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes((item.estadoFisico || '').toLowerCase()))
-                .filter((item) => item.nombre.toLowerCase().includes(busquedaExistencias.toLowerCase()))
-                .map((item) => {
+          ) : (() => {
+            const piezasDanadas = existencias.filter(item => (item.nombre || '').toLowerCase().includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes((item.estadoFisico || '').toLowerCase()));
+            const filtrados = piezasDanadas.filter(item => coincideBusquedaSemaforo(item, busquedaExistencias));
+
+            if (filtrados.length === 0) {
+              return (
+                <div style={{ textAlign: 'center', padding: '3rem', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', color: '#6F7271' }}>
+                  {busquedaExistencias.trim()
+                    ? `No se encontraron piezas dañadas que coincidan con "${busquedaExistencias}".`
+                    : 'No hay piezas dañadas o reemplazadas registradas actualmente.'}
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                {filtrados.map((item) => {
                   const esDanadaDefinitiva = ['dañada', 'danada'].includes((item.estadoFisico || '').toLowerCase());
                   return (
                     <div
@@ -1370,8 +1420,9 @@ export default function InventarioSemaforos() {
                     </div>
                   );
                 })}
-            </div>
-          )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -2285,17 +2336,7 @@ export default function InventarioSemaforos() {
         const grupo = grupos.find(g => g.key === grupoSeleccionado);
         if (!grupo) return null;
 
-        const subItemsFiltrados = grupo.subItems.filter(sub => {
-          if (!busquedaDesglose.trim()) return true;
-          const q = busquedaDesglose.toLowerCase();
-          return (
-            (sub.nombre || '').toLowerCase().includes(q) ||
-            (sub.numeroSerie || '').toLowerCase().includes(q) ||
-            (sub.numeroInventario || '').toLowerCase().includes(q) ||
-            (sub.modelo || '').toLowerCase().includes(q) ||
-            (sub.marca || '').toLowerCase().includes(q)
-          );
-        });
+        const subItemsFiltrados = grupo.subItems.filter(sub => coincideBusquedaSemaforo(sub, busquedaDesglose));
 
         return (
           <div style={{
