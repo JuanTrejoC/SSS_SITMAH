@@ -623,6 +623,7 @@ export default function InventarioTecnologico() {
       procedencia: '',
       estatus: 'Activo',
       detalles: {},
+      cantidad: 1,
       equipoPrincipalId: null
     };
   }
@@ -729,7 +730,7 @@ export default function InventarioTecnologico() {
         img.onerror = () => resolve(null);
       });
 
-      const logoHidalgo = await loadImg('/images/sitmah_logo.webp', '#691B31');
+      const logoHidalgo = await loadImg('/images/logo_sitmah_nuevo.png');
       const logoSitmah = await loadImg('/images/sistema de tm.webp');
 
       // Franja superior guinda
@@ -742,7 +743,7 @@ export default function InventarioTecnologico() {
 
       // Logos
       if (logoHidalgo) {
-        doc.addImage(logoHidalgo, 'PNG', 14, 10, 32, 11);
+        doc.addImage(logoHidalgo, 'PNG', 14, 8, 14, 15);
       }
       if (logoSitmah) {
         doc.addImage(logoSitmah, 'PNG', pageWidth - 46, 10, 32, 11);
@@ -1186,7 +1187,7 @@ export default function InventarioTecnologico() {
           img.src = svgData;
         });
 
-        const logoHidalgo = await loadImg('/images/sitmah_logo.webp', '#691B31'); 
+        const logoHidalgo = await loadImg('/images/logo_sitmah_nuevo.png'); 
         const logoSitmah = await loadImg('/images/sistema de tm.webp'); 
 
         const iTot = await loadSvg('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>');
@@ -1219,7 +1220,7 @@ export default function InventarioTecnologico() {
           doc.text(`Página ${data.pageNumber}`, pageWidth - 15, pageHeight - 3, { align: 'right' });
 
           if (data.pageNumber === 1) {
-            if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 8, 30, 10);
+            if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 7, 13, 14);
             
             doc.setTextColor(105, 27, 49);
             doc.setFontSize(18);
@@ -1445,7 +1446,7 @@ export default function InventarioTecnologico() {
       const json = await res.json();
 
       if (res.ok && json.ok) {
-        Swal.fire('Éxito', editandoId ? 'Equipo actualizado' : 'Equipo registrado', 'success');
+        Swal.fire('Éxito', json.message || (editandoId ? 'Equipo actualizado' : 'Equipo registrado'), 'success');
         setModalAbierto(false);
         resetForm();
         cargarEquipos();
@@ -2898,32 +2899,49 @@ export default function InventarioTecnologico() {
                       </datalist>
                     </div>
 
-                    {!(form.tipo && ['camara'].includes(form.tipo) && estacionesList.map(e => typeof e === 'string' ? e : e.nombre).includes(form.areaUbicacion)) && (
+                    {!editandoId && (
                       <div>
-                        <label style={labelStyle}>Área *</label>
-                        <select
-                          value={form.direccion}
-                          onChange={e => setForm({ ...form, direccion: e.target.value })}
-                          style={{ ...inputStyle, cursor: 'pointer' }}
+                        <label style={labelStyle}>
+                          Cantidad de unidades *
+                          <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 'normal', marginLeft: '6px' }}>
+                            (Crea registros individuales independientes)
+                          </span>
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={form.cantidad ?? 1}
+                          onChange={e => setForm({ ...form, cantidad: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                          style={inputStyle}
                           required
-                        >
-                          <option value="">-- Seleccionar Área --</option>
-                          {DIRECCIONES_SITMAH.map(a => (
-                            <option key={a} value={a}>{a}</option>
-                          ))}
-                        </select>
+                        />
                       </div>
                     )}
+
+                    <div>
+                      <label style={labelStyle}>Área *</label>
+                      <select
+                        value={form.direccion}
+                        onChange={e => setForm({ ...form, direccion: e.target.value })}
+                        style={{ ...inputStyle, cursor: 'pointer' }}
+                        required
+                      >
+                        <option value="">-- Seleccionar Área --</option>
+                        {DIRECCIONES_SITMAH.map(a => (
+                          <option key={a} value={a}>{a}</option>
+                        ))}
+                        {form.direccion && !DIRECCIONES_SITMAH.includes(form.direccion) && (
+                          <option value={form.direccion}>{form.direccion}</option>
+                        )}
+                      </select>
+                    </div>
 
                     <div>
                       <label style={labelStyle}>Ubicación *</label>
                       <select
                         value={form.areaUbicacion}
-                        onChange={e => {
-                          const val = e.target.value;
-                          const isEstacion = ['camara'].includes(form.tipo) && estacionesList.map(est => typeof est === 'string' ? est : est.nombre).includes(val);
-                          setForm({ ...form, areaUbicacion: val, direccion: isEstacion ? '' : form.direccion });
-                        }}
+                        onChange={e => setForm({ ...form, areaUbicacion: e.target.value })}
                         style={{ ...inputStyle, cursor: 'pointer' }}
                         required
                       >

@@ -126,8 +126,16 @@
 
 /* El logo 2 (Logo central) */
 .app-header__brand-logo-2 {
-  height: 48px;
-  width: auto;
+  height: 86px !important;
+  max-height: 86px !important;
+  width: auto !important;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.45));
+  transition: transform 0.2s ease;
+}
+
+.app-header__brand-logo-2:hover {
+  transform: scale(1.04);
 }
 
 @media (max-width: 640px) {
@@ -145,11 +153,12 @@
   }
 
   .app-header__brand-logo-1 {
-    height: 40px;
+    height: 48px;
   }
 
   .app-header__brand-logo-2 {
-    height: 25px;
+    height: 60px !important;
+    max-height: 64px !important;
   }
 
   .app-header__back-btn {

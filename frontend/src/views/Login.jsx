@@ -99,10 +99,10 @@ export default function Login() {
                 src={logoSitmah}
                 alt="SITMAH Logo"
                 style={{
-                  maxWidth: 'clamp(140px, 60%, 200px)',
-                  maxHeight: '70px',
+                  maxWidth: '120px',
+                  maxHeight: '100px',
                   objectFit: 'contain',
-                  filter: 'brightness(0) invert(1)',
+                  filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))',
                   marginBottom: '0.85rem',
                 }}
               />

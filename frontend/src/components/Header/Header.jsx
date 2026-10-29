@@ -5,6 +5,7 @@ import { FaExclamationCircle, FaCheckCircle, FaBars, FaLock, FaEye, FaEyeSlash, 
 import Swal from 'sweetalert2';
 import NotificationCenter from './NotificationCenter';
 import BuscadorGlobalModal from './BuscadorGlobalModal';
+import logoNuevo from '../../assets/logoSSS.png';
 import './Header.css';
 
 export default function Header({ toggleSidebar, hideLogos, hideBackButton = false }) {
@@ -148,12 +149,20 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
             className="app-header__brand"
             onClick={handleHomeClick}
             aria-label="Ir al inicio"
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'pointer', padding: 0, background: 'transparent' }}
           >
             <img
-              src="/images/sitmah_logo.webp"
+              src={logoNuevo}
               alt="Logo SITMAH"
               className="app-header__brand-logo-2"
+              style={{
+                height: '86px',
+                maxHeight: '86px',
+                width: 'auto',
+                objectFit: 'contain',
+                filter: 'drop-shadow(0 4px 12px rgba(0, 0, 0, 0.45))',
+                display: 'block'
+              }}
             />
           </button>
         </div>

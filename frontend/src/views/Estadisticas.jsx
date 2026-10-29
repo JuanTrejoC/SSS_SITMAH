@@ -302,9 +302,9 @@ export default function Estadisticas() {
               </p>
             </div>
             <img
-              src="/images/sitmah_logo.webp"
+              src="/images/logo_sitmah_nuevo.png"
               alt="SITMAH"
-              style={{ height: '42px', objectFit: 'contain' }}
+              style={{ height: '54px', objectFit: 'contain' }}
             />
           </div>
         </div>

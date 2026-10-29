@@ -9,6 +9,7 @@ router.use(authAdmin);
 // Rutas CRUD
 router.get('/', equipoController.obtenerEquipos);
 router.post('/', equipoController.crearEquipo);
+router.post('/:id/desglosar', equipoController.desglosarEquipo);
 router.put('/:id', equipoController.actualizarEquipo);
 router.delete('/:id', equipoController.eliminarEquipo);
 

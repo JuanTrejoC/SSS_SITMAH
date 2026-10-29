@@ -56,21 +56,29 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       <div style={{
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'flex-start',
-        marginBottom: '1.5rem',
+        alignItems: 'center',
+        marginBottom: '1.25rem',
         paddingTop: '0.25rem',
-        paddingRight: '2rem', /* espacio para el botón close en mobile */
+        paddingRight: '1rem',
       }}>
         <a
           href="https://s-transportemetropolitano.hidalgo.gob.mx/"
           target="_blank"
           rel="noreferrer"
-          style={{ cursor: 'pointer', textDecoration: 'none', display: 'block', width: '100%' }}
+          style={{ cursor: 'pointer', textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}
         >
           <img
             src={logoSitmah}
             alt="SITMAH Logo"
             className="sidebar-logo"
+            style={{
+              maxHeight: '80px',
+              width: 'auto',
+              objectFit: 'contain',
+              objectPosition: 'center',
+              filter: 'drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45))',
+              marginBottom: '0.35rem'
+            }}
           />
         </a>
       </div>

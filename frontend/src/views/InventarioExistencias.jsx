@@ -687,6 +687,7 @@ export default function InventarioExistencias() {
         responsable: form.responsable || null,
         cargoResponsable: form.cargoResponsable || null,
         direccion: form.direccion || null,
+        cantidad: Math.max(1, parseInt(form.detalles?.cantidad, 10) || 1),
         detalles: {
           ...form.detalles,
           cantidad: Math.max(1, parseInt(form.detalles?.cantidad, 10) || 1)
@@ -710,7 +711,7 @@ export default function InventarioExistencias() {
       if (res.ok && json.ok) {
         Swal.fire({
           title: 'Éxito',
-          text: editandoId ? 'Actualizado correctamente.' : 'Registrado correctamente.',
+          text: json.message || (editandoId ? 'Actualizado correctamente.' : 'Registrado correctamente.'),
           icon: 'success',
           confirmButtonColor: '#691B31'
         });
@@ -834,6 +835,44 @@ export default function InventarioExistencias() {
       } catch (err) {
         console.error('Error al eliminar:', err);
         Swal.fire('Error', 'Error al conectar con el servidor.', 'error');
+      }
+    }
+  };
+
+  const handleDesglosarLote = async (item) => {
+    const cant = item.cantidad || 1;
+    const confirmacion = await Swal.fire({
+      title: '¿Separar en unidades individuales?',
+      html: `Este registro tiene <b>${cant} unidades</b> agrupadas.<br/><br/>
+Al separarlo, el sistema creará <b>${cant} registros individuales independientes</b> en la base de datos con el mismo número de serie y modelo.<br/><br/>
+Podrás asignar cada uno a un resguardante, área o estatus diferente por separado sin que se mezclen ni se eliminen los demás.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#0284c7',
+      cancelButtonColor: '#6F7271',
+      confirmButtonText: `Sí, separar en ${cant} unidades`,
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (confirmacion.isConfirmed) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/inventario-tecnologico/${item.id}/desglosar`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${user.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        const json = await res.json();
+        if (res.ok && json.ok) {
+          Swal.fire('¡Listo!', json.message || 'Lote desglosado correctamente en unidades independientes.', 'success');
+          await cargarExistencias();
+        } else {
+          Swal.fire('Error', json.error || 'No se pudo desglosar el lote.', 'error');
+        }
+      } catch (err) {
+        console.error('Error al desglosar:', err);
+        Swal.fire('Error', 'Ocurrió un error en el servidor.', 'error');
       }
     }
   };
@@ -1028,7 +1067,7 @@ export default function InventarioExistencias() {
         img.onerror = () => resolve(null);
       });
 
-      const logoHidalgo = await loadImg('/images/sitmah_logo.webp', '#691B31');
+      const logoHidalgo = await loadImg('/images/logo_sitmah_nuevo.png');
       const logoSitmah = await loadImg('/images/sistema de tm.webp');
 
       const totalPiezas = registros.reduce((acc, r) => acc + (Number(r.cantidad) || 0), 0);
@@ -1051,7 +1090,7 @@ export default function InventarioExistencias() {
         doc.text('SISTEMA INTEGRAL DE CONTROL SITMAH - INVENTARIO DE EXISTENCIAS', 15, pageHeight - 3);
 
         if (data.pageNumber === 1) {
-          if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 8, 30, 10);
+          if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 7, 13, 14);
 
           doc.setTextColor(105, 27, 49);
           doc.setFontSize(16);
@@ -2636,19 +2675,44 @@ export default function InventarioExistencias() {
                                   <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.8rem' }}>Sin número de serie ni inventario</span>
                                 )}
                                 {item.cantidad > 1 && (
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.1rem' }}>
-                                    <strong style={{color:'#64748b'}}>Cantidad:</strong>
-                                    <span style={{
-                                      backgroundColor: '#dcfce7',
-                                      color: '#166534',
-                                      fontSize: '0.75rem',
-                                      fontWeight: '700',
-                                      padding: '0.1rem 0.45rem',
-                                      borderRadius: '4px'
-                                    }}>
-                                      {item.cantidad} uds.
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                                      <strong style={{color:'#64748b'}}>Cantidad:</strong>
+                                      <span style={{
+                                        backgroundColor: '#dcfce7',
+                                        color: '#166534',
+                                        fontSize: '0.75rem',
+                                        fontWeight: '700',
+                                        padding: '0.1rem 0.45rem',
+                                        borderRadius: '4px'
+                                      }}>
+                                        {item.cantidad} uds.
+                                      </span>
                                     </span>
-                                  </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDesglosarLote(item)}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.3rem',
+                                        backgroundColor: '#eff6ff',
+                                        color: '#1d4ed8',
+                                        border: '1px solid #bfdbfe',
+                                        borderRadius: '5px',
+                                        padding: '0.2rem 0.55rem',
+                                        fontSize: '0.75rem',
+                                        fontWeight: '600',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                      }}
+                                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#dbeafe'}
+                                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#eff6ff'}
+                                      title="Separar este lote en registros individuales independientes para poder asignar o cambiar estatus por separado"
+                                    >
+                                      ⚡ Separar en {item.cantidad} unidades
+                                    </button>
+                                  </div>
                                 )}
                               </div>
 
@@ -2891,10 +2955,18 @@ export default function InventarioExistencias() {
                     </div>
 
                     <div>
-                      <label style={labelStyle}>Cantidad *</label>
+                      <label style={labelStyle}>
+                        Cantidad *
+                        {!editandoId && (
+                          <span style={{ fontSize: '11px', color: '#6b7280', fontWeight: 'normal', marginLeft: '6px' }}>
+                            (Crea unidades individuales independientes)
+                          </span>
+                        )}
+                      </label>
                       <input
                         type="number"
                         min="1"
+                        max="100"
                         value={form.detalles?.cantidad ?? 1}
                         onChange={e => {
                           const val = e.target.value;
@@ -2937,6 +3009,9 @@ export default function InventarioExistencias() {
                             {DIRECCIONES_SITMAH.map(a => (
                               <option key={a} value={a}>{a}</option>
                             ))}
+                            {form.direccion && !DIRECCIONES_SITMAH.includes(form.direccion) && (
+                              <option value={form.direccion}>{form.direccion}</option>
+                            )}
                           </select>
                         </div>
 

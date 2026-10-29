@@ -259,6 +259,45 @@ const crearEquipo = async (req, res) => {
       }
     }
 
+    const cantidadNum = Math.max(1, parseInt(req.body.cantidad || detalles?.cantidad, 10) || 1);
+
+    if (cantidadNum > 1) {
+      const equiposCreados = [];
+      const detallesIndividual = { ...(detalles || {}), cantidad: 1 };
+
+      for (let i = 0; i < cantidadNum; i++) {
+        let invParaEste = numeroInventario || null;
+        if (invParaEste && !ignorarUnicos.includes(invTrim)) {
+          invParaEste = i === 0 ? invParaEste : `${invParaEste}-${i + 1}`;
+        }
+
+        const eq = await prisma.equipoTecnologico.create({
+          data: {
+            tipo,
+            numeroInventario: invParaEste,
+            numeroSerie: numeroSerie || null,
+            marca: marca || null,
+            modelo: modelo || null,
+            responsable: responsable || null,
+            cargoResponsable: cargoResponsable || null,
+            areaUbicacion: areaUbicacion || null,
+            direccion: direccion || null,
+            procedencia: procedencia || null,
+            estatus: estatus || 'Activo',
+            detalles: detallesIndividual
+          }
+        });
+        equiposCreados.push(eq);
+      }
+
+      return res.status(201).json({
+        ok: true,
+        data: equiposCreados[0],
+        totalCreados: equiposCreados.length,
+        message: `Se crearon ${equiposCreados.length} unidades individuales correctamente.`
+      });
+    }
+
     const nuevoEquipo = await prisma.equipoTecnologico.create({
       data: {
         tipo,
@@ -272,7 +311,7 @@ const crearEquipo = async (req, res) => {
         direccion: direccion || null,
         procedencia: procedencia || null,
         estatus: estatus || 'Activo',
-        detalles: detalles || {}
+        detalles: { ...(detalles || {}), cantidad: 1 }
       }
     });
 
@@ -728,9 +767,73 @@ async function procesarPerifericosDeDetalles(detalles, equipoPrincipalId, respon
   return nuevosDetalles;
 }
 
+// Desglosar un lote agrupado (con cantidad > 1 en detalles) en unidades individuales independientes
+const desglosarEquipo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const equipo = await prisma.equipoTecnologico.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!equipo) {
+      return res.status(404).json({ ok: false, error: 'Equipo no encontrado' });
+    }
+
+    const cantidadActual = Math.max(1, parseInt(equipo.detalles?.cantidad, 10) || 1);
+    if (cantidadActual <= 1) {
+      return res.status(400).json({ ok: false, error: 'Este registro ya es una unidad individual independiente.' });
+    }
+
+    // 1. Actualizar el registro original a cantidad: 1
+    const detallesActualizados = { ...(equipo.detalles || {}), cantidad: 1 };
+    await prisma.equipoTecnologico.update({
+      where: { id: equipo.id },
+      data: { detalles: detallesActualizados }
+    });
+
+    // 2. Crear las (cantidadActual - 1) unidades restantes individuales
+    const faltantes = cantidadActual - 1;
+    const ignorarUnicos = ['S/N', 'INF-S/N', 'S/S', 'N/A', 'SIN NUMERO', 'SIN SERIE', 'S/M', 'SN'];
+    const invTrim = (equipo.numeroInventario || '').trim().toUpperCase();
+
+    for (let i = 0; i < faltantes; i++) {
+      let invParaEste = equipo.numeroInventario || null;
+      if (invParaEste && !ignorarUnicos.includes(invTrim)) {
+        invParaEste = `${invParaEste}-${i + 2}`;
+      }
+
+      await prisma.equipoTecnologico.create({
+        data: {
+          tipo: equipo.tipo,
+          numeroInventario: invParaEste,
+          numeroSerie: equipo.numeroSerie,
+          marca: equipo.marca,
+          modelo: equipo.modelo,
+          responsable: equipo.responsable,
+          cargoResponsable: equipo.cargoResponsable,
+          areaUbicacion: equipo.areaUbicacion,
+          direccion: equipo.direccion,
+          procedencia: equipo.procedencia,
+          estatus: equipo.estatus,
+          detalles: detallesActualizados
+        }
+      });
+    }
+
+    res.json({
+      ok: true,
+      message: `Se desglosó el lote en ${cantidadActual} unidades individuales independientes.`
+    });
+  } catch (error) {
+    console.error('Error al desglosar equipo:', error);
+    res.status(500).json({ ok: false, error: 'Error interno al desglosar equipo' });
+  }
+};
+
 module.exports = {
   obtenerEquipos,
   crearEquipo,
   actualizarEquipo,
-  eliminarEquipo
+  eliminarEquipo,
+  desglosarEquipo
 };
