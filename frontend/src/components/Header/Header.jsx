@@ -129,16 +129,40 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
           {!hideLogos && (
             <button
               type="button"
-              className="app-header__brand"
+              className="app-header__brand sitrach-brand-btn"
               onClick={handleHomeClick}
-              aria-label="Ir al inicio"
-              style={{ cursor: 'pointer', marginLeft: showBackButton ? '0' : '0.5rem' }}
+              aria-label="Ir al inicio - SITRAC-H"
+              style={{
+                cursor: 'pointer',
+                marginLeft: showBackButton ? '0' : '0.5rem',
+                background: 'transparent',
+                border: 'none',
+                padding: '0.2rem 0.4rem',
+                textAlign: 'left'
+              }}
             >
-              <img
-                src="/images/sistema de tm.webp"
-                alt="Sistema de TM"
-                className="app-header__brand-logo-1"
-              />
+              <div className="sitrach-brand">
+                <div className="sitrach-acronym">
+                  <span className="sitrach-letters">SITR</span>
+                  <svg className="sitrach-a-svg" viewBox="0 0 24 28" fill="none" aria-hidden="true">
+                    <path d="M12 2L2 26H7.8L12 15L16.2 26H22L12 2Z" fill="#FFFFFF" />
+                    <polygon points="12,8 7.5,19 16.5,19" fill="#BC955B" />
+                  </svg>
+                  <span className="sitrach-letters">C</span>
+                  <span className="sitrach-dash" aria-hidden="true"></span>
+                  <span className="sitrach-letters">H</span>
+                </div>
+                <div className="sitrach-sub">
+                  <div className="sitrach-sub-row1">
+                    <span className="sitrach-line"></span>
+                    <span className="sitrach-text">Sistema Inteligente de Tránsito, Resguardo</span>
+                    <span className="sitrach-line"></span>
+                  </div>
+                  <div className="sitrach-sub-row2">
+                    y Automatización de Control de Hidalgo.
+                  </div>
+                </div>
+              </div>
             </button>
           )}
         </div>

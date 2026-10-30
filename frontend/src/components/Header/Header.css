@@ -419,3 +419,133 @@
 .header-login-submit:hover {
   opacity: 0.88;
 }
+
+/* ========================================================= */
+/* IDENTIDAD INSTITUCIONAL SITRAC-H                          */
+/* ========================================================= */
+.sitrach-brand-btn {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+}
+
+.sitrach-brand-btn:hover {
+  transform: translateY(-1px);
+  opacity: 0.95;
+}
+
+.sitrach-brand {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  background: transparent;
+  user-select: none;
+  line-height: 1;
+}
+
+.sitrach-acronym {
+  display: inline-flex;
+  align-items: center;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 1.62rem;
+  font-weight: 900;
+  color: #FFFFFF;
+  letter-spacing: 3.5px;
+  line-height: 1;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+.sitrach-a-svg {
+  width: 23px;
+  height: 27px;
+  margin: 0 1px 0 0;
+  display: inline-block;
+  vertical-align: middle;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+}
+
+.sitrach-dash {
+  display: inline-block;
+  width: 13px;
+  height: 5px;
+  background-color: #BC955B;
+  border-radius: 1px;
+  margin: 0 5px 0 2px;
+  vertical-align: middle;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.sitrach-sub {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.sitrach-sub-row1 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+}
+
+.sitrach-line {
+  flex: 1;
+  height: 1.5px;
+  background: linear-gradient(90deg, rgba(188, 149, 91, 0.2), #BC955B 50%, rgba(188, 149, 91, 0.2));
+}
+
+.sitrach-text {
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: #F8EFE4;
+  white-space: nowrap;
+  letter-spacing: 0.35px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.sitrach-sub-row2 {
+  font-size: 0.60rem;
+  font-weight: 500;
+  color: #EBDCC6;
+  letter-spacing: 0.35px;
+  margin-top: 2px;
+  text-align: center;
+  width: 100%;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+@media (max-width: 900px) {
+  .sitrach-sub {
+    display: none;
+  }
+  .sitrach-acronym {
+    font-size: 1.35rem;
+    letter-spacing: 2px;
+  }
+  .sitrach-a-svg {
+    width: 19px;
+    height: 23px;
+  }
+  .sitrach-dash {
+    width: 10px;
+    height: 4px;
+    margin: 0 3px 0 1px;
+  }
+}
+
+@media (max-width: 640px) {
+  .sitrach-acronym {
+    font-size: 1.15rem;
+    letter-spacing: 1.5px;
+  }
+  .sitrach-a-svg {
+    width: 16px;
+    height: 19px;
+  }
+  .sitrach-dash {
+    width: 8px;
+    height: 3.5px;
+  }
+}

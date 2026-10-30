@@ -109,14 +109,31 @@ export default function Login() {
             </a>
             <h1 style={{
               color: 'white',
-              fontSize: 'clamp(1.1rem, 3vw, 1.35rem)',
+              fontSize: 'clamp(1.15rem, 3vw, 1.4rem)',
               fontWeight: '700',
-              margin: '0 0 0.25rem',
+              margin: '0 0 0.35rem',
+              letterSpacing: '-0.01em',
             }}>
               Acceso Administrador
             </h1>
-            <p style={{ color: 'rgba(252,211,211,0.85)', fontSize: '0.82rem', margin: 0 }}>
-              SISTEMA DE SOLICITUD DE SERVICIO SITMAH
+            <div style={{
+              color: '#FFFFFF',
+              fontSize: '0.92rem',
+              fontWeight: '800',
+              letterSpacing: '2px',
+              marginBottom: '0.35rem'
+            }}>
+              SITRAC-H
+            </div>
+            <p style={{
+              color: 'rgba(252,235,225,0.92)',
+              fontSize: '0.76rem',
+              lineHeight: 1.35,
+              margin: '0 auto',
+              maxWidth: '340px',
+              fontWeight: '500'
+            }}>
+              Sistema Inteligente de Tránsito, Resguardo y Automatización de Control de Hidalgo
             </p>
           </div>
 
@@ -297,7 +314,7 @@ export default function Login() {
           color: '#9ca3af',
           textAlign: 'center',
         }}>
-          © {new Date().getFullYear()} SITMAH — Sistema de Transporte Metropolitano de Hidalgo
+          © {new Date().getFullYear()} SITRAC-H — Gobierno del Estado de Hidalgo
         </p>
       </div>
 

@@ -104,7 +104,7 @@ export default function Dashboard() {
                 ¡Bienvenido{(user?.nombre || user?.username) ? `, ${user.nombre || user.username}` : ''}!
               </h1>
               <p style={{ color: '#E5E7EB', margin: '0.5rem 0 0 0', fontSize: 'clamp(0.875rem, 2vw, 1.05rem)', maxWidth: '650px', opacity: 0.9 }}>
-                Panel general del Sistema de Transporte Masivo de Hidalgo (SITMAH). Gestiona y monitorea incidencias operativas, semafóricas y de infraestructura en tiempo real.
+                Panel general del Sistema Inteligente de Tránsito, Resguardo y Automatización de Control de Hidalgo (SITRAC-H). Gestiona y monitorea incidencias operativas, semafóricas y de infraestructura en tiempo real.
               </p>
             </div>
 
