@@ -245,17 +245,19 @@ const crearEquipo = async (req, res) => {
       return res.status(400).json({ ok: false, error: 'El tipo de equipo es obligatorio.' });
     }
 
-    // Validación de duplicados únicamente en número de inventario (ignora marcadores genéricos)
-    const ignorarUnicos = ['S/N', 'INF-S/N', 'S/S', 'N/A', 'SIN NUMERO', 'SIN SERIE', 'S/M', 'SN'];
+    // Normalización de número de inventario: marcadores genéricos se normalizan a null
+    const ignorarUnicos = ['S/N', 'INF-S/N', 'S/S', 'N/A', 'SIN NUMERO', 'SIN SERIE', 'S/M', 'SN', '-'];
     const invTrim = (numeroInventario || '').trim().toUpperCase();
+    const esGenericoOSinInv = !numeroInventario || !invTrim || ignorarUnicos.includes(invTrim);
+    const invLimpio = esGenericoOSinInv ? null : numeroInventario.trim();
 
-    if (numeroInventario && !ignorarUnicos.includes(invTrim)) {
+    if (invLimpio) {
       const existe = await prisma.equipoTecnologico.findFirst({
-        where: { numeroInventario: numeroInventario.trim() }
+        where: { numeroInventario: invLimpio }
       });
 
       if (existe) {
-        return res.status(400).json({ ok: false, error: `El número de inventario "${numeroInventario}" ya está registrado en otro equipo.` });
+        return res.status(400).json({ ok: false, error: `El número de inventario "${invLimpio}" ya está registrado en otro equipo.` });
       }
     }
 
@@ -266,8 +268,8 @@ const crearEquipo = async (req, res) => {
       const detallesIndividual = { ...(detalles || {}), cantidad: 1 };
 
       for (let i = 0; i < cantidadNum; i++) {
-        let invParaEste = numeroInventario || null;
-        if (invParaEste && !ignorarUnicos.includes(invTrim)) {
+        let invParaEste = invLimpio;
+        if (invParaEste) {
           invParaEste = i === 0 ? invParaEste : `${invParaEste}-${i + 1}`;
         }
 
@@ -275,7 +277,7 @@ const crearEquipo = async (req, res) => {
           data: {
             tipo,
             numeroInventario: invParaEste,
-            numeroSerie: numeroSerie || null,
+            numeroSerie: numeroSerie ? numeroSerie.trim() : null,
             marca: marca || null,
             modelo: modelo || null,
             responsable: responsable || null,
@@ -301,7 +303,7 @@ const crearEquipo = async (req, res) => {
     const nuevoEquipo = await prisma.equipoTecnologico.create({
       data: {
         tipo,
-        numeroInventario: numeroInventario || null,
+        numeroInventario: invLimpio,
         numeroSerie: numeroSerie || null,
         marca: marca || null,
         modelo: modelo || null,
@@ -336,7 +338,13 @@ const crearEquipo = async (req, res) => {
     res.status(201).json({ ok: true, data: nuevoEquipo });
   } catch (error) {
     console.error('Error al crear equipo:', error);
-    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+    if (error.code === 'P2002') {
+      return res.status(400).json({
+        ok: false,
+        error: 'El número de inventario o identificador ingresado ya se encuentra registrado en otro equipo.'
+      });
+    }
+    res.status(500).json({ ok: false, error: error.message || 'Error interno del servidor' });
   }
 };
 
@@ -370,25 +378,27 @@ const actualizarEquipo = async (req, res) => {
     }
 
     // Validación de duplicados, excluyendo el equipo actual (únicamente número de inventario)
-    const ignorarUnicos = ['S/N', 'INF-S/N', 'S/S', 'N/A', 'SIN NUMERO', 'SIN SERIE', 'S/M', 'SN'];
+    const ignorarUnicos = ['S/N', 'INF-S/N', 'S/S', 'N/A', 'SIN NUMERO', 'SIN SERIE', 'S/M', 'SN', '-'];
     const invTrim = (numeroInventario || '').trim().toUpperCase();
+    const esGenericoOSinInv = !numeroInventario || !invTrim || ignorarUnicos.includes(invTrim);
+    const invLimpio = esGenericoOSinInv ? null : numeroInventario.trim();
 
-    if (numeroInventario && !ignorarUnicos.includes(invTrim)) {
+    if (invLimpio) {
       const existe = await prisma.equipoTecnologico.findFirst({
         where: {
           id: { not: parseInt(id) },
-          numeroInventario: numeroInventario.trim()
+          numeroInventario: invLimpio
         }
       });
 
       if (existe) {
-        return res.status(400).json({ ok: false, error: `El número de inventario "${numeroInventario}" ya está registrado en otro equipo.` });
+        return res.status(400).json({ ok: false, error: `El número de inventario "${invLimpio}" ya está registrado en otro equipo.` });
       }
     }
 
     const datosActualizar = {
       tipo,
-      numeroInventario: numeroInventario || null,
+      numeroInventario: invLimpio,
       numeroSerie: numeroSerie || null,
       marca: marca || null,
       modelo: modelo || null,
@@ -464,7 +474,13 @@ const actualizarEquipo = async (req, res) => {
     res.json({ ok: true, data: equipoActualizado });
   } catch (error) {
     console.error('Error al actualizar equipo:', error);
-    res.status(500).json({ ok: false, error: 'Error interno del servidor' });
+    if (error.code === 'P2002') {
+      return res.status(400).json({
+        ok: false,
+        error: 'El número de inventario o identificador ingresado ya se encuentra registrado en otro equipo.'
+      });
+    }
+    res.status(500).json({ ok: false, error: error.message || 'Error interno del servidor' });
   }
 };
 
@@ -729,8 +745,12 @@ async function procesarPerifericosDeDetalles(detalles, equipoPrincipalId, respon
   delete nuevosDetalles.numeroInventarioMonitores;
 
   // 3. Crear en BD
+  const ignorarUnicosPerif = ['S/N', 'INF-S/N', 'S/S', 'N/A', 'SIN NUMERO', 'SIN SERIE', 'S/M', 'SN', '-'];
   for (const p of perifericosAcrear) {
     let finalInventario = p.inventario && p.inventario.trim() !== '' ? p.inventario.trim() : null;
+    if (finalInventario && ignorarUnicosPerif.includes(finalInventario.toUpperCase())) {
+      finalInventario = null;
+    }
     if (finalInventario) {
       let count = 0;
       let newInventario = finalInventario;
@@ -797,10 +817,9 @@ const desglosarEquipo = async (req, res) => {
     const invTrim = (equipo.numeroInventario || '').trim().toUpperCase();
 
     for (let i = 0; i < faltantes; i++) {
-      let invParaEste = equipo.numeroInventario || null;
-      if (invParaEste && !ignorarUnicos.includes(invTrim)) {
-        invParaEste = `${invParaEste}-${i + 2}`;
-      }
+      let invParaEste = (equipo.numeroInventario && !ignorarUnicos.includes(invTrim))
+        ? `${equipo.numeroInventario.trim()}-${i + 2}`
+        : null;
 
       await prisma.equipoTecnologico.create({
         data: {

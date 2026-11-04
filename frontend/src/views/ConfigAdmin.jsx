@@ -566,7 +566,7 @@ export default function ConfigAdmin() {
                       </div>
                       <div style={{ marginBottom: '1.2rem' }}>
                         <label style={{ fontSize: '0.8rem', fontWeight: '500', color: '#475569' }}>Correo de Notificaciones</label>
-                        <input type="email" value={correoDestino} onChange={(e) => setCorreoDestino(e.target.value)} placeholder="ejemplo@sitmah.gob.mx" style={{ width: '100%', padding: '0.55rem', border: '1px solid #9B9B9A', borderRadius: '6px', fontSize: '0.85rem', marginTop: '0.2rem' }} required />
+                        <input type="email" value={correoDestino} onChange={(e) => setCorreoDestino(e.target.value)} placeholder="ejemplo@sitrach.gob.mx" style={{ width: '100%', padding: '0.55rem', border: '1px solid #9B9B9A', borderRadius: '6px', fontSize: '0.85rem', marginTop: '0.2rem' }} required />
                       </div>
                     </>
                   )}

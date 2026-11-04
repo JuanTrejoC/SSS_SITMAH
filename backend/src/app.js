@@ -51,7 +51,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.get('/api/health', (req, res) => {
-  ok(res, { message: 'SITMAH API funcionando' });
+  ok(res, { message: 'SITRAC-H API funcionando' });
 });
 
 app.use('/api/auth', authRoutes);
@@ -68,7 +68,7 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`SITMAH API corriendo en http://localhost:${PORT}`);
+  console.log(`SITRAC-H API corriendo en http://localhost:${PORT}`);
 });
 
 module.exports = app;

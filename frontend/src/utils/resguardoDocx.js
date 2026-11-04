@@ -348,7 +348,7 @@ export async function generarResguardoDocx(resguardo) {
                       new Paragraph({
                         children: [
                           new TextRun({
-                            text: 'SISTEMA INTEGRADO DE TRANSPORTE MASIVO',
+                            text: 'SITRAC-H - SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL',
                             font: 'Arial',
                             size: 20,
                             color: '000000'

@@ -469,7 +469,7 @@ export default function FormInfraestructura({ usuarioActual }) {
             </div>
             <div>
               <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#fcd3d3', fontWeight: '700' }}>
-                Sistema de Atención a Incidencias · SITMAH
+                Sistema de Atención a Incidencias — SITRAC-H
               </span>
               <h1 style={{ fontSize: 'clamp(1.35rem, 3.5vw, 1.85rem)', fontWeight: '800', margin: '0.2rem 0 0.4rem 0' }}>
                 Crear Reporte de Infraestructura
@@ -604,7 +604,7 @@ export default function FormInfraestructura({ usuarioActual }) {
                 </label>
                 <input
                   type="email"
-                  placeholder="correo@sitmah.gob.mx"
+                  placeholder="correo@sitrach.gob.mx"
                   value={formData.email}
                   onChange={(e) => {
                     setFormData(prev => ({ ...prev, email: e.target.value }))

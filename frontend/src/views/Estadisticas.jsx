@@ -154,7 +154,7 @@ export default function Estadisticas() {
       
       const periodoSlug = getPeriodoTexto().replace(/\s+/g, '_')
       const fechaHoy = new Date().toISOString().slice(0, 10)
-      doc.save(`Reporte_Estadisticas_SITMAH_${periodoSlug}_${fechaHoy}.pdf`)
+      doc.save(`Reporte_Estadisticas_SITRAC-H_${periodoSlug}_${fechaHoy}.pdf`)
 
       Swal.close()
     } catch (err) {
@@ -279,7 +279,7 @@ export default function Estadisticas() {
           borderRadius: generandoPdf ? '12px' : '0'
         }}
       >
-        {/* Encabezado oficial SITMAH (visible solo al generar PDF o al imprimir) */}
+        {/* Encabezado oficial SITRAC-H (visible solo al generar PDF o al imprimir) */}
         <div
           className="print-only-block"
           style={{
@@ -292,7 +292,7 @@ export default function Estadisticas() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h1 style={{ fontSize: '1.75rem', color: '#691B31', fontWeight: 'bold', margin: 0 }}>
-                SITMAH - Reporte de Estadísticas
+                SITRAC-H - Reporte de Estadísticas
               </h1>
               <p style={{ color: '#6F7271', margin: '0.25rem 0', fontSize: '0.85rem' }}>
                 Generado el {new Date().toLocaleDateString('es-MX')} a las {new Date().toLocaleTimeString('es-MX')}
@@ -303,7 +303,7 @@ export default function Estadisticas() {
             </div>
             <img
               src="/images/logo_sitmah_nuevo.png"
-              alt="SITMAH"
+              alt="SITRAC-H"
               style={{ height: '54px', objectFit: 'contain' }}
             />
           </div>

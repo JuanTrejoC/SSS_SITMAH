@@ -4,23 +4,19 @@ import { FaAdjust } from 'react-icons/fa'
 
 export default function ThemeToggle() {
   const [esEscalaGrises, setEsEscalaGrises] = useState(() => {
-    return localStorage.getItem('sitmah_grayscale') === 'true'
+    return localStorage.getItem('sitrach_grayscale') === 'true' || localStorage.getItem('sitmah_grayscale') === 'true'
   })
 
   useEffect(() => {
-    const root = document.getElementById('root')
-    if (root) {
-      if (esEscalaGrises) {
-        root.classList.add('grayscale-theme')
-      } else {
-        root.classList.remove('grayscale-theme')
-      }
+    if (esEscalaGrises) {
+      document.documentElement.classList.add('grayscale-theme')
+    } else {
+      document.documentElement.classList.remove('grayscale-theme')
     }
+    localStorage.setItem('sitrach_grayscale', String(esEscalaGrises))
     localStorage.setItem('sitmah_grayscale', String(esEscalaGrises))
   }, [esEscalaGrises])
 
-  // Se renderiza con portal directamente en document.body para quedar FUERA del
-  // stacking context del filtro grayscale, así position:fixed funciona correctamente
   return createPortal(
     <button
       onClick={() => setEsEscalaGrises(!esEscalaGrises)}
@@ -49,4 +45,3 @@ export default function ThemeToggle() {
     document.body
   )
 }
-

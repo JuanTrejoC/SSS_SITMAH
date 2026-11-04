@@ -61,15 +61,14 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         paddingTop: '0.25rem',
         paddingRight: '1rem',
       }}>
-        <a
-          href="https://s-transportemetropolitano.hidalgo.gob.mx/"
-          target="_blank"
-          rel="noreferrer"
+        <Link
+          to={user?.rol === 'administrador' ? '/dashboard' : user?.rol === 'infraestructura' ? '/dashboard-infraestructura' : '/crear-oficinas'}
+          onClick={closeSidebar}
           style={{ cursor: 'pointer', textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}
         >
           <img
             src={logoSitmah}
-            alt="SITMAH Logo"
+            alt="SITRAC-H Logo"
             className="sidebar-logo"
             style={{
               maxHeight: '80px',
@@ -80,7 +79,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
               marginBottom: '0.35rem'
             }}
           />
-        </a>
+        </Link>
       </div>
 
       {/* SECCIÓN: GENERAL — solo admin y solicitante */}

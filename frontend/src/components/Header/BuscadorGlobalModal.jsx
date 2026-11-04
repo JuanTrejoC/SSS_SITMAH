@@ -242,7 +242,7 @@ export default function BuscadorGlobalModal({ isOpen, onClose }) {
           {query.trim().length < 2 && (
             <div style={{ padding: '2rem 1.5rem', textAlign: 'center', color: '#64748b' }}>
               <p style={{ fontWeight: 600, color: '#334155', marginBottom: '0.5rem' }}>
-                {esModoInfra ? 'Búsqueda en Módulo de Infraestructura' : 'Búsqueda Global en SITMAH'}
+                {esModoInfra ? 'Búsqueda en Módulo de Infraestructura' : 'Búsqueda Global en SITRAC-H'}
               </p>
               <p style={{ fontSize: '0.85rem', maxWidth: '420px', margin: '0 auto', lineHeight: 1.5 }}>
                 {esModoInfra

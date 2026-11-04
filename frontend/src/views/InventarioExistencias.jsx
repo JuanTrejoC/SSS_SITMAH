@@ -1068,7 +1068,7 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
       });
 
       const logoHidalgo = await loadImg('/images/logo_sitmah_nuevo.png');
-      const logoSitmah = await loadImg('/images/sistema de tm.webp');
+      // const logoSitmah = null; // Eliminado logo antiguo de transporte metropolitano
 
       const totalPiezas = registros.reduce((acc, r) => acc + (Number(r.cantidad) || 0), 0);
       const countBuen = registros.filter(r => normalizarEstado(r.estadoFisico) === 'Stock').reduce((a, r) => a + (Number(r.cantidad) || 0), 0);
@@ -1087,7 +1087,7 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
         doc.setFontSize(8);
         doc.setFont(undefined, 'normal');
         doc.text(`Página ${data.pageNumber}`, pageWidth - 15, pageHeight - 3, { align: 'right' });
-        doc.text('SISTEMA INTEGRAL DE CONTROL SITMAH - INVENTARIO DE EXISTENCIAS', 15, pageHeight - 3);
+        doc.text('SISTEMA INTEGRAL DE CONTROL SITRAC-H - INVENTARIO DE EXISTENCIAS', 15, pageHeight - 3);
 
         if (data.pageNumber === 1) {
           if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 7, 13, 14);
@@ -1099,7 +1099,12 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
 
           doc.setTextColor(184, 134, 11);
           doc.setFontSize(9);
-          doc.text(subtituloDoc.toUpperCase(), pageWidth / 2, 19, { align: 'center' });
+          doc.text('SITRAC-H - SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 18, { align: 'center' });
+
+          doc.setTextColor(100);
+          doc.setFontSize(7.5);
+          doc.setFont(undefined, 'normal');
+          doc.text(subtituloDoc.toUpperCase(), pageWidth / 2, 22, { align: 'center' });
 
           doc.setTextColor(100);
           doc.setFontSize(8);
@@ -1135,19 +1140,17 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
           drawMiniCard(startX + 3 * (cardW + gap), cardY, cardW, 15, 'DAÑADAS / BAJA', `${countDan} uds.`, [254, 242, 242], [185, 28, 28]);
         } else {
           // Encabezado compacto
-          if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 6, 22, 7);
+          if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 6, 9, 9);
           doc.setTextColor(105, 27, 49);
           doc.setFontSize(11);
           doc.setFont(undefined, 'bold');
           doc.text(`${tituloDoc} (Continuación)`, pageWidth / 2, 11, { align: 'center' });
           doc.setTextColor(184, 134, 11);
           doc.setFontSize(8);
-          doc.text('SISTEMA DE TRANSPORTE METROPOLITANO DE HIDALGO', pageWidth / 2, 15, { align: 'center' });
+          doc.text('SITRAC-H - SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 15, { align: 'center' });
         }
 
-        if (logoSitmah) {
-          doc.addImage(logoSitmah, 'PNG', pageWidth / 2 - 15, pageHeight - 22, 30, 9);
-        }
+// Logo de transporte metropolitano removido
       };
 
       const getEstadoFisicoTexto = (est) => {
@@ -1249,7 +1252,7 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
       });
 
       const sufijo = tipo === 'buen_estado' || tipo === 'Stock' ? 'Buen_Estado' : tipo === 'por_reparar' || tipo === 'Mantenimiento' ? 'Por_Reparar' : tipo === 'danado' || tipo === 'Baja' ? 'Danados' : 'Existencias';
-      const nombreArchivo = `Reporte_SITMAH_${sufijo}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      const nombreArchivo = `Reporte_SITRAC-H_${sufijo}_${new Date().toISOString().slice(0, 10)}.pdf`;
       doc.save(nombreArchivo);
 
       Swal.fire({
@@ -3288,9 +3291,9 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
                             placeholder="Ej: Monocromática Láser"
                           />
                           <CustomSpecSelect
-                            label="Propiedad (Rentada / SITMAH)"
+                            label="Propiedad (Rentada / SITRAC-H)"
                             value={form.detalles.propiedad || ''}
-                            options={['Rentada', 'SITMAH']}
+                            options={['Rentada', 'SITRAC-H']}
                             onChange={val => handleDetalleChange('propiedad', val)}
                             placeholder="Ej: En comodato"
                           />

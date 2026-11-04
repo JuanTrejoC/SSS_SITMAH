@@ -177,7 +177,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
           >
             <img
               src={logoNuevo}
-              alt="Logo SITMAH"
+              alt="Logo SITRAC-H"
               className="app-header__brand-logo-2"
               style={{
                 height: '86px',

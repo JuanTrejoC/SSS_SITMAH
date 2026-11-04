@@ -38,7 +38,7 @@ async function getTransporter() {
 
 async function enviarCorreo({ to, subject, html }) {
   const transporter = await getTransporter();
-  const from = process.env.MAIL_FROM || 'SITMAH <noreply@sitmah.local>';
+  const from = process.env.MAIL_FROM || 'SITRAC-H <noreply@sitrach.local>';
 
   const info = await transporter.sendMail({ from, to, subject, html });
 
@@ -55,12 +55,12 @@ async function enviarConfirmacionReporte({ email, folio, tipo }) {
 
   await enviarCorreo({
     to: email,
-    subject: `Reporte ${folio} registrado - SITMAH`,
+    subject: `Reporte ${folio} registrado - SITRAC-H`,
     html: `
       <div style="font-family: Arial, sans-serif; color: #334155; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
         <div style="background-color: #7F1D1D; color: white; padding: 20px; text-align: center;">
           <h2 style="margin: 0; font-size: 1.5rem; letter-spacing: 0.5px;">Confirmación de Registro</h2>
-          <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 0.9rem;">SITMAH - Sistema de Gestión</p>
+          <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 0.9rem;">SITRAC-H - Sistema Inteligente de Tránsito, Resguardo y Automatización de Control</p>
         </div>
         <div style="padding: 25px; background-color: white;">
           <p style="margin-top: 0; font-size: 1rem; color: #1e293b;">Hola,</p>
@@ -73,7 +73,7 @@ async function enviarConfirmacionReporte({ email, folio, tipo }) {
           
           <div style="background-color: #f8fafc; border-left: 4px solid #b98a46; padding: 15px; margin: 20px 0; border-radius: 4px;">
             <p style="margin: 0; font-weight: bold; color: #1e293b; font-size: 0.9rem;">¿Qué sigue?</p>
-            <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: #475569;">El equipo de tecnología de SITMAH lo atenderá dentro de las siguientes 72 horas hábiles</p>
+            <p style="margin: 5px 0 0 0; font-size: 0.85rem; color: #475569;">El equipo de tecnología de SITRAC-H lo atenderá dentro de las siguientes 72 horas hábiles</p>
           </div>
 
           <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 30px; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 15px;">
@@ -81,7 +81,7 @@ async function enviarConfirmacionReporte({ email, folio, tipo }) {
           </p>
         </div>
         <div style="background-color: #f8fafc; padding: 15px; text-align: center; font-size: 0.75rem; color: #64748b; border-top: 1px solid #e2e8f0;">
-          SITMAH - Sistema de reportes
+          SITRAC-H - Sistema de Reportes
         </div>
       </div>
     `,
@@ -95,12 +95,12 @@ async function enviarNotificacionAdmins({ folio, fecha, tipo, prioridad, falla, 
 
   await enviarCorreo({
     to: correos.join(', '),
-    subject: `Nuevo reporte ${folio} (${tipoTexto}) - SITMAH`,
+    subject: `Nuevo reporte ${folio} (${tipoTexto}) - SITRAC-H`,
     html: `
       <div style="font-family: Arial, sans-serif; color: #334155; line-height: 1.6; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
         <div style="background-color: #7F1D1D; color: white; padding: 20px; text-align: center;">
           <h2 style="margin: 0; font-size: 1.5rem; letter-spacing: 0.5px;">Nuevo Reporte Técnico</h2>
-          <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 0.9rem;">SITMAH - Sistema de Gestión</p>
+          <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 0.9rem;">SITRAC-H - Sistema Inteligente de Tránsito, Resguardo y Automatización de Control</p>
         </div>
         <div style="padding: 25px; background-color: white;">
           <p style="margin-top: 0;">Se ha registrado un nuevo reporte con la siguiente información detallada:</p>
@@ -143,7 +143,7 @@ async function enviarNotificacionAdmins({ folio, fecha, tipo, prioridad, falla, 
           </div>
         </div>
         <div style="background-color: #f8fafc; padding: 15px; text-align: center; font-size: 0.75rem; color: #64748b; border-top: 1px solid #e2e8f0;">
-          SITMAH &copy; 2026 - Área de Tecnología
+          SITRAC-H &copy; 2026 - Área de Tecnología
         </div>
       </div>
     `,

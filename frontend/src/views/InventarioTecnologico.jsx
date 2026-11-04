@@ -731,7 +731,7 @@ export default function InventarioTecnologico() {
       });
 
       const logoHidalgo = await loadImg('/images/logo_sitmah_nuevo.png');
-      const logoSitmah = await loadImg('/images/sistema de tm.webp');
+      // const logoSitmah = null; // Eliminado logo antiguo de transporte metropolitano
 
       // Franja superior guinda
       doc.setFillColor(105, 27, 49); // #691B31
@@ -745,9 +745,6 @@ export default function InventarioTecnologico() {
       if (logoHidalgo) {
         doc.addImage(logoHidalgo, 'PNG', 14, 8, 14, 15);
       }
-      if (logoSitmah) {
-        doc.addImage(logoSitmah, 'PNG', pageWidth - 46, 10, 32, 11);
-      }
 
       // Título
       doc.setTextColor(105, 27, 49);
@@ -757,7 +754,7 @@ export default function InventarioTecnologico() {
 
       doc.setTextColor(188, 149, 91);
       doc.setFontSize(9);
-      doc.text('SISTEMA INTEGRADO DE TRANSPORTE MASIVO DE HIDALGO', pageWidth / 2, 21, { align: 'center' });
+      doc.text('SITRAC-H - SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 21, { align: 'center' });
 
       doc.setFont(undefined, 'normal');
       doc.setTextColor(100);
@@ -941,14 +938,14 @@ export default function InventarioTecnologico() {
       doc.setFontSize(7);
       doc.setTextColor(100);
       doc.text('ENTREGA / SUPERVISIÓN DE EQUIPO', rightColX + colWidth / 2, firmaY + 23, { align: 'center' });
-      doc.text('SISTEMA INTEGRADO DE TRANSPORTE MASIVO', rightColX + colWidth / 2, firmaY + 26.5, { align: 'center' });
+      doc.text('SITRAC-H - CONTROL Y RESGUARDO', rightColX + colWidth / 2, firmaY + 26.5, { align: 'center' });
 
       // Footer
       doc.setFillColor(105, 27, 49);
       doc.rect(0, pageHeight - 6, pageWidth, 6, 'F');
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(7);
-      doc.text('SITMAH - Ficha Oficial de Control Tecnológico', 14, pageHeight - 2);
+      doc.text('SITRAC-H - Ficha Oficial de Control Tecnológico', 14, pageHeight - 2);
       doc.text('Página 1 de 1', pageWidth - 14, pageHeight - 2, { align: 'right' });
 
       const numId = (item.numeroInventario || item.numeroSerie || item.id).toString().replace(/[^a-zA-Z0-9]/g, '_');
@@ -1094,7 +1091,7 @@ export default function InventarioTecnologico() {
         ...item,
         nombreResguardante: resguardante.trim(),
         cargo: cargo || '',
-        direccion: direccion || 'Operación SITMAH',
+        direccion: direccion || 'Operación SITRAC-H',
         tipoInventario: 'tecnologico',
         descripcionPdf: `${tituloBien}\n\n${lineasDetalle.join('\n')}`,
         numeroSeriePdf: item.numeroSerie || 'S/S',
@@ -1188,7 +1185,7 @@ export default function InventarioTecnologico() {
         });
 
         const logoHidalgo = await loadImg('/images/logo_sitmah_nuevo.png'); 
-        const logoSitmah = await loadImg('/images/sistema de tm.webp'); 
+        // const logoSitmah = null; // Eliminado logo antiguo de transporte metropolitano 
 
         const iTot = await loadSvg('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>');
         const iOp = await loadSvg('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>');
@@ -1218,6 +1215,7 @@ export default function InventarioTecnologico() {
           doc.setFontSize(8);
           doc.setFont(undefined, 'normal');
           doc.text(`Página ${data.pageNumber}`, pageWidth - 15, pageHeight - 3, { align: 'right' });
+          doc.text('SISTEMA INTEGRAL DE CONTROL SITRAC-H - INVENTARIO TECNOLÓGICO', 14, pageHeight - 3);
 
           if (data.pageNumber === 1) {
             if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 7, 13, 14);
@@ -1229,7 +1227,7 @@ export default function InventarioTecnologico() {
             
             doc.setTextColor(184, 134, 11);
             doc.setFontSize(10);
-            doc.text('SISTEMA DE TRANSPORTE METROPOLITANO DE HIDALGO', pageWidth / 2, 21, { align: 'center' });
+            doc.text('SITRAC-H - SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 21, { align: 'center' });
 
             if (filtroTipo || busqueda) {
               const labelFiltro = filtroTipo ? (TIPOS_EQUIPO.find(t => t.value === filtroTipo)?.label || filtroTipo) : 'Todos los tipos';
@@ -1281,26 +1279,24 @@ export default function InventarioTecnologico() {
             drawCard(startX + 3 * (cardW + gap), 28, cardW, 18, 'UBICACIONES', ubicaciones, iUbi);
           } else {
             // Encabezado compacto para páginas 2 en adelante
-            if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 6, 22, 7);
+            if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 6, 9, 9);
             doc.setTextColor(105, 27, 49);
             doc.setFontSize(11);
             doc.setFont(undefined, 'bold');
             doc.text('INVENTARIO TECNOLÓGICO (Continuación)', pageWidth / 2, 11, { align: 'center' });
             doc.setTextColor(184, 134, 11);
             doc.setFontSize(8);
-            doc.text('SISTEMA DE TRANSPORTE METROPOLITANO DE HIDALGO', pageWidth / 2, 15, { align: 'center' });
+            doc.text('SITRAC-H - SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 15, { align: 'center' });
           }
           
-          if (logoSitmah) {
-             doc.addImage(logoSitmah, 'PNG', pageWidth / 2 - 15, pageHeight - 25, 30, 9);
-          }
+// Logo de transporte metropolitano removido
           doc.setTextColor(105, 27, 49);
           doc.setFontSize(7);
           doc.setFont(undefined, 'bold');
           doc.text('NOTA:', 14, pageHeight - 20);
           doc.setFont(undefined, 'normal');
           doc.setTextColor(100);
-          doc.text('Este documento es un reporte generado automáticamente\npor el Sistema SITMAH.', 14, pageHeight - 16);
+          doc.text('Este documento es un reporte generado automáticamente\npor el Sistema SITRAC-H.', 14, pageHeight - 16);
         };
 
         const tableColumn = ["TIPO", "RESPONSABLE", "NÚMERO DE\nINVENTARIO", "NÚMERO DE\nSERIE", "MARCA", "MODELO", "ÁREA", "UBICACIÓN", "ESTATUS"];
@@ -1387,7 +1383,7 @@ export default function InventarioTecnologico() {
 
         const sufijoTipo = filtroTipo ? `_${filtroTipo}` : '';
         const sufijoBusqueda = busqueda ? `_filtrado` : '';
-        doc.save(`inventario_tecnologico${sufijoTipo}${sufijoBusqueda}_${new Date().getTime()}.pdf`);
+        doc.save(`inventario_tecnologico_SITRAC-H${sufijoTipo}${sufijoBusqueda}_${new Date().getTime()}.pdf`);
       } else {
         Swal.fire('Error', json.error || 'Error al obtener datos', 'error');
       }
@@ -1455,7 +1451,7 @@ export default function InventarioTecnologico() {
       }
     } catch (err) {
       console.error('Error al guardar:', err);
-      Swal.fire('Error', 'Error interno del servidor', 'error');
+      Swal.fire('Error', err.message || 'Error al conectar con el servidor', 'error');
     }
   };
 
@@ -3215,9 +3211,9 @@ export default function InventarioTecnologico() {
                             placeholder="Ej: Monocromática Láser"
                           />
                           <CustomSpecSelect
-                            label="Propiedad (Rentada / SITMAH)"
+                            label="Propiedad (Rentada / SITRAC-H)"
                             value={form.detalles.propiedad || ''}
-                            options={['Rentada', 'SITMAH']}
+                            options={['Rentada', 'SITRAC-H']}
                             onChange={val => handleDetalleChange('propiedad', val)}
                             placeholder="Ej: En comodato"
                           />

@@ -81,8 +81,8 @@ async function sincronizarResguardosPendientes() {
             equipoTecnologicoId: eq.id,
             nombreResguardante: nombreResp,
             cargo: eq.cargoResponsable || (eq.areaUbicacion ? 'Responsable de Ubicación' : ''),
-            direccion: eq.direccion || eq.areaUbicacion || 'Operación SITMAH',
-            area: eq.direccion || eq.areaUbicacion || 'Operación SITMAH',
+            direccion: eq.direccion || eq.areaUbicacion || 'Operación SITRAC-H',
+            area: eq.direccion || eq.areaUbicacion || 'Operación SITRAC-H',
             descripcionPdf: `${titulo}\n\n${lineas.join('\n')}`,
             numeroSeriePdf: eq.numeroSerie || 'S/S',
             fechaPrestamo: new Date(),
@@ -281,7 +281,7 @@ async function obtenerFirmado(req, res) {
     res.removeHeader('X-Frame-Options');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Content-Type', 'application/pdf');
-    const nombreLimpio = `Resguardo_Firmado_${(resguardo.nombreResguardante || 'sitmah').replace(/\s+/g, '_')}.pdf`;
+    const nombreLimpio = `Resguardo_Firmado_${(resguardo.nombreResguardante || 'sitrach').replace(/\s+/g, '_')}.pdf`;
 
     if (req.query.download === '1') {
       res.download(ruta, nombreLimpio);

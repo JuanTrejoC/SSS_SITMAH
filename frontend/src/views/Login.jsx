@@ -89,15 +89,10 @@ export default function Login() {
             padding: 'clamp(1.5rem, 5vw, 2.25rem)',
             textAlign: 'center',
           }}>
-            <a
-              href="https://s-transportemetropolitano.hidalgo.gob.mx/"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ cursor: 'pointer', display: 'inline-block', textDecoration: 'none' }}
-            >
+            <div style={{ display: 'inline-block' }}>
               <img
                 src={logoSitmah}
-                alt="SITMAH Logo"
+                alt="Logo SITRAC-H"
                 style={{
                   maxWidth: '120px',
                   maxHeight: '100px',
@@ -106,7 +101,7 @@ export default function Login() {
                   marginBottom: '0.85rem',
                 }}
               />
-            </a>
+            </div>
             <h1 style={{
               color: 'white',
               fontSize: 'clamp(1.15rem, 3vw, 1.4rem)',

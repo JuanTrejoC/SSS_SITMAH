@@ -746,10 +746,10 @@ async function exportarHerramientasExcel(herramientas, tipo = 'herramienta_infra
   sheet.views = [{ showGridLines: true }];
 
   if (esInfra) {
-    // Encabezado institucional estilo SITMAH
+    // Encabezado institucional estilo SITRAC-H
     sheet.mergeCells('B1:G1');
     const titleCell1 = sheet.getCell('B1');
-    titleCell1.value = 'SISTEMA INTEGRADO DE TRANSPORTE MASIVO DE HIDALGO (SITMAH)';
+    titleCell1.value = 'SITRAC-H - SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL DE HIDALGO';
     titleCell1.font = { name: 'Segoe UI', size: 12, bold: true, color: { argb: 'FF000000' } };
     titleCell1.alignment = { vertical: 'middle', horizontal: 'center' };
 

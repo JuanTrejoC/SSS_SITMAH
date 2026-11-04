@@ -1,5 +1,5 @@
 /* ============================================================
-   SITMAH — Sistema CSS Global · Mobile-First · Responsive
+   SITRAC-H — Sistema CSS Global • Mobile-First • Responsive
    ============================================================ */
 
 /* ---------- FUENTE INTER (Google Fonts) ---------- */
@@ -531,26 +531,11 @@ input, select, textarea {
 }
 
 /* ============================================================
-   TEMA ESCALA DE GRISES
+   TEMA ESCALA DE GRISES (ACCESIBILIDAD)
    ============================================================ */
-
-/* Truco con backdrop-filter para no romper el position: fixed del header */
-body.grayscale-theme::after,
-#root.grayscale-theme::after {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  backdrop-filter: grayscale(100%);
-  -webkit-backdrop-filter: grayscale(100%);
-  pointer-events: none;
-  z-index: 999999;
-}
-
-#root.grayscale-theme {
-  filter: none;
+html.grayscale-theme {
+  filter: grayscale(100%) !important;
+  -webkit-filter: grayscale(100%) !important;
 }
 
 /* ============================================================
@@ -688,4 +673,4 @@ body.grayscale-theme::after,
    ============================================================ */
 .swal2-container {
   z-index: 9999 !important;
-}
+}
