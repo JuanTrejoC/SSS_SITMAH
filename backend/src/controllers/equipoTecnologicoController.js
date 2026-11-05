@@ -108,42 +108,53 @@ function construirCondicionesBusqueda(search) {
     .split(/\s+/)
     .filter(p => p.length > 0 && !conectores.has(p));
 
-  // Detectar tipos de equipo friendly asociados a la búsqueda completa o palabras
+  // Detectar tipos de equipo friendly asociados (solo si coincide como palabra completa o frase exacta)
   const tiposDetectados = new Set();
   for (const [tipoKey, sinonimos] of Object.entries(MAPA_TIPOS_FRIENDLY)) {
-    if (sinonimos.some(s => rawNorm.includes(s) || palabras.includes(s))) {
-      tiposDetectados.add(tipoKey);
+    for (const s of sinonimos) {
+      if (s.includes(' ')) {
+        if (rawNorm.includes(s)) tiposDetectados.add(tipoKey);
+      } else {
+        if (palabras.includes(s)) tiposDetectados.add(tipoKey);
+      }
     }
   }
 
-  const terminos = new Set([raw, rawNorm]);
   const compacto = raw.replace(/\s+/g, '');
-  if (compacto) terminos.add(compacto);
   const conEspacio = raw.replace(/(\d+)(gb|tb|mb|ghz|mhz)/gi, '$1 $2');
-  if (conEspacio) terminos.add(conEspacio);
 
-  palabras.forEach(p => {
-    if (p.length >= 2) terminos.add(p);
-  });
-  tiposDetectados.forEach(t => terminos.add(t));
-
-  // Si son múltiples palabras (ej. "camara epcom", "teclado logitech", "dell optiplex 7090")
+  // Si son múltiples palabras (ej. "ECHAVARRÍA RAMOS DIANA LAURA", "laptop dell", "teclado logitech")
   if (palabras.length > 1) {
+    // Cada palabra ingresada DEBE cumplirse en alguno de los campos del registro (búsqueda AND estricta)
     const andGroup = palabras.map(palabra => {
       const tiposDePalabra = [];
       for (const [tipoKey, sinonimos] of Object.entries(MAPA_TIPOS_FRIENDLY)) {
-        if (sinonimos.includes(palabra)) tiposDePalabra.push(tipoKey);
+        if (sinonimos.includes(palabra)) {
+          tiposDePalabra.push(tipoKey);
+        }
       }
       return { OR: generarCamposOrParaTermino(palabra, tiposDePalabra) };
     });
 
-    const directOrs = Array.from(terminos).flatMap(t => generarCamposOrParaTermino(t, Array.from(tiposDetectados)));
-    return [{ AND: andGroup }, ...directOrs];
+    // Frase completa exacta o sin espacios por si coincide contigua en el campo de texto
+    const phraseConditions = [];
+    if (raw) phraseConditions.push(...generarCamposOrParaTermino(raw, Array.from(tiposDetectados)));
+    if (rawNorm && rawNorm !== raw) phraseConditions.push(...generarCamposOrParaTermino(rawNorm, Array.from(tiposDetectados)));
+    if (compacto && compacto !== rawNorm && compacto !== raw) phraseConditions.push(...generarCamposOrParaTermino(compacto, Array.from(tiposDetectados)));
+
+    return [
+      { AND: andGroup },
+      ...phraseConditions
+    ];
   }
 
   // Una sola palabra o término directo
+  const singleTerminos = new Set([raw, rawNorm]);
+  if (compacto) singleTerminos.add(compacto);
+  if (conEspacio) singleTerminos.add(conEspacio);
+
   const orConditions = [];
-  for (const term of terminos) {
+  for (const term of singleTerminos) {
     orConditions.push(...generarCamposOrParaTermino(term, Array.from(tiposDetectados)));
   }
   return orConditions;

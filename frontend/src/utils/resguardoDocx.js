@@ -231,8 +231,8 @@ export async function generarResguardoDocx(resguardo) {
                 new ImageRun({
                   data: imageBuffer,
                   transformation: {
-                    width: 320,
-                    height: 52
+                    width: 230,
+                    height: 55
                   },
                   type: 'png'
                 })

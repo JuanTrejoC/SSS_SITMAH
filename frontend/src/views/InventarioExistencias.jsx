@@ -15,6 +15,8 @@ import {
 } from 'react-icons/fa';
 import { buscarPersonalSitmah, PERSONAL_SITMAH, CARGOS_NORMALIZADOS, DIRECCIONES_SITMAH } from '../data/personalSitmah';
 import PersonalAutocomplete from '../components/PersonalAutocomplete';
+import logoSitrachSrc from '../assets/logoSSS.png';
+import escudoHidalgoSrc from '../assets/escudo_hidalgo.png';
 
 const labelStyle = {
   display: 'block',
@@ -1047,28 +1049,30 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
       const pageWidth = doc.internal.pageSize.width;
       const pageHeight = doc.internal.pageSize.height;
 
-      // Cargar logos institucionales
-      const loadImg = (src, tintColor) => new Promise((resolve) => {
+      // Cargar logos institucionales empaquetados directamente
+      const loadImg = (src) => new Promise((resolve) => {
+        if (!src) return resolve(null);
         const img = new Image();
-        img.src = src;
+        img.crossOrigin = 'Anonymous';
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0);
-          if (tintColor) {
-            ctx.globalCompositeOperation = 'source-in';
-            ctx.fillStyle = tintColor;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-          }
           resolve(canvas.toDataURL('image/png'));
         };
-        img.onerror = () => resolve(null);
+        img.onerror = () => {
+          console.warn('Error al cargar imagen en PDF:', src);
+          resolve(null);
+        };
+        img.src = src;
       });
 
-      const logoHidalgo = await loadImg('/images/logo_sitmah_nuevo.png');
-      // const logoSitmah = null; // Eliminado logo antiguo de transporte metropolitano
+      const [logoSitrach, logoHidalgo] = await Promise.all([
+        loadImg(logoSitrachSrc),
+        loadImg(escudoHidalgoSrc)
+      ]);
 
       const totalPiezas = registros.reduce((acc, r) => acc + (Number(r.cantidad) || 0), 0);
       const countBuen = registros.filter(r => normalizarEstado(r.estadoFisico) === 'Stock').reduce((a, r) => a + (Number(r.cantidad) || 0), 0);
@@ -1077,8 +1081,10 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
 
       const drawHeaderFooter = (data) => {
         // Franja superior institucional
-        doc.setFillColor(105, 27, 49);
+        doc.setFillColor(105, 27, 49); // #691B31
         doc.rect(0, 0, pageWidth, 5, 'F');
+        doc.setFillColor(188, 149, 91); // #BC955B Dorado
+        doc.rect(0, 5, pageWidth, 1.2, 'F');
 
         // Franja inferior institucional
         doc.setFillColor(105, 27, 49);
@@ -1090,26 +1096,35 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
         doc.text('SISTEMA INTEGRAL DE CONTROL SITRAC-H - INVENTARIO DE EXISTENCIAS', 15, pageHeight - 3);
 
         if (data.pageNumber === 1) {
-          if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 7, 13, 14);
+          // Logo SITRAC-H (Izquierda)
+          if (logoSitrach) {
+            doc.addImage(logoSitrach, 'PNG', 14, 7.5, 14.5, 15);
+          }
+
+          // Escudo del Estado de Hidalgo (Derecha)
+          if (logoHidalgo) {
+            doc.addImage(logoHidalgo, 'PNG', pageWidth - 26, 7.5, 12.5, 15);
+          }
 
           doc.setTextColor(105, 27, 49);
-          doc.setFontSize(16);
+          doc.setFontSize(15);
           doc.setFont(undefined, 'bold');
-          doc.text(tituloDoc, pageWidth / 2, 14, { align: 'center' });
+          doc.text(tituloDoc, pageWidth / 2, 13, { align: 'center' });
 
           doc.setTextColor(184, 134, 11);
-          doc.setFontSize(9);
-          doc.text('SITRAC-H - SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 18, { align: 'center' });
+          doc.setFontSize(8.5);
+          doc.setFont(undefined, 'bold');
+          doc.text('SITRAC-H — SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 17.5, { align: 'center' });
 
           doc.setTextColor(100);
           doc.setFontSize(7.5);
           doc.setFont(undefined, 'normal');
-          doc.text(subtituloDoc.toUpperCase(), pageWidth / 2, 22, { align: 'center' });
+          doc.text(subtituloDoc.toUpperCase(), pageWidth / 2, 21.5, { align: 'center' });
 
           doc.setTextColor(100);
-          doc.setFontSize(8);
+          doc.setFontSize(7.5);
           doc.setFont(undefined, 'normal');
-          doc.text(`Fecha de emisión:\n${new Date().toLocaleString()}`, pageWidth - 14, 11, { align: 'right' });
+          doc.text(`Fecha de emisión:\n${new Date().toLocaleString()}`, pageWidth - 31, 12, { align: 'right' });
 
           // Tarjetas de resumen en el encabezado
           const drawMiniCard = (x, y, w, h, label, val, bgHex, textHex) => {
@@ -1140,14 +1155,17 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
           drawMiniCard(startX + 3 * (cardW + gap), cardY, cardW, 15, 'DAÑADAS / BAJA', `${countDan} uds.`, [254, 242, 242], [185, 28, 28]);
         } else {
           // Encabezado compacto
-          if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 6, 9, 9);
+          if (logoSitrach) doc.addImage(logoSitrach, 'PNG', 14, 6.5, 9, 9.3);
+          if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', pageWidth - 22, 6.5, 7.8, 9.3);
+
           doc.setTextColor(105, 27, 49);
           doc.setFontSize(11);
           doc.setFont(undefined, 'bold');
           doc.text(`${tituloDoc} (Continuación)`, pageWidth / 2, 11, { align: 'center' });
           doc.setTextColor(184, 134, 11);
           doc.setFontSize(8);
-          doc.text('SITRAC-H - SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 15, { align: 'center' });
+          doc.setFont(undefined, 'bold');
+          doc.text('SITRAC-H — SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 15, { align: 'center' });
         }
 
 // Logo de transporte metropolitano removido
@@ -1235,18 +1253,18 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
               textColor = [220, 38, 38];
             }
 
-            const x = data.cell.x + 2;
-            const y = data.cell.y + 2;
-            const w = data.cell.width - 4;
-            const h = data.cell.height - 4;
+            const pillH = 5.2;
+            const pillW = Math.min(data.cell.width - 4, 21.0);
+            const x = data.cell.x + (data.cell.width - pillW) / 2;
+            const y = data.cell.y + (data.cell.height - pillH) / 2;
 
             doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
-            doc.roundedRect(x, y, w, h, 2, 2, 'F');
+            doc.roundedRect(x, y, pillW, pillH, 1.8, 1.8, 'F');
 
             doc.setFontSize(6.5);
             doc.setTextColor(textColor[0], textColor[1], textColor[2]);
             doc.setFont(undefined, 'bold');
-            doc.text(estado, data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 1.5, { align: 'center' });
+            doc.text(estado, data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2, { align: 'center', baseline: 'middle' });
           }
         }
       });

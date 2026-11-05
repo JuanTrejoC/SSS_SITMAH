@@ -17,6 +17,8 @@ import { generarResguardoDocx } from '../utils/resguardoDocx';
 import { registrarResguardo } from '../utils/registrarResguardo';
 import { buscarPersonalSitmah, PERSONAL_SITMAH, CARGOS_NORMALIZADOS, DIRECCIONES_SITMAH } from '../data/personalSitmah';
 import PersonalAutocomplete from '../components/PersonalAutocomplete';
+import logoSitrachSrc from '../assets/logoSSS.png';
+import escudoHidalgoSrc from '../assets/escudo_hidalgo.png';
 
 const TIPOS_EQUIPO = [
   { value: 'escritorio', label: 'Escritorio', icon: FaDesktop, group: 'Computadoras' },
@@ -654,8 +656,10 @@ export default function InventarioTecnologico() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    cargarEquipos();
+    const timer = setTimeout(() => {
+      cargarEquipos();
+    }, 250);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagina, busqueda, filtroTipo]);
 
@@ -711,27 +715,29 @@ export default function InventarioTecnologico() {
       const pageWidth = doc.internal.pageSize.width;
       const pageHeight = doc.internal.pageSize.height;
 
-      const loadImg = (src, tintColor) => new Promise((resolve) => {
+      const loadImg = (src) => new Promise((resolve) => {
+        if (!src) return resolve(null);
         const img = new Image();
-        img.src = src;
+        img.crossOrigin = 'Anonymous';
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0);
-          if (tintColor) {
-            ctx.globalCompositeOperation = 'source-in';
-            ctx.fillStyle = tintColor;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-          }
           resolve(canvas.toDataURL('image/png'));
         };
-        img.onerror = () => resolve(null);
+        img.onerror = () => {
+          console.warn('Error al cargar imagen para Ficha:', src);
+          resolve(null);
+        };
+        img.src = src;
       });
 
-      const logoHidalgo = await loadImg('/images/logo_sitmah_nuevo.png');
-      // const logoSitmah = null; // Eliminado logo antiguo de transporte metropolitano
+      const [logoSitrach, logoHidalgo] = await Promise.all([
+        loadImg(logoSitrachSrc),
+        loadImg(escudoHidalgoSrc)
+      ]);
 
       // Franja superior guinda
       doc.setFillColor(105, 27, 49); // #691B31
@@ -742,8 +748,11 @@ export default function InventarioTecnologico() {
       doc.rect(0, 6, pageWidth, 1.5, 'F');
 
       // Logos
+      if (logoSitrach) {
+        doc.addImage(logoSitrach, 'PNG', 14, 8, 14.5, 15);
+      }
       if (logoHidalgo) {
-        doc.addImage(logoHidalgo, 'PNG', 14, 8, 14, 15);
+        doc.addImage(logoHidalgo, 'PNG', pageWidth - 26, 8, 12.5, 15);
       }
 
       // Título
@@ -1184,8 +1193,10 @@ export default function InventarioTecnologico() {
           img.src = svgData;
         });
 
-        const logoHidalgo = await loadImg('/images/logo_sitmah_nuevo.png'); 
-        // const logoSitmah = null; // Eliminado logo antiguo de transporte metropolitano 
+        const [logoSitrach, logoHidalgo] = await Promise.all([
+          loadImg(logoSitrachSrc),
+          loadImg(escudoHidalgoSrc)
+        ]);
 
         const iTot = await loadSvg('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>');
         const iOp = await loadSvg('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>');
@@ -1218,7 +1229,8 @@ export default function InventarioTecnologico() {
           doc.text('SISTEMA INTEGRAL DE CONTROL SITRAC-H - INVENTARIO TECNOLÓGICO', 14, pageHeight - 3);
 
           if (data.pageNumber === 1) {
-            if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 7, 13, 14);
+            if (logoSitrach) doc.addImage(logoSitrach, 'PNG', 14, 7, 14.5, 15);
+            if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', pageWidth - 26, 7, 12.5, 15);
             
             doc.setTextColor(105, 27, 49);
             doc.setFontSize(18);
@@ -1239,9 +1251,9 @@ export default function InventarioTecnologico() {
             }
 
             doc.setTextColor(100);
-            doc.setFontSize(8);
+            doc.setFontSize(7.5);
             doc.setFont(undefined, 'normal');
-            doc.text(`Fecha de generación:\n${new Date().toLocaleString()}`, pageWidth - 14, 12, { align: 'right' });
+            doc.text(`Fecha de generación:\n${new Date().toLocaleString()}`, pageWidth - 31, 12, { align: 'right' });
 
             const totalCount = registros.length;
             const operando = registros.filter(r => r.estatus?.toLowerCase() === 'operando' || r.estatus?.toLowerCase() === 'activo').length;
@@ -1279,7 +1291,8 @@ export default function InventarioTecnologico() {
             drawCard(startX + 3 * (cardW + gap), 28, cardW, 18, 'UBICACIONES', ubicaciones, iUbi);
           } else {
             // Encabezado compacto para páginas 2 en adelante
-            if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', 14, 6, 9, 9);
+            if (logoSitrach) doc.addImage(logoSitrach, 'PNG', 14, 6.5, 9, 9.3);
+            if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', pageWidth - 22, 6.5, 7.8, 9.3);
             doc.setTextColor(105, 27, 49);
             doc.setFontSize(11);
             doc.setFont(undefined, 'bold');
@@ -1289,14 +1302,7 @@ export default function InventarioTecnologico() {
             doc.text('SITRAC-H - SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 15, { align: 'center' });
           }
           
-// Logo de transporte metropolitano removido
-          doc.setTextColor(105, 27, 49);
-          doc.setFontSize(7);
-          doc.setFont(undefined, 'bold');
-          doc.text('NOTA:', 14, pageHeight - 20);
-          doc.setFont(undefined, 'normal');
-          doc.setTextColor(100);
-          doc.text('Este documento es un reporte generado automáticamente\npor el Sistema SITRAC-H.', 14, pageHeight - 16);
+// Nota inferior removida a solicitud
         };
 
         const tableColumn = ["TIPO", "RESPONSABLE", "NÚMERO DE\nINVENTARIO", "NÚMERO DE\nSERIE", "MARCA", "MODELO", "ÁREA", "UBICACIÓN", "ESTATUS"];
@@ -1326,7 +1332,7 @@ export default function InventarioTecnologico() {
           startY: 52,
           margin: {
             top: 18,
-            bottom: 28,
+            bottom: 16,
             left: 14,
             right: 14
           },
@@ -1334,7 +1340,14 @@ export default function InventarioTecnologico() {
           pageBreak: 'auto',
           theme: 'grid',
           styles: { fontSize: 7, cellPadding: 2.5, halign: 'center', valign: 'middle', lineColor: [230, 230, 230], overflow: 'linebreak' },
-          headStyles: { fillColor: [105, 27, 49], textColor: [255, 255, 255], fontStyle: 'bold', cellPadding: { top: 3, right: 3, bottom: 3, left: 8 } },
+          headStyles: { 
+            fillColor: [105, 27, 49], 
+            textColor: [255, 255, 255], 
+            fontStyle: 'bold', 
+            halign: 'left',
+            valign: 'middle',
+            cellPadding: { top: 3.5, right: 2, bottom: 3.5, left: 7.2 } 
+          },
           alternateRowStyles: { fillColor: [255, 251, 240] },
           didDrawPage: drawHeaderFooter,
           willDrawCell: (data) => {
@@ -1346,7 +1359,11 @@ export default function InventarioTecnologico() {
             if (data.section === 'head') {
               const icon = hIcons[data.column.index];
               if (icon) {
-                doc.addImage(icon, 'PNG', data.cell.x + 2, data.cell.y + (data.cell.height / 2) - 3, 6, 6);
+                const iconW = 4.0;
+                const iconH = 4.0;
+                const iconX = data.cell.x + 1.8;
+                const iconY = data.cell.y + (data.cell.height - iconH) / 2;
+                doc.addImage(icon, 'PNG', iconX, iconY, iconW, iconH);
               }
             }
             if (data.section === 'body' && data.column.index === 8) { 
@@ -1365,18 +1382,18 @@ export default function InventarioTecnologico() {
                 textColor = [220, 38, 38];
               }
               
-              const x = data.cell.x + 2;
-              const y = data.cell.y + 2;
-              const w = data.cell.width - 4;
-              const h = data.cell.height - 4;
+              const pillH = 5.2;
+              const pillW = Math.min(data.cell.width - 4, 18.0);
+              const x = data.cell.x + (data.cell.width - pillW) / 2;
+              const y = data.cell.y + (data.cell.height - pillH) / 2;
               
               doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
-              doc.roundedRect(x, y, w, h, 2, 2, 'F');
+              doc.roundedRect(x, y, pillW, pillH, 1.8, 1.8, 'F');
               
               doc.setFontSize(6);
               doc.setTextColor(textColor[0], textColor[1], textColor[2]);
               doc.setFont(undefined, 'bold');
-              doc.text(estatus, data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2 + 2, { align: 'center' });
+              doc.text(estatus, data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2, { align: 'center', baseline: 'middle' });
             }
           }
         });
@@ -2244,7 +2261,7 @@ export default function InventarioTecnologico() {
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
         <input
           type="text"
-          placeholder="Buscar por inv, serie, marca, modelo, procesador, RAM, almacenamiento, SO..."
+          placeholder="Buscar por responsable, número de inventario, serie, marca, modelo..."
           value={busqueda}
           onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }}
           style={{ padding: '0.75rem 1.25rem', border: '1px solid #CBD5E1', borderRadius: '8px', flex: 1, minWidth: '300px', fontSize: '1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}

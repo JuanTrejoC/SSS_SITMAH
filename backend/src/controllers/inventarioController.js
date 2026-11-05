@@ -7,47 +7,73 @@ const { exportarInventarioExistencias, exportarInventarioMobiliario, exportarHer
 function construirCondicionesBusquedaEquipo(search) {
   if (!search || !search.trim()) return [];
   const raw = search.trim();
-  const terms = new Set([raw]);
+  const rawNorm = (raw || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+
+  const conectores = new Set(['de', 'del', 'la', 'las', 'el', 'los', 'en', 'con', 'para', 'y', 'o', 'un', 'una']);
+  const palabras = rawNorm
+    .replace(/[^a-z0-9\s\-_]/g, ' ')
+    .split(/\s+/)
+    .filter(p => p.length > 0 && !conectores.has(p));
+
   const compacto = raw.replace(/\s+/g, '');
-  if (compacto) terms.add(compacto);
   const conEspacio = raw.replace(/(\d+)(gb|tb|mb|ghz|mhz)/gi, '$1 $2');
+
+  const camposParaTermino = (term) => [
+    { tipo: { contains: term } },
+    { numeroInventario: { contains: term } },
+    { numeroSerie: { contains: term } },
+    { marca: { contains: term } },
+    { modelo: { contains: term } },
+    { responsable: { contains: term } },
+    { cargoResponsable: { contains: term } },
+    { areaUbicacion: { contains: term } },
+    { direccion: { contains: term } },
+    { procedencia: { contains: term } },
+    { estatus: { contains: term } },
+    { detalles: { path: '$.procesador', string_contains: term } },
+    { detalles: { path: '$.ram', string_contains: term } },
+    { detalles: { path: '$.almacenamiento', string_contains: term } },
+    { detalles: { path: '$.tipoAlmacenamiento', string_contains: term } },
+    { detalles: { path: '$.sistemaOperativo', string_contains: term } },
+    { detalles: { path: '$.tarjetaGrafica', string_contains: term } },
+    { detalles: { path: '$.red', string_contains: term } },
+    { detalles: { path: '$.mac', string_contains: term } },
+    { detalles: { path: '$.ipPredeterminada', string_contains: term } },
+    { detalles: { path: '$.nombre', string_contains: term } },
+    { detalles: { path: '$.especificarTipo', string_contains: term } },
+    { detalles: { path: '$.marcaTeclado', string_contains: term } },
+    { detalles: { path: '$.modeloTeclado', string_contains: term } },
+    { detalles: { path: '$.marcaMouse', string_contains: term } },
+    { detalles: { path: '$.modeloMouse', string_contains: term } },
+    { detalles: { path: '$.marcaRegulador', string_contains: term } },
+    { detalles: { path: '$.modeloRegulador', string_contains: term } },
+    { detalles: { path: '$.megapixeles', string_contains: term } }
+  ];
+
+  if (palabras.length > 1) {
+    const andGroup = palabras.map(p => ({ OR: camposParaTermino(p) }));
+    const phraseConditions = [];
+    if (raw) phraseConditions.push(...camposParaTermino(raw));
+    if (rawNorm && rawNorm !== raw) phraseConditions.push(...camposParaTermino(rawNorm));
+    if (compacto && compacto !== rawNorm && compacto !== raw) phraseConditions.push(...camposParaTermino(compacto));
+
+    return [
+      { AND: andGroup },
+      ...phraseConditions
+    ];
+  }
+
+  const terms = new Set([raw, rawNorm]);
+  if (compacto) terms.add(compacto);
   if (conEspacio) terms.add(conEspacio);
 
   const orConditions = [];
   for (const term of terms) {
-    orConditions.push(
-      { tipo: { contains: term } },
-      { numeroInventario: { contains: term } },
-      { numeroSerie: { contains: term } },
-      { marca: { contains: term } },
-      { modelo: { contains: term } },
-      { responsable: { contains: term } },
-      { cargoResponsable: { contains: term } },
-      { areaUbicacion: { contains: term } },
-      { direccion: { contains: term } },
-      { procedencia: { contains: term } },
-      { estatus: { contains: term } },
-
-      // Especificaciones técnicas de escritorio y equipos en JSON detalles
-      { detalles: { path: '$.procesador', string_contains: term } },
-      { detalles: { path: '$.ram', string_contains: term } },
-      { detalles: { path: '$.almacenamiento', string_contains: term } },
-      { detalles: { path: '$.tipoAlmacenamiento', string_contains: term } },
-      { detalles: { path: '$.sistemaOperativo', string_contains: term } },
-      { detalles: { path: '$.tarjetaGrafica', string_contains: term } },
-      { detalles: { path: '$.red', string_contains: term } },
-      { detalles: { path: '$.mac', string_contains: term } },
-      { detalles: { path: '$.ipPredeterminada', string_contains: term } },
-      { detalles: { path: '$.nombre', string_contains: term } },
-      { detalles: { path: '$.especificarTipo', string_contains: term } },
-      { detalles: { path: '$.marcaTeclado', string_contains: term } },
-      { detalles: { path: '$.modeloTeclado', string_contains: term } },
-      { detalles: { path: '$.marcaMouse', string_contains: term } },
-      { detalles: { path: '$.modeloMouse', string_contains: term } },
-      { detalles: { path: '$.marcaRegulador', string_contains: term } },
-      { detalles: { path: '$.modeloRegulador', string_contains: term } },
-      { detalles: { path: '$.megapixeles', string_contains: term } }
-    );
+    orConditions.push(...camposParaTermino(term));
   }
   return orConditions;
 }
