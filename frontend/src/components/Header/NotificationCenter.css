@@ -607,10 +607,18 @@ body.swal2-toast-shown .swal2-container.sitrach-toast-container .swal2-popup.sit
   width: 370px !important;
   max-width: calc(100vw - 32px) !important;
   margin: 0 0 0 auto !important;
-  animation: sitrachToastSlideIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) !important;
   position: relative !important;
   box-sizing: border-box !important;
   transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+body.swal2-toast-shown .swal2-container.sitrach-toast-container .swal2-popup.sitrach-toast-popup.sitrach-toast-enter {
+  animation: sitrachToastSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+body.swal2-toast-shown .swal2-container.sitrach-toast-container .swal2-popup.sitrach-toast-popup.sitrach-toast-exit,
+body.swal2-toast-shown .swal2-container.sitrach-toast-container .swal2-popup.sitrach-toast-popup.swal2-hide {
+  animation: sitrachToastSlideOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards !important;
 }
 
 body.swal2-toast-shown .swal2-container.sitrach-toast-container .swal2-popup.sitrach-toast-popup:hover {
@@ -626,6 +634,17 @@ body.swal2-toast-shown .swal2-container.sitrach-toast-container .swal2-popup.sit
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sitrachToastSlideOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
   }
 }
 
@@ -736,6 +755,47 @@ body.swal2-toast-shown .swal2-container.sitrach-toast-container .swal2-popup.sit
   color: #BC955B;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.sitrach-toast-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sitrach-toast-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  color: #94A3B8;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  line-height: 1;
+  position: relative;
+  z-index: 20;
+  pointer-events: auto !important;
+}
+
+.sitrach-toast-close-btn svg {
+  pointer-events: none !important;
+}
+
+.sitrach-toast-close-btn:hover {
+  background: #F1F5F9;
+  border-color: #E2E8F0;
+  color: #DC2626;
+  transform: scale(1.08);
+}
+
+.sitrach-toast-close-btn:active {
+  transform: scale(0.92);
 }
 
 .sitrach-toast-pill-tag {

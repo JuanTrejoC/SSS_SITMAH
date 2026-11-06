@@ -11,7 +11,7 @@ import {
   FaFilePdf, FaDownload, FaFileAlt, FaChevronDown,
   FaDesktop, FaLaptop, FaMobileAlt, FaNetworkWired, FaServer, FaShieldAlt, FaWifi, FaVideo,
   FaBroadcastTower, FaPrint, FaTv, FaMemory, FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone,
-  FaPlug, FaTabletAlt, FaChevronLeft, FaLink, FaUnlink, FaTrashAlt, FaExclamationCircle
+  FaPlug, FaTabletAlt, FaChevronLeft, FaLink, FaUnlink, FaTrashAlt, FaExclamationCircle, FaCircle, FaBolt
 } from 'react-icons/fa';
 import { buscarPersonalSitmah, PERSONAL_SITMAH, CARGOS_NORMALIZADOS, DIRECCIONES_SITMAH } from '../data/personalSitmah';
 import PersonalAutocomplete from '../components/PersonalAutocomplete';
@@ -2330,9 +2330,13 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
                             padding: '0.2rem 0.5rem',
                             borderRadius: '6px',
                             backgroundColor: bgQtyPill,
-                            color: colorQtyText
+                            color: colorQtyText,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem'
                           }}>
-                            {esStock ? '🟢 Stock' : esBaja ? '🔴 Baja' : '🟡 Mantenimiento'}
+                            <FaCircle size={7} style={{ color: esStock ? '#16a34a' : esBaja ? '#dc2626' : '#d97706' }} />
+                            {esStock ? 'Stock' : esBaja ? 'Baja' : 'Mantenimiento'}
                           </span>
                         </div>
 
@@ -2550,9 +2554,13 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
                               padding: '0.2rem 0.5rem',
                               borderRadius: '6px',
                               backgroundColor: bgQtyPill,
-                              color: colorQtyText
+                              color: colorQtyText,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem'
                             }}>
-                              {esStock ? '🟢 Stock' : esBaja ? '🔴 Baja' : '🟡 Mantenimiento'}
+                              <FaCircle size={7} style={{ color: esStock ? '#16a34a' : esBaja ? '#dc2626' : '#d97706' }} />
+                              {esStock ? 'Stock' : esBaja ? 'Baja' : 'Mantenimiento'}
                             </span>
 
                             <span style={{
@@ -2725,13 +2733,16 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
                                         fontSize: '0.75rem',
                                         fontWeight: '600',
                                         cursor: 'pointer',
-                                        transition: 'all 0.2s'
+                                        transition: 'all 0.2s',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.35rem'
                                       }}
                                       onMouseOver={e => e.currentTarget.style.backgroundColor = '#dbeafe'}
                                       onMouseOut={e => e.currentTarget.style.backgroundColor = '#eff6ff'}
                                       title="Separar este lote en registros individuales independientes para poder asignar o cambiar estatus por separado"
                                     >
-                                      ⚡ Separar en {item.cantidad} unidades
+                                      <FaBolt size={10} /> Separar en {item.cantidad} unidades
                                     </button>
                                   </div>
                                 )}

@@ -47,6 +47,35 @@ export const AuthProvider = ({ children }) => {
     setCargando(false)
   }, [])
 
+  // Renovación silenciosa del token en segundo plano mientras el usuario está activo
+  const renovarSesion = async () => {
+    if (!user?.token) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/renovar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.ok && json.data?.token) {
+          const nuevoUsuario = {
+            ...user,
+            ...json.data.usuario,
+            rol: json.data.usuario.rol === 'admin' ? 'administrador' : json.data.usuario.rol,
+            token: json.data.token
+          };
+          setUser(nuevoUsuario);
+          localStorage.setItem('sesion_sitmah', JSON.stringify(nuevoUsuario));
+        }
+      }
+    } catch (err) {
+      console.warn('No se pudo renovar sesión en segundo plano:', err);
+    }
+  };
+
   // Auto-cierre de sesión cuando el token expire estando dentro del sistema
   useEffect(() => {
     if (user?.token) {
@@ -56,8 +85,11 @@ export const AuthProvider = ({ children }) => {
         if (timeRemaining <= 0) {
           logout();
         } else {
+          // Si quedan menos de 30 minutos de vigencia, intentar renovar silenciosamente
+          if (timeRemaining < 30 * 60 * 1000) {
+            renovarSesion();
+          }
           const timer = setTimeout(() => {
-            // Alert opcional, pero aquí solo cerramos sesión
             logout();
           }, timeRemaining);
           return () => clearTimeout(timer);
@@ -69,13 +101,21 @@ export const AuthProvider = ({ children }) => {
   // Temporizador de inactividad (15 minutos)
   useEffect(() => {
     let timeoutId;
+    let lastRenewal = Date.now();
 
     const resetTimer = () => {
       clearTimeout(timeoutId);
       if (user) {
+        // Si han pasado más de 10 minutos de uso continuo, renovar token silenciosamente
+        const now = Date.now();
+        if (now - lastRenewal > 10 * 60 * 1000) {
+          lastRenewal = now;
+          renovarSesion();
+        }
+
         timeoutId = setTimeout(() => {
           logout();
-        }, 15 * 60 * 1000); // 15 minutos en milisegundos
+        }, 15 * 60 * 1000); // 15 minutos exactos de inactividad
       }
     };
 
@@ -84,19 +124,14 @@ export const AuthProvider = ({ children }) => {
       resetTimer();
       
       // Eventos que reinician el temporizador de inactividad
-      window.addEventListener('mousemove', resetTimer);
-      window.addEventListener('keydown', resetTimer);
-      window.addEventListener('click', resetTimer);
-      window.addEventListener('scroll', resetTimer);
-    }
+      const eventos = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart', 'input', 'focus'];
+      eventos.forEach((evt) => window.addEventListener(evt, resetTimer, { passive: true }));
 
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener('mousemove', resetTimer);
-      window.removeEventListener('keydown', resetTimer);
-      window.removeEventListener('click', resetTimer);
-      window.removeEventListener('scroll', resetTimer);
-    };
+      return () => {
+        clearTimeout(timeoutId);
+        eventos.forEach((evt) => window.removeEventListener(evt, resetTimer));
+      };
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 

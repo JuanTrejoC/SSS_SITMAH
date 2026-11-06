@@ -390,7 +390,9 @@ function SelectorEquipoResguardo({ items, selectedId, tipoOpcion, onSelect, onCl
                       </div>
                     </div>
                     {esSeleccionado && (
-                      <span style={{ color: '#691B31', fontWeight: 'bold', fontSize: '0.85rem' }}>✓</span>
+                      <span style={{ color: '#691B31', display: 'flex', alignItems: 'center' }}>
+                        <FaCheck size={11} />
+                      </span>
                     )}
                   </div>
                 );
@@ -782,7 +784,7 @@ function Resguardos() {
         <div style="font-size: 0.95rem; color: #475569; text-align: left; line-height: 1.5;">
           ${itemNombre ? `<p style="margin-bottom: 0.5rem;"><strong>Bien:</strong> ${itemNombre}</p>` : ''}
           <div style="margin-top: 0.5rem; color: #166534; background: #dcfce7; padding: 0.65rem; border-radius: 8px; border: 1px solid #bbf7d0;">
-            ✔ El equipo regresará <strong>automáticamente a Stock</strong> en el inventario y se liberará su asignación.
+            <svg style="display:inline-block; vertical-align:-2px; margin-right:5px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>El equipo regresará <strong>automáticamente a Stock</strong> en el inventario y se liberará su asignación.
           </div>
           <p style="margin-top: 0.65rem; font-size: 0.85rem; color: #64748b;">
             El resguardo cambiará a estado <strong>Devuelto</strong> en el historial.

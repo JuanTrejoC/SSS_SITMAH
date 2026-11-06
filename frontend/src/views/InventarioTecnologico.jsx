@@ -11,7 +11,7 @@ import {
   FaServer, FaShieldAlt, FaWifi, FaVideo, FaHdd, FaBroadcastTower, FaPrint, FaTv, FaMemory,
   FaThLarge, FaGlobe, FaFan, FaPhone, FaMicrophone, FaFilePdf, FaFileExcel, FaFileWord, FaPlug, FaTabletAlt,
   FaCogs, FaBoxes, FaTools, FaWrench, FaCheckCircle, FaExclamationTriangle, FaExclamationCircle,
-  FaMapMarkerAlt, FaSearch
+  FaMapMarkerAlt, FaSearch, FaCheck
 } from 'react-icons/fa';
 import { generarResguardoDocx } from '../utils/resguardoDocx';
 import { registrarResguardo } from '../utils/registrarResguardo';
@@ -2696,7 +2696,7 @@ export default function InventarioTecnologico() {
                             }
                           }}
                         >
-                          {yaAgregado ? '✓' : '+'} {acc}
+                          {yaAgregado ? <FaCheck size={9} style={{ marginRight: '0.25rem' }} /> : <FaPlus size={9} style={{ marginRight: '0.25rem' }} />} {acc}
                         </button>
                       );
                     })}
@@ -3705,9 +3705,9 @@ export default function InventarioTecnologico() {
                     }}
                   >
                     <option value="">-- Todos los estados --</option>
-                    <option value="Buen Estado">🟢 Buen Estado</option>
-                    <option value="Por Reparar">🟡 Por Reparar</option>
-                    <option value="Dañada">🔴 Dañada</option>
+                    <option value="Buen Estado">● Buen Estado</option>
+                    <option value="Por Reparar">● Por Reparar</option>
+                    <option value="Dañada">● Dañada</option>
                   </select>
 
                   {/* Filter by location */}
@@ -3721,7 +3721,7 @@ export default function InventarioTecnologico() {
                   >
                     <option value="">-- Todas las ubicaciones --</option>
                     {Array.from(new Set(refacciones.map(r => r.areaUbicacion).filter(Boolean))).map(ubic => (
-                      <option key={ubic} value={ubic}>📍 {ubic}</option>
+                      <option key={ubic} value={ubic}>{ubic}</option>
                     ))}
                   </select>
                 </div>
@@ -4074,9 +4074,9 @@ export default function InventarioTecnologico() {
                       color: formRefaccion.estadoFisico === 'Buen Estado' ? '#15803d' : (formRefaccion.estadoFisico === 'Por Reparar' ? '#b45309' : '#b91c1c')
                     }}
                   >
-                    <option value="Buen Estado">🟢 Buen Estado</option>
-                    <option value="Por Reparar">🟡 Por Reparar</option>
-                    <option value="Dañada">🔴 Dañada</option>
+                    <option value="Buen Estado">● Buen Estado</option>
+                    <option value="Por Reparar">● Por Reparar</option>
+                    <option value="Dañada">● Dañada</option>
                   </select>
                 </div>
 
@@ -4390,7 +4390,7 @@ const CustomFilterSelect = ({ value, onChange, opciones, gruposOpciones }) => {
             >
               <FaLaptop color="#64748b" size={16} />
               <span style={{ fontWeight: '600', color: !value ? '#0369a1' : '#475569' }}>Todos los tipos</span>
-              {!value && <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#0ea5e9', fontWeight: '600' }}>✓</span>}
+              {!value && <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', color: '#0ea5e9' }}><FaCheck size={11} /></span>}
             </div>
 
             <div className="filter-dropdown-container">
@@ -4456,7 +4456,7 @@ const CustomFilterSelect = ({ value, onChange, opciones, gruposOpciones }) => {
                           >
                             <opcion.icon color={value === opcion.value ? '#691B31' : '#64748b'} size={15} />
                             <span style={{ fontSize: '0.9rem', fontWeight: '500', color: value === opcion.value ? '#691B31' : '#475569' }}>{opcion.label}</span>
-                            {value === opcion.value && <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#691B31', fontWeight: '700' }}>✓</span>}
+                            {value === opcion.value && <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', color: '#691B31' }}><FaCheck size={11} /></span>}
                           </div>
                         ))}
                       </div>

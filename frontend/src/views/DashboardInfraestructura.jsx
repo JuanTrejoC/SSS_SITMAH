@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { FaEye, FaTrashAlt, FaChevronRight, FaCogs, FaFileExcel, FaWrench, FaBoxes } from 'react-icons/fa'
+import { FaEye, FaTrashAlt, FaChevronRight, FaCogs, FaFileExcel, FaWrench, FaBoxes, FaTimes, FaExclamationTriangle, FaCheck } from 'react-icons/fa'
 import Swal from 'sweetalert2'
 import { useAuth } from '../context/AuthContext'
 import { formatFolio } from '../utils/formatFolio'
@@ -865,9 +865,10 @@ export default function DashboardInfraestructura() {
                 </div>
                 <button
                   onClick={cerrarDetalle}
-                  style={{ backgroundColor: '#F3F4F6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontWeight: 'bold' }}
+                  style={{ backgroundColor: '#F3F4F6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4B5563' }}
+                  title="Cerrar"
                 >
-                  ✕
+                  <FaTimes size={14} />
                 </button>
               </div>
 
@@ -972,7 +973,7 @@ export default function DashboardInfraestructura() {
                               cursor: 'pointer'
                             }}
                           >
-                            🔧 A Reparación
+                            <FaWrench style={{ marginRight: '0.35rem' }} /> A Reparación
                           </button>
                           <button
                             type="button"
@@ -985,10 +986,12 @@ export default function DashboardInfraestructura() {
                               color: estadoPiezaReemplazada === 'danada' ? '#B91C1C' : '#6B7280',
                               fontSize: '0.78rem',
                               fontWeight: estadoPiezaReemplazada === 'danada' ? '700' : '500',
-                              cursor: 'pointer'
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center'
                             }}
                           >
-                            ⚠️ Dañada / Para baja
+                            <FaExclamationTriangle style={{ marginRight: '0.35rem' }} /> Dañada / Para baja
                           </button>
                         </div>
                       </div>
@@ -1047,8 +1050,8 @@ export default function DashboardInfraestructura() {
         {confirmResuelto.visible && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2050, padding: '1rem' }}>
             <div style={{ backgroundColor: 'white', padding: '1.75rem', borderRadius: '16px', width: '90%', maxWidth: '400px', textAlign: 'center' }}>
-              <div style={{ backgroundColor: '#D1FAE5', color: '#059669', width: '54px', height: '54px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem', margin: '0 auto 1.25rem' }}>
-                ✓
+              <div style={{ backgroundColor: '#D1FAE5', color: '#059669', width: '54px', height: '54px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
+                <FaCheck size={22} />
               </div>
               <h3 style={{ color: '#111827', marginBottom: '0.75rem', fontSize: '1.2rem', fontWeight: '800' }}>¿Confirmar Resolución?</h3>
               <p style={{ color: '#6B7280', fontSize: '0.9rem', marginBottom: '1.5rem', lineHeight: '1.5' }}>

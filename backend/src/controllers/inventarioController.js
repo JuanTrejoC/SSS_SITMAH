@@ -118,6 +118,8 @@ const controladorSemaforoSchema = z.object({
   totalLedsVerdes: z.coerce.number().int().nonnegative().default(0),
   totalLedsRojos: z.coerce.number().int().nonnegative().default(0),
   totalLedsAmarillos: z.coerce.number().int().nonnegative().default(0),
+  totalFlechasVerdes: z.coerce.number().int().nonnegative().default(0),
+  totalFlechasRojas: z.coerce.number().int().nonnegative().default(0),
   pasoPeatonal: z.boolean().default(false),
   audible: z.boolean().default(false),
   pantallaLed: z.boolean().default(false),
@@ -128,6 +130,69 @@ const controladorSemaforoSchema = z.object({
   fibraOptica: z.boolean().default(false),
   gps: z.boolean().default(false),
   botonera: z.boolean().default(false),
+  // Inspección Exterior / Cimentación y Base
+  cimientoCompleto: z.string().nullable().optional(),
+  cimientoCuantosDados: z.string().nullable().optional(),
+  tapaCableado: z.string().nullable().optional(),
+  tornilleriaBaseCompleta: z.string().nullable().optional(),
+  tornilleriaCuantosTornillos: z.string().nullable().optional(),
+  observacionesExterior: z.string().nullable().optional(),
+  // Electrónica Interna - Módulo GPS
+  gpsModelo: z.string().nullable().optional(),
+  gpsComponenteFisico: z.string().nullable().optional(),
+  gpsAntenaExterior: z.string().nullable().optional(),
+  // Configuración de CPU, Red y Gabinete
+  numeroGabinete: z.string().nullable().optional(),
+  versionFirmware: z.string().nullable().optional(),
+  ipLocal: z.string().nullable().optional(),
+  ipSystem: z.string().nullable().optional(),
+  mascaraRed: z.string().nullable().optional(),
+  gateway: z.string().nullable().optional(),
+  cicloCompleto: z.string().nullable().optional(),
+  respaldoProgramacionUsb: z.string().nullable().optional(),
+  // Electrónica Interna - Conflictos y Relevadores
+  tarjetaConflictosMarca: z.string().nullable().optional(),
+  tarjetaConflictosModelo: z.string().nullable().optional(),
+  tarjetaConflictosEstado: z.string().nullable().optional(),
+  tarjetaRelevadoresMarca: z.string().nullable().optional(),
+  tarjetaRelevadoresModelo: z.string().nullable().optional(),
+  tarjetaRelevadoresCantidad: z.string().nullable().optional(),
+  // Sección C: Red, Conectividad y Energía
+  switchFibraMarca: z.string().nullable().optional(),
+  switchFibraModelo: z.string().nullable().optional(),
+  switchFibraPuertosTotal: z.string().nullable().optional(),
+  switchFibraPuertosUso: z.string().nullable().optional(),
+  switchFibraFuentePoder: z.string().nullable().optional(),
+  receptorFibraDispositivo: z.string().nullable().optional(),
+  receptorFibraCable: z.string().nullable().optional(),
+  conexionesTarjetaMadre: z.string().nullable().optional(),
+  fuentePoderSupresorPicos: z.string().nullable().optional(),
+  // Sección D: Postes (SEMEX)
+  posteModeloTipo: z.string().nullable().optional(),
+  posteTapaRegistro: z.string().nullable().optional(),
+  posteObservaciones: z.string().nullable().optional(),
+  postesDetalle: z.any().optional(),
+  // Cabezales Vehiculares
+  tipoCabezal: z.string().nullable().optional(),
+  cabezalModelo: z.string().nullable().optional(),
+  pantallaPiezas: z.coerce.number().int().nonnegative().optional(),
+  pantallaEstado: z.string().nullable().optional(),
+  cabezalesDetalle: z.any().optional(),
+  // Semáforos Peatonales
+  peatonalModelo: z.string().nullable().optional(),
+  peatonalModuloEstado: z.string().nullable().optional(),
+  peatonalObservaciones: z.string().nullable().optional(),
+  audibleModelo: z.string().nullable().optional(),
+  audibleModuloEstado: z.string().nullable().optional(),
+  audibleObservaciones: z.string().nullable().optional(),
+  // Cámaras Videodetectoras
+  camaraModelo: z.string().nullable().optional(),
+  camaraCantidad: z.string().nullable().optional(),
+  camaraObservaciones: z.string().nullable().optional(),
+  // Registros de Piso
+  registrosPisoTapas: z.string().nullable().optional(),
+  registrosPisoDanados: z.coerce.number().int().nonnegative().optional(),
+  registrosPisoCoordenadas: z.any().optional(),
 });
 
 // Schema for adding stock existencias
@@ -536,10 +601,40 @@ async function crearControladorSemaforo(req, res) {
     if (body[key] === 'false') body[key] = false;
   });
 
+  if (typeof body.cabezalesDetalle === 'string') {
+    try {
+      body.cabezalesDetalle = JSON.parse(body.cabezalesDetalle);
+    } catch (e) {
+      body.cabezalesDetalle = null;
+    }
+  }
+
+  if (typeof body.postesDetalle === 'string') {
+    try {
+      body.postesDetalle = JSON.parse(body.postesDetalle);
+    } catch (e) {
+      body.postesDetalle = null;
+    }
+  }
+
+  if (typeof body.registrosPisoCoordenadas === 'string') {
+    try {
+      body.registrosPisoCoordenadas = JSON.parse(body.registrosPisoCoordenadas);
+    } catch (e) {
+      body.registrosPisoCoordenadas = null;
+    }
+  }
+
   const parsed = controladorSemaforoSchema.safeParse(body);
   if (!parsed.success) return fail(res, parsed.error);
 
   const dataToSave = { ...parsed.data };
+  if (dataToSave.peatonalModelo || dataToSave.peatonalModuloEstado) {
+    dataToSave.pasoPeatonal = true;
+  }
+  if (dataToSave.audibleModelo || dataToSave.audibleModuloEstado) {
+    dataToSave.audible = true;
+  }
   if (req.file) {
     // Relative path to be stored in the database
     dataToSave.archivoProgramacion = `uploads/${req.file.filename}`;
@@ -573,6 +668,30 @@ async function actualizarControladorSemaforo(req, res) {
     if (body[key] === 'false') body[key] = false;
   });
 
+  if (typeof body.cabezalesDetalle === 'string') {
+    try {
+      body.cabezalesDetalle = JSON.parse(body.cabezalesDetalle);
+    } catch (e) {
+      body.cabezalesDetalle = null;
+    }
+  }
+
+  if (typeof body.postesDetalle === 'string') {
+    try {
+      body.postesDetalle = JSON.parse(body.postesDetalle);
+    } catch (e) {
+      body.postesDetalle = null;
+    }
+  }
+
+  if (typeof body.registrosPisoCoordenadas === 'string') {
+    try {
+      body.registrosPisoCoordenadas = JSON.parse(body.registrosPisoCoordenadas);
+    } catch (e) {
+      body.registrosPisoCoordenadas = null;
+    }
+  }
+
   const parsed = controladorSemaforoSchema.safeParse(body);
   if (!parsed.success) return fail(res, parsed.error);
 
@@ -580,6 +699,12 @@ async function actualizarControladorSemaforo(req, res) {
   if (!existe) return fail(res, 'Controlador semafórico no encontrado', 404);
 
   const dataToUpdate = { ...parsed.data };
+  if (dataToUpdate.peatonalModelo || dataToUpdate.peatonalModuloEstado) {
+    dataToUpdate.pasoPeatonal = true;
+  }
+  if (dataToUpdate.audibleModelo || dataToUpdate.audibleModuloEstado) {
+    dataToUpdate.audible = true;
+  }
   if (req.file) {
     dataToUpdate.archivoProgramacion = `uploads/${req.file.filename}`;
   } else if (body.removerArchivo === 'true') {

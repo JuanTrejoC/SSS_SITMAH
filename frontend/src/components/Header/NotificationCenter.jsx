@@ -63,7 +63,7 @@ function mostrarToastSitrach({
   mensajeHtml = '',
   estado = 'ACCIÓN COMPLETADA',
   tipo = 'success', // 'success' | 'restore' | 'info'
-  timer = 2800
+  timer = 1800
 }) {
   const esRestore = tipo === 'restore';
   const iconSvg = esRestore
@@ -90,9 +90,42 @@ function mostrarToastSitrach({
     timerProgressBar: true,
     showConfirmButton: false,
     showCloseButton: false,
+    showClass: {
+      popup: 'sitrach-toast-enter',
+    },
+    hideClass: {
+      popup: 'sitrach-toast-exit',
+    },
     didOpen: (toast) => {
       toast.onmouseenter = Swal.stopTimer;
       toast.onmouseleave = Swal.resumeTimer;
+      const closeBtn = toast.querySelector('.sitrach-toast-close-btn');
+      if (closeBtn) {
+        const cerrarToast = (e) => {
+          if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          try {
+            Swal.close();
+          } catch (err) {
+            console.error('Error al cerrar toast:', err);
+          }
+          // Respaldo de seguridad para removerlo inmediatamente del DOM si la animación es bloqueada
+          setTimeout(() => {
+            const popup = Swal.getPopup();
+            if (popup && popup.classList.contains('sitrach-toast-popup')) {
+              popup.remove();
+            }
+            const container = document.querySelector('.sitrach-toast-container');
+            if (container) {
+              container.remove();
+            }
+          }, 220);
+        };
+        closeBtn.onclick = cerrarToast;
+        closeBtn.onpointerdown = (e) => e.stopPropagation();
+      }
     },
     customClass: {
       popup: 'sitrach-toast-popup',
@@ -111,10 +144,18 @@ function mostrarToastSitrach({
           <div class="sitrach-toast-content">
             <div class="sitrach-toast-header">
               <span class="sitrach-toast-system-tag">SITRAC-H</span>
-              <span class="sitrach-toast-pill-tag ${pillClass}">
-                <span class="sitrach-toast-pill-dot"></span>
-                ${estado}
-              </span>
+              <div class="sitrach-toast-header-actions">
+                <span class="sitrach-toast-pill-tag ${pillClass}">
+                  <span class="sitrach-toast-pill-dot"></span>
+                  ${estado}
+                </span>
+                <button type="button" class="sitrach-toast-close-btn" title="Cerrar notificación" aria-label="Cerrar">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
             </div>
             <div class="sitrach-toast-title">${titulo}</div>
             <div class="sitrach-toast-text">${mensajeHtml}</div>
@@ -315,7 +356,7 @@ export default function NotificationCenter() {
             <div><strong>Detalle:</strong> ${notif.detalle || 'Sin detalle'}</div>
           </div>
           <p style="font-size: 0.78rem; color: #94A3B8; margin-top: 0.5rem; margin-bottom: 0;">
-            <em>ℹ️ Nota: El reporte original permanecerá seguro e intacto en el sistema.</em>
+            <em><svg style="display:inline-block; vertical-align:-2px; margin-right:4px;" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>Nota: El reporte original permanecerá seguro e intacto en el sistema.</em>
           </p>
         </div>
       `,
@@ -335,7 +376,7 @@ export default function NotificationCenter() {
           mensajeHtml: `El reporte <span class="sitrach-toast-chip">${notif.folio}</span> ya no se mostrará en la campana.`,
           estado: 'RETIRADO DE VISTA',
           tipo: 'success',
-          timer: 2600,
+          timer: 1800,
         });
       }
     });
@@ -365,7 +406,7 @@ export default function NotificationCenter() {
               cursor: ${mayoresAUnMes.length > 0 ? 'pointer' : 'not-allowed'};
               font-weight: 600; font-size: 0.85rem;
             " ${mayoresAUnMes.length === 0 ? 'disabled' : ''}>
-              <span>📅 Más de 1 mes (≥ 30 días)</span>
+              <span><svg style="display:inline-block; vertical-align:-2px; margin-right:6px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>Más de 1 mes (≥ 30 días)</span>
               <span style="
                 background: ${mayoresAUnMes.length > 0 ? 'rgba(255,255,255,0.25)' : '#E2E8F0'};
                 padding: 0.15rem 0.6rem; border-radius: 12px; font-size: 0.8rem;
@@ -380,7 +421,7 @@ export default function NotificationCenter() {
               cursor: ${mayoresADosSemanas.length > 0 ? 'pointer' : 'not-allowed'};
               font-weight: 600; font-size: 0.85rem;
             " ${mayoresADosSemanas.length === 0 ? 'disabled' : ''}>
-              <span>📅 Más de 2 semanas (≥ 14 días)</span>
+              <span><svg style="display:inline-block; vertical-align:-2px; margin-right:6px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>Más de 2 semanas (≥ 14 días)</span>
               <span style="
                 background: ${mayoresADosSemanas.length > 0 ? 'rgba(255,255,255,0.25)' : '#E2E8F0'};
                 padding: 0.15rem 0.6rem; border-radius: 12px; font-size: 0.8rem;
@@ -394,14 +435,14 @@ export default function NotificationCenter() {
                 background: #F8FAFC; color: #475569; cursor: pointer;
                 font-weight: 500; font-size: 0.8rem; margin-top: 0.3rem;
               ">
-                <span>🔄 Restaurar notificaciones eliminadas</span>
+                <span><svg style="display:inline-block; vertical-align:-2px; margin-right:6px;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>Restaurar notificaciones eliminadas</span>
                 <span style="background: #E2E8F0; padding: 0.15rem 0.5rem; border-radius: 10px; font-weight: bold;">${descartadasIds.length}</span>
               </button>
             ` : ''}
           </div>
 
           <p style="font-size: 0.75rem; color: #94A3B8; margin-top: 1rem; margin-bottom: 0;">
-            ℹ️ Mientras tú no las elimines, las notificaciones seguirán aquí sin importar el tiempo transcurrido.
+            <svg style="display:inline-block; vertical-align:-2px; margin-right:4px;" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>Mientras tú no las elimines, las notificaciones seguirán aquí sin importar el tiempo transcurrido.
           </p>
         </div>
       `,
@@ -457,7 +498,7 @@ export default function NotificationCenter() {
           mensajeHtml: `Se retiraron <span class="sitrach-toast-chip">${lista.length} ${lista.length === 1 ? 'notificación' : 'notificaciones'}</span> (${etiqueta}) de la campana.`,
           estado: 'DEPURACIÓN EXITOSA',
           tipo: 'success',
-          timer: 2800,
+          timer: 1800,
         });
       }
     });
@@ -483,7 +524,7 @@ export default function NotificationCenter() {
           mensajeHtml: 'Se volvieron a mostrar en la campana todas las notificaciones previamente retiradas.',
           estado: 'RESTAURADO',
           tipo: 'restore',
-          timer: 2600,
+          timer: 1800,
         });
       }
     });

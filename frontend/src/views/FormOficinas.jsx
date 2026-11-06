@@ -12,7 +12,10 @@ import {
   FaCheckCircle,
   FaTimes,
   FaSearch,
-  FaBoxes
+  FaBoxes,
+  FaCheck,
+  FaLightbulb,
+  FaBoxOpen
 } from 'react-icons/fa'
 import PersonalAutocomplete from '../components/PersonalAutocomplete'
 import { CARGOS_NORMALIZADOS } from '../data/personalSitmah'
@@ -1167,9 +1170,9 @@ export default function FormOficinas({ usuarioActual }) {
                     }}
                   >
                     <option value="" style={{ backgroundColor: 'white', color: '#374151', fontWeight: 'normal' }}>Seleccione prioridad</option>
-                    <option value="Baja" style={{ backgroundColor: '#FEF9C3', color: '#854D0E' }}>🟢 Baja</option>
-                    <option value="Media" style={{ backgroundColor: '#FFEDD5', color: '#9A3412' }}>🟡 Media</option>
-                    <option value="Alta" style={{ backgroundColor: '#FEE2E2', color: '#991B1B' }}>🔴 Alta</option>
+                    <option value="Baja" style={{ backgroundColor: '#FEF9C3', color: '#854D0E' }}>● Baja</option>
+                    <option value="Media" style={{ backgroundColor: '#FFEDD5', color: '#9A3412' }}>● Media</option>
+                    <option value="Alta" style={{ backgroundColor: '#FEE2E2', color: '#991B1B' }}>● Alta</option>
                   </select>
                   {errores.prioridad && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.prioridad}</span>}
                 </div>
@@ -1347,8 +1350,8 @@ export default function FormOficinas({ usuarioActual }) {
                           </label>
                         </>
                       ) : (
-                        <span style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: '600', padding: '0.4rem 0.5rem', display: 'inline-flex', alignItems: 'center' }}>
-                          ✓ Máximo alcanzado (3/3)
+                        <span style={{ fontSize: '0.8rem', color: '#64748B', fontWeight: '600', padding: '0.4rem 0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <FaCheck size={11} /> Máximo alcanzado (3/3)
                         </span>
                       )}
                       <button
@@ -1688,7 +1691,9 @@ export default function FormOficinas({ usuarioActual }) {
                   borderRadius: '12px',
                   border: '1px dashed #CBD5E1'
                 }}>
-                  <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>💡</div>
+                  <div style={{ marginBottom: '0.65rem', color: '#D97706' }}>
+                    <FaLightbulb size={36} />
+                  </div>
                   <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1E293B', marginBottom: '0.35rem' }}>
                     Seleccione un solicitante en el Paso 1
                   </div>
@@ -1720,7 +1725,9 @@ export default function FormOficinas({ usuarioActual }) {
                   borderRadius: '12px',
                   border: '1px dashed #CBD5E1'
                 }}>
-                  <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📦</div>
+                  <div style={{ marginBottom: '0.65rem', color: '#64748B' }}>
+                    <FaBoxOpen size={36} />
+                  </div>
                   <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1E293B', marginBottom: '0.35rem' }}>
                     Sin equipos registrados
                   </div>

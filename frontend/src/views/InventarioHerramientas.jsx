@@ -17,7 +17,9 @@ import {
   FaEye,
   FaUpload,
   FaCheckCircle,
-  FaImages
+  FaImages,
+  FaChartBar,
+  FaCamera
 } from 'react-icons/fa';
 
 const labelStyle = {
@@ -938,7 +940,7 @@ export default function InventarioHerramientas() {
               gap: '0.6rem'
             }}
           >
-            <span style={{ color: '#BC955B' }}>📊</span> Dashboard de Herramientas
+            <FaChartBar style={{ color: '#BC955B' }} /> Dashboard de Herramientas
           </h2>
           <button
             style={{
@@ -2337,8 +2339,8 @@ export default function InventarioHerramientas() {
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0, color: '#1e293b', fontSize: '1.1rem', fontWeight: '800' }}>
-                📷 {imagenModal.titulo}
+              <h3 style={{ margin: 0, color: '#1e293b', fontSize: '1.1rem', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <FaCamera style={{ color: '#64748b' }} /> {imagenModal.titulo}
               </h3>
               <button
                 type="button"

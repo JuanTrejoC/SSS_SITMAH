@@ -314,18 +314,94 @@ model ControladorSemaforo {
   semaforos4Luces     Int      @default(0) @map("semaforos_4_luces")
   totalLedsVerdes     Int      @default(0) @map("total_leds_verdes")
   totalLedsRojos      Int      @default(0) @map("total_leds_rojos")
-  totalLedsAmarillos  Int      @default(0) @map("total_leds_amarillos")
-  pasoPeatonal        Boolean  @default(false) @map("paso_peatonal")
-  audible             Boolean  @default(false)
-  pantallaLed         Boolean  @default(false) @map("pantalla_led")
-  tarjetaRelevadora   Boolean  @default(false) @map("tarjeta_relevadora")
-  fuentePoder         Boolean  @default(false) @map("fuente_poder")
-  cpu                 Boolean  @default(false)
-  switch              Boolean  @default(false)
-  fibraOptica         Boolean  @default(false) @map("fibra_optica")
-  gps                 Boolean  @default(false)
-  botonera            Boolean  @default(false)
-  archivoProgramacion String?  @map("archivo_programacion") @db.VarChar(500)
+  totalLedsAmarillos          Int      @default(0) @map("total_leds_amarillos")
+  totalFlechasVerdes          Int      @default(0) @map("total_flechas_verdes")
+  totalFlechasRojas           Int      @default(0) @map("total_flechas_rojas")
+  pasoPeatonal                Boolean  @default(false) @map("paso_peatonal")
+  audible                     Boolean  @default(false)
+  pantallaLed                 Boolean  @default(false) @map("pantalla_led")
+  tarjetaRelevadora           Boolean  @default(false) @map("tarjeta_relevadora")
+  fuentePoder                 Boolean  @default(false) @map("fuente_poder")
+  cpu                         Boolean  @default(false)
+  switch                      Boolean  @default(false)
+  fibraOptica                 Boolean  @default(false) @map("fibra_optica")
+  gps                         Boolean  @default(false)
+  botonera                    Boolean  @default(false)
+  archivoProgramacion         String?  @map("archivo_programacion") @db.VarChar(500)
+
+  // Inspección Exterior / Cimentación y Base
+  cimientoCompleto            String?  @map("cimiento_completo") @db.VarChar(10)
+  cimientoCuantosDados        String?  @map("cimiento_cuantos_dados") @db.VarChar(100)
+  tapaCableado                String?  @map("tapa_cableado") @db.VarChar(10)
+  tornilleriaBaseCompleta     String?  @map("tornilleria_base_completa") @db.VarChar(10)
+  tornilleriaCuantosTornillos String?  @map("tornilleria_cuantos_tornillos") @db.VarChar(100)
+  observacionesExterior       String?  @map("observaciones_exterior") @db.Text
+
+  // Electrónica Interna - Módulo GPS
+  gpsModelo                   String?  @map("gps_modelo") @db.VarChar(50)
+  gpsComponenteFisico         String?  @map("gps_componente_fisico") @db.VarChar(50)
+  gpsAntenaExterior           String?  @map("gps_antena_exterior") @db.VarChar(50)
+
+  // Configuración de CPU, Red y Gabinete
+  numeroGabinete              String?  @map("numero_gabinete") @db.VarChar(50)
+  versionFirmware             String?  @map("version_firmware") @db.VarChar(50)
+  ipLocal                     String?  @map("ip_local") @db.VarChar(50)
+  ipSystem                    String?  @map("ip_system") @db.VarChar(50)
+  mascaraRed                  String?  @map("mascara_red") @db.VarChar(50)
+  gateway                     String?  @map("gateway") @db.VarChar(50)
+  cicloCompleto               String?  @map("ciclo_completo") @db.VarChar(100)
+  respaldoProgramacionUsb     String?  @map("respaldo_programacion_usb") @db.VarChar(100)
+
+  // Electrónica Interna - Conflictos y Relevadores
+  tarjetaConflictosMarca      String?  @map("tarjeta_conflictos_marca") @db.VarChar(100)
+  tarjetaConflictosModelo     String?  @map("tarjeta_conflictos_modelo") @db.VarChar(100)
+  tarjetaConflictosEstado     String?  @map("tarjeta_conflictos_estado") @db.VarChar(50)
+  tarjetaRelevadoresMarca     String?  @map("tarjeta_relevadores_marca") @db.VarChar(100)
+  tarjetaRelevadoresModelo    String?  @map("tarjeta_relevadores_modelo") @db.VarChar(100)
+  tarjetaRelevadoresCantidad  String?  @map("tarjeta_relevadores_cantidad") @db.VarChar(50)
+
+  // Sección C: Red, Conectividad y Energía
+  switchFibraMarca            String?  @map("switch_fibra_marca") @db.VarChar(100)
+  switchFibraModelo           String?  @map("switch_fibra_modelo") @db.VarChar(100)
+  switchFibraPuertosTotal     String?  @map("switch_fibra_puertos_total") @db.VarChar(50)
+  switchFibraPuertosUso       String?  @map("switch_fibra_puertos_uso") @db.VarChar(50)
+  switchFibraFuentePoder      String?  @map("switch_fibra_fuente_poder") @db.VarChar(50)
+  receptorFibraDispositivo    String?  @map("receptor_fibra_dispositivo") @db.VarChar(50)
+  receptorFibraCable          String?  @map("receptor_fibra_cable") @db.VarChar(50)
+  conexionesTarjetaMadre      String?  @map("conexiones_tarjeta_madre") @db.VarChar(50)
+  fuentePoderSupresorPicos    String?  @map("fuente_poder_supresor_picos") @db.VarChar(50)
+
+  // Sección D: Postes (SEMEX)
+  posteModeloTipo             String?  @map("poste_modelo_tipo") @db.VarChar(100)
+  posteTapaRegistro           String?  @map("poste_tapa_registro") @db.VarChar(50)
+  posteObservaciones          String?  @map("poste_observaciones") @db.Text
+  postesDetalle               Json?    @map("postes_detalle")
+
+  // Cabezales Vehiculares
+  tipoCabezal                 String?  @default("LED") @map("tipo_cabezal") @db.VarChar(50)
+  cabezalModelo               String?  @map("cabezal_modelo") @db.VarChar(100)
+  pantallaPiezas              Int?     @default(0) @map("pantalla_piezas")
+  pantallaEstado              String?  @map("pantalla_estado") @db.VarChar(50)
+  cabezalesDetalle            Json?    @map("cabezales_detalle")
+
+  // Semáforos Peatonales
+  peatonalModelo              String?  @map("peatonal_modelo") @db.VarChar(100)
+  peatonalModuloEstado        String?  @map("peatonal_modulo_estado") @db.VarChar(50)
+  peatonalObservaciones       String?  @map("peatonal_observaciones") @db.Text
+  audibleModelo               String?  @map("audible_modelo") @db.VarChar(100)
+  audibleModuloEstado         String?  @map("audible_modulo_estado") @db.VarChar(50)
+  audibleObservaciones        String?  @map("audible_observaciones") @db.Text
+
+  // Cámaras Videodetectoras
+  camaraModelo                String?  @map("camara_modelo") @db.VarChar(100)
+  camaraCantidad              String?  @map("camara_cantidad") @db.VarChar(50)
+  camaraObservaciones         String?  @map("camara_observaciones") @db.Text
+
+  // Registros de Piso
+  registrosPisoTapas          String?  @map("registros_piso_tapas") @db.VarChar(50)
+  registrosPisoDanados        Int?     @default(0) @map("registros_piso_danados")
+  registrosPisoCoordenadas    Json?    @map("registros_piso_coordenadas")
+
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 

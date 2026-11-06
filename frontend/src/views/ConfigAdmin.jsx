@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   FaUsersCog, FaBuilding, FaMapMarkerAlt, FaTags,
   FaEnvelope, FaEdit, FaTrashAlt, FaToggleOff,
-  FaIdBadge, FaBus, FaTrafficLight, FaExclamationTriangle, FaLink, FaSitemap
+  FaIdBadge, FaBus, FaTrafficLight, FaExclamationTriangle, FaLink, FaSitemap, FaTimes
 } from 'react-icons/fa'
 import Swal from 'sweetalert2'
 import { useAuth } from '../context/AuthContext'
@@ -510,9 +510,10 @@ export default function ConfigAdmin() {
               </h2>
               <button
                 onClick={() => { setModalAbierto(false); setCatalogoSeleccionado(null) }}
-                style={{ border: 'none', backgroundColor: 'transparent', fontSize: '1.3rem', cursor: 'pointer', color: '#6F7271' }}
+                style={{ border: 'none', backgroundColor: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#6F7271', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                title="Cerrar"
               >
-                ✕
+                <FaTimes />
               </button>
             </div>
 
@@ -731,9 +732,10 @@ export default function ConfigAdmin() {
               </h2>
               <button
                 onClick={() => { setModalAsignaciones(false); setEstacionSeleccionada(null) }}
-                style={{ border: 'none', backgroundColor: 'transparent', fontSize: '1.3rem', cursor: 'pointer', color: '#6F7271' }}
+                style={{ border: 'none', backgroundColor: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#6F7271', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                title="Cerrar"
               >
-                ✕
+                <FaTimes />
               </button>
             </div>
 

@@ -113,6 +113,29 @@ h1, h2, h3, h4, h5, h6 {
   object-position: left;
   margin-bottom: 0.75rem;
   filter: drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.25));
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.25s ease;
+}
+
+.sidebar-logo:hover {
+  transform: translateY(-3px) scale(1.03);
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+}
+
+/* Logo animado interactivo en Inicio de Sesión */
+.login-brand-logo {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
+  cursor: pointer;
+  user-select: none;
+}
+
+.login-brand-logo:hover {
+  transform: translateY(-6px) scale(1.05);
+  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.52)) !important;
+}
+
+.login-brand-logo:active {
+  transform: translateY(-2px) scale(0.98);
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.4)) !important;
 }
 
 /* Etiqueta de sección */
@@ -673,4 +696,18 @@ html.grayscale-theme {
    ============================================================ */
 .swal2-container {
   z-index: 9999 !important;
+}
+
+/* ============================================================
+   DESACTIVAR SPINNERS Y SCROLL EN INPUTS NUMÉRICOS
+   ============================================================ */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
 }

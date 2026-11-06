@@ -93,12 +93,33 @@ export default function Login() {
               <img
                 src={logoSitmah}
                 alt="Logo SITRAC-H"
+                className="login-brand-logo"
                 style={{
                   maxWidth: '120px',
                   maxHeight: '100px',
                   objectFit: 'contain',
                   filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))',
                   marginBottom: '0.85rem',
+                  display: 'block',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  transition: 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-6px) scale(1.05)'
+                  e.currentTarget.style.filter = 'drop-shadow(0 12px 22px rgba(0,0,0,0.52))'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0) scale(1)'
+                  e.currentTarget.style.filter = 'drop-shadow(0 4px 8px rgba(0,0,0,0.35))'
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px) scale(0.98)'
+                  e.currentTarget.style.filter = 'drop-shadow(0 6px 12px rgba(0,0,0,0.4))'
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-6px) scale(1.05)'
+                  e.currentTarget.style.filter = 'drop-shadow(0 12px 22px rgba(0,0,0,0.52))'
                 }}
               />
             </div>

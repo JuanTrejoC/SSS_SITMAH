@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import Swal from 'sweetalert2'
-import { FaCheckCircle, FaCamera, FaSignature, FaTrash, FaCalendarAlt, FaUserCheck, FaTools, FaEdit, FaLock, FaTimes, FaSave, FaExclamationTriangle, FaSyncAlt, FaImages } from 'react-icons/fa'
+import { FaCheck, FaCheckCircle, FaCamera, FaSignature, FaTrash, FaCalendarAlt, FaUserCheck, FaTools, FaEdit, FaLock, FaTimes, FaSave, FaExclamationTriangle, FaSyncAlt, FaImages } from 'react-icons/fa'
 import { useAuth } from '../context/AuthContext'
 import { notificarCambioReporte } from '../utils/notificacionesLeidas'
 import ModalCamara from './ModalCamara'
@@ -606,8 +606,8 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
                   Fotografías de Solución (Agregar nuevas fotos si lo requiere):
                 </label>
                 {fotosSolucion && fotosSolucion.length > 0 && (
-                  <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: '600' }}>
-                    ✓ {fotosSolucion.length} foto(s) ya registrada(s)
+                  <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <FaCheck size={11} /> {fotosSolucion.length} foto(s) ya registrada(s)
                   </span>
                 )}
               </div>
@@ -686,8 +686,8 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', backgroundColor: '#F8FAFC', padding: '0.85rem', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
-                    <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#065F46' }}>
-                      ✓ {vistasPreviasEvidencia.length} nueva(s) foto(s) seleccionada(s)
+                    <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#065F46', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <FaCheck size={11} /> {vistasPreviasEvidencia.length} nueva(s) foto(s) seleccionada(s)
                     </span>
                     <div style={{ display: 'flex', gap: '0.4rem' }}>
                       {vistasPreviasEvidencia.length < MAX_FOTOS && (
@@ -728,7 +728,7 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
                           onClick={() => eliminarFotoSolucion(index)}
                           style={{ position: 'absolute', top: '4px', right: '4px', backgroundColor: '#DC2626', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', zIndex: 2 }}
                         >
-                          ✕
+                          <FaTimes size={10} />
                         </button>
                         <img src={item.url} alt={`Solución ${index + 1}`} style={{ width: '100%', height: '80px', objectFit: 'cover', display: 'block' }} />
                       </div>
@@ -796,8 +796,8 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
                     style={{ width: '100%', height: '120px', cursor: 'crosshair', touchAction: 'none', display: 'block' }}
                   />
                   {!hayFirma && (
-                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none', color: '#94A3B8', fontSize: '0.85rem', fontWeight: '500' }}>
-                      ✍️ Firme aquí con mouse o dedo
+                    <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none', color: '#94A3B8', fontSize: '0.85rem', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <FaSignature size={15} /> Firme aquí con mouse o dedo
                     </div>
                   )}
                 </div>
@@ -874,8 +874,8 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
             <strong style={{ fontSize: '0.95rem', color: '#111827' }}>
               Atención y Resolución del Reporte:
             </strong>
-            <span style={{ fontSize: '0.75rem', backgroundColor: '#D1FAE5', color: '#065F46', padding: '0.25rem 0.65rem', borderRadius: '6px', fontWeight: '700', border: '1px solid #A7F3D0' }}>
-              ✓ Resuelto
+            <span style={{ fontSize: '0.75rem', backgroundColor: '#D1FAE5', color: '#065F46', padding: '0.25rem 0.65rem', borderRadius: '6px', fontWeight: '700', border: '1px solid #A7F3D0', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <FaCheckCircle size={11} /> Resuelto
             </span>
             {yaFueModificado && (
               <span style={{ fontSize: '0.75rem', backgroundColor: '#FEF3C7', color: '#92400E', padding: '0.25rem 0.65rem', borderRadius: '6px', fontWeight: '700', border: '1px solid #FCD34D', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
@@ -1109,8 +1109,8 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
               Fotografía de Evidencia de Solución <span style={{ color: '#DC2626' }}>* (Obligatoria para cerrar{tipo === 'oficina' ? ' — máx. 3 fotos' : ''})</span>
             </label>
             {reporte.evidencias && reporte.evidencias.length > 0 && (
-              <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: '600' }}>
-                ✓ {reporte.evidencias.length} evidencia(s) previa(s)
+              <span style={{ fontSize: '0.75rem', color: '#059669', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <FaCheck size={11} /> {reporte.evidencias.length} evidencia(s) previa(s)
               </span>
             )}
           </div>
@@ -1192,10 +1192,11 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', backgroundColor: '#F8FAFC', padding: '0.85rem', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
               {/* Barra superior de fotos */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#065F46', backgroundColor: '#D1FAE5', padding: '0.2rem 0.6rem', borderRadius: '12px', border: '1px solid #A7F3D0' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#065F46', backgroundColor: '#D1FAE5', padding: '0.2rem 0.6rem', borderRadius: '12px', border: '1px solid #A7F3D0', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <FaCheck size={11} />
                   {tipo === 'oficina'
-                    ? `✓ ${vistasPreviasEvidencia.length} de ${MAX_FOTOS} foto(s) de solución`
-                    : `✓ ${vistasPreviasEvidencia.length} foto(s) de solución seleccionada(s)`}
+                    ? `${vistasPreviasEvidencia.length} de ${MAX_FOTOS} foto(s) de solución`
+                    : `${vistasPreviasEvidencia.length} foto(s) de solución seleccionada(s)`}
                 </span>
                 <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                   {vistasPreviasEvidencia.length < MAX_FOTOS && (
@@ -1320,7 +1321,7 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
                         zIndex: 2
                       }}
                     >
-                      ✕
+                      <FaTimes size={10} />
                     </button>
 
                     <img
@@ -1390,8 +1391,8 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
               }}
             />
             {!hayFirma && (
-              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none', color: '#94A3B8', fontSize: '0.85rem', fontWeight: '500' }}>
-                ✍️ Firme aquí con mouse o dedo
+              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', pointerEvents: 'none', color: '#94A3B8', fontSize: '0.85rem', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <FaSignature size={15} /> Firme aquí con mouse o dedo
               </div>
             )}
           </div>

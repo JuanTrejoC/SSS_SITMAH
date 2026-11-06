@@ -30,7 +30,7 @@ async function login(req, res) {
   const token = jwt.sign(
     { id: usuario.id, username: usuario.username, rol: usuario.rol },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '12h' }
   );
 
   ok(res, {
@@ -45,4 +45,43 @@ async function login(req, res) {
   });
 }
 
-module.exports = { login };
+async function renovar(req, res) {
+  const usuarioToken = req.usuario;
+  if (!usuarioToken?.id) {
+    return fail(res, 'No autorizado', 401);
+  }
+
+  const usuario = await prisma.usuario.findUnique({
+    where: { id: usuarioToken.id },
+    select: {
+      id: true,
+      username: true,
+      nombre: true,
+      email: true,
+      rol: true,
+    },
+  });
+
+  if (!usuario) {
+    return fail(res, 'Usuario no encontrado', 401);
+  }
+
+  const token = jwt.sign(
+    { id: usuario.id, username: usuario.username, rol: usuario.rol },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '12h' }
+  );
+
+  ok(res, {
+    token,
+    usuario: {
+      id: usuario.id,
+      username: usuario.username,
+      nombre: usuario.nombre,
+      email: usuario.email,
+      rol: usuario.rol,
+    },
+  });
+}
+
+module.exports = { login, renovar };

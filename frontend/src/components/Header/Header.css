@@ -131,11 +131,12 @@
   width: auto !important;
   object-fit: contain;
   filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.45));
-  transition: transform 0.2s ease;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.25s ease;
 }
 
 .app-header__brand-logo-2:hover {
-  transform: scale(1.04);
+  transform: translateY(-3px) scale(1.04);
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.55));
 }
 
 @media (max-width: 640px) {

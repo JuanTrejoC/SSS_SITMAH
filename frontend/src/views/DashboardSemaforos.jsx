@@ -1,6 +1,6 @@
 // src/views/DashboardSemaforos.jsx
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { FaEye, FaTrashAlt, FaChevronRight, FaCogs, FaFileExcel } from 'react-icons/fa'
+import { FaEye, FaTrashAlt, FaChevronRight, FaCogs, FaFileExcel, FaTimes, FaEdit, FaWrench, FaExclamationTriangle, FaSyncAlt } from 'react-icons/fa'
 import Swal from 'sweetalert2'
 import { useAuth } from '../context/AuthContext'
 import { formatFolio } from '../utils/formatFolio'
@@ -733,8 +733,8 @@ export default function DashboardSemaforos() {
                             <option value="resuelto">Resuelto</option>
                           </select>
                           {r.modificado && (
-                            <div style={{ fontSize: '0.7rem', color: '#B45309', fontWeight: '700', marginTop: '0.2rem' }}>
-                              ✏️ Modificado
+                            <div style={{ fontSize: '0.7rem', color: '#B45309', fontWeight: '700', marginTop: '0.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <FaEdit /> Modificado
                             </div>
                           )}
                         </td>
@@ -797,9 +797,10 @@ export default function DashboardSemaforos() {
                 </h3>
                 <button
                   onClick={cerrarDetalle}
-                  style={{ background: 'none', border: 'none', fontSize: '1.2rem', color: '#6B7280', cursor: 'pointer' }}
+                  style={{ background: 'none', border: 'none', fontSize: '1.1rem', color: '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  title="Cerrar"
                 >
-                  ✕
+                  <FaTimes />
                 </button>
               </div>
 
@@ -812,8 +813,8 @@ export default function DashboardSemaforos() {
                 <div>
                   <strong>Estado:</strong> {obtenerNombreEstado(verDetalle.estado)}
                   {verDetalle.modificado && (
-                    <span style={{ marginLeft: '0.35rem', backgroundColor: '#FEF3C7', color: '#92400E', padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700', border: '1px solid #FCD34D' }}>
-                      ✏️ Modificado (1/1)
+                    <span style={{ marginLeft: '0.35rem', backgroundColor: '#FEF3C7', color: '#92400E', padding: '0.15rem 0.45rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '700', border: '1px solid #FCD34D', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <FaEdit /> Modificado (1/1)
                     </span>
                   )}
                 </div>
@@ -958,7 +959,7 @@ export default function DashboardSemaforos() {
                               transition: 'all 0.15s'
                             }}
                           >
-                            <span>🔧</span> A Reparación
+                            <FaWrench size={11} /> A Reparación
                           </button>
                           <button
                             type="button"
@@ -978,7 +979,7 @@ export default function DashboardSemaforos() {
                               transition: 'all 0.15s'
                             }}
                           >
-                            <span>⚠️</span> Dañada / Para baja
+                            <FaExclamationTriangle size={11} /> Dañada / Para baja
                           </button>
                         </div>
                       </div>
@@ -1058,7 +1059,7 @@ export default function DashboardSemaforos() {
                     <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #E5E7EB' }}>
                       <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.65rem' }}>
                         <strong style={{ fontSize: '0.95rem', color: '#111827', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <span>🔄</span> Pieza Reemplazada:
+                          <FaSyncAlt style={{ color: '#0284C7' }} /> Pieza Reemplazada:
                         </strong>
                       </div>
 
@@ -1123,10 +1124,13 @@ export default function DashboardSemaforos() {
                                       backgroundColor: esReparacion ? '#0284C7' : 'white',
                                       color: esReparacion ? 'white' : '#475569',
                                       cursor: 'pointer',
-                                      transition: 'all 0.15s'
+                                      transition: 'all 0.15s',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.3rem'
                                     }}
                                   >
-                                    🔧 Reparación
+                                    <FaWrench size={11} /> Reparación
                                   </button>
                                   <button
                                     type="button"
@@ -1140,10 +1144,13 @@ export default function DashboardSemaforos() {
                                       backgroundColor: !esReparacion ? '#DC2626' : 'white',
                                       color: !esReparacion ? 'white' : '#475569',
                                       cursor: 'pointer',
-                                      transition: 'all 0.15s'
+                                      transition: 'all 0.15s',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.3rem'
                                     }}
                                   >
-                                    ⚠️ Dañada
+                                    <FaExclamationTriangle size={11} /> Dañada
                                   </button>
                                 </div>
                               </div>

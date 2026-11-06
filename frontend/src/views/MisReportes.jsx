@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { FaTimes } from 'react-icons/fa'
 
 export default function MisReportes({ usuarioActual }) {
   const [reportes, setReportes] = useState([])
@@ -134,7 +135,7 @@ export default function MisReportes({ usuarioActual }) {
             <div className="card-padding" style={{ backgroundColor: 'white', borderRadius: '12px', width: '90%', maxWidth: '600px', maxHeight: '80vh', overflowY: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h3 style={{ color: '#BC955B' }}>Detalle del Reporte #{verDetalle.id}</h3>
-                <button onClick={() => setVerDetalle(null)} style={{ border: 'none', backgroundColor: 'transparent', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
+                <button onClick={() => setVerDetalle(null)} style={{ border: 'none', backgroundColor: 'transparent', fontSize: '1.1rem', cursor: 'pointer', color: '#6F7271', display: 'flex', alignItems: 'center' }} title="Cerrar"><FaTimes /></button>
               </div>
               <div style={{ lineHeight: '1.6' }}>
                 {Object.entries(verDetalle).map(([k, v]) => (
