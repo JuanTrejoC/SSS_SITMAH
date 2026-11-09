@@ -894,7 +894,7 @@ export default function InventarioSemaforos() {
     // Electrónica Interna - Conflictos y Relevadores
     tarjetaConflictosMarcaModo: 'Peek Traffic',
     tarjetaConflictosMarca: 'Peek Traffic',
-    tarjetaConflictosModelo: '',
+    tarjetaConflictosModelo: 'Model 2010E',
     tarjetaConflictosEstado: '',
     tarjetaRelevadoresMarcaModo: 'Peek Traffic',
     tarjetaRelevadoresMarca: 'Peek Traffic',
@@ -903,8 +903,8 @@ export default function InventarioSemaforos() {
     // Sección C: Red, Conectividad y Energía
     switchFibraMarcaModo: 'Moxa',
     switchFibraMarca: 'Moxa',
-    switchFibraModelo: '',
-    switchFibraPuertosTotal: '',
+    switchFibraModelo: 'Moxa EDS-208 / 308',
+    switchFibraPuertosTotal: '8',
     switchFibraPuertosUso: '',
     switchFibraFuentePoder: '',
     receptorFibraDispositivo: '',
@@ -1780,7 +1780,7 @@ export default function InventarioSemaforos() {
       // Electrónica Interna - Conflictos y Relevadores
       tarjetaConflictosMarcaModo: 'Peek Traffic',
       tarjetaConflictosMarca: 'Peek Traffic',
-      tarjetaConflictosModelo: '',
+      tarjetaConflictosModelo: 'Model 2010E',
       tarjetaConflictosEstado: '',
       tarjetaRelevadoresMarcaModo: 'Peek Traffic',
       tarjetaRelevadoresMarca: 'Peek Traffic',
@@ -1789,8 +1789,8 @@ export default function InventarioSemaforos() {
       // Sección C: Red, Conectividad y Energía
       switchFibraMarcaModo: 'Moxa',
       switchFibraMarca: 'Moxa',
-      switchFibraModelo: '',
-      switchFibraPuertosTotal: '',
+      switchFibraModelo: 'Moxa EDS-208 / 308',
+      switchFibraPuertosTotal: '8',
       switchFibraPuertosUso: '',
       switchFibraFuentePoder: '',
       receptorFibraDispositivo: '',
@@ -3383,40 +3383,44 @@ export default function InventarioSemaforos() {
                     onChange={(e) => {
                       const nuevoModelo = e.target.value
                       if (nuevoModelo === 'C-3000') {
-                        setControladorForm(prev => ({
-                          ...prev,
-                          modelo: 'C-3000',
-                          // Tarjeta de Conflictos para C-3000
-                          tarjetaConflictosMarcaModo: 'Peek Traffic',
-                          tarjetaConflictosMarca: 'Peek Traffic',
-                          tarjetaConflictosModelo: prev.tarjetaConflictosModelo && MODELOS_TARJETA_CONFLICTOS_PEEK.includes(prev.tarjetaConflictosModelo) ? prev.tarjetaConflictosModelo : '',
-                          // Switch de Fibra para C-3000
-                          switchFibraMarcaModo: 'Moxa',
-                          switchFibraMarca: 'Moxa',
-                          switchFibraModelo: prev.switchFibraModelo && MODELOS_SWITCH_MOXA_CATALOGO.some(m => m.modelo === prev.switchFibraModelo) ? prev.switchFibraModelo : '',
-                          switchFibraPuertosTotal: prev.switchFibraPuertosTotal || '',
-                          switch: true,
-                          // Relevadores para C-3000
-                          tarjetaRelevadoresMarcaModo: 'Peek Traffic',
-                          tarjetaRelevadoresMarca: 'Peek Traffic',
-                          tarjetaRelevadoresModelo: prev.tarjetaRelevadoresModelo && (MODELOS_RELEVADORES_PEEK.includes(prev.tarjetaRelevadoresModelo) || MODELOS_RELEVADORES_SEMEX.includes(prev.tarjetaRelevadoresModelo)) ? prev.tarjetaRelevadoresModelo : 'RC-308',
-                          tarjetaRelevadora: true
-                        }))
+                        setControladorForm(prev => {
+                          const switchMod = prev.switchFibraModelo && MODELOS_SWITCH_MOXA_CATALOGO.some(m => m.modelo === prev.switchFibraModelo) ? prev.switchFibraModelo : 'Moxa EDS-208 / 308'
+                          const switchObj = MODELOS_SWITCH_MOXA_CATALOGO.find(m => m.modelo === switchMod)
+                          return {
+                            ...prev,
+                            modelo: 'C-3000',
+                            // Tarjeta de Conflictos para C-3000 (Solo marca y modelo)
+                            tarjetaConflictosMarcaModo: 'Peek Traffic',
+                            tarjetaConflictosMarca: 'Peek Traffic',
+                            tarjetaConflictosModelo: prev.tarjetaConflictosModelo && MODELOS_TARJETA_CONFLICTOS_PEEK.includes(prev.tarjetaConflictosModelo) ? prev.tarjetaConflictosModelo : 'Model 2010E',
+                            // Switch de Fibra para C-3000 (Marca, modelo y total de puertos según modelo)
+                            switchFibraMarcaModo: 'Moxa',
+                            switchFibraMarca: 'Moxa',
+                            switchFibraModelo: switchMod,
+                            switchFibraPuertosTotal: switchObj ? switchObj.puertos : '8',
+                            switch: true,
+                            // Relevadores para C-3000 (Solo marca y modelo)
+                            tarjetaRelevadoresMarcaModo: 'Peek Traffic',
+                            tarjetaRelevadoresMarca: 'Peek Traffic',
+                            tarjetaRelevadoresModelo: prev.tarjetaRelevadoresModelo && MODELOS_RELEVADORES_PEEK.includes(prev.tarjetaRelevadoresModelo) ? prev.tarjetaRelevadoresModelo : 'RC-308',
+                            tarjetaRelevadora: true
+                          }
+                        })
                       } else if (nuevoModelo === 'C-5000') {
                         setControladorForm(prev => ({
                           ...prev,
                           modelo: 'C-5000',
-                          // Tarjeta de Conflictos para C-5000 (Fijo)
+                          // Tarjeta de Conflictos para C-5000 (Solo marca y modelo)
                           tarjetaConflictosMarcaModo: 'Oriux (Peek Traffic)',
                           tarjetaConflictosMarca: 'Oriux (Peek Traffic)',
                           tarjetaConflictosModelo: 'C5000 MMU Integrado',
-                          // Switch de Fibra para C-5000 (Fijo)
+                          // Switch de Fibra para C-5000 (Marca, modelo y total de puertos según modelo)
                           switchFibraMarcaModo: 'Oriux',
                           switchFibraMarca: 'Oriux',
                           switchFibraModelo: 'C5000 ATC CPU Ports',
-                          switchFibraPuertosTotal: prev.switchFibraPuertosTotal || '2',
+                          switchFibraPuertosTotal: '2',
                           switch: true,
-                          // Relevadores para C-5000 (Fijo)
+                          // Relevadores para C-5000 (Solo marca y modelo)
                           tarjetaRelevadoresMarcaModo: 'Oriux',
                           tarjetaRelevadoresMarca: 'Oriux',
                           tarjetaRelevadoresModelo: 'C5000 Card-Based Load Switch',
@@ -4231,7 +4235,7 @@ export default function InventarioSemaforos() {
                                 ...prev,
                                 tarjetaConflictosMarcaModo: 'Peek Traffic',
                                 tarjetaConflictosMarca: 'Peek Traffic',
-                                tarjetaConflictosModelo: ''
+                                tarjetaConflictosModelo: prev.tarjetaConflictosModelo && MODELOS_TARJETA_CONFLICTOS_PEEK.includes(prev.tarjetaConflictosModelo) ? prev.tarjetaConflictosModelo : 'Model 2010E'
                               }))
                             } else if (val === 'Oriux (Peek Traffic)') {
                               setControladorForm(prev => ({
@@ -4605,14 +4609,18 @@ export default function InventarioSemaforos() {
                         onChange={(e) => {
                           const val = e.target.value
                           if (val === 'Moxa') {
-                            setControladorForm(prev => ({
-                              ...prev,
-                              switchFibraMarcaModo: 'Moxa',
-                              switchFibraMarca: 'Moxa',
-                              switchFibraModelo: prev.switchFibraModelo && MODELOS_SWITCH_MOXA_CATALOGO.some(m => m.modelo === prev.switchFibraModelo) ? prev.switchFibraModelo : '',
-                              switchFibraPuertosTotal: prev.switchFibraPuertosTotal || '',
-                              switch: true
-                            }))
+                            setControladorForm(prev => {
+                              const switchMod = prev.switchFibraModelo && MODELOS_SWITCH_MOXA_CATALOGO.some(m => m.modelo === prev.switchFibraModelo) ? prev.switchFibraModelo : 'Moxa EDS-208 / 308'
+                              const switchObj = MODELOS_SWITCH_MOXA_CATALOGO.find(m => m.modelo === switchMod)
+                              return {
+                                ...prev,
+                                switchFibraMarcaModo: 'Moxa',
+                                switchFibraMarca: 'Moxa',
+                                switchFibraModelo: switchMod,
+                                switchFibraPuertosTotal: switchObj ? switchObj.puertos : '8',
+                                switch: true
+                              }
+                            })
                           } else if (val === 'Oriux') {
                             setControladorForm(prev => ({
                               ...prev,
