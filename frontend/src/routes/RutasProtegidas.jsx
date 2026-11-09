@@ -1,15 +1,17 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import CargandoPagina from '../components/CargandoPagina'
 
 // SOLO ADMIN: Tecnológicos y Semafóricos
 export function RutaSoloAdmin() {
   const { user, cargando } = useAuth()
 
   if (cargando) {
-    return null // Retornamos null mientras se restaura la sesión
+    return <CargandoPagina />
   }
 
-  if (!user || user.rol !== 'administrador') {
+  const esAdmin = user && (user.rol === 'administrador' || user.rol === 'admin')
+  if (!user || !esAdmin) {
     return <Navigate to="/login" replace />
   }
 
@@ -20,7 +22,7 @@ export function RutaSoloAdmin() {
 export function RutaSoloInfra() {
   const { user, cargando } = useAuth()
 
-  if (cargando) return null
+  if (cargando) return <CargandoPagina />
 
   if (!user || user.rol !== 'infraestructura') {
     return <Navigate to="/login" replace />
@@ -33,9 +35,10 @@ export function RutaSoloInfra() {
 export function RutaAdminOrInfra() {
   const { user, cargando } = useAuth()
 
-  if (cargando) return null
+  if (cargando) return <CargandoPagina />
 
-  if (!user || (user.rol !== 'administrador' && user.rol !== 'infraestructura')) {
+  const esPermitido = user && (user.rol === 'administrador' || user.rol === 'admin' || user.rol === 'infraestructura')
+  if (!esPermitido) {
     return <Navigate to="/login" replace />
   }
 
@@ -47,10 +50,10 @@ export function RutaSoloSolicitante() {
   const { user, cargando } = useAuth()
 
   if (cargando) {
-    return null
+    return <CargandoPagina />
   }
 
-  if (user?.rol === 'administrador') {
+  if (user?.rol === 'administrador' || user?.rol === 'admin') {
     return <Navigate to="/dashboard" replace />
   }
 

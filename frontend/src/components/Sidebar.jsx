@@ -12,6 +12,9 @@ export default function Sidebar({ isOpen, setIsOpen }) {
   const ubicacion = useLocation()
   const esActivo = (ruta) => ubicacion.pathname === ruta
 
+  const esAdmin = user?.rol === 'administrador' || user?.rol === 'admin'
+  const esInfra = user?.rol === 'infraestructura'
+
   const closeSidebar = () => {
     if (setIsOpen) {
       setIsOpen(false)
@@ -62,7 +65,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         paddingRight: '1rem',
       }}>
         <Link
-          to={user?.rol === 'administrador' ? '/dashboard' : user?.rol === 'infraestructura' ? '/dashboard-infraestructura' : '/crear-oficinas'}
+          to={esAdmin ? '/dashboard' : esInfra ? '/dashboard-infraestructura' : '/crear-oficinas'}
           onClick={closeSidebar}
           style={{ cursor: 'pointer', textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}
         >
@@ -83,12 +86,12 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       </div>
 
       {/* SECCIÓN: GENERAL — solo admin y solicitante */}
-      {user?.rol !== 'infraestructura' && (
+      {!esInfra && (
         <div style={{ marginBottom: '1.5rem' }}>
           <p className="sidebar-section-label">General</p>
 
           {/* Dashboard — solo admin */}
-          {user?.rol === 'administrador' && (
+          {esAdmin && (
             <Link
               to="/dashboard"
               style={linkStyle('/dashboard')}
@@ -102,7 +105,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
           )}
 
           {/* Crear Reporte Oficinas — solo solicitante */}
-          {user?.rol !== 'administrador' && (
+          {!esAdmin && (
             <Link
               to="/crear-oficinas"
               style={linkStyle('/crear-oficinas')}
@@ -116,7 +119,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
           )}
 
           {/* Crear Reporte Semáforos — solo solicitante */}
-          {user?.rol !== 'administrador' && (
+          {!esAdmin && (
             <Link
               to="/crear-semaforos"
               style={linkStyle('/crear-semaforos')}
@@ -130,7 +133,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
           )}
 
           {/* Crear Reporte Infraestructura — solo solicitante */}
-          {user?.rol !== 'administrador' && (
+          {!esAdmin && (
             <Link
               to="/crear-infraestructura"
               style={linkStyle('/crear-infraestructura')}
@@ -146,7 +149,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       )}
 
       {/* SECCIÓN: INFRAESTRUCTURA — administrador e infraestructura */}
-      {(user?.rol === 'administrador' || user?.rol === 'infraestructura') && (
+      {(esAdmin || esInfra) && (
         <div style={{ marginBottom: '1.5rem' }}>
           <p className="sidebar-section-label">Infraestructura</p>
 
@@ -162,7 +165,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
           </Link>
 
 
-          {user?.rol === 'infraestructura' && (
+          {esInfra && (
             <Link
               to="/inventario-herramientas"
               style={linkStyle('/inventario-herramientas')}
@@ -178,7 +181,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       )}
 
       {/* SECCIÓN: ADMINISTRACIÓN — solo administrador */}
-      {user?.rol === 'administrador' && (
+      {esAdmin && (
         <div style={{ marginBottom: '1.5rem' }}>
           <p className="sidebar-section-label">Administración</p>
 
@@ -263,7 +266,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       )}
 
       {/* REDES SOCIALES — solo solicitante */}
-      {(user?.rol !== 'administrador' && user?.rol !== 'infraestructura') && (
+      {(!esAdmin && !esInfra) && (
         <div style={{
           marginTop: 'auto',
           paddingTop: '1.25rem',

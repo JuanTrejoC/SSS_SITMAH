@@ -3,10 +3,12 @@ import Sidebar from './Sidebar'
 import Header from './Header/Header'
 import ThemeToggle from './ThemeToggle'
 import { useState, useEffect, Suspense } from 'react'
+import { useAuth } from '../context/AuthContext'
 import CargandoPagina from './CargandoPagina'
 import { FaWifi } from 'react-icons/fa'
 
 export default function Layout() {
+  const { cargando } = useAuth()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true)
 
@@ -29,6 +31,14 @@ export default function Layout() {
     }
     return () => { document.body.style.overflow = '' }
   }, [isSidebarOpen])
+
+  if (cargando) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc' }}>
+        <CargandoPagina />
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc' }}>

@@ -59,6 +59,14 @@ router.get('/controladores/:id/descargar-programacion', asyncHandler(inventario.
 router.put('/controladores/:id', upload.single('archivoProgramacion'), asyncHandler(inventario.actualizarControladorSemaforo));
 router.delete('/controladores/:id', asyncHandler(inventario.eliminarControladorSemaforo));
 
+// Rutas modulares para levantamiento concurrente en campo
+router.patch('/controladores/:id/gabinete', upload.single('archivoProgramacion'), asyncHandler(inventario.actualizarGabineteControlador));
+router.get('/controladores/:id/postes', asyncHandler(inventario.obtenerPostesControlador));
+router.post('/controladores/:id/postes', asyncHandler(inventario.agregarPosteControlador));
+router.put('/controladores/:id/postes/:posteId', asyncHandler(inventario.actualizarPosteControlador));
+router.delete('/controladores/:id/postes/:posteId', asyncHandler(inventario.eliminarPosteControlador));
+router.patch('/controladores/:id/registros-piso', asyncHandler(inventario.actualizarRegistrosPisoControlador));
+
 // Mobiliario Routes
 router.get('/mobiliario', asyncHandler(inventario.listarMobiliario));
 router.post('/mobiliario', asyncHandler(inventario.crearMobiliario));

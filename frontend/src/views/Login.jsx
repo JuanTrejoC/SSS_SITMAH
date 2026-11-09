@@ -1,23 +1,34 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import ThemeToggle from '../components/ThemeToggle'
 import { FaExclamationCircle, FaCheckCircle, FaLock, FaUser, FaEye, FaEyeSlash } from 'react-icons/fa'
 import logoSitmah from '../assets/logo.png'
 
 export default function Login() {
-  const { user, loginAdmin } = useAuth()
+  const { user, cargando: authCargando, loginAdmin } = useAuth()
+  const navigate = useNavigate()
   const [datos, setDatos] = useState({ usuario: '', contrasena: '' })
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
   const [verContrasena, setVerContrasena] = useState(false)
   const [errores, setErrores] = useState({ usuario: false, contrasena: false })
 
+  if (authCargando) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }}>
+        <div style={{ color: '#691B31', fontWeight: '700', fontSize: '1rem', letterSpacing: '0.3px' }}>
+          Verificando sesión...
+        </div>
+      </div>
+    )
+  }
+
   if (user) {
     if (user.rol === 'infraestructura') {
-      return <Navigate to="/inventario-herramientas" replace />
+      return <Navigate to="/dashboard-infraestructura" replace />
     }
-    if (user.rol === 'administrador') {
+    if (user.rol === 'administrador' || user.rol === 'admin') {
       return <Navigate to="/dashboard" replace />
     }
     return <Navigate to="/crear-oficinas" replace />
@@ -32,17 +43,22 @@ export default function Login() {
 
   const enviar = async (e) => {
     e.preventDefault()
+    if (cargando) return
     setError('')
     setCargando(true)
-    const res = await loginAdmin(datos)
+    const res = await loginAdmin({
+      usuario: (datos.usuario || '').trim(),
+      contrasena: datos.contrasena || ''
+    })
     setCargando(false)
     if (res.ok) {
-      if (res.user?.rol === 'infraestructura') {
-        window.location.href = '/dashboard-infraestructura'
-      } else if (res.user?.rol === 'administrador') {
-        window.location.href = '/dashboard'
+      const rol = res.user?.rol
+      if (rol === 'infraestructura') {
+        navigate('/dashboard-infraestructura', { replace: true })
+      } else if (rol === 'administrador' || rol === 'admin') {
+        navigate('/dashboard', { replace: true })
       } else {
-        window.location.href = '/crear-oficinas'
+        navigate('/crear-oficinas', { replace: true })
       }
     }
     else setError(res.error || 'Credenciales incorrectas')

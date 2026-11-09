@@ -298,7 +298,7 @@ async function procesarPerifericosDeDetalles(detalles, equipoPrincipalId, respon
       perifericosAcrear.push({ tipo, marca, modelo, serie, inventario });
       fs.appendFileSync(logFile, `Encontrado periférico plano: ${tipo} - ${marca} - ${inventario}\n`);
     }
-    
+
     // Limpiar JSON
     delete nuevosDetalles[`marca${sufijo}`];
     delete nuevosDetalles[`modelo${sufijo}`];
@@ -416,12 +416,12 @@ async function crearEquipoTecnologico(req, res) {
   });
 
   const detallesLimpios = await procesarPerifericosDeDetalles(
-    data.detalles, 
-    equipo.id, 
-    data.responsable, 
-    data.cargoResponsable, 
-    data.areaUbicacion, 
-    data.direccion, 
+    data.detalles,
+    equipo.id,
+    data.responsable,
+    data.cargoResponsable,
+    data.areaUbicacion,
+    data.direccion,
     data.procedencia
   );
 
@@ -528,12 +528,12 @@ async function actualizarEquipoTecnologico(req, res) {
   });
 
   const detallesLimpios = await procesarPerifericosDeDetalles(
-    data.detalles, 
-    equipo.id, 
-    data.responsable, 
-    data.cargoResponsable, 
-    data.areaUbicacion, 
-    data.direccion, 
+    data.detalles,
+    equipo.id,
+    data.responsable,
+    data.cargoResponsable,
+    data.areaUbicacion,
+    data.direccion,
     data.procedencia
   );
 
@@ -659,7 +659,7 @@ async function obtenerControladorSemaforo(req, res) {
 
 async function actualizarControladorSemaforo(req, res) {
   const id = Number(req.params.id);
-  
+
   const body = { ...req.body };
   // Convert boolean strings to actual booleans (from FormData)
   const booleanFields = ['pasoPeatonal', 'audible', 'pantallaLed', 'tarjetaRelevadora', 'fuentePoder', 'cpu', 'switch', 'fibraOptica', 'gps', 'botonera'];
@@ -743,6 +743,327 @@ async function descargarProgramacion(req, res) {
       res.status(500).send('Error al descargar el archivo.');
     }
   });
+}
+
+// =========================================================================
+// FUNCIONES MODULARES PARA TRABAJO CONCURRENTE EN CRUCEROS (SECCIONES)
+// =========================================================================
+
+const normalizarNombreModeloPosteBackend = (mod) => {
+  if (!mod) return '';
+  const str = String(mod).trim();
+  if (str.toLowerCase().includes('pedestal') || str.toLowerCase().includes('mp-01') || str.toLowerCase() === 'poste peatonal' || str.toLowerCase() === 'peatonal') {
+    return 'MP-01';
+  }
+  return str;
+};
+
+const recalcularTotalesDesdePostesBackend = (postesRaw) => {
+  let listaPostes = [];
+  if (typeof postesRaw === 'string') {
+    try { listaPostes = JSON.parse(postesRaw); } catch (e) { listaPostes = []; }
+  } else if (Array.isArray(postesRaw)) {
+    listaPostes = postesRaw;
+  }
+
+  let semaforos3 = 0;
+  let semaforos4 = 0;
+  let totalVerdes = 0;
+  let totalFlechasVerdes = 0;
+  let totalRojos = 0;
+  let totalFlechasRojas = 0;
+  let totalAmarillos = 0;
+
+  listaPostes.forEach(p => {
+    if (p.tipoPoste !== 'peatonal' && (p.tipoCabezal || 'LED') === 'LED') {
+      const grupos = Array.isArray(p.cabezalesGrupos) ? p.cabezalesGrupos : [];
+      grupos.forEach(grupo => {
+        const num = grupo.numLeds !== undefined ? Number(grupo.numLeds) : 4;
+        if (num === 3) semaforos3 += 1;
+        else if (num === 4) semaforos4 += 1;
+
+        const leds = (grupo.leds || []).slice(0, num);
+        leds.forEach(led => {
+          const c = (led.color || '').toLowerCase();
+          if (c === 'verde') totalVerdes += 1;
+          else if (c === 'flecha verde') totalFlechasVerdes += 1;
+          else if (c === 'rojo') totalRojos += 1;
+          else if (c === 'flecha roja') totalFlechasRojas += 1;
+          else if (c === 'amarillo') totalAmarillos += 1;
+        });
+      });
+    }
+  });
+
+  const tienePantalla = listaPostes.some(p => p.tipoPoste !== 'peatonal' && p.tipoCabezal === 'Pantalla');
+  const totalPantallaPiezas = listaPostes.reduce((acc, p) => (p.tipoPoste !== 'peatonal' && p.tipoCabezal === 'Pantalla') ? acc + (Number(p.pantallaPiezas) || 0) : acc, 0);
+
+  const pantallasPostes = listaPostes
+    .filter(p => p.tipoPoste !== 'peatonal' && p.tipoCabezal === 'Pantalla')
+    .flatMap(p => Array.isArray(p.pantallasLista) && p.pantallasLista.length > 0 ? p.pantallasLista : [{ estado: p.pantallaEstado || 'Funciona' }]);
+
+  let estadoPantallasConsolidado = 'Funciona';
+  if (pantallasPostes.length > 0) {
+    const hayFalla = pantallasPostes.some(x => x.estado === 'No funciona');
+    const todasFallan = pantallasPostes.every(x => x.estado === 'No funciona');
+    estadoPantallasConsolidado = todasFallan ? 'No funciona' : (hayFalla ? 'Parcial' : 'Funciona');
+  }
+
+  const peatonalesLuminosos = (p) => {
+    if (!p.tienePeatonal) return [];
+    if (Array.isArray(p.peatonalesLista) && p.peatonalesLista.length > 0) {
+      return p.peatonalesLista.filter(pt => pt.modelo && !pt.modelo.toLowerCase().includes('sin cabezal'));
+    }
+    if (p.peatonalModelo && !p.peatonalModelo.toLowerCase().includes('sin cabezal')) {
+      return [{ modelo: p.peatonalModelo }];
+    }
+    return [];
+  };
+
+  const tienePasoPeatonal = listaPostes.some(p => p.tienePeatonal && peatonalesLuminosos(p).length > 0);
+  const totalPeatonales = listaPostes.reduce((acc, p) => p.tienePeatonal ? acc + peatonalesLuminosos(p).length : acc, 0);
+
+  const totalAudibles = listaPostes.reduce((acc, p) => {
+    if (p.tienePeatonal && Array.isArray(p.peatonalesLista) && p.peatonalesLista.length > 0) {
+      const count = p.peatonalesLista.filter(pt => pt.tieneAudible).length;
+      if (count > 0) return acc + count;
+    }
+    return p.tieneAudible ? acc + (p.audiblesLista?.length || 1) : acc;
+  }, 0);
+  const tieneAudible = totalAudibles > 0 || listaPostes.some(p => p.tieneAudible && ((p.audiblesLista && p.audiblesLista.length > 0) || p.audibleModelo));
+
+  const tieneCamara = listaPostes.some(p => p.tieneCamara);
+  const totalCamaras = listaPostes.reduce((acc, p) => p.tieneCamara ? acc + (parseInt(p.camaraCantidad, 10) || 0) : acc, 0);
+
+  const modelosPostes = [...new Set(listaPostes.map(p => normalizarNombreModeloPosteBackend(p.modeloPoste)).filter(Boolean))].join(', ');
+  const primerPoste = listaPostes[0] || {};
+  const primerPosteModelo = normalizarNombreModeloPosteBackend(primerPoste.modeloPoste);
+  const primerPeatonal = listaPostes.find(p => p.tienePeatonal && peatonalesLuminosos(p).length > 0)?.peatonalesLista?.[0];
+  const primerAudible = listaPostes.flatMap(p => (p.tienePeatonal ? (p.peatonalesLista || []) : [])).find(pt => pt.tieneAudible)
+    || listaPostes.find(p => p.tieneAudible && p.audiblesLista?.[0])?.audiblesLista?.[0];
+
+  return {
+    semaforos3Luces: semaforos3,
+    semaforos4Luces: semaforos4,
+    totalLedsVerdes: totalVerdes,
+    totalFlechasVerdes: totalFlechasVerdes,
+    totalLedsRojos: totalRojos,
+    totalFlechasRojas: totalFlechasRojas,
+    totalLedsAmarillos: totalAmarillos,
+    pantallaLed: tienePantalla,
+    pantallaPiezas: totalPantallaPiezas,
+    pantallaEstado: estadoPantallasConsolidado,
+    pasoPeatonal: tienePasoPeatonal,
+    audible: tieneAudible,
+    posteModeloTipo: modelosPostes || primerPosteModelo || null,
+    posteTapaRegistro: primerPoste.tapaRegistro || 'Buena',
+    posteObservaciones: listaPostes.map((p, i) => {
+      const ubi = p.ubicacionPoste ? ` (${p.ubicacionPoste})` : '';
+      return p.observaciones ? `Poste ${i + 1}${ubi}: ${p.observaciones}` : '';
+    }).filter(Boolean).join(' | ') || null,
+    peatonalModelo: primerPeatonal?.modelo || listaPostes.find(p => p.tienePeatonal && p.peatonalModelo)?.peatonalModelo || null,
+    peatonalModuloEstado: primerPeatonal?.estado || listaPostes.find(p => p.tienePeatonal && p.peatonalModuloEstado)?.peatonalModuloEstado || null,
+    audibleModelo: primerAudible?.audibleModelo || primerAudible?.modelo || listaPostes.find(p => p.tieneAudible && p.audibleModelo)?.audibleModelo || null,
+    audibleModuloEstado: primerAudible?.audibleEstado || primerAudible?.estado || listaPostes.find(p => p.tieneAudible && p.audibleModuloEstado)?.audibleModuloEstado || null,
+    camaraModelo: listaPostes.find(p => p.tieneCamara && p.camaraModelo)?.camaraModelo || null,
+    camaraCantidad: totalCamaras > 0 ? String(totalCamaras) : (listaPostes.find(p => p.tieneCamara && p.camaraCantidad)?.camaraCantidad || null)
+  };
+};
+
+async function actualizarGabineteControlador(req, res) {
+  const id = Number(req.params.id);
+  const existe = await prisma.controladorSemaforo.findUnique({ where: { id } });
+  if (!existe) return fail(res, 'Controlador semafórico no encontrado', 404);
+
+  const body = { ...req.body };
+  const booleanFields = ['tarjetaRelevadora', 'fuentePoder', 'cpu', 'switch', 'fibraOptica', 'gps', 'botonera'];
+  booleanFields.forEach(key => {
+    if (body[key] === 'true') body[key] = true;
+    if (body[key] === 'false') body[key] = false;
+  });
+
+  const gabineteData = {};
+  const allowedFields = [
+    'modelo', 'cruceroId',
+    'tarjetaConflictosMarca', 'tarjetaConflictosModelo', 'tarjetaConflictosEstado',
+    'tarjetaRelevadoresMarca', 'tarjetaRelevadoresModelo', 'tarjetaRelevadoresCantidad',
+    'tarjetaRelevadora', 'fuentePoder', 'cpu', 'switch', 'fibraOptica', 'gps', 'botonera',
+    'cimientoCompleto', 'cimientoCuantosDados', 'tapaCableado', 'tornilleriaBaseCompleta', 'tornilleriaCuantosTornillos',
+    'observacionesExterior', 'gpsModelo', 'gpsComponenteFisico', 'gpsAntenaExterior',
+    'numeroGabinete', 'versionFirmware', 'ipLocal', 'ipSystem', 'mascaraRed', 'gateway',
+    'cicloCompleto', 'respaldoProgramacionUsb',
+    'switchFibraMarca', 'switchFibraModelo', 'switchFibraPuertosTotal', 'switchFibraPuertosUso', 'switchFibraFuentePoder',
+    'receptorFibraDispositivo', 'receptorFibraCable', 'conexionesTarjetaMadre', 'fuentePoderSupresorPicos'
+  ];
+
+  allowedFields.forEach(campo => {
+    if (body[campo] !== undefined) {
+      if (campo === 'cruceroId') {
+        gabineteData[campo] = Number(body[campo]);
+      } else {
+        gabineteData[campo] = body[campo];
+      }
+    }
+  });
+
+  if (req.file) {
+    gabineteData.archivoProgramacion = `uploads/${req.file.filename}`;
+  } else if (body.removerArchivo === 'true') {
+    gabineteData.archivoProgramacion = null;
+  }
+
+  const controlador = await prisma.controladorSemaforo.update({
+    where: { id },
+    data: gabineteData,
+    include: { crucero: true }
+  });
+
+  ok(res, { controlador, mensaje: 'Datos del gabinete guardados exitosamente.' });
+}
+
+async function obtenerPostesControlador(req, res) {
+  const id = Number(req.params.id);
+  const existe = await prisma.controladorSemaforo.findUnique({ where: { id } });
+  if (!existe) return fail(res, 'Controlador semafórico no encontrado', 404);
+
+  let list = [];
+  if (typeof existe.postesDetalle === 'string') {
+    try { list = JSON.parse(existe.postesDetalle); } catch (e) { list = []; }
+  } else if (Array.isArray(existe.postesDetalle)) {
+    list = existe.postesDetalle;
+  }
+
+  ok(res, { postes: list, id: existe.id, modelo: existe.modelo });
+}
+
+async function agregarPosteControlador(req, res) {
+  const id = Number(req.params.id);
+  const existe = await prisma.controladorSemaforo.findUnique({ where: { id } });
+  if (!existe) return fail(res, 'Controlador semafórico no encontrado', 404);
+
+  let list = [];
+  if (typeof existe.postesDetalle === 'string') {
+    try { list = JSON.parse(existe.postesDetalle); } catch (e) { list = []; }
+  } else if (Array.isArray(existe.postesDetalle)) {
+    list = [...existe.postesDetalle];
+  }
+
+  const rawPoste = req.body.poste || req.body;
+  if (!rawPoste || typeof rawPoste !== 'object') {
+    return fail(res, 'Los datos del poste son requeridos', 400);
+  }
+
+  const sigId = list.length > 0 ? Math.max(...list.map(p => Number(p.id) || 0)) + 1 : 1;
+  const nuevoPoste = {
+    ...rawPoste,
+    id: rawPoste.id || sigId
+  };
+
+  list.push(nuevoPoste);
+
+  const totales = recalcularTotalesDesdePostesBackend(list);
+
+  const controlador = await prisma.controladorSemaforo.update({
+    where: { id },
+    data: {
+      postesDetalle: list,
+      ...totales
+    },
+    include: { crucero: true }
+  });
+
+  ok(res, { poste: nuevoPoste, postes: list, controlador, mensaje: 'Poste agregado exitosamente al crucero.' }, 201);
+}
+
+async function actualizarPosteControlador(req, res) {
+  const id = Number(req.params.id);
+  const posteId = Number(req.params.posteId);
+  const existe = await prisma.controladorSemaforo.findUnique({ where: { id } });
+  if (!existe) return fail(res, 'Controlador semafórico no encontrado', 404);
+
+  let list = [];
+  if (typeof existe.postesDetalle === 'string') {
+    try { list = JSON.parse(existe.postesDetalle); } catch (e) { list = []; }
+  } else if (Array.isArray(existe.postesDetalle)) {
+    list = [...existe.postesDetalle];
+  }
+
+  const rawPoste = req.body.poste || req.body;
+  const index = list.findIndex(p => Number(p.id) === posteId);
+  if (index === -1) {
+    return fail(res, 'Poste no encontrado en este controlador', 404);
+  }
+
+  list[index] = {
+    ...list[index],
+    ...rawPoste,
+    id: posteId
+  };
+
+  const totales = recalcularTotalesDesdePostesBackend(list);
+
+  const controlador = await prisma.controladorSemaforo.update({
+    where: { id },
+    data: {
+      postesDetalle: list,
+      ...totales
+    },
+    include: { crucero: true }
+  });
+
+  ok(res, { poste: list[index], postes: list, controlador, mensaje: 'Poste actualizado exitosamente.' });
+}
+
+async function eliminarPosteControlador(req, res) {
+  const id = Number(req.params.id);
+  const posteId = Number(req.params.posteId);
+  const existe = await prisma.controladorSemaforo.findUnique({ where: { id } });
+  if (!existe) return fail(res, 'Controlador semafórico no encontrado', 404);
+
+  let list = [];
+  if (typeof existe.postesDetalle === 'string') {
+    try { list = JSON.parse(existe.postesDetalle); } catch (e) { list = []; }
+  } else if (Array.isArray(existe.postesDetalle)) {
+    list = [...existe.postesDetalle];
+  }
+
+  const filtrados = list.filter(p => Number(p.id) !== posteId);
+  const totales = recalcularTotalesDesdePostesBackend(filtrados);
+
+  const controlador = await prisma.controladorSemaforo.update({
+    where: { id },
+    data: {
+      postesDetalle: filtrados,
+      ...totales
+    },
+    include: { crucero: true }
+  });
+
+  ok(res, { postes: filtrados, controlador, mensaje: 'Poste eliminado exitosamente.' });
+}
+
+async function actualizarRegistrosPisoControlador(req, res) {
+  const id = Number(req.params.id);
+  const existe = await prisma.controladorSemaforo.findUnique({ where: { id } });
+  if (!existe) return fail(res, 'Controlador semafórico no encontrado', 404);
+
+  const { registrosPisoTapas, registrosPisoDanados, registrosPisoCoordenadas } = req.body;
+  let parsedCoords = registrosPisoCoordenadas;
+  if (typeof registrosPisoCoordenadas === 'string') {
+    try { parsedCoords = JSON.parse(registrosPisoCoordenadas); } catch (e) { parsedCoords = null; }
+  }
+
+  const controlador = await prisma.controladorSemaforo.update({
+    where: { id },
+    data: {
+      registrosPisoTapas: registrosPisoTapas !== undefined ? String(registrosPisoTapas) : existe.registrosPisoTapas,
+      registrosPisoDanados: registrosPisoDanados !== undefined ? Number(registrosPisoDanados) : existe.registrosPisoDanados,
+      registrosPisoCoordenadas: parsedCoords !== undefined ? parsedCoords : existe.registrosPisoCoordenadas
+    },
+    include: { crucero: true }
+  });
+
+  ok(res, { controlador, mensaje: 'Registros de piso guardados exitosamente.' });
 }
 
 // ==========================================
@@ -980,7 +1301,7 @@ async function exportarExistenciasExcel(req, res) {
 async function exportarEquipoTecnologicoExcel(req, res) {
   const { tipo, search, area, mes, includeImages, order } = req.query;
   const where = {};
-  
+
   if (req.usuario && req.usuario.rol === 'infraestructura') {
     where.tipo = 'herramienta_infra';
   } else {
@@ -999,7 +1320,7 @@ async function exportarEquipoTecnologicoExcel(req, res) {
   if (search) {
     where.OR = construirCondicionesBusquedaEquipo(search);
   }
-  
+
   if (mes) {
     const [year, month] = mes.split('-').map(Number);
     const start = new Date(year, month - 1, 1);
@@ -1153,7 +1474,7 @@ async function eliminarMobiliario(req, res) {
 async function exportarMobiliarioExcel(req, res) {
   const { search, order } = req.query;
   const where = {};
-  
+
   if (search) {
     where.OR = [
       { numeroInventario: { contains: search } },
@@ -1195,6 +1516,12 @@ module.exports = {
   actualizarControladorSemaforo,
   eliminarControladorSemaforo,
   descargarProgramacion,
+  actualizarGabineteControlador,
+  obtenerPostesControlador,
+  agregarPosteControlador,
+  actualizarPosteControlador,
+  eliminarPosteControlador,
+  actualizarRegistrosPisoControlador,
 
   listarExistencias,
   ingresarExistencia,

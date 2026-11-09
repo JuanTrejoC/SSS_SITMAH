@@ -1,14 +1,15 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import CargandoPagina from '../components/CargandoPagina'
 
 export default function InicioRedirect() {
   const { user, cargando } = useAuth()
 
   if (cargando) {
-    return null
+    return <CargandoPagina />
   }
 
-  if (user?.rol === 'administrador') {
+  if (user?.rol === 'administrador' || user?.rol === 'admin') {
     return <Navigate to="/dashboard" replace />
   }
 

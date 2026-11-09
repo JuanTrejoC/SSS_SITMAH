@@ -63,7 +63,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
       navigate('/');
       return;
     }
-    if (user.rol === 'administrador') {
+    if (user.rol === 'administrador' || user.rol === 'admin') {
       navigate('/dashboard');
     } else if (user.rol === 'infraestructura') {
       navigate('/dashboard-infraestructura');
@@ -221,7 +221,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
                 <kbd className="header-search-kbd">Ctrl K</kbd>
               </button>
 
-              {(user.rol === 'administrador' || user.rol === 'infraestructura') && <NotificationCenter />}
+              {(user.rol === 'administrador' || user.rol === 'admin' || user.rol === 'infraestructura') && <NotificationCenter />}
               <div className="app-header__profile" ref={profileRef}>
               <button 
                 className="app-header__profile-btn"

@@ -16,8 +16,16 @@ async function login(req, res) {
   }
 
   const { username, password } = parsed.data;
+  const usernameTrim = (username || '').trim();
 
-  const usuario = await prisma.usuario.findUnique({ where: { username } });
+  const usuario = await prisma.usuario.findFirst({
+    where: {
+      OR: [
+        { username: usernameTrim },
+        { email: usernameTrim }
+      ]
+    }
+  });
   if (!usuario) {
     return fail(res, 'Usuario o contraseña incorrectos', 401);
   }
