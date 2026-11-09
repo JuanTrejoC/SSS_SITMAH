@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Swal from 'sweetalert2'
 import { API_BASE_URL } from '../config'
+import { mostrarAlertaError, verificarConexion } from '../utils/conexionUtils'
 import {
   FaBuilding,
   FaLaptop,
@@ -507,6 +508,7 @@ export default function FormOficinas({ usuarioActual }) {
 
   const enviar = async (e) => {
     e.preventDefault()
+    if (!verificarConexion()) return
 
     const nuevosErrores = {}
     const nuevosValidos = {}
@@ -696,11 +698,11 @@ export default function FormOficinas({ usuarioActual }) {
         setErrores({})
         setValido({})
       } else {
-        Swal.fire('Error', 'Error al guardar: ' + (resultado.error || resultado.mensaje || 'Desconocido'), 'error');
+        mostrarAlertaError(resultado.error || resultado.mensaje, 'Error', 'No se pudo registrar el reporte.')
         console.error('Detalles del error:', resultado)
       }
     } catch (error) {
-      Swal.fire('Error', 'No se pudo conectar: ' + error.message, 'error');
+      mostrarAlertaError(error, 'Error', 'No se pudo conectar con el servidor.')
       console.error('Error completo:', error)
     }
 

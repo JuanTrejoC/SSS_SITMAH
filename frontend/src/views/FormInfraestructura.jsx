@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
 import { API_BASE_URL } from '../config'
+import { mostrarAlertaError, verificarConexion } from '../utils/conexionUtils'
 import { FaWrench, FaCamera, FaTrashAlt, FaPaperPlane, FaTimes, FaImages } from 'react-icons/fa'
 import PersonalAutocomplete from '../components/PersonalAutocomplete'
 import { CARGOS_NORMALIZADOS } from '../data/personalSitmah'
@@ -326,6 +327,7 @@ export default function FormInfraestructura({ usuarioActual }) {
 
   const enviar = async (e) => {
     e.preventDefault()
+    if (!verificarConexion()) return
 
     const camposObligatorios = ['solicitante', 'area_id', 'cargo', 'email', 'telefono', 'sede_id', 'equipo', 'prioridad', 'descripcion']
     camposObligatorios.forEach(campo => {
@@ -426,10 +428,10 @@ export default function FormInfraestructura({ usuarioActual }) {
         setErrores({})
         setValido({})
       } else {
-        Swal.fire('Error', 'Error al guardar: ' + (resultado.error || 'Desconocido'), 'error')
+        mostrarAlertaError(resultado.error, 'Error', 'No se pudo registrar el reporte.')
       }
     } catch (error) {
-      Swal.fire('Error', 'No se pudo conectar con el servidor: ' + error.message, 'error')
+      mostrarAlertaError(error, 'Error', 'No se pudo conectar con el servidor.')
     } finally {
       setCargando(false)
     }

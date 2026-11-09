@@ -4,6 +4,7 @@ import { RutaSoloAdmin, RutaSoloSolicitante, RutaSoloInfra, RutaAdminOrInfra } f
 import InicioRedirect from './InicioRedirect'
 import Layout from '../components/Layout'
 import CargandoPagina from '../components/CargandoPagina'
+import ErrorPagina from '../components/ErrorPagina'
 
 // Vistas cargadas bajo demanda con Code Splitting (React.lazy)
 const Login = lazy(() => import('../views/Login'))
@@ -28,6 +29,7 @@ const StockInfraestructura = lazy(() => import('../views/StockInfraestructura'))
 const router = createBrowserRouter([
   {
     path: '/login',
+    errorElement: <ErrorPagina />,
     element: (
       <Suspense fallback={<CargandoPagina />}>
         <Login />
@@ -37,6 +39,7 @@ const router = createBrowserRouter([
 
   {
     element: <Layout />, // Este Layout contiene <Outlet /> envuelto en <Suspense />
+    errorElement: <ErrorPagina />,
     children: [
       // SOLICITANTE: admin o infra es redirigido a su panel
       {

@@ -5,6 +5,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
+import { mostrarAlertaError, verificarConexion } from '../utils/conexionUtils';
 import {
   FaBoxes, FaPlus, FaEdit, FaEye, FaTimes, FaSearch, FaCogs, FaWrench, FaTools, FaHdd, FaChevronRight,
   FaCheckCircle, FaExclamationTriangle, FaMapMarkerAlt, FaFilter, FaArrowLeft, FaRedoAlt,
@@ -472,7 +473,7 @@ const coincideBusquedaExistencia = (item, busquedaStr) => {
 };
 
 export default function InventarioExistencias() {
-  const { user } = useAuth();
+  const { user } = useAuth() || {};
   const navigate = useNavigate();
 
   const [existencias, setExistencias] = useState([]);
@@ -671,6 +672,7 @@ export default function InventarioExistencias() {
 
   const handleGuardar = async (e) => {
     e.preventDefault();
+    if (!verificarConexion()) return;
     if (!form.tipo) {
       Swal.fire('Error', 'Seleccione un tipo de equipo.', 'error');
       return;
@@ -709,7 +711,7 @@ export default function InventarioExistencias() {
         },
         body: JSON.stringify(payload)
       });
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
       if (res.ok && json.ok) {
         Swal.fire({
           title: 'Éxito',
@@ -721,11 +723,11 @@ export default function InventarioExistencias() {
         resetForm();
         cargarExistencias();
       } else {
-        Swal.fire('Error', json.error || 'No se pudo guardar.', 'error');
+        mostrarAlertaError(json.error || 'No se pudo guardar.', 'Error', 'No se pudo guardar el registro.');
       }
     } catch (err) {
       console.error('Error al guardar existencias:', err);
-      Swal.fire('Error', 'Ocurrió un error en el servidor.', 'error');
+      mostrarAlertaError(err, 'Error', 'Ocurrió un error al guardar existencias.');
     }
   };
 
@@ -827,16 +829,16 @@ export default function InventarioExistencias() {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${user.token}` }
         });
-        const json = await res.json();
+        const json = await res.json().catch(() => ({}));
         if (res.ok && json.ok) {
           Swal.fire('Eliminado', 'Artículo eliminado correctamente.', 'success');
           cargarExistencias();
         } else {
-          Swal.fire('Error', json.error || 'No se pudo eliminar el artículo.', 'error');
+          mostrarAlertaError(json.error || 'No se pudo eliminar el artículo.', 'Error', 'No se pudo eliminar el artículo.');
         }
       } catch (err) {
         console.error('Error al eliminar:', err);
-        Swal.fire('Error', 'Error al conectar con el servidor.', 'error');
+        mostrarAlertaError(err, 'Error', 'No se pudo eliminar el artículo.');
       }
     }
   };
@@ -865,16 +867,16 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
             'Content-Type': 'application/json'
           }
         });
-        const json = await res.json();
+        const json = await res.json().catch(() => ({}));
         if (res.ok && json.ok) {
           Swal.fire('¡Listo!', json.message || 'Lote desglosado correctamente en unidades independientes.', 'success');
           await cargarExistencias();
         } else {
-          Swal.fire('Error', json.error || 'No se pudo desglosar el lote.', 'error');
+          mostrarAlertaError(json.error || 'No se pudo desglosar el lote.', 'Error', 'No se pudo desglosar el lote.');
         }
       } catch (err) {
         console.error('Error al desglosar:', err);
-        Swal.fire('Error', 'Ocurrió un error en el servidor.', 'error');
+        mostrarAlertaError(err, 'Error', 'No se pudo desglosar el lote.');
       }
     }
   };

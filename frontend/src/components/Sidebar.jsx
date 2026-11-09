@@ -8,7 +8,7 @@ import { FaFacebook, FaXTwitter } from 'react-icons/fa6'
 import logoSitmah from '../assets/logo.png'
 
 export default function Sidebar({ isOpen, setIsOpen }) {
-  const { user } = useAuth()
+  const { user } = useAuth() || {}
   const ubicacion = useLocation()
   const esActivo = (ruta) => ubicacion.pathname === ruta
 

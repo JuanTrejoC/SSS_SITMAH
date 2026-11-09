@@ -3,8 +3,16 @@ import { API_BASE_URL } from '../config'
 
 /* eslint-disable react-refresh/only-export-components */
 
-export const AuthContext = createContext()
-export const useAuth = () => useContext(AuthContext)
+const defaultAuthValue = {
+  user: null,
+  cargando: false,
+  loginAdmin: async () => ({ ok: false, error: 'No se pudo conectar con el servidor' }),
+  logout: () => {},
+  renovarSesion: async () => {}
+}
+
+export const AuthContext = createContext(defaultAuthValue)
+export const useAuth = () => useContext(AuthContext) || defaultAuthValue
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)

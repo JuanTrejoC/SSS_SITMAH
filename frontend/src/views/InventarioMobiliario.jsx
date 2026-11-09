@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
+import { mostrarAlertaError, verificarConexion } from '../utils/conexionUtils';
 import { FaChair, FaPlus, FaEdit, FaTrashAlt, FaChevronLeft, FaChevronRight, FaTimes, FaFileExcel, FaFileWord } from 'react-icons/fa';
 import { generarResguardoDocx } from '../utils/resguardoDocx';
 import { registrarResguardo } from '../utils/registrarResguardo';
@@ -9,7 +10,7 @@ import PersonalAutocomplete from '../components/PersonalAutocomplete';
 import { CARGOS_NORMALIZADOS, DIRECCIONES_SITMAH } from '../data/personalSitmah';
 
 export default function InventarioMobiliario() {
-  const { user } = useAuth();
+  const { user } = useAuth() || {};
   
   const [mobiliario, setMobiliario] = useState([]);
   const [cargando, setCargando] = useState(false);
@@ -157,6 +158,7 @@ export default function InventarioMobiliario() {
   
   const handleGuardar = async (e) => {
     e.preventDefault();
+    if (!verificarConexion()) return;
     const bienFinal = seleccionBien === 'Otro' ? otroBien.trim() : seleccionBien;
 
     if (!form.numeroInventario || !bienFinal || !form.descripcion || !form.nombreResguardante || !form.direccion) {
@@ -178,18 +180,18 @@ export default function InventarioMobiliario() {
         },
         body: JSON.stringify({ ...form, bien: bienFinal })
       });
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
       
       if (res.ok && json.ok) {
         Swal.fire('Éxito', editandoId ? 'Mobiliario actualizado' : 'Mobiliario registrado', 'success');
         setModalAbierto(false);
         cargarMobiliario();
       } else {
-        Swal.fire('Error', json.error || 'Error al guardar', 'error');
+        mostrarAlertaError(json.error || 'Error al guardar', 'Error', 'No se pudo guardar el mobiliario.');
       }
     } catch (err) {
       console.error('Error al guardar:', err);
-      Swal.fire('Error', 'Error interno del servidor', 'error');
+      mostrarAlertaError(err, 'Error', 'No se pudo guardar el mobiliario.');
     }
   };
   
@@ -230,12 +232,16 @@ export default function InventarioMobiliario() {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${user.token}` }
         });
-        if (res.ok) {
+        const json = await res.json().catch(() => ({}));
+        if (res.ok && json.ok) {
           Swal.fire('Eliminado', 'El mobiliario ha sido eliminado.', 'success');
           cargarMobiliario();
+        } else {
+          mostrarAlertaError(json.error || 'No se pudo eliminar', 'Error', 'No se pudo eliminar el mobiliario.');
         }
       } catch (err) {
         console.error('Error al eliminar:', err);
+        mostrarAlertaError(err, 'Error', 'No se pudo eliminar el mobiliario.');
       }
     }
   };

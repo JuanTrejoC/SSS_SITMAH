@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import Swal from 'sweetalert2';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
+import { mostrarAlertaError, verificarConexion } from '../utils/conexionUtils';
 import {
   FaWrench,
   FaHammer,
@@ -43,7 +44,7 @@ const inputStyle = {
 };
 
 export default function InventarioHerramientas() {
-  const { user } = useAuth();
+  const { user } = useAuth() || {};
 
   // Tab activo: 'herramienta_infra' o 'herramienta_tec'
   const [tabActiva, setTabActiva] = useState(
@@ -482,6 +483,7 @@ export default function InventarioHerramientas() {
 
   const handleGuardar = async (e) => {
     e.preventDefault();
+    if (!verificarConexion()) return;
 
     const errs = validarFormularioCompleto();
     if (Object.keys(errs).length > 0) {
@@ -540,7 +542,7 @@ export default function InventarioHerramientas() {
         },
         body: JSON.stringify(payload)
       });
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
 
       if (res.ok && json.ok) {
         Swal.fire('Éxito', editandoId ? 'Herramienta actualizada' : 'Herramienta registrada exitosamente', 'success');
@@ -549,11 +551,11 @@ export default function InventarioHerramientas() {
         cargarHerramientas();
         cargarContadores();
       } else {
-        Swal.fire('Error', json.error || 'Error al guardar la herramienta', 'error');
+        mostrarAlertaError(json.error || 'Error al guardar la herramienta', 'Error', 'Error al guardar la herramienta');
       }
     } catch (err) {
       console.error('Error al guardar:', err);
-      Swal.fire('Error', 'Error interno del servidor', 'error');
+      mostrarAlertaError(err, 'Error', 'No se pudo guardar la herramienta.');
     }
   };
 
@@ -608,13 +610,17 @@ export default function InventarioHerramientas() {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${user.token}` }
         });
-        if (res.ok) {
+        const json = await res.json().catch(() => ({}));
+        if (res.ok && json.ok) {
           Swal.fire('Eliminado', 'La herramienta ha sido eliminada correctamente.', 'success');
           cargarHerramientas();
           cargarContadores();
+        } else {
+          mostrarAlertaError(json.error || 'No se pudo eliminar la herramienta', 'Error', 'No se pudo eliminar la herramienta');
         }
       } catch (err) {
         console.error('Error al eliminar:', err);
+        mostrarAlertaError(err, 'Error', 'No se pudo eliminar la herramienta');
       }
     }
   };

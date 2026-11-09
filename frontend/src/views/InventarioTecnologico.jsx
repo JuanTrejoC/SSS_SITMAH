@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
+import { mostrarAlertaError, verificarConexion } from '../utils/conexionUtils';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
@@ -60,7 +61,7 @@ const TIPOS_EQUIPO = [
 ];
 
 export default function InventarioTecnologico() {
-  const { user } = useAuth();
+  const { user } = useAuth() || {};
   const navigate = useNavigate();
 
   const [equipos, setEquipos] = useState([]);
@@ -422,6 +423,7 @@ export default function InventarioTecnologico() {
 
   const guardarRefaccion = async (e) => {
     e.preventDefault();
+    if (!verificarConexion()) return;
     if (!formRefaccion.nombre.trim()) {
       Swal.fire({ icon: 'warning', title: 'Campo Requerido', text: 'El nombre de la refacción es obligatorio.' });
       return;
@@ -446,13 +448,13 @@ export default function InventarioTecnologico() {
             tipoInventario: 'tecnologico'
           })
         });
-        const json = await res.json();
+        const json = await res.json().catch(() => ({}));
         if (res.ok && json.ok) {
           Swal.fire({ icon: 'success', title: '¡Guardado!', text: 'Refacción actualizada exitosamente.' });
           setModalFormRefaccionAbierto(false);
           cargarRefacciones();
         } else {
-          Swal.fire({ icon: 'error', title: 'Error', text: json.error || 'No se pudo actualizar la refacción.' });
+          mostrarAlertaError(json.error || 'No se pudo actualizar la refacción.', 'Error', 'No se pudo actualizar la refacción.');
         }
       } else {
         const payload = {
@@ -487,7 +489,7 @@ export default function InventarioTecnologico() {
           },
           body: JSON.stringify(payload)
         });
-        const json = await res.json();
+        const json = await res.json().catch(() => ({}));
         if (res.ok && json.ok) {
           Swal.fire({
             icon: 'success',
@@ -497,12 +499,12 @@ export default function InventarioTecnologico() {
           setModalFormRefaccionAbierto(false);
           cargarRefacciones();
         } else {
-          Swal.fire({ icon: 'error', title: 'Error', text: json.error || 'No se pudo guardar la refacción.' });
+          mostrarAlertaError(json.error || 'No se pudo guardar la refacción.', 'Error', 'No se pudo guardar la refacción.');
         }
       }
     } catch (err) {
       console.error('Error al guardar refacción:', err);
-      Swal.fire({ icon: 'error', title: 'Error', text: 'Ocurrió un error inesperado al guardar la refacción.' });
+      mostrarAlertaError(err, 'Error', 'Ocurrió un error al guardar la refacción.');
     }
   };
 
@@ -1433,6 +1435,7 @@ export default function InventarioTecnologico() {
 
   const handleGuardar = async (e) => {
     e.preventDefault();
+    if (!verificarConexion()) return;
     if (!form.tipo) {
       Swal.fire('Error', 'Seleccione un tipo de equipo', 'warning');
       return;
@@ -1456,7 +1459,7 @@ export default function InventarioTecnologico() {
         },
         body: JSON.stringify(form)
       });
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
 
       if (res.ok && json.ok) {
         Swal.fire('Éxito', json.message || (editandoId ? 'Equipo actualizado' : 'Equipo registrado'), 'success');
@@ -1464,11 +1467,11 @@ export default function InventarioTecnologico() {
         resetForm();
         cargarEquipos();
       } else {
-        Swal.fire('Error', json.error || 'Error al guardar el equipo', 'error');
+        mostrarAlertaError(json.error || 'Error al guardar el equipo', 'Error', 'Error al guardar el equipo');
       }
     } catch (err) {
       console.error('Error al guardar:', err);
-      Swal.fire('Error', err.message || 'Error al conectar con el servidor', 'error');
+      mostrarAlertaError(err, 'Error', 'No se pudo guardar el equipo.');
     }
   };
 

@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
 import { API_BASE_URL } from '../config'
+import { mostrarAlertaError, verificarConexion } from '../utils/conexionUtils'
 import { FaTrafficLight, FaSearch, FaTimes, FaCheck, FaChevronDown } from 'react-icons/fa'
 import ModalCamara from '../components/ModalCamara'
 
@@ -351,6 +352,7 @@ export default function FormSemaforos({ usuarioActual }) {
   // Envío del formulario
   const enviar = async (e) => {
     e.preventDefault()
+    if (!verificarConexion()) return
 
     const confirmar = await Swal.fire({
       title: '¿Enviar reporte de semáforo?',
@@ -469,11 +471,11 @@ export default function FormSemaforos({ usuarioActual }) {
         setErrores({})
         setValido({})
       } else {
-        Swal.fire('Error', resultado.error || resultado.mensaje || 'Error desconocido', 'error')
+        mostrarAlertaError(resultado.error || resultado.mensaje, 'Error', 'No se pudo registrar el reporte.')
         console.error('Detalles del error:', resultado)
       }
     } catch (error) {
-      Swal.fire('Error', `Sin conexión: ${error.message}`, 'error')
+      mostrarAlertaError(error, 'Error', 'No se pudo conectar con el servidor.')
       console.error('Error completo:', error)
     }
 

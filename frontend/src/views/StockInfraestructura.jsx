@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
 import { API_BASE_URL } from '../config';
 import { useAuth } from '../context/AuthContext';
+import { mostrarAlertaError, verificarConexion } from '../utils/conexionUtils';
 
 const CATEGORIAS_SUGERIDAS = [
   'Material Eléctrico',
@@ -18,7 +19,7 @@ const CATEGORIAS_SUGERIDAS = [
 ];
 
 export default function StockInfraestructura() {
-  const { user } = useAuth();
+  const { user } = useAuth() || {};
   const navigate = useNavigate();
   const [stock, setStock] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -103,6 +104,7 @@ export default function StockInfraestructura() {
 
   const handleGuardar = async (e) => {
     e.preventDefault();
+    if (!verificarConexion()) return;
     if (!form.nombre.trim()) {
       Swal.fire('Atención', 'El nombre de la refacción o material es obligatorio.', 'warning');
       return;
@@ -137,7 +139,7 @@ export default function StockInfraestructura() {
         body: JSON.stringify(payload)
       });
 
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
       if (res.ok && json.ok) {
         Swal.fire({
           title: 'Éxito',
@@ -149,11 +151,11 @@ export default function StockInfraestructura() {
         resetForm();
         cargarStock();
       } else {
-        Swal.fire('Error', json.error || 'No se pudo guardar la refacción.', 'error');
+        mostrarAlertaError(json.error || 'No se pudo guardar la refacción.', 'Error', 'No se pudo guardar la refacción.');
       }
     } catch (err) {
       console.error('Error al guardar en stock:', err);
-      Swal.fire('Error', 'Ocurrió un error en el servidor.', 'error');
+      mostrarAlertaError(err, 'Error', 'Ocurrió un error al guardar en stock.');
     }
   };
 
@@ -176,16 +178,16 @@ export default function StockInfraestructura() {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${user.token}` }
       });
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
       if (res.ok && json.ok) {
         Swal.fire('Eliminado', 'La refacción ha sido eliminada del stock.', 'success');
         cargarStock();
       } else {
-        Swal.fire('Error', json.error || 'No se pudo eliminar.', 'error');
+        mostrarAlertaError(json.error || 'No se pudo eliminar.', 'Error', 'No se pudo eliminar la refacción.');
       }
     } catch (err) {
       console.error('Error al eliminar refacción:', err);
-      Swal.fire('Error', 'Ocurrió un error en el servidor.', 'error');
+      mostrarAlertaError(err, 'Error', 'No se pudo eliminar la refacción.');
     }
   };
 

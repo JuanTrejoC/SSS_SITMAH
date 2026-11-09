@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Swal from 'sweetalert2'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../context/AuthContext'
+import { mostrarAlertaError, verificarConexion } from '../utils/conexionUtils'
 import {
   FaRoad, FaPlus, FaEdit, FaTrashAlt, FaBoxes,
   FaChevronLeft, FaChevronRight, FaTimes,
@@ -362,7 +363,7 @@ const normalizarPostesDetalle = (postesRaw, fallbackItem = null) => {
     if (fallbackItem.cabezalesDetalle) {
       try {
         parsedDetalle = typeof fallbackItem.cabezalesDetalle === 'string' ? JSON.parse(fallbackItem.cabezalesDetalle) : fallbackItem.cabezalesDetalle
-      } catch (e) {}
+      } catch (e) { }
     }
     const grupos = normalizarCabezalesDetalle(parsedDetalle, fallbackItem.semaforos3Luces, fallbackItem.semaforos4Luces)
 
@@ -396,8 +397,8 @@ const normalizarPostesDetalle = (postesRaw, fallbackItem = null) => {
 
 const recalcularTotalesDesdePostes = (postes) => {
   const listaPostes = Array.isArray(postes) ? postes : []
-  
-  const allCabezalesGrupos = listaPostes.flatMap(p => 
+
+  const allCabezalesGrupos = listaPostes.flatMap(p =>
     (p.tipoCabezal || 'LED') === 'LED' ? normalizarCabezalesDetalle(p.cabezalesGrupos) : []
   )
 
@@ -423,7 +424,7 @@ const recalcularTotalesDesdePostes = (postes) => {
     modeloPoste: modelosPostes || primerPoste.modeloPoste || '',
     posteModeloTipo: primerPoste.modeloPoste || '',
     posteTapaRegistro: primerPoste.tapaRegistro || 'Buena',
-    posteObservaciones: listaPostes.map((p, i) => p.observaciones ? `Poste ${i+1}: ${p.observaciones}` : '').filter(Boolean).join(' | '),
+    posteObservaciones: listaPostes.map((p, i) => p.observaciones ? `Poste ${i + 1}: ${p.observaciones}` : '').filter(Boolean).join(' | '),
     peatonalModelo: listaPostes.find(p => p.tienePeatonal && p.peatonalModelo)?.peatonalModelo || '',
     peatonalModuloEstado: listaPostes.find(p => p.tienePeatonal && p.peatonalModuloEstado)?.peatonalModuloEstado || '',
     audibleModelo: listaPostes.find(p => p.tieneAudible && p.audibleModelo)?.audibleModelo || '',
@@ -456,7 +457,7 @@ const getCategoriaIcon = (cat) => {
 };
 
 export default function InventarioSemaforos() {
-  const { user } = useAuth()
+  const { user } = useAuth() || {}
   const [tabActiva, setTabActiva] = useState('existencias') // 'existencias' o 'controladores'
 
   // ==========================================
@@ -831,6 +832,7 @@ export default function InventarioSemaforos() {
   // ==========================================
   const handleGuardarStock = async (e) => {
     e.preventDefault()
+    if (!verificarConexion()) return
     if (!stockForm.nombre.trim()) {
       Swal.fire('Error', 'El nombre del componente es obligatorio.', 'error')
       return
@@ -853,25 +855,24 @@ export default function InventarioSemaforos() {
         body: JSON.stringify({ ...stockForm, cantidad: cantidadFinal })
       })
 
-      if (res.ok) {
-        const json = await res.json()
-        if (json.ok) {
-          Swal.fire({
-            title: 'Éxito',
-            text: editandoStockId ? 'Existencias actualizadas correctamente.' : 'Existencias ingresadas correctamente.',
-            icon: 'success',
-            confirmButtonColor: '#691B31'
-          })
-          setModalStockAbierto(false)
-          resetStockForm()
-          cargarExistencias()
-        } else {
-          Swal.fire('Error', json.error || 'No se pudo guardar la refacción.', 'error')
-        }
+      const json = await res.json().catch(() => ({}))
+
+      if (res.ok && json.ok) {
+        Swal.fire({
+          title: 'Éxito',
+          text: editandoStockId ? 'Existencias actualizadas correctamente.' : 'Existencias ingresadas correctamente.',
+          icon: 'success',
+          confirmButtonColor: '#691B31'
+        })
+        setModalStockAbierto(false)
+        resetStockForm()
+        cargarExistencias()
+      } else {
+        mostrarAlertaError(json.error || 'No se pudo guardar la refacción.', 'Error', 'No se pudo guardar la refacción.')
       }
     } catch (err) {
       console.error('Error al guardar existencias:', err)
-      Swal.fire('Error', 'Ocurrió un error en el servidor.', 'error')
+      mostrarAlertaError(err, 'Error', 'Ocurrió un error al guardar existencias.')
     }
   }
 
@@ -911,15 +912,16 @@ export default function InventarioSemaforos() {
           headers: { 'Authorization': `Bearer ${user.token}` }
         })
 
-        const json = await res.json()
+        const json = await res.json().catch(() => ({}))
         if (res.ok && json.ok) {
           Swal.fire('Eliminado', 'La refacción ha sido eliminada del inventario.', 'success')
           cargarExistencias()
         } else {
-          Swal.fire('Error', json.error || 'No se pudo eliminar.', 'error')
+          mostrarAlertaError(json.error || 'No se pudo eliminar.', 'Error', 'No se pudo eliminar la refacción.')
         }
       } catch (err) {
         console.error('Error al eliminar existencia:', err)
+        mostrarAlertaError(err, 'Error', 'No se pudo eliminar la refacción.')
       }
     }
   }
@@ -1016,6 +1018,7 @@ export default function InventarioSemaforos() {
 
   const handleGuardarControlador = async (e) => {
     e.preventDefault()
+    if (!verificarConexion()) return
     if (!validarControlador()) return
 
     const url = editandoControladorId
@@ -1038,7 +1041,7 @@ export default function InventarioSemaforos() {
           formData.append(key, controladorForm[key])
         }
       })
-      
+
       if (archivoProgramacion) {
         if (archivoProgramacion instanceof File) {
           formData.append('archivoProgramacion', archivoProgramacion)
@@ -1055,25 +1058,24 @@ export default function InventarioSemaforos() {
         body: formData
       })
 
-      if (res.ok) {
-        const json = await res.json()
-        if (json.ok) {
-          Swal.fire({
-            title: 'Éxito',
-            text: editandoControladorId ? 'Controlador actualizado.' : 'Controlador registrado.',
-            icon: 'success',
-            confirmButtonColor: '#691B31'
-          })
-          setModalControladorAbierto(false)
-          resetControladorForm()
-          cargarControladores()
-        } else {
-          Swal.fire('Error', json.error || 'Ocurrió un problema.', 'error')
-        }
+      const json = await res.json().catch(() => ({}))
+
+      if (res.ok && json.ok) {
+        Swal.fire({
+          title: 'Éxito',
+          text: editandoControladorId ? 'Controlador actualizado.' : 'Controlador registrado.',
+          icon: 'success',
+          confirmButtonColor: '#691B31'
+        })
+        setModalControladorAbierto(false)
+        resetControladorForm()
+        cargarControladores()
+      } else {
+        mostrarAlertaError(json.error || 'Ocurrió un problema al guardar el controlador.', 'Error', 'No se pudo guardar el controlador.')
       }
     } catch (err) {
       console.error('Error al guardar controlador:', err)
-      Swal.fire('Error', 'Error en el servidor.', 'error')
+      mostrarAlertaError(err, 'Error', 'No se pudo guardar el controlador.')
     }
   }
 
@@ -1197,12 +1199,16 @@ export default function InventarioSemaforos() {
           headers: { 'Authorization': `Bearer ${user.token}` }
         })
 
-        if (res.ok) {
+        const json = await res.json().catch(() => ({}))
+        if (res.ok && json.ok) {
           Swal.fire('Eliminado', 'El controlador ha sido eliminado del inventario.', 'success')
           cargarControladores()
+        } else {
+          mostrarAlertaError(json.error || 'No se pudo eliminar el controlador.', 'Error', 'No se pudo eliminar el controlador.')
         }
       } catch (err) {
         console.error('Error al eliminar controlador:', err)
+        mostrarAlertaError(err, 'Error', 'No se pudo eliminar el controlador.')
       }
     }
   }
@@ -1942,8 +1948,8 @@ export default function InventarioSemaforos() {
                           {item.subItems?.length > 1
                             ? ` — ${item.subItems.length} registros individuales`
                             : item.subItems?.[0]?.modelo
-                            ? ` — ${item.subItems[0].modelo}`
-                            : ''}
+                              ? ` — ${item.subItems[0].modelo}`
+                              : ''}
                         </div>
                       </div>
 
@@ -2560,29 +2566,23 @@ export default function InventarioSemaforos() {
       {/* MODAL - REGISTRAR / EDITAR CONTROLADOR                       */}
       {/* ============================================================ */}
       {modalControladorAbierto && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
-          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center',
-          alignItems: 'center', zIndex: 2000, padding: '1rem'
-        }}>
-          <div style={{
-            backgroundColor: 'white', borderRadius: '12px', padding: '2rem', width: '100%',
-            maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', position: 'relative'
-          }}>
+        <div className="modal-controlador-overlay">
+          <div className="modal-controlador-card">
             <button
               onClick={() => setModalControladorAbierto(false)}
-              style={{ position: 'absolute', top: '1.25rem', right: '1.25rem', border: 'none', background: 'none', cursor: 'pointer', color: '#9B9B9A' }}
+              style={{ position: 'absolute', top: '1rem', right: '1rem', border: 'none', background: 'none', cursor: 'pointer', color: '#9B9B9A', zIndex: 10 }}
+              title="Cerrar"
             >
               <FaTimes size={18} />
             </button>
 
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#691B31', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <FaTrafficLight size={22} style={{ color: '#BC955B' }} />
-              {editandoControladorId ? 'Actualizar Controlador Semafórico' : 'Registrar Nuevo Controlador Semafórico'}
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#691B31', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', paddingRight: '2rem' }}>
+              <FaTrafficLight size={20} style={{ color: '#BC955B', flexShrink: 0 }} />
+              <span>{editandoControladorId ? 'Actualizar Controlador Semafórico' : 'Registrar Nuevo Controlador Semafórico'}</span>
             </h2>
 
             <form onSubmit={handleGuardarControlador}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '1rem' }}>
                 <div>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                     <FaMicrochip size={13} style={{ color: '#691B31' }} /> Modelo *
@@ -2680,12 +2680,13 @@ export default function InventarioSemaforos() {
               <div style={{
                 marginBottom: '1.5rem',
                 backgroundColor: '#F8FAFC',
-                padding: '1.15rem',
+                padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
                 borderRadius: '10px',
                 border: '1px solid #E2E8F0',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '1rem'
+                gap: '1rem',
+                boxSizing: 'border-box'
               }}>
                 <div style={{
                   display: 'flex',
@@ -2922,12 +2923,13 @@ export default function InventarioSemaforos() {
               <div style={{
                 marginBottom: '1.5rem',
                 backgroundColor: '#F8FAFC',
-                padding: '1.15rem',
+                padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
                 borderRadius: '10px',
                 border: '1px solid #E2E8F0',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '1rem'
+                gap: '1rem',
+                boxSizing: 'border-box'
               }}>
                 <div style={{
                   display: 'flex',
@@ -3074,12 +3076,13 @@ export default function InventarioSemaforos() {
               <div style={{
                 marginBottom: '1.5rem',
                 backgroundColor: '#F8FAFC',
-                padding: '1.15rem',
+                padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
                 borderRadius: '10px',
                 border: '1px solid #E2E8F0',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '1rem'
+                gap: '1rem',
+                boxSizing: 'border-box'
               }}>
                 <div style={{
                   display: 'flex',
@@ -3479,8 +3482,8 @@ export default function InventarioSemaforos() {
                             {controladorForm.tarjetaConflictosModelo &&
                               !MODELOS_TARJETA_CONFLICTOS_PEEK.includes(controladorForm.tarjetaConflictosModelo) &&
                               !MODELOS_TARJETA_CONFLICTOS_C5000.includes(controladorForm.tarjetaConflictosModelo) && (
-                              <option value={controladorForm.tarjetaConflictosModelo}>{controladorForm.tarjetaConflictosModelo}</option>
-                            )}
+                                <option value={controladorForm.tarjetaConflictosModelo}>{controladorForm.tarjetaConflictosModelo}</option>
+                              )}
                           </select>
                         )}
                       </div>
@@ -3650,8 +3653,8 @@ export default function InventarioSemaforos() {
                             {controladorForm.tarjetaRelevadoresModelo &&
                               !MODELOS_RELEVADORES_SEMEX.includes(controladorForm.tarjetaRelevadoresModelo) &&
                               !MODELOS_RELEVADORES_C5000.includes(controladorForm.tarjetaRelevadoresModelo) && (
-                              <option value={controladorForm.tarjetaRelevadoresModelo}>{controladorForm.tarjetaRelevadoresModelo}</option>
-                            )}
+                                <option value={controladorForm.tarjetaRelevadoresModelo}>{controladorForm.tarjetaRelevadoresModelo}</option>
+                              )}
                           </select>
                         )}
                       </div>
@@ -3687,12 +3690,13 @@ export default function InventarioSemaforos() {
               <div style={{
                 marginBottom: '1.5rem',
                 backgroundColor: '#F8FAFC',
-                padding: '1.15rem',
+                padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
                 borderRadius: '10px',
                 border: '1px solid #E2E8F0',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '1rem'
+                gap: '1rem',
+                boxSizing: 'border-box'
               }}>
                 <div style={{
                   display: 'flex',
@@ -3827,8 +3831,8 @@ export default function InventarioSemaforos() {
                           {controladorForm.switchFibraModelo &&
                             !MODELOS_SWITCH_MOXA_CATALOGO.some(m => m.modelo === controladorForm.switchFibraModelo) &&
                             !MODELOS_SWITCH_ORIUX_CATALOGO.some(m => m.modelo === controladorForm.switchFibraModelo) && (
-                            <option value={controladorForm.switchFibraModelo}>{controladorForm.switchFibraModelo}</option>
-                          )}
+                              <option value={controladorForm.switchFibraModelo}>{controladorForm.switchFibraModelo}</option>
+                            )}
                         </select>
                       )}
                     </div>
@@ -3999,9 +4003,10 @@ export default function InventarioSemaforos() {
               <div style={{
                 marginBottom: '1.5rem',
                 backgroundColor: '#fcfbf9',
-                padding: '1.25rem',
+                padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
                 borderRadius: '10px',
-                border: '1px solid #DDC9A3'
+                border: '1px solid #DDC9A3',
+                boxSizing: 'border-box'
               }}>
                 {/* Header General de Postes */}
                 <div style={{
@@ -4071,8 +4076,9 @@ export default function InventarioSemaforos() {
                         backgroundColor: '#FFFFFF',
                         borderRadius: '8px',
                         border: '1px solid #E2E8F0',
-                        padding: '1.15rem 1.25rem',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
+                        padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                        boxSizing: 'border-box'
                       }}
                     >
                       {/* Encabezado del poste */}
@@ -4399,7 +4405,7 @@ export default function InventarioSemaforos() {
                                     </div>
 
                                     {numLeds > 0 && (
-                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.45rem' }}>
+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '0.45rem' }}>
                                         {leds.map((led, idx) => {
                                           const colorActual = OPCIONES_COLORES_LED.find(c => c.valor === led.color) || OPCIONES_COLORES_LED[0]
                                           return (
@@ -4410,26 +4416,28 @@ export default function InventarioSemaforos() {
                                                 alignItems: 'center',
                                                 justifyContent: 'space-between',
                                                 backgroundColor: '#FFFFFF',
-                                                padding: '0.3rem 0.55rem',
+                                                padding: '0.35rem 0.5rem',
                                                 borderRadius: '4px',
                                                 border: '1px solid #E2E8F0',
-                                                gap: '0.45rem'
+                                                gap: '0.4rem',
+                                                flexWrap: 'wrap',
+                                                boxSizing: 'border-box'
                                               }}
                                             >
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', minWidth: '55px' }}>
-                                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: colorActual.color, display: 'inline-block' }} />
-                                                <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#334155' }}>L{led.numero || idx + 1}</span>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flex: '1 1 120px', minWidth: '105px' }}>
+                                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: colorActual.color, display: 'inline-block', flexShrink: 0 }} />
+                                                <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#334155', minWidth: '22px', flexShrink: 0 }}>L{led.numero || idx + 1}</span>
+                                                <select
+                                                  value={led.color || 'Rojo'}
+                                                  onChange={(e) => handleCambiarLedEnPoste(pIdx, gIdx, idx, 'color', e.target.value)}
+                                                  style={{ flex: 1, minWidth: '65px', padding: '0.2rem 0.35rem', border: '1px solid #CBD5E1', borderRadius: '4px', fontSize: '0.78rem' }}
+                                                >
+                                                  {OPCIONES_COLORES_LED.map(c => (
+                                                    <option key={c.valor} value={c.valor}>{c.label}</option>
+                                                  ))}
+                                                </select>
                                               </div>
-                                              <select
-                                                value={led.color || 'Rojo'}
-                                                onChange={(e) => handleCambiarLedEnPoste(pIdx, gIdx, idx, 'color', e.target.value)}
-                                                style={{ flex: 1, padding: '0.2rem 0.35rem', border: '1px solid #CBD5E1', borderRadius: '4px', fontSize: '0.78rem' }}
-                                              >
-                                                {OPCIONES_COLORES_LED.map(c => (
-                                                  <option key={c.valor} value={c.valor}>{c.label}</option>
-                                                ))}
-                                              </select>
-                                              <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center' }}>
+                                              <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexShrink: 0 }}>
                                                 {['Funciona', 'No funciona'].map(est => (
                                                   <label key={est} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: led.estado === est ? '700' : '500', color: led.estado === est ? (est === 'Funciona' ? '#16A34A' : '#DC2626') : '#64748B' }}>
                                                     <input
@@ -4786,9 +4794,10 @@ export default function InventarioSemaforos() {
               <div style={{
                 marginBottom: '1.5rem',
                 backgroundColor: '#fcfbf9',
-                padding: '1.25rem',
+                padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
                 borderRadius: '10px',
-                border: '1px solid #DDC9A3'
+                border: '1px solid #DDC9A3',
+                boxSizing: 'border-box'
               }}>
                 <div style={{
                   display: 'flex',
