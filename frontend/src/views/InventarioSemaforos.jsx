@@ -539,7 +539,7 @@ const normalizarPostesDetalle = (postesRaw, fallbackItem = null) => {
     })
   }
 
-  if (fallbackItem) {
+  if (fallbackItem && (fallbackItem.semaforos3Luces > 0 || fallbackItem.semaforos4Luces > 0 || fallbackItem.pasoPeatonal || fallbackItem.posteModeloTipo)) {
     let parsedDetalle = null
     if (fallbackItem.cabezalesDetalle) {
       try {
@@ -600,7 +600,7 @@ const normalizarPostesDetalle = (postesRaw, fallbackItem = null) => {
     }]
   }
 
-  return [crearPosteInicial(1, 'PCC-1')]
+  return []
 }
 
 const recalcularTotalesDesdePostes = (postes) => {
@@ -942,8 +942,8 @@ export default function InventarioSemaforos() {
     conexionesTarjetaMadre: '',
     fuentePoderSupresorPicos: '',
     // Sección D: Postes y Equipamiento Asociado
-    postes: [crearPosteInicial(1, 'PCC-1')],
-    posteModeloTipo: 'PCC-1',
+    postes: [],
+    posteModeloTipo: '',
     posteTapaRegistro: 'Buena',
     posteObservaciones: '',
     // Cabezales Vehiculares
@@ -1985,13 +1985,13 @@ export default function InventarioSemaforos() {
 
   const resetControladorForm = () => {
     setEditandoControladorId(null)
-    const posteInit = [crearPosteInicial(1, 'PCC-1')]
+    const posteInit = []
     const totalesInit = recalcularTotalesDesdePostes(posteInit)
     setControladorForm({
       modelo: '',
       cruceroId: '',
       ...totalesInit,
-      postes: posteInit,
+      postes: [],
       tarjetaRelevadora: false,
       tarjetaRelevadoraDetalle: '',
       fuentePoder: false,
@@ -5239,52 +5239,10 @@ export default function InventarioSemaforos() {
                   </div>
                 </div>
 
-                {/* Listado de Postes */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {(controladorForm.postes || []).length === 0 ? (
-                    <div style={{
-                      backgroundColor: '#F8FAFC',
-                      border: '2px dashed #CBD5E1',
-                      borderRadius: '10px',
-                      padding: '2.5rem 1.5rem',
-                      textAlign: 'center',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.65rem'
-                    }}>
-                      <FaSign size={32} style={{ color: '#94A3B8' }} />
-                      <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#334155' }}>
-                        No hay postes registrados en este crucero
-                      </div>
-                      <div style={{ fontSize: '0.8rem', color: '#64748B', maxWidth: '400px' }}>
-                        Haz clic en el botón de abajo para registrar el primer poste vehicular o peatonal de este crucero.
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleAgregarPoste}
-                        style={{
-                          marginTop: '0.5rem',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.4rem',
-                          backgroundColor: '#691B31',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          borderRadius: '6px',
-                          padding: '0.5rem 1rem',
-                          fontSize: '0.82rem',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 4px rgba(105,27,49,0.15)'
-                        }}
-                      >
-                        <FaPlus size={11} style={{ color: '#BC955B' }} /> Agregar primer poste
-                      </button>
-                    </div>
-                  ) : (
-                    (controladorForm.postes || []).map((poste, pIdx) => (
+                {/* Listado de Postes (Se muestra únicamente si el usuario agrega postes) */}
+                {(controladorForm.postes || []).length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.85rem' }}>
+                    {(controladorForm.postes || []).map((poste, pIdx) => (
                       <div
                         key={poste.uid || poste.id || pIdx}
                       style={{
@@ -6609,8 +6567,9 @@ export default function InventarioSemaforos() {
                         )}
                       </div>
                     </div>
-                  )))}
+                  ))}
                 </div>
+              )}
 
                 {/* Botón inferior: Agregar otro poste */}
                 {(controladorForm.postes || []).length > 0 && (
