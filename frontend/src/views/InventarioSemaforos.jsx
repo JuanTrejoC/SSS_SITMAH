@@ -1065,6 +1065,49 @@ export default function InventarioSemaforos() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabActiva, paginaControladores])
 
+  // Sincronización automática en vivo (al enfocar la ventana y sondeo periódico para no requerir F5)
+  useEffect(() => {
+    const sincronizarDatosEnVivo = () => {
+      cargarCatalogos()
+      if (tabActiva === 'controladores') {
+        cargarControladores()
+        cargarTodosLosControladores()
+      } else {
+        cargarExistencias()
+      }
+    }
+
+    const handleFocus = () => {
+      sincronizarDatosEnVivo()
+    }
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        sincronizarDatosEnVivo()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    const interval = setInterval(() => {
+      // Auto-refrescar catálogo de cruceros siempre
+      cargarCatalogos()
+      // Refrescar controladores en segundo plano si no estamos editando en el modal
+      if (tabActiva === 'controladores' && !modalControladorAbierto) {
+        cargarControladores()
+        cargarTodosLosControladores()
+      }
+    }, 10000)
+
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      clearInterval(interval)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabActiva, modalControladorAbierto, paginaControladores])
+
   // Prevent background scrolling when modals are open
   useEffect(() => {
     if (modalStockAbierto || modalHistorialAbierto || modalControladorAbierto || grupoSeleccionado) {
@@ -1339,12 +1382,67 @@ export default function InventarioSemaforos() {
         setModalControladorAbierto(false)
         resetControladorForm()
         cargarControladores()
+        cargarTodosLosControladores()
+        cargarCatalogos()
       } else {
         mostrarAlertaError(json.error || 'Ocurrió un problema al guardar el controlador.', 'Error', 'No se pudo guardar el controlador.')
       }
     } catch (err) {
       console.error('Error al guardar controlador:', err)
       mostrarAlertaError(err, 'Error', 'No se pudo guardar el controlador.')
+    }
+  }
+
+  const handleCrearNuevoCruceroRapido = async () => {
+    const { value: nombreCrucero } = await Swal.fire({
+      title: 'Registrar Nuevo Crucero',
+      input: 'text',
+      inputLabel: 'Nombre o intersección del crucero',
+      inputPlaceholder: 'Ej. Av. Juárez esq. Guerrero',
+      showCancelButton: true,
+      confirmButtonText: 'Guardar Crucero',
+      confirmButtonColor: '#691B31',
+      cancelButtonText: 'Cancelar',
+      cancelButtonColor: '#6F7271',
+      inputValidator: (value) => {
+        if (!value || !value.trim()) {
+          return 'Debes ingresar un nombre para el crucero'
+        }
+      }
+    })
+
+    if (!nombreCrucero || !nombreCrucero.trim()) return
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/catalogos/cruceros`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
+        body: JSON.stringify({ nombre: nombreCrucero.trim() })
+      })
+      const json = await res.json().catch(() => ({}))
+      if (res.ok && json.ok) {
+        await cargarCatalogos()
+        const nuevoId = json.data?.id
+        if (nuevoId) {
+          setControladorForm(prev => ({ ...prev, cruceroId: String(nuevoId) }))
+        }
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'success',
+          title: `Crucero "${nombreCrucero.trim()}" registrado`,
+          showConfirmButton: false,
+          timer: 2500
+        })
+      } else {
+        mostrarAlertaError(json.error || 'No se pudo crear el crucero.', 'Error', 'Error al registrar crucero.')
+      }
+    } catch (err) {
+      console.error('Error al crear crucero:', err)
+      mostrarAlertaError(err, 'Error', 'No se pudo registrar el crucero.')
     }
   }
 
@@ -1387,6 +1485,8 @@ export default function InventarioSemaforos() {
           setControladorForm(prev => ({ ...prev, postes: postesNorm }))
         }
         cargarControladores()
+        cargarTodosLosControladores()
+        cargarCatalogos()
         Swal.fire({
           title: 'Crucero Iniciado',
           text: 'Se ha creado el expediente de este crucero en el servidor. Ahora tú y tus compañeros pueden registrar postes y gabinete simultáneamente.',
@@ -1456,6 +1556,7 @@ export default function InventarioSemaforos() {
           timer: 2500
         })
         cargarControladores()
+        cargarTodosLosControladores()
       } else {
         mostrarAlertaError(json.error || 'No se pudo guardar el gabinete.', 'Error', 'Ocurrió un error al guardar.')
       }
@@ -1490,6 +1591,7 @@ export default function InventarioSemaforos() {
           postes: listaFinal
         }))
         cargarControladores()
+        cargarTodosLosControladores()
         Swal.fire({
           toast: true,
           position: 'top-end',
@@ -1565,6 +1667,7 @@ export default function InventarioSemaforos() {
           postes: listaFinal
         }))
         cargarControladores()
+        cargarTodosLosControladores()
         Swal.fire({
           toast: true,
           position: 'top-end',
@@ -1586,12 +1689,9 @@ export default function InventarioSemaforos() {
 
   const handleEliminarPosteModular = async (pIdx) => {
     const listaActual = controladorForm.postes || []
-    if (listaActual.length <= 1) {
-      Swal.fire('Atención', 'El crucero debe tener al menos un poste registrado.', 'info')
-      return
-    }
-
     const poste = listaActual[pIdx]
+    if (!poste) return
+
     const confirmacion = await Swal.fire({
       title: `¿Eliminar Poste #${pIdx + 1}?`,
       text: poste.ubicacionPoste ? `Ubicación: ${poste.ubicacionPoste}` : 'Se quitará este poste del crucero.',
@@ -1630,6 +1730,7 @@ export default function InventarioSemaforos() {
             postes: listaFinal
           }))
           cargarControladores()
+          cargarTodosLosControladores()
           Swal.fire({
             toast: true,
             position: 'top-end',
@@ -1674,6 +1775,14 @@ export default function InventarioSemaforos() {
         ...totales,
         postes: restantesLocales
       }))
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: 'Poste eliminado',
+        showConfirmButton: false,
+        timer: 1800
+      })
     }
   }
 
@@ -1706,6 +1815,7 @@ export default function InventarioSemaforos() {
           timer: 2500
         })
         cargarControladores()
+        cargarTodosLosControladores()
       } else {
         mostrarAlertaError(json.error || 'No se pudieron guardar los registros de piso.', 'Error', 'Error al guardar.')
       }
@@ -1819,6 +1929,7 @@ export default function InventarioSemaforos() {
     setArchivoProgramacion(item.archivoProgramacion || null)
     setControladorErrores({})
     setModalControladorAbierto(true)
+    cargarCatalogos()
 
     // Consultar el servidor para asegurar que tenemos la información más fresca (en vivo) por si otro técnico guardó
     try {
@@ -1860,6 +1971,8 @@ export default function InventarioSemaforos() {
         if (res.ok && json.ok) {
           Swal.fire('Eliminado', 'El controlador ha sido eliminado del inventario.', 'success')
           cargarControladores()
+          cargarTodosLosControladores()
+          cargarCatalogos()
         } else {
           mostrarAlertaError(json.error || 'No se pudo eliminar el controlador.', 'Error', 'No se pudo eliminar el controlador.')
         }
@@ -2004,7 +2117,7 @@ export default function InventarioSemaforos() {
 
   const handleAgregarPoste = () => {
     setControladorForm(prev => {
-      const listaActual = prev.postes && prev.postes.length > 0 ? prev.postes : [crearPosteInicial(1, 'PCC-1')]
+      const listaActual = prev.postes || []
       const maxId = listaActual.reduce((max, p) => Math.max(max, Number(p.id) || 0), 0)
       const nuevoPoste = crearPosteInicial(maxId + 1, 'PCC-1')
       const nuevosPostes = [...listaActual, nuevoPoste]
@@ -2020,7 +2133,6 @@ export default function InventarioSemaforos() {
   const handleEliminarPoste = (pIdx) => {
     setControladorForm(prev => {
       const listaActual = prev.postes || []
-      if (listaActual.length <= 1) return prev
       const nuevosPostes = listaActual.filter((_, idx) => idx !== pIdx)
       const totales = recalcularTotalesDesdePostes(nuevosPostes)
       return {
@@ -2456,7 +2568,7 @@ export default function InventarioSemaforos() {
           </button>
         ) : (
           <button
-            onClick={() => { resetControladorForm(); setModalControladorAbierto(true); }}
+            onClick={() => { resetControladorForm(); cargarCatalogos(); setModalControladorAbierto(true); }}
             style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#691B31', color: 'white',
               border: 'none', padding: '0.65rem 1.25rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
@@ -3584,12 +3696,61 @@ export default function InventarioSemaforos() {
                 </div>
 
                 <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                    <FaMapMarkerAlt size={13} style={{ color: '#691B31' }} /> Crucero *
-                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.35rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: '700', color: '#334155' }}>
+                      <FaMapMarkerAlt size={13} style={{ color: '#691B31' }} /> Crucero *
+                    </label>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <button
+                        type="button"
+                        onClick={cargarCatalogos}
+                        title="Actualizar catálogo de cruceros"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#64748B',
+                          fontSize: '0.72rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          padding: '0.15rem 0.35rem',
+                          borderRadius: '4px'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.color = '#691B31'}
+                        onMouseOut={(e) => e.currentTarget.style.color = '#64748B'}
+                      >
+                        <FaSyncAlt size={10} /> Refrescar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCrearNuevoCruceroRapido}
+                        title="Registrar un nuevo crucero si no aparece en la lista"
+                        style={{
+                          background: '#F1F5F9',
+                          border: '1px solid #CBD5E1',
+                          color: '#691B31',
+                          fontSize: '0.72rem',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '4px'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#E2E8F0'}
+                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#F1F5F9'}
+                      >
+                        <FaPlus size={9} style={{ color: '#BC955B' }} /> + Nuevo crucero
+                      </button>
+                    </div>
+                  </div>
                   <select
                     value={controladorForm.cruceroId}
                     onChange={(e) => setControladorForm({ ...controladorForm, cruceroId: e.target.value })}
+                    onFocus={() => cargarCatalogos()}
                     style={{
                       width: '100%', padding: '0.6rem', border: `1px solid ${controladorErrores.cruceroId ? '#A02142' : '#CBD5E1'}`,
                       borderRadius: '8px', fontSize: '0.9rem'
@@ -5102,9 +5263,52 @@ export default function InventarioSemaforos() {
 
                 {/* Listado de Postes */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {(controladorForm.postes || []).map((poste, pIdx) => (
-                    <div
-                      key={poste.id || pIdx}
+                  {(controladorForm.postes || []).length === 0 ? (
+                    <div style={{
+                      backgroundColor: '#F8FAFC',
+                      border: '2px dashed #CBD5E1',
+                      borderRadius: '10px',
+                      padding: '2.5rem 1.5rem',
+                      textAlign: 'center',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.65rem'
+                    }}>
+                      <FaSign size={32} style={{ color: '#94A3B8' }} />
+                      <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#334155' }}>
+                        No hay postes registrados en este crucero
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#64748B', maxWidth: '400px' }}>
+                        Haz clic en el botón de abajo para registrar el primer poste vehicular o peatonal de este crucero.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAgregarPoste}
+                        style={{
+                          marginTop: '0.5rem',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          backgroundColor: '#691B31',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '0.5rem 1rem',
+                          fontSize: '0.82rem',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 4px rgba(105,27,49,0.15)'
+                        }}
+                      >
+                        <FaPlus size={11} style={{ color: '#BC955B' }} /> Agregar primer poste
+                      </button>
+                    </div>
+                  ) : (
+                    (controladorForm.postes || []).map((poste, pIdx) => (
+                      <div
+                        key={poste.uid || poste.id || pIdx}
                       style={{
                         backgroundColor: '#FFFFFF',
                         borderRadius: '8px',
@@ -5163,31 +5367,29 @@ export default function InventarioSemaforos() {
                         </div>
 
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.65rem' }}>
-                          {(controladorForm.postes || []).length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleEliminarPosteModular(pIdx)}
-                              disabled={guardandoModularSeccion === `poste-del-${pIdx}`}
-                              title="Eliminar este poste"
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.3rem',
-                                background: 'none',
-                                border: 'none',
-                                color: '#DC2626',
-                                fontSize: '0.78rem',
-                                fontWeight: '600',
-                                cursor: 'pointer',
-                                padding: '0.2rem 0.4rem',
-                                borderRadius: '4px'
-                              }}
-                              onMouseOver={(e) => e.currentTarget.style.textDecoration = 'underline'}
-                              onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}
-                            >
-                              <FaTrashAlt size={11} /> {guardandoModularSeccion === `poste-del-${pIdx}` ? 'Borrando...' : 'Eliminar este poste'}
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleEliminarPosteModular(pIdx)}
+                            disabled={guardandoModularSeccion === `poste-del-${pIdx}`}
+                            title="Eliminar este poste"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              background: 'none',
+                              border: 'none',
+                              color: '#DC2626',
+                              fontSize: '0.78rem',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              padding: '0.2rem 0.4rem',
+                              borderRadius: '4px'
+                            }}
+                            onMouseOver={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                            onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}
+                          >
+                            <FaTrashAlt size={11} /> {guardandoModularSeccion === `poste-del-${pIdx}` ? 'Borrando...' : 'Eliminar este poste'}
+                          </button>
                         </div>
                       </div>
 
@@ -6429,36 +6631,38 @@ export default function InventarioSemaforos() {
                         )}
                       </div>
                     </div>
-                  ))}
+                  )))}
                 </div>
 
                 {/* Botón inferior: Agregar otro poste */}
-                <div style={{ marginTop: '1rem' }}>
-                  <button
-                    type="button"
-                    onClick={handleAgregarPoste}
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem 1rem',
-                      backgroundColor: '#FFFFFF',
-                      border: '1.5px dashed #CBD5E1',
-                      borderRadius: '8px',
-                      color: '#691B31',
-                      fontSize: '0.85rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.4rem',
-                      transition: 'all 0.15s'
-                    }}
-                    onMouseOver={(e) => { e.currentTarget.style.borderColor = '#691B31'; e.currentTarget.style.backgroundColor = '#FCFBF9'; }}
-                    onMouseOut={(e) => { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
-                  >
-                    <FaPlus size={11} style={{ color: '#BC955B' }} /> Agregar otro poste al crucero
-                  </button>
-                </div>
+                {(controladorForm.postes || []).length > 0 && (
+                  <div style={{ marginTop: '1rem' }}>
+                    <button
+                      type="button"
+                      onClick={handleAgregarPoste}
+                      style={{
+                        width: '100%',
+                        padding: '0.65rem 1rem',
+                        backgroundColor: '#FFFFFF',
+                        border: '1.5px dashed #CBD5E1',
+                        borderRadius: '8px',
+                        color: '#691B31',
+                        fontSize: '0.85rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.4rem',
+                        transition: 'all 0.15s'
+                      }}
+                      onMouseOver={(e) => { e.currentTarget.style.borderColor = '#691B31'; e.currentTarget.style.backgroundColor = '#FCFBF9'; }}
+                      onMouseOut={(e) => { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
+                    >
+                      <FaPlus size={11} style={{ color: '#BC955B' }} /> Agregar otro poste al crucero
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* REGISTROS DE PISO */}

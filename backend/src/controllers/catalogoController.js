@@ -1,5 +1,5 @@
 const prisma = require('../config/db');
-const { ok } = require('../utils/response');
+const { ok, fail } = require('../utils/response');
 
 // Función auxiliar para ordenar dejando "Otro" al final
 function ordenarConOtroAlFinal(lista) {
@@ -169,4 +169,33 @@ async function obtenerEquiposPorResponsable(req, res) {
   return ok(res, equipos);
 }
 
-module.exports = { listarCatalogo, obtenerEquiposPorResponsable };
+async function crearCruceroRapido(req, res) {
+  const nombreRaw = req.body?.nombre;
+  const nombre = typeof nombreRaw === 'string' ? nombreRaw.trim() : '';
+  if (!nombre) {
+    return fail(res, 'El nombre del crucero es obligatorio', 400);
+  }
+
+  // Buscar si ya existe por nombre
+  let crucero = await prisma.crucero.findFirst({
+    where: { nombre: { equals: nombre, mode: 'insensitive' } }
+  });
+
+  if (!crucero) {
+    crucero = await prisma.crucero.create({
+      data: {
+        nombre,
+        activo: true
+      }
+    });
+  } else if (!crucero.activo) {
+    crucero = await prisma.crucero.update({
+      where: { id: crucero.id },
+      data: { activo: true }
+    });
+  }
+
+  ok(res, crucero, 201);
+}
+
+module.exports = { listarCatalogo, obtenerEquiposPorResponsable, crearCruceroRapido };
