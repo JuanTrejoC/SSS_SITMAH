@@ -321,12 +321,14 @@ const crearAudibleInicial = (id = 1, sentido = '') => ({
   observaciones: ''
 })
 
-const crearPosteInicial = (id = 1, modelo = 'PCC-1', tipo = null) => {
+const generarPosteUid = () => `pst_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${Math.random().toString(36).substr(2, 5)}`
+
+const crearPosteInicial = (id = 1, modelo = 'PCC-1', tipo = null, uid = null) => {
   const modeloNorm = normalizarNombreModeloPoste(modelo)
   const esPeatonal = tipo === 'peatonal' || modeloNorm === 'MP-01'
   const tipoPoste = esPeatonal ? 'peatonal' : (tipo || 'mixto')
   return {
-    uid: `pst_${Date.now()}_${Math.random().toString(36).substr(2, 7)}`,
+    uid: (uid && typeof uid === 'string' && uid.length > 8 && !uid.match(/^pst_\d+$/)) ? uid : generarPosteUid(),
     id,
     guardadoEnServidor: false,
     tipoPoste, // 'mixto' (Vehicular / Mixto) | 'peatonal' (Exclusivo Peatonal / Pedestal)
@@ -500,10 +502,14 @@ const normalizarPostesDetalle = (postesRaw, fallbackItem = null) => {
         }))
       }
 
+      const rawUid = p.uid
+      const esUidValido = rawUid && typeof rawUid === 'string' && rawUid.length > 8 && !rawUid.match(/^pst_\d+$/)
+      const uid = esUidValido ? rawUid : (p.id ? `pst_db_${p.id}` : generarPosteUid())
+
       return {
-        uid: p.uid || (p.id ? `pst_${p.id}` : `pst_${idx + 1}`),
+        uid,
         id: p.id || idx + 1,
-        guardadoEnServidor: true,
+        guardadoEnServidor: p.guardadoEnServidor !== undefined ? Boolean(p.guardadoEnServidor) : true,
         tipoPoste,
         ubicacionPoste: p.ubicacionPoste || '',
         modeloPoste,
@@ -548,7 +554,7 @@ const normalizarPostesDetalle = (postesRaw, fallbackItem = null) => {
       || (!fallbackItem.semaforos3Luces && !fallbackItem.semaforos4Luces && tienePeatonal)
 
     return [{
-      uid: 'pst_1',
+      uid: fallbackItem?.id ? `pst_fb_${fallbackItem.id}_1` : generarPosteUid(),
       id: 1,
       guardadoEnServidor: true,
       tipoPoste: esPeatonal ? 'peatonal' : 'mixto',
@@ -1286,7 +1292,13 @@ export default function InventarioSemaforos() {
         if (key === 'cabezalesDetalle') {
           formData.append('cabezalesDetalle', JSON.stringify(controladorForm.cabezalesDetalle || DEFAULT_CABEZALES_DETALLE))
         } else if (key === 'postes') {
-          formData.append('postesDetalle', JSON.stringify(controladorForm.postes || []))
+          const postesConUid = (controladorForm.postes || []).map((p, idx) => ({
+            ...p,
+            uid: (p.uid && typeof p.uid === 'string' && p.uid.length > 8 && !p.uid.match(/^pst_\d+$/))
+              ? p.uid
+              : `pst_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 6)}`
+          }))
+          formData.append('postesDetalle', JSON.stringify(postesConUid))
         } else if (key === 'registrosPisoCoordenadas') {
           formData.append('registrosPisoCoordenadas', JSON.stringify(controladorForm.registrosPisoCoordenadas || []))
         } else if (key === 'tarjetaConflictosMarcaModo' || key === 'switchFibraMarcaModo' || key === 'tarjetaRelevadoresMarcaModo') {
@@ -1354,7 +1366,13 @@ export default function InventarioSemaforos() {
       const formData = new FormData()
       formData.append('modelo', controladorForm.modelo)
       formData.append('cruceroId', controladorForm.cruceroId)
-      formData.append('postesDetalle', JSON.stringify(controladorForm.postes || []))
+      const postesConUid = (controladorForm.postes || []).map((p, idx) => ({
+        ...p,
+        uid: (p.uid && typeof p.uid === 'string' && p.uid.length > 8 && !p.uid.match(/^pst_\d+$/))
+          ? p.uid
+          : `pst_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 6)}`
+      }))
+      formData.append('postesDetalle', JSON.stringify(postesConUid))
 
       const res = await fetch(`${API_BASE_URL}/api/inventario/controladores`, {
         method: 'POST',
@@ -1364,6 +1382,10 @@ export default function InventarioSemaforos() {
       const json = await res.json().catch(() => ({}))
       if (res.ok && json.ok) {
         setEditandoControladorId(json.data.id)
+        if (json.data.postesDetalle) {
+          const postesNorm = normalizarPostesDetalle(json.data.postesDetalle)
+          setControladorForm(prev => ({ ...prev, postes: postesNorm }))
+        }
         cargarControladores()
         Swal.fire({
           title: 'Crucero Iniciado',
@@ -1456,11 +1478,10 @@ export default function InventarioSemaforos() {
       if (res.ok && json.ok) {
         const rawPostes = json.data?.postes || json.postes || []
         const postesServidor = normalizarPostesDetalle(rawPostes)
+        const uidsServidor = new Set(postesServidor.map(p => p.uid).filter(Boolean))
         // Preservar borradores locales que el técnico esté capturando actualmente y aún no haya guardado
-        const maxServId = postesServidor.length > 0 ? Math.max(...postesServidor.map(p => Number(p.id) || 0)) : 0
         const localesNuevos = (controladorForm.postes || [])
-          .filter(p => p.guardadoEnServidor === false)
-          .map((p, idx) => ({ ...p, id: maxServId + idx + 1 }))
+          .filter(p => p.uid && !uidsServidor.has(p.uid) && !p.guardadoEnServidor)
         const listaFinal = [...postesServidor, ...localesNuevos]
         const totales = recalcularTotalesDesdePostes(listaFinal)
         setControladorForm(prev => ({
@@ -1496,11 +1517,12 @@ export default function InventarioSemaforos() {
 
     setGuardandoModularSeccion(`poste-${pIdx}`)
     try {
-      const yaEnServidor = Boolean(posteAGuardar.guardadoEnServidor && posteAGuardar.id && posteAGuardar.id !== 'temp')
-      const url = yaEnServidor
-        ? `${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/postes/${posteAGuardar.id}`
+      const yaEnServidor = Boolean(posteAGuardar.guardadoEnServidor)
+      const ident = posteAGuardar.uid || posteAGuardar.id
+      const url = yaEnServidor && ident
+        ? `${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/postes/${ident}`
         : `${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/postes`
-      const metodo = yaEnServidor ? 'PUT' : 'POST'
+      const metodo = yaEnServidor && ident ? 'PUT' : 'POST'
 
       let res = await fetch(url, {
         method: metodo,
@@ -1528,9 +1550,13 @@ export default function InventarioSemaforos() {
       if (res.ok && json.ok) {
         const rawPostes = json.data?.postes || json.postes || []
         const postesServidor = normalizarPostesDetalle(rawPostes)
-        // Preservar postes locales que aún no se hayan guardado en el servidor
-        const idsServidor = new Set(postesServidor.map(p => Number(p.id)))
-        const localesNoGuardados = listaActual.filter(p => !idsServidor.has(Number(p.id)) && Number(p.id) !== Number(posteAGuardar.id))
+        // Preservar postes locales que aún no se hayan guardado en el servidor usando UID (NUNCA por id numérico)
+        const uidsServidor = new Set(postesServidor.map(p => p.uid).filter(Boolean))
+        const localesNoGuardados = listaActual.filter(p => {
+          if (!p.uid) return false
+          if (p.uid === posteAGuardar.uid) return false // el recién guardado ya está en postesServidor
+          return !uidsServidor.has(p.uid) && !p.guardadoEnServidor
+        })
         const listaFinal = [...postesServidor, ...localesNoGuardados]
         const totales = recalcularTotalesDesdePostes(listaFinal)
         setControladorForm(prev => ({
@@ -1543,7 +1569,7 @@ export default function InventarioSemaforos() {
           toast: true,
           position: 'top-end',
           icon: 'success',
-          title: `Poste #${pIdx + 1} guardado en el servidor`,
+          title: `Poste guardado en el servidor (${postesServidor.length} en el crucero)`,
           showConfirmButton: false,
           timer: 2500
         })
@@ -1568,7 +1594,7 @@ export default function InventarioSemaforos() {
     const poste = listaActual[pIdx]
     const confirmacion = await Swal.fire({
       title: `¿Eliminar Poste #${pIdx + 1}?`,
-      text: poste.ubicacionPoste ? `Coordenadas: ${poste.ubicacionPoste}` : 'Se quitará este poste del crucero.',
+      text: poste.ubicacionPoste ? `Ubicación: ${poste.ubicacionPoste}` : 'Se quitará este poste del crucero.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#A02142',
@@ -1581,11 +1607,12 @@ export default function InventarioSemaforos() {
 
     // Lista resultante local sin el poste eliminado
     const restantesLocales = listaActual.filter((_, idx) => idx !== pIdx)
+    const ident = poste.uid || poste.id
 
-    if (editandoControladorId && poste && poste.id) {
+    if (editandoControladorId && poste && poste.guardadoEnServidor && ident) {
       setGuardandoModularSeccion(`poste-del-${pIdx}`)
       try {
-        const res = await fetch(`${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/postes/${poste.id}`, {
+        const res = await fetch(`${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/postes/${ident}`, {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${user.token}` }
         })
@@ -1593,9 +1620,8 @@ export default function InventarioSemaforos() {
         if (res.ok && json.ok) {
           const rawPostes = json.data?.postes || json.postes || []
           const postesServidor = normalizarPostesDetalle(rawPostes)
-          // Preservar postes locales no guardados todavía en el servidor
-          const idsServidor = new Set(postesServidor.map(p => Number(p.id)))
-          const localesNoGuardados = restantesLocales.filter(p => !idsServidor.has(Number(p.id)))
+          const uidsServidor = new Set(postesServidor.map(p => p.uid).filter(Boolean))
+          const localesNoGuardados = restantesLocales.filter(p => p.uid && !uidsServidor.has(p.uid) && !p.guardadoEnServidor)
           const listaFinal = [...postesServidor, ...localesNoGuardados]
           const totales = recalcularTotalesDesdePostes(listaFinal)
           setControladorForm(prev => ({
@@ -1624,7 +1650,7 @@ export default function InventarioSemaforos() {
             toast: true,
             position: 'top-end',
             icon: 'success',
-            title: 'Poste eliminado',
+            title: 'Poste eliminado localmente',
             showConfirmButton: false,
             timer: 2000
           })
@@ -1641,6 +1667,7 @@ export default function InventarioSemaforos() {
         setGuardandoModularSeccion(null)
       }
     } else {
+      // Poste solo existía localmente en borrador
       const totales = recalcularTotalesDesdePostes(restantesLocales)
       setControladorForm(prev => ({
         ...prev,
@@ -5047,30 +5074,6 @@ export default function InventarioSemaforos() {
                       <FaBoxes size={11} style={{ color: '#691B31' }} />
                       {(controladorForm.postes || []).length} poste{((controladorForm.postes || []).length !== 1) ? 's' : ''} en crucero
                     </span>
-                    {editandoControladorId && (
-                      <button
-                        type="button"
-                        onClick={handleRefrescarPostes}
-                        disabled={guardandoModularSeccion === 'refrescandoPostes'}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          backgroundColor: '#F1F5F9',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '6px',
-                          padding: '0.35rem 0.65rem',
-                          fontSize: '0.78rem',
-                          fontWeight: '700',
-                          color: '#1E293B',
-                          cursor: 'pointer'
-                        }}
-                        title="Actualizar lista para ver postes registrados por compañeros"
-                      >
-                        <FaSyncAlt className={guardandoModularSeccion === 'refrescandoPostes' ? 'fa-spin' : ''} size={11} style={{ color: '#2563EB' }} />
-                        <span>{guardandoModularSeccion === 'refrescandoPostes' ? 'Sincronizando...' : 'Sincronizar'}</span>
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={handleAgregarPoste}
@@ -5160,32 +5163,6 @@ export default function InventarioSemaforos() {
                         </div>
 
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.65rem' }}>
-                          {editandoControladorId && (
-                            <button
-                              type="button"
-                              onClick={() => handleGuardarPosteModular(pIdx)}
-                              disabled={guardandoModularSeccion === `poste-${pIdx}`}
-                              style={{
-                                backgroundColor: '#ECFDF5',
-                                border: '1px solid #A7F3D0',
-                                color: '#065F46',
-                                borderRadius: '5px',
-                                padding: '0.25rem 0.65rem',
-                                fontSize: '0.78rem',
-                                fontWeight: '700',
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.35rem',
-                                transition: 'all 0.15s'
-                              }}
-                              title="Guarda este poste directamente en el servidor sin tocar los demás postes"
-                            >
-                              {guardandoModularSeccion === `poste-${pIdx}` ? <FaSyncAlt className="fa-spin" size={10} /> : <FaSave size={10} />}
-                              <span>{guardandoModularSeccion === `poste-${pIdx}` ? 'Guardando...' : 'Guardar este poste'}</span>
-                            </button>
-                          )}
-
                           {(controladorForm.postes || []).length > 1 && (
                             <button
                               type="button"
@@ -5753,7 +5730,7 @@ export default function InventarioSemaforos() {
                                       </div>
 
                                       {numLeds > 0 && (
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '0.55rem' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '0.6rem' }}>
                                           {leds.map((led, idx) => {
                                             const colorActual = OPCIONES_COLORES_LED.find(c => c.valor === led.color) || OPCIONES_COLORES_LED[0]
                                             return (
@@ -5761,30 +5738,55 @@ export default function InventarioSemaforos() {
                                                 key={`p-${pIdx}-g-${gIdx}-led-${led.numero || idx + 1}`}
                                                 style={{
                                                   display: 'flex',
+                                                  flexWrap: 'wrap',
                                                   alignItems: 'center',
                                                   justifyContent: 'space-between',
                                                   backgroundColor: '#FFFFFF',
-                                                  padding: '0.45rem 0.65rem',
-                                                  borderRadius: '6px',
+                                                  padding: '0.5rem 0.7rem',
+                                                  borderRadius: '7px',
                                                   border: '1px solid #E2E8F0',
-                                                  gap: '0.5rem',
+                                                  gap: '0.45rem 0.75rem',
                                                   boxSizing: 'border-box'
                                                 }}
                                               >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 0 }}>
-                                                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: colorActual.color, display: 'inline-block', flexShrink: 0, boxShadow: '0 0 3px rgba(0,0,0,0.2)' }} />
-                                                  <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#1E293B', minWidth: '22px', flexShrink: 0 }}>L{led.numero || idx + 1}</span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flex: '1 1 140px', minWidth: '125px' }}>
+                                                  <span
+                                                    style={{
+                                                      width: '13px',
+                                                      height: '13px',
+                                                      borderRadius: '50%',
+                                                      backgroundColor: colorActual.color,
+                                                      display: 'inline-block',
+                                                      flexShrink: 0,
+                                                      boxShadow: `0 0 0 2px #FFFFFF, 0 0 0 3.5px ${colorActual.color}`
+                                                    }}
+                                                    title={`Color: ${colorActual.label}`}
+                                                  />
+                                                  <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#1E293B', minWidth: '22px', flexShrink: 0 }}>
+                                                    L{led.numero || idx + 1}
+                                                  </span>
                                                   <select
                                                     value={led.color || 'Rojo'}
                                                     onChange={(e) => handleCambiarLedEnPoste(pIdx, gIdx, idx, 'color', e.target.value)}
-                                                    style={{ flex: 1, minWidth: '65px', padding: '0.25rem 0.4rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.78rem', backgroundColor: '#F8FAFC' }}
+                                                    style={{
+                                                      flex: 1,
+                                                      minWidth: '95px',
+                                                      padding: '0.3rem 0.5rem',
+                                                      border: '1px solid #CBD5E1',
+                                                      borderLeft: `4px solid ${colorActual.color}`,
+                                                      borderRadius: '6px',
+                                                      fontSize: '0.8rem',
+                                                      fontWeight: '600',
+                                                      backgroundColor: '#F8FAFC',
+                                                      color: '#1E293B'
+                                                    }}
                                                   >
                                                     {OPCIONES_COLORES_LED.map(c => (
                                                       <option key={c.valor} value={c.valor}>{c.label}</option>
                                                     ))}
                                                   </select>
                                                 </div>
-                                                <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', flexShrink: 0 }}>
+                                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
                                                   {['Funciona', 'No funciona'].map((estado) => {
                                                     const isChecked = (led.estado || 'Funciona') === estado
                                                     return (
@@ -5793,9 +5795,9 @@ export default function InventarioSemaforos() {
                                                         style={{
                                                           display: 'inline-flex',
                                                           alignItems: 'center',
-                                                          gap: '0.25rem',
+                                                          gap: '0.3rem',
                                                           cursor: 'pointer',
-                                                          fontSize: '0.78rem',
+                                                          fontSize: '0.8rem',
                                                           whiteSpace: 'nowrap',
                                                           fontWeight: isChecked ? '700' : '500',
                                                           color: isChecked ? (estado === 'Funciona' ? '#16A34A' : '#DC2626') : '#64748B'
@@ -5807,13 +5809,13 @@ export default function InventarioSemaforos() {
                                                           value={estado}
                                                           checked={isChecked}
                                                           onChange={() => handleCambiarLedEnPoste(pIdx, gIdx, idx, 'estado', estado)}
-                                                          style={{ accentColor: '#691B31', width: '13px', height: '13px', cursor: 'pointer' }}
+                                                          style={{ accentColor: '#691B31', width: '15px', height: '15px', cursor: 'pointer' }}
                                                         />
                                                         <span
                                                           style={{
                                                             display: 'inline-block',
-                                                            width: '7px',
-                                                            height: '7px',
+                                                            width: '8px',
+                                                            height: '8px',
                                                             borderRadius: '50%',
                                                             backgroundColor: estado === 'Funciona' ? '#16A34A' : '#DC2626'
                                                           }}

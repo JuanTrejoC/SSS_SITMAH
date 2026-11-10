@@ -649,7 +649,9 @@ async function crearControladorSemaforo(req, res) {
   if (Array.isArray(body.postesDetalle)) {
     const list = body.postesDetalle.map((p, idx) => ({
       ...p,
-      uid: p.uid || (p.id ? `pst_${p.id}` : `pst_${idx + 1}`),
+      uid: (p.uid && typeof p.uid === 'string' && p.uid.length > 8 && !p.uid.match(/^pst_\d+$/))
+        ? p.uid
+        : `pst_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 6)}`,
       id: Number(p.id) || idx + 1,
       guardadoEnServidor: true
     }));
@@ -721,109 +723,120 @@ async function actualizarControladorSemaforo(req, res) {
   const parsed = controladorSemaforoSchema.safeParse(body);
   if (!parsed.success) return fail(res, parsed.error);
 
-  const existe = await prisma.controladorSemaforo.findUnique({ where: { id } });
-  if (!existe) return fail(res, 'Controlador semafórico no encontrado', 404);
-
-  const dataToUpdate = { ...parsed.data };
-  if (dataToUpdate.peatonalModelo || dataToUpdate.peatonalModuloEstado) {
-    dataToUpdate.pasoPeatonal = true;
-  }
-  if (dataToUpdate.audibleModelo || dataToUpdate.audibleModuloEstado) {
-    dataToUpdate.audible = true;
-  }
-  if (req.file) {
-    dataToUpdate.archivoProgramacion = `uploads/${req.file.filename}`;
-  } else if (body.removerArchivo === 'true') {
-    dataToUpdate.archivoProgramacion = null;
-  }
-
-  // Proteger campos de gabinete para que no se sobreescriban con valores vacíos si la base de datos ya tiene información
-  const camposGabinete = [
-    'numeroGabinete', 'versionFirmware', 'ipLocal', 'ipSystem', 'mascaraRed', 'gateway',
-    'cicloCompleto', 'respaldoProgramacionUsb', 'tarjetaConflictosMarca', 'tarjetaConflictosModelo',
-    'tarjetaConflictosEstado', 'tarjetaRelevadoresMarca', 'tarjetaRelevadoresModelo',
-    'tarjetaRelevadoresCantidad', 'switchFibraMarca', 'switchFibraModelo', 'switchFibraPuertosTotal',
-    'switchFibraPuertosUso', 'switchFibraFuentePoder', 'receptorFibraDispositivo', 'receptorFibraCable',
-    'conexionesTarjetaMadre', 'fuentePoderSupresorPicos', 'gpsModelo', 'gpsComponenteFisico',
-    'gpsAntenaExterior', 'observacionesExterior'
-  ];
-
-  camposGabinete.forEach(campo => {
-    if ((dataToUpdate[campo] === undefined || dataToUpdate[campo] === null || dataToUpdate[campo] === '') && existe[campo]) {
-      dataToUpdate[campo] = existe[campo];
-    }
-  });
-
-  // Proteger registros de piso si vienen vacíos para que un técnico no borre lo que capturó el otro
-  if ((dataToUpdate.registrosPisoTapas === undefined || dataToUpdate.registrosPisoTapas === null || dataToUpdate.registrosPisoTapas === '') && existe.registrosPisoTapas) {
-    dataToUpdate.registrosPisoTapas = existe.registrosPisoTapas;
-  }
-  if ((dataToUpdate.registrosPisoDanados === undefined || dataToUpdate.registrosPisoDanados === null || Number(dataToUpdate.registrosPisoDanados) === 0) && Number(existe.registrosPisoDanados) > 0) {
-    dataToUpdate.registrosPisoDanados = existe.registrosPisoDanados;
-    dataToUpdate.registrosPisoCoordenadas = existe.registrosPisoCoordenadas;
-  }
-
-  // Fusión inteligente (Smart Merge) de postesDetalle para sincronizar automáticamente el trabajo de ambos técnicos
-  if (Array.isArray(body.postesDetalle)) {
-    let listDB = [];
-    if (typeof existe.postesDetalle === 'string') {
-      try { listDB = JSON.parse(existe.postesDetalle); } catch (e) { listDB = []; }
-    } else if (Array.isArray(existe.postesDetalle)) {
-      listDB = [...existe.postesDetalle];
-    }
-
-    // Normalizar postes de la BD asegurando uid
-    listDB = listDB.map((p, idx) => ({
-      ...p,
-      uid: p.uid || (p.id ? `pst_${p.id}` : `pst_${idx + 1}`),
-      id: Number(p.id) || idx + 1,
-      guardadoEnServidor: true
-    }));
-
-    const incomingList = body.postesDetalle.map((p, idx) => ({
-      ...p,
-      uid: p.uid || (p.id ? `pst_${p.id}` : `pst_${idx + 1}`)
-    }));
-
-    // Mapa por UID para preservar exactamente los postes existentes y agregar los nuevos de cada técnico
-    const dbUidMap = new Map();
-    listDB.forEach(p => dbUidMap.set(p.uid, p));
-
-    incomingList.forEach(pIn => {
-      if (dbUidMap.has(pIn.uid)) {
-        // Poste que ya existía: actualizarlo protegiendo campos no vacíos de la BD
-        const dbP = dbUidMap.get(pIn.uid);
-        const merged = { ...dbP, ...pIn, guardadoEnServidor: true };
-        if (!merged.ubicacionPoste && dbP.ubicacionPoste) merged.ubicacionPoste = dbP.ubicacionPoste;
-        if (!merged.observaciones && dbP.observaciones) merged.observaciones = dbP.observaciones;
-        dbUidMap.set(pIn.uid, merged);
-      } else {
-        // Poste nuevo creado por este técnico: agregarlo sin conflicto
-        dbUidMap.set(pIn.uid, { ...pIn, guardadoEnServidor: true });
-      }
-    });
-
-    // Reasignar IDs correlativos limpios 1..N
-    const listaFinalPostes = Array.from(dbUidMap.values()).map((p, idx) => ({
-      ...p,
-      id: idx + 1,
-      guardadoEnServidor: true
-    }));
-    dataToUpdate.postesDetalle = listaFinalPostes;
-
-    // Recalcular totales consolidados (semáforos, LEDs, audibles, peatonales, etc.)
-    const totales = recalcularTotalesDesdePostesBackend(listaFinalPostes);
-    Object.assign(dataToUpdate, totales);
-  }
-
   try {
-    const controlador = await prisma.controladorSemaforo.update({
-      where: { id },
-      data: dataToUpdate,
+    const controlador = await prisma.$transaction(async (tx) => {
+      const existe = await tx.controladorSemaforo.findUnique({ where: { id } });
+      if (!existe) throw new Error('Controlador semafórico no encontrado');
+
+      const dataToUpdate = { ...parsed.data };
+      if (dataToUpdate.peatonalModelo || dataToUpdate.peatonalModuloEstado) {
+        dataToUpdate.pasoPeatonal = true;
+      }
+      if (dataToUpdate.audibleModelo || dataToUpdate.audibleModuloEstado) {
+        dataToUpdate.audible = true;
+      }
+      if (req.file) {
+        dataToUpdate.archivoProgramacion = `uploads/${req.file.filename}`;
+      } else if (body.removerArchivo === 'true') {
+        dataToUpdate.archivoProgramacion = null;
+      }
+
+      // Proteger campos de gabinete para que no se sobreescriban con valores vacíos si la base de datos ya tiene información
+      const camposGabinete = [
+        'numeroGabinete', 'versionFirmware', 'ipLocal', 'ipSystem', 'mascaraRed', 'gateway',
+        'cicloCompleto', 'respaldoProgramacionUsb', 'tarjetaConflictosMarca', 'tarjetaConflictosModelo',
+        'tarjetaConflictosEstado', 'tarjetaRelevadoresMarca', 'tarjetaRelevadoresModelo',
+        'tarjetaRelevadoresCantidad', 'switchFibraMarca', 'switchFibraModelo', 'switchFibraPuertosTotal',
+        'switchFibraPuertosUso', 'switchFibraFuentePoder', 'receptorFibraDispositivo', 'receptorFibraCable',
+        'conexionesTarjetaMadre', 'fuentePoderSupresorPicos', 'gpsModelo', 'gpsComponenteFisico',
+        'gpsAntenaExterior', 'observacionesExterior'
+      ];
+
+      camposGabinete.forEach(campo => {
+        if ((dataToUpdate[campo] === undefined || dataToUpdate[campo] === null || dataToUpdate[campo] === '') && existe[campo]) {
+          dataToUpdate[campo] = existe[campo];
+        }
+      });
+
+      // Proteger registros de piso si vienen vacíos para que un técnico no borre lo que capturó el otro
+      if ((dataToUpdate.registrosPisoTapas === undefined || dataToUpdate.registrosPisoTapas === null || dataToUpdate.registrosPisoTapas === '') && existe.registrosPisoTapas) {
+        dataToUpdate.registrosPisoTapas = existe.registrosPisoTapas;
+      }
+      if ((dataToUpdate.registrosPisoDanados === undefined || dataToUpdate.registrosPisoDanados === null || Number(dataToUpdate.registrosPisoDanados) === 0) && Number(existe.registrosPisoDanados) > 0) {
+        dataToUpdate.registrosPisoDanados = existe.registrosPisoDanados;
+        dataToUpdate.registrosPisoCoordenadas = existe.registrosPisoCoordenadas;
+      }
+
+      // Fusión inteligente (Smart Merge) de postesDetalle para sincronizar automáticamente el trabajo de ambos técnicos
+      if (Array.isArray(body.postesDetalle)) {
+        let listDB = [];
+        if (typeof existe.postesDetalle === 'string') {
+          try { listDB = JSON.parse(existe.postesDetalle); } catch (e) { listDB = []; }
+        } else if (Array.isArray(existe.postesDetalle)) {
+          listDB = [...existe.postesDetalle];
+        }
+
+        // Normalizar postes de la BD asegurando uid único y persistente
+        listDB = listDB.map((p, idx) => ({
+          ...p,
+          uid: (p.uid && typeof p.uid === 'string' && p.uid.length > 8 && !p.uid.match(/^pst_\d+$/))
+            ? p.uid
+            : `pst_${id}_${p.id || idx + 1}_${Math.random().toString(36).substr(2, 6)}`,
+          id: Number(p.id) || idx + 1,
+          guardadoEnServidor: true
+        }));
+
+        const incomingList = body.postesDetalle.map((p, idx) => ({
+          ...p,
+          uid: (p.uid && typeof p.uid === 'string' && p.uid.length > 8 && !p.uid.match(/^pst_\d+$/))
+            ? p.uid
+            : `pst_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 6)}`
+        }));
+
+        // Mapa por UID para preservar exactamente los postes existentes y agregar los nuevos de cada técnico
+        const dbUidMap = new Map();
+        listDB.forEach(p => dbUidMap.set(p.uid, p));
+
+        incomingList.forEach(pIn => {
+          if (dbUidMap.has(pIn.uid)) {
+            // Poste que ya existía: actualizarlo protegiendo campos no vacíos de la BD
+            const dbP = dbUidMap.get(pIn.uid);
+            const merged = { ...dbP, ...pIn, guardadoEnServidor: true };
+            if (!merged.ubicacionPoste && dbP.ubicacionPoste) merged.ubicacionPoste = dbP.ubicacionPoste;
+            if (!merged.observaciones && dbP.observaciones) merged.observaciones = dbP.observaciones;
+            dbUidMap.set(pIn.uid, merged);
+          } else {
+            // Poste nuevo creado por este técnico: agregarlo sin conflicto
+            dbUidMap.set(pIn.uid, { ...pIn, guardadoEnServidor: true });
+          }
+        });
+
+        // Reasignar IDs correlativos limpios 1..N
+        const listaFinalPostes = Array.from(dbUidMap.values()).map((p, idx) => ({
+          ...p,
+          id: idx + 1,
+          guardadoEnServidor: true
+        }));
+        dataToUpdate.postesDetalle = listaFinalPostes;
+
+        // Recalcular totales consolidados (semáforos, LEDs, audibles, peatonales, etc.)
+        const totales = recalcularTotalesDesdePostesBackend(listaFinalPostes);
+        Object.assign(dataToUpdate, totales);
+      }
+
+      return await tx.controladorSemaforo.update({
+        where: { id },
+        data: dataToUpdate,
+        include: { crucero: true }
+      });
     });
+
     ok(res, controlador);
   } catch (error) {
     console.error('Error al actualizar controlador semafórico en Prisma:', error);
+    if (error.message === 'Controlador semafórico no encontrado') {
+      return fail(res, error.message, 404);
+    }
     fail(res, error.message || 'Error al actualizar el controlador en la base de datos', 500);
   }
 }
@@ -1042,6 +1055,29 @@ async function obtenerPostesControlador(req, res) {
     list = existe.postesDetalle;
   }
 
+  // Asegurar que cada poste en la BD tenga un UID único persistente
+  let actualizado = false;
+  list = list.map((p, idx) => {
+    const esValido = p && p.uid && typeof p.uid === 'string' && p.uid.length > 8 && !p.uid.match(/^pst_\d+$/);
+    if (!esValido) {
+      actualizado = true;
+      return {
+        ...p,
+        uid: `pst_${id}_${p.id || idx + 1}_${Math.random().toString(36).substr(2, 6)}`,
+        id: p.id || idx + 1,
+        guardadoEnServidor: true
+      };
+    }
+    return { ...p, id: p.id || idx + 1, guardadoEnServidor: true };
+  });
+
+  if (actualizado && list.length > 0) {
+    await prisma.controladorSemaforo.update({
+      where: { id },
+      data: { postesDetalle: list }
+    }).catch(err => console.error('Error actualizando UIDs persistentes:', err));
+  }
+
   ok(res, { postes: list, id: existe.id, modelo: existe.modelo });
 }
 
@@ -1062,14 +1098,46 @@ async function agregarPosteControlador(req, res) {
     return fail(res, 'Los datos del poste son requeridos', 400);
   }
 
-  const sigId = list.length > 0 ? Math.max(...list.map(p => Number(p.id) || 0)) + 1 : 1;
-  const nuevoPoste = {
-    ...rawPoste,
-    id: sigId,
+  // Asegurar UIDs únicos válidos en todos los postes existentes de la BD
+  list = list.map((p, idx) => ({
+    ...p,
+    uid: (p.uid && typeof p.uid === 'string' && p.uid.length > 8 && !p.uid.match(/^pst_\d+$/))
+      ? p.uid
+      : `pst_${id}_${p.id || idx + 1}_${Math.random().toString(36).substr(2, 6)}`,
+    id: Number(p.id) || idx + 1,
     guardadoEnServidor: true
-  };
+  }));
 
-  list.push(nuevoPoste);
+  const uid = (rawPoste.uid && typeof rawPoste.uid === 'string' && rawPoste.uid.length > 8 && !rawPoste.uid.match(/^pst_\d+$/))
+    ? rawPoste.uid
+    : `pst_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+
+  // Si ya existía este poste en la BD (por UID), actualizarlo en lugar de duplicarlo
+  const existingIdx = list.findIndex(p => p.uid === uid);
+  if (existingIdx !== -1) {
+    list[existingIdx] = {
+      ...list[existingIdx],
+      ...rawPoste,
+      uid,
+      id: list[existingIdx].id,
+      guardadoEnServidor: true
+    };
+  } else {
+    const sigId = list.length > 0 ? Math.max(...list.map(p => Number(p.id) || 0)) + 1 : 1;
+    list.push({
+      ...rawPoste,
+      uid,
+      id: sigId,
+      guardadoEnServidor: true
+    });
+  }
+
+  // Renumerar ordenadamente 1..N
+  list = list.map((p, idx) => ({
+    ...p,
+    id: idx + 1,
+    guardadoEnServidor: true
+  }));
 
   const totales = recalcularTotalesDesdePostesBackend(list);
 
@@ -1082,12 +1150,13 @@ async function agregarPosteControlador(req, res) {
     include: { crucero: true }
   });
 
-  ok(res, { poste: nuevoPoste, postes: list, controlador, mensaje: 'Poste agregado exitosamente al crucero.' }, 201);
+  const posteGuardado = list.find(p => p.uid === uid) || list[list.length - 1];
+  ok(res, { poste: posteGuardado, postes: list, controlador, mensaje: 'Poste guardado exitosamente en el crucero.' }, 201);
 }
 
 async function actualizarPosteControlador(req, res) {
   const id = Number(req.params.id);
-  const posteId = Number(req.params.posteId);
+  const posteIdentificador = req.params.posteId;
   const existe = await prisma.controladorSemaforo.findUnique({ where: { id } });
   if (!existe) return fail(res, 'Controlador semafórico no encontrado', 404);
 
@@ -1099,11 +1168,37 @@ async function actualizarPosteControlador(req, res) {
   }
 
   const rawPoste = req.body.poste || req.body;
-  const index = list.findIndex(p => Number(p.id) === posteId);
+  if (!rawPoste || typeof rawPoste !== 'object') {
+    return fail(res, 'Los datos del poste son requeridos', 400);
+  }
+
+  // Asegurar UIDs únicos válidos en todos los postes de la BD
+  list = list.map((p, idx) => ({
+    ...p,
+    uid: (p.uid && typeof p.uid === 'string' && p.uid.length > 8 && !p.uid.match(/^pst_\d+$/))
+      ? p.uid
+      : `pst_${id}_${p.id || idx + 1}_${Math.random().toString(36).substr(2, 6)}`,
+    id: Number(p.id) || idx + 1,
+    guardadoEnServidor: true
+  }));
+
+  const targetUid = rawPoste.uid || (isNaN(Number(posteIdentificador)) ? String(posteIdentificador) : null);
+
+  let index = -1;
+  if (targetUid) {
+    index = list.findIndex(p => p.uid === targetUid);
+  }
+  if (index === -1 && !isNaN(Number(posteIdentificador))) {
+    index = list.findIndex(p => Number(p.id) === Number(posteIdentificador));
+  }
+
+  const finalUid = targetUid || (index !== -1 ? list[index].uid : `pst_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`);
+
   if (index === -1) {
     const sigId = list.length > 0 ? Math.max(...list.map(p => Number(p.id) || 0)) + 1 : 1;
     list.push({
       ...rawPoste,
+      uid: finalUid,
       id: sigId,
       guardadoEnServidor: true
     });
@@ -1111,10 +1206,18 @@ async function actualizarPosteControlador(req, res) {
     list[index] = {
       ...list[index],
       ...rawPoste,
-      id: posteId,
+      uid: finalUid,
+      id: list[index].id,
       guardadoEnServidor: true
     };
   }
+
+  // Renumerar ordenadamente 1..N
+  list = list.map((p, idx) => ({
+    ...p,
+    id: idx + 1,
+    guardadoEnServidor: true
+  }));
 
   const totales = recalcularTotalesDesdePostesBackend(list);
 
@@ -1127,13 +1230,13 @@ async function actualizarPosteControlador(req, res) {
     include: { crucero: true }
   });
 
-  const posteGuardado = list.find(p => Number(p.id) === posteId) || list[list.length - 1] || rawPoste;
+  const posteGuardado = list.find(p => p.uid === finalUid) || list[list.length - 1] || rawPoste;
   ok(res, { poste: posteGuardado, postes: list, controlador, mensaje: 'Poste guardado exitosamente.' });
 }
 
 async function eliminarPosteControlador(req, res) {
   const id = Number(req.params.id);
-  const posteId = Number(req.params.posteId);
+  const posteIdentificador = req.params.posteId;
   const existe = await prisma.controladorSemaforo.findUnique({ where: { id } });
   if (!existe) return fail(res, 'Controlador semafórico no encontrado', 404);
 
@@ -1144,19 +1247,30 @@ async function eliminarPosteControlador(req, res) {
     list = [...existe.postesDetalle];
   }
 
-  const filtrados = list.filter(p => Number(p.id) !== posteId);
-  const totales = recalcularTotalesDesdePostesBackend(filtrados);
+  const filtrados = list.filter(p => {
+    if (p.uid && p.uid === posteIdentificador) return false;
+    if (!isNaN(Number(posteIdentificador)) && Number(p.id) === Number(posteIdentificador)) return false;
+    return true;
+  });
+
+  const listaFinal = filtrados.map((p, idx) => ({
+    ...p,
+    id: idx + 1,
+    guardadoEnServidor: true
+  }));
+
+  const totales = recalcularTotalesDesdePostesBackend(listaFinal);
 
   const controlador = await prisma.controladorSemaforo.update({
     where: { id },
     data: {
-      postesDetalle: filtrados,
+      postesDetalle: listaFinal,
       ...totales
     },
     include: { crucero: true }
   });
 
-  ok(res, { postes: filtrados, controlador, mensaje: 'Poste eliminado exitosamente.' });
+  ok(res, { postes: listaFinal, controlador, mensaje: 'Poste eliminado exitosamente.' });
 }
 
 async function actualizarRegistrosPisoControlador(req, res) {
