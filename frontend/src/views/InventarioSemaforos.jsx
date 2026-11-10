@@ -3703,28 +3703,6 @@ export default function InventarioSemaforos() {
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
                       <button
                         type="button"
-                        onClick={cargarCatalogos}
-                        title="Actualizar catálogo de cruceros"
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#64748B',
-                          fontSize: '0.72rem',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                          padding: '0.15rem 0.35rem',
-                          borderRadius: '4px'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.color = '#691B31'}
-                        onMouseOut={(e) => e.currentTarget.style.color = '#64748B'}
-                      >
-                        <FaSyncAlt size={10} /> Refrescar
-                      </button>
-                      <button
-                        type="button"
                         onClick={handleCrearNuevoCruceroRapido}
                         title="Registrar un nuevo crucero si no aparece en la lista"
                         style={{
