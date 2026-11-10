@@ -628,6 +628,17 @@ async function crearControladorSemaforo(req, res) {
   const parsed = controladorSemaforoSchema.safeParse(body);
   if (!parsed.success) return fail(res, parsed.error);
 
+  // Si ya existe un controlador registrado para este crucero, actualizarlo con fusión para no duplicar ni sobreescribir
+  if (parsed.data.cruceroId) {
+    const yaExiste = await prisma.controladorSemaforo.findFirst({
+      where: { cruceroId: parsed.data.cruceroId }
+    });
+    if (yaExiste) {
+      req.params.id = yaExiste.id;
+      return actualizarControladorSemaforo(req, res);
+    }
+  }
+
   const dataToSave = { ...parsed.data };
   if (dataToSave.peatonalModelo || dataToSave.peatonalModuloEstado) {
     dataToSave.pasoPeatonal = true;
@@ -635,16 +646,31 @@ async function crearControladorSemaforo(req, res) {
   if (dataToSave.audibleModelo || dataToSave.audibleModuloEstado) {
     dataToSave.audible = true;
   }
+  if (Array.isArray(body.postesDetalle)) {
+    const list = body.postesDetalle.map((p, idx) => ({
+      ...p,
+      uid: p.uid || (p.id ? `pst_${p.id}` : `pst_${idx + 1}`),
+      id: Number(p.id) || idx + 1,
+      guardadoEnServidor: true
+    }));
+    dataToSave.postesDetalle = list;
+    const totales = recalcularTotalesDesdePostesBackend(list);
+    Object.assign(dataToSave, totales);
+  }
   if (req.file) {
     // Relative path to be stored in the database
     dataToSave.archivoProgramacion = `uploads/${req.file.filename}`;
   }
 
-  const controlador = await prisma.controladorSemaforo.create({
-    data: dataToSave,
-  });
-
-  ok(res, controlador, 201);
+  try {
+    const controlador = await prisma.controladorSemaforo.create({
+      data: dataToSave,
+    });
+    ok(res, controlador, 201);
+  } catch (error) {
+    console.error('Error al crear controlador semafórico en Prisma:', error);
+    fail(res, error.message || 'Error al guardar el controlador en la base de datos', 500);
+  }
 }
 
 async function obtenerControladorSemaforo(req, res) {
@@ -711,12 +737,95 @@ async function actualizarControladorSemaforo(req, res) {
     dataToUpdate.archivoProgramacion = null;
   }
 
-  const controlador = await prisma.controladorSemaforo.update({
-    where: { id },
-    data: dataToUpdate,
+  // Proteger campos de gabinete para que no se sobreescriban con valores vacíos si la base de datos ya tiene información
+  const camposGabinete = [
+    'numeroGabinete', 'versionFirmware', 'ipLocal', 'ipSystem', 'mascaraRed', 'gateway',
+    'cicloCompleto', 'respaldoProgramacionUsb', 'tarjetaConflictosMarca', 'tarjetaConflictosModelo',
+    'tarjetaConflictosEstado', 'tarjetaRelevadoresMarca', 'tarjetaRelevadoresModelo',
+    'tarjetaRelevadoresCantidad', 'switchFibraMarca', 'switchFibraModelo', 'switchFibraPuertosTotal',
+    'switchFibraPuertosUso', 'switchFibraFuentePoder', 'receptorFibraDispositivo', 'receptorFibraCable',
+    'conexionesTarjetaMadre', 'fuentePoderSupresorPicos', 'gpsModelo', 'gpsComponenteFisico',
+    'gpsAntenaExterior', 'observacionesExterior'
+  ];
+
+  camposGabinete.forEach(campo => {
+    if ((dataToUpdate[campo] === undefined || dataToUpdate[campo] === null || dataToUpdate[campo] === '') && existe[campo]) {
+      dataToUpdate[campo] = existe[campo];
+    }
   });
 
-  ok(res, controlador);
+  // Proteger registros de piso si vienen vacíos para que un técnico no borre lo que capturó el otro
+  if ((dataToUpdate.registrosPisoTapas === undefined || dataToUpdate.registrosPisoTapas === null || dataToUpdate.registrosPisoTapas === '') && existe.registrosPisoTapas) {
+    dataToUpdate.registrosPisoTapas = existe.registrosPisoTapas;
+  }
+  if ((dataToUpdate.registrosPisoDanados === undefined || dataToUpdate.registrosPisoDanados === null || Number(dataToUpdate.registrosPisoDanados) === 0) && Number(existe.registrosPisoDanados) > 0) {
+    dataToUpdate.registrosPisoDanados = existe.registrosPisoDanados;
+    dataToUpdate.registrosPisoCoordenadas = existe.registrosPisoCoordenadas;
+  }
+
+  // Fusión inteligente (Smart Merge) de postesDetalle para sincronizar automáticamente el trabajo de ambos técnicos
+  if (Array.isArray(body.postesDetalle)) {
+    let listDB = [];
+    if (typeof existe.postesDetalle === 'string') {
+      try { listDB = JSON.parse(existe.postesDetalle); } catch (e) { listDB = []; }
+    } else if (Array.isArray(existe.postesDetalle)) {
+      listDB = [...existe.postesDetalle];
+    }
+
+    // Normalizar postes de la BD asegurando uid
+    listDB = listDB.map((p, idx) => ({
+      ...p,
+      uid: p.uid || (p.id ? `pst_${p.id}` : `pst_${idx + 1}`),
+      id: Number(p.id) || idx + 1,
+      guardadoEnServidor: true
+    }));
+
+    const incomingList = body.postesDetalle.map((p, idx) => ({
+      ...p,
+      uid: p.uid || (p.id ? `pst_${p.id}` : `pst_${idx + 1}`)
+    }));
+
+    // Mapa por UID para preservar exactamente los postes existentes y agregar los nuevos de cada técnico
+    const dbUidMap = new Map();
+    listDB.forEach(p => dbUidMap.set(p.uid, p));
+
+    incomingList.forEach(pIn => {
+      if (dbUidMap.has(pIn.uid)) {
+        // Poste que ya existía: actualizarlo protegiendo campos no vacíos de la BD
+        const dbP = dbUidMap.get(pIn.uid);
+        const merged = { ...dbP, ...pIn, guardadoEnServidor: true };
+        if (!merged.ubicacionPoste && dbP.ubicacionPoste) merged.ubicacionPoste = dbP.ubicacionPoste;
+        if (!merged.observaciones && dbP.observaciones) merged.observaciones = dbP.observaciones;
+        dbUidMap.set(pIn.uid, merged);
+      } else {
+        // Poste nuevo creado por este técnico: agregarlo sin conflicto
+        dbUidMap.set(pIn.uid, { ...pIn, guardadoEnServidor: true });
+      }
+    });
+
+    // Reasignar IDs correlativos limpios 1..N
+    const listaFinalPostes = Array.from(dbUidMap.values()).map((p, idx) => ({
+      ...p,
+      id: idx + 1,
+      guardadoEnServidor: true
+    }));
+    dataToUpdate.postesDetalle = listaFinalPostes;
+
+    // Recalcular totales consolidados (semáforos, LEDs, audibles, peatonales, etc.)
+    const totales = recalcularTotalesDesdePostesBackend(listaFinalPostes);
+    Object.assign(dataToUpdate, totales);
+  }
+
+  try {
+    const controlador = await prisma.controladorSemaforo.update({
+      where: { id },
+      data: dataToUpdate,
+    });
+    ok(res, controlador);
+  } catch (error) {
+    console.error('Error al actualizar controlador semafórico en Prisma:', error);
+    fail(res, error.message || 'Error al actualizar el controlador en la base de datos', 500);
+  }
 }
 
 async function eliminarControladorSemaforo(req, res) {
@@ -956,7 +1065,8 @@ async function agregarPosteControlador(req, res) {
   const sigId = list.length > 0 ? Math.max(...list.map(p => Number(p.id) || 0)) + 1 : 1;
   const nuevoPoste = {
     ...rawPoste,
-    id: rawPoste.id || sigId
+    id: sigId,
+    guardadoEnServidor: true
   };
 
   list.push(nuevoPoste);
@@ -991,14 +1101,20 @@ async function actualizarPosteControlador(req, res) {
   const rawPoste = req.body.poste || req.body;
   const index = list.findIndex(p => Number(p.id) === posteId);
   if (index === -1) {
-    return fail(res, 'Poste no encontrado en este controlador', 404);
+    const sigId = list.length > 0 ? Math.max(...list.map(p => Number(p.id) || 0)) + 1 : 1;
+    list.push({
+      ...rawPoste,
+      id: sigId,
+      guardadoEnServidor: true
+    });
+  } else {
+    list[index] = {
+      ...list[index],
+      ...rawPoste,
+      id: posteId,
+      guardadoEnServidor: true
+    };
   }
-
-  list[index] = {
-    ...list[index],
-    ...rawPoste,
-    id: posteId
-  };
 
   const totales = recalcularTotalesDesdePostesBackend(list);
 
@@ -1011,7 +1127,8 @@ async function actualizarPosteControlador(req, res) {
     include: { crucero: true }
   });
 
-  ok(res, { poste: list[index], postes: list, controlador, mensaje: 'Poste actualizado exitosamente.' });
+  const posteGuardado = list.find(p => Number(p.id) === posteId) || list[list.length - 1] || rawPoste;
+  ok(res, { poste: posteGuardado, postes: list, controlador, mensaje: 'Poste guardado exitosamente.' });
 }
 
 async function eliminarPosteControlador(req, res) {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../context/AuthContext'
@@ -13,7 +13,7 @@ import {
   FaCalendarAlt, FaUpload, FaHistory, FaDownload, FaExclamationTriangle,
   FaListUl, FaSearch, FaBuilding, FaTrafficLight, FaVideo, FaLayerGroup,
   FaCircle, FaExternalLinkAlt, FaBroadcastTower, FaLightbulb, FaSave, FaArrowDown, FaSyncAlt, FaCube,
-  FaUsers, FaBolt
+  FaUsers, FaBolt, FaFileArchive
 } from 'react-icons/fa'
 
 // ==================================================
@@ -321,45 +321,52 @@ const crearAudibleInicial = (id = 1, sentido = '') => ({
   observaciones: ''
 })
 
-const crearPosteInicial = (id = 1, modelo = 'PCC-1') => ({
-  id,
-  tipoPoste: 'mixto', // 'mixto' (Vehicular / Mixto) | 'peatonal' (Exclusivo Peatonal / Pedestal)
-  ubicacionPoste: '', // ej. 'Banqueta Poniente', 'Camellón Central / Isleta', etc.
-  modeloPoste: modelo,
-  tapaRegistro: 'Buena',
-  observaciones: '',
-  tipoCabezal: 'LED',
-  cabezalModelo: 'LV-1',
-  pantallaPiezas: '',
-  pantallaEstado: 'Funciona',
-  pantallasLista: [],
-  cabezalesGrupos: [
-    {
-      id: 1,
-      numLeds: 4,
-      leds: [
-        { numero: 1, color: 'Rojo', estado: 'Funciona' },
-        { numero: 2, color: 'Amarillo', estado: 'Funciona' },
-        { numero: 3, color: 'Verde', estado: 'Funciona' },
-        { numero: 4, color: 'Flecha Verde', estado: 'Funciona' }
-      ]
-    }
-  ],
-  tienePeatonal: false,
-  peatonalesLista: [crearPeatonalInicial(1, 'Sentido hacia Camellón')],
-  peatonalModelo: '',
-  peatonalModuloEstado: 'Operando',
-  peatonalObservaciones: '',
-  tieneAudible: false,
-  audiblesLista: [crearAudibleInicial(1, 'Sentido hacia Camellón')],
-  audibleModelo: '',
-  audibleModuloEstado: 'Operando',
-  audibleObservaciones: '',
-  tieneCamara: false,
-  camaraModelo: '',
-  camaraCantidad: '',
-  camaraObservaciones: ''
-})
+const crearPosteInicial = (id = 1, modelo = 'PCC-1', tipo = null) => {
+  const modeloNorm = normalizarNombreModeloPoste(modelo)
+  const esPeatonal = tipo === 'peatonal' || modeloNorm === 'MP-01'
+  const tipoPoste = esPeatonal ? 'peatonal' : (tipo || 'mixto')
+  return {
+    uid: `pst_${Date.now()}_${Math.random().toString(36).substr(2, 7)}`,
+    id,
+    guardadoEnServidor: false,
+    tipoPoste, // 'mixto' (Vehicular / Mixto) | 'peatonal' (Exclusivo Peatonal / Pedestal)
+    ubicacionPoste: '', // ej. 'Banqueta Poniente', 'Camellón Central / Isleta', etc.
+    modeloPoste: esPeatonal ? 'MP-01' : (modeloNorm || 'PCC-1'),
+    tapaRegistro: 'Buena',
+    observaciones: '',
+    tipoCabezal: esPeatonal ? 'Ninguno' : 'LED',
+    cabezalModelo: esPeatonal ? '' : 'LV-1',
+    pantallaPiezas: '',
+    pantallaEstado: 'Funciona',
+    pantallasLista: [],
+    cabezalesGrupos: esPeatonal ? [] : [
+      {
+        id: 1,
+        numLeds: 4,
+        leds: [
+          { numero: 1, color: 'Rojo', estado: 'Funciona' },
+          { numero: 2, color: 'Amarillo', estado: 'Funciona' },
+          { numero: 3, color: 'Verde', estado: 'Funciona' },
+          { numero: 4, color: 'Flecha Verde', estado: 'Funciona' }
+        ]
+      }
+    ],
+    tienePeatonal: esPeatonal,
+    peatonalesLista: [crearPeatonalInicial(1, 'Sentido hacia Camellón')],
+    peatonalModelo: esPeatonal ? MODELOS_PEATONAL_CATALOGO[0] : '',
+    peatonalModuloEstado: 'Operando',
+    peatonalObservaciones: '',
+    tieneAudible: false,
+    audiblesLista: [crearAudibleInicial(1, 'Sentido hacia Camellón')],
+    audibleModelo: '',
+    audibleModuloEstado: 'Operando',
+    audibleObservaciones: '',
+    tieneCamara: false,
+    camaraModelo: '',
+    camaraCantidad: '',
+    camaraObservaciones: ''
+  }
+}
 
 const normalizarPostesDetalle = (postesRaw, fallbackItem = null) => {
   let list = []
@@ -444,17 +451,27 @@ const normalizarPostesDetalle = (postesRaw, fallbackItem = null) => {
         }
       }
 
-      // Determinar tipoPoste
+      // Determinar tipoPoste de forma robusta
+      const modeloNorm = normalizarNombreModeloPoste(p.modeloPoste)
+      const esPeatonalPorModelo = modeloNorm === 'MP-01' || (p.modeloPoste && (
+        p.modeloPoste.toLowerCase().includes('peatonal') ||
+        p.modeloPoste.toLowerCase().includes('pedestal') ||
+        p.modeloPoste.toLowerCase().includes('mp-01')
+      ))
+      const sinCabezalesVehiculares = p.tipoCabezal === 'Ninguno' || (!p.cabezalesGrupos || p.cabezalesGrupos.length === 0)
+
       let tipoPoste = p.tipoPoste
-      if (!tipoPoste) {
-        if (p.tipoCabezal === 'Ninguno' || (p.modeloPoste && p.modeloPoste.toLowerCase().includes('peatonal'))) {
+      if (tipoPoste !== 'peatonal' && tipoPoste !== 'mixto') {
+        if (esPeatonalPorModelo || (sinCabezalesVehiculares && (p.tienePeatonal || p.peatonalModelo))) {
           tipoPoste = 'peatonal'
         } else {
           tipoPoste = 'mixto'
         }
+      } else if (tipoPoste === 'mixto' && esPeatonalPorModelo && sinCabezalesVehiculares) {
+        tipoPoste = 'peatonal'
       }
 
-      let modeloPoste = normalizarNombreModeloPoste(p.modeloPoste) || (tipoPoste === 'peatonal' ? 'MP-01' : 'PCC-1')
+      let modeloPoste = modeloNorm || (tipoPoste === 'peatonal' ? 'MP-01' : 'PCC-1')
 
       const tienePeatonal = tipoPoste === 'peatonal'
         ? true
@@ -484,18 +501,20 @@ const normalizarPostesDetalle = (postesRaw, fallbackItem = null) => {
       }
 
       return {
+        uid: p.uid || (p.id ? `pst_${p.id}` : `pst_${idx + 1}`),
         id: p.id || idx + 1,
+        guardadoEnServidor: true,
         tipoPoste,
         ubicacionPoste: p.ubicacionPoste || '',
         modeloPoste,
         tapaRegistro: p.tapaRegistro || 'Buena',
         observaciones: p.observaciones || '',
-        tipoCabezal: p.tipoCabezal || 'LED',
-        cabezalModelo: p.cabezalModelo || 'LV-1',
-        pantallaPiezas: numPiezas > 0 ? numPiezas : (p.pantallaPiezas !== undefined ? p.pantallaPiezas : ''),
-        pantallaEstado: p.pantallaEstado || (pantallasLista.some(x => x.estado === 'No funciona') ? 'Parcial' : 'Funciona'),
-        pantallasLista,
-        cabezalesGrupos: normalizarCabezalesDetalle(p.cabezalesGrupos || p.cabezalesDetalle || DEFAULT_CABEZALES_DETALLE),
+        tipoCabezal: tipoPoste === 'peatonal' ? 'Ninguno' : (p.tipoCabezal || 'LED'),
+        cabezalModelo: tipoPoste === 'peatonal' ? '' : (p.cabezalModelo || 'LV-1'),
+        pantallaPiezas: tipoPoste === 'peatonal' ? '' : (numPiezas > 0 ? numPiezas : (p.pantallaPiezas !== undefined ? p.pantallaPiezas : '')),
+        pantallaEstado: tipoPoste === 'peatonal' ? 'Funciona' : (p.pantallaEstado || (pantallasLista.some(x => x.estado === 'No funciona') ? 'Parcial' : 'Funciona')),
+        pantallasLista: tipoPoste === 'peatonal' ? [] : pantallasLista,
+        cabezalesGrupos: tipoPoste === 'peatonal' ? [] : normalizarCabezalesDetalle(p.cabezalesGrupos || p.cabezalesDetalle || DEFAULT_CABEZALES_DETALLE),
         tienePeatonal,
         peatonalesLista,
         peatonalModelo: peatonalesLista[0]?.modelo || p.peatonalModelo || '',
@@ -525,16 +544,20 @@ const normalizarPostesDetalle = (postesRaw, fallbackItem = null) => {
 
     const tienePeatonal = !!(fallbackItem.pasoPeatonal || fallbackItem.peatonalModelo)
     const tieneAudible = !!(fallbackItem.audible || fallbackItem.audibleModelo)
+    const esPeatonal = (fallbackItem.posteModeloTipo && normalizarNombreModeloPoste(fallbackItem.posteModeloTipo) === 'MP-01')
+      || (!fallbackItem.semaforos3Luces && !fallbackItem.semaforos4Luces && tienePeatonal)
 
     return [{
+      uid: 'pst_1',
       id: 1,
-      tipoPoste: 'mixto',
+      guardadoEnServidor: true,
+      tipoPoste: esPeatonal ? 'peatonal' : 'mixto',
       ubicacionPoste: '',
-      modeloPoste: fallbackItem.posteModeloTipo || fallbackItem.modeloPoste || 'PCC-1',
+      modeloPoste: fallbackItem.posteModeloTipo || (esPeatonal ? 'MP-01' : (fallbackItem.modeloPoste || 'PCC-1')),
       tapaRegistro: fallbackItem.posteTapaRegistro || 'Buena',
       observaciones: fallbackItem.posteObservaciones || '',
-      tipoCabezal: fallbackItem.tipoCabezal || 'LED',
-      cabezalModelo: fallbackItem.cabezalModelo || 'LV-1',
+      tipoCabezal: esPeatonal ? 'Ninguno' : (fallbackItem.tipoCabezal || 'LED'),
+      cabezalModelo: esPeatonal ? '' : (fallbackItem.cabezalModelo || 'LV-1'),
       pantallaPiezas: fallbackItem.pantallaPiezas || 0,
       pantallaEstado: fallbackItem.pantallaEstado || 'Funciona',
       pantallasLista: Array.from({ length: Number(fallbackItem.pantallaPiezas) || 0 }, (_, i) => ({
@@ -845,6 +868,7 @@ export default function InventarioSemaforos() {
   const [editandoControladorId, setEditandoControladorId] = useState(null)
   const [mostrarProgramacion, setMostrarProgramacion] = useState(false)
   const [archivoProgramacion, setArchivoProgramacion] = useState(null)
+  const archivoProgramacionInputRef = useRef(null)
 
   const [controladorForm, setControladorForm] = useState({
     modelo: '',
@@ -1291,9 +1315,12 @@ export default function InventarioSemaforos() {
       const json = await res.json().catch(() => ({}))
 
       if (res.ok && json.ok) {
+        const numPostesFinal = json.data?.postesDetalle?.length || (controladorForm.postes || []).length
         Swal.fire({
-          title: 'Éxito',
-          text: editandoControladorId ? 'Controlador actualizado.' : 'Controlador registrado.',
+          title: '¡Sincronizado y Guardado!',
+          text: editandoControladorId 
+            ? `Controlador actualizado correctamente. Hay ${numPostesFinal} poste(s) consolidados en este crucero.` 
+            : 'Controlador registrado.',
           icon: 'success',
           confirmButtonColor: '#691B31'
         })
@@ -1427,18 +1454,26 @@ export default function InventarioSemaforos() {
       })
       const json = await res.json().catch(() => ({}))
       if (res.ok && json.ok) {
-        const postesServidor = normalizarPostesDetalle(json.postes || [])
-        const totales = recalcularTotalesDesdePostes(postesServidor)
+        const rawPostes = json.data?.postes || json.postes || []
+        const postesServidor = normalizarPostesDetalle(rawPostes)
+        // Preservar borradores locales que el técnico esté capturando actualmente y aún no haya guardado
+        const maxServId = postesServidor.length > 0 ? Math.max(...postesServidor.map(p => Number(p.id) || 0)) : 0
+        const localesNuevos = (controladorForm.postes || [])
+          .filter(p => p.guardadoEnServidor === false)
+          .map((p, idx) => ({ ...p, id: maxServId + idx + 1 }))
+        const listaFinal = [...postesServidor, ...localesNuevos]
+        const totales = recalcularTotalesDesdePostes(listaFinal)
         setControladorForm(prev => ({
           ...prev,
           ...totales,
-          postes: postesServidor
+          postes: listaFinal
         }))
+        cargarControladores()
         Swal.fire({
           toast: true,
           position: 'top-end',
           icon: 'success',
-          title: `Postes sincronizados (${postesServidor.length} en servidor)`,
+          title: `Sincronizado: ${postesServidor.length} poste(s) en servidor`,
           showConfirmButton: false,
           timer: 2000
         })
@@ -1455,18 +1490,19 @@ export default function InventarioSemaforos() {
 
   const handleGuardarPosteModular = async (pIdx) => {
     if (!editandoControladorId) return
-    const posteAGuardar = (controladorForm.postes || [])[pIdx]
+    const listaActual = controladorForm.postes || []
+    const posteAGuardar = listaActual[pIdx]
     if (!posteAGuardar) return
 
     setGuardandoModularSeccion(`poste-${pIdx}`)
     try {
-      const existeId = Boolean(posteAGuardar.id && posteAGuardar.id !== 'temp')
-      const url = existeId
+      const yaEnServidor = Boolean(posteAGuardar.guardadoEnServidor && posteAGuardar.id && posteAGuardar.id !== 'temp')
+      const url = yaEnServidor
         ? `${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/postes/${posteAGuardar.id}`
         : `${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/postes`
-      const metodo = existeId ? 'PUT' : 'POST'
+      const metodo = yaEnServidor ? 'PUT' : 'POST'
 
-      const res = await fetch(url, {
+      let res = await fetch(url, {
         method: metodo,
         headers: {
           'Content-Type': 'application/json',
@@ -1475,14 +1511,32 @@ export default function InventarioSemaforos() {
         body: JSON.stringify({ poste: posteAGuardar })
       })
 
+      // Fallback: Si el servidor responde 404 porque el poste aún no existía en BD, crearlo con POST
+      if (metodo === 'PUT' && res.status === 404) {
+        const postUrl = `${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/postes`
+        res = await fetch(postUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${user.token}`
+          },
+          body: JSON.stringify({ poste: posteAGuardar })
+        })
+      }
+
       const json = await res.json().catch(() => ({}))
       if (res.ok && json.ok) {
-        const postesServidor = normalizarPostesDetalle(json.postes || [])
-        const totales = recalcularTotalesDesdePostes(postesServidor)
+        const rawPostes = json.data?.postes || json.postes || []
+        const postesServidor = normalizarPostesDetalle(rawPostes)
+        // Preservar postes locales que aún no se hayan guardado en el servidor
+        const idsServidor = new Set(postesServidor.map(p => Number(p.id)))
+        const localesNoGuardados = listaActual.filter(p => !idsServidor.has(Number(p.id)) && Number(p.id) !== Number(posteAGuardar.id))
+        const listaFinal = [...postesServidor, ...localesNoGuardados]
+        const totales = recalcularTotalesDesdePostes(listaFinal)
         setControladorForm(prev => ({
           ...prev,
           ...totales,
-          postes: postesServidor
+          postes: listaFinal
         }))
         cargarControladores()
         Swal.fire({
@@ -1525,6 +1579,9 @@ export default function InventarioSemaforos() {
 
     if (!confirmacion.isConfirmed) return
 
+    // Lista resultante local sin el poste eliminado
+    const restantesLocales = listaActual.filter((_, idx) => idx !== pIdx)
+
     if (editandoControladorId && poste && poste.id) {
       setGuardandoModularSeccion(`poste-del-${pIdx}`)
       try {
@@ -1534,12 +1591,17 @@ export default function InventarioSemaforos() {
         })
         const json = await res.json().catch(() => ({}))
         if (res.ok && json.ok) {
-          const postesServidor = normalizarPostesDetalle(json.postes || [])
-          const totales = recalcularTotalesDesdePostes(postesServidor)
+          const rawPostes = json.data?.postes || json.postes || []
+          const postesServidor = normalizarPostesDetalle(rawPostes)
+          // Preservar postes locales no guardados todavía en el servidor
+          const idsServidor = new Set(postesServidor.map(p => Number(p.id)))
+          const localesNoGuardados = restantesLocales.filter(p => !idsServidor.has(Number(p.id)))
+          const listaFinal = [...postesServidor, ...localesNoGuardados]
+          const totales = recalcularTotalesDesdePostes(listaFinal)
           setControladorForm(prev => ({
             ...prev,
             ...totales,
-            postes: postesServidor
+            postes: listaFinal
           }))
           cargarControladores()
           Swal.fire({
@@ -1551,16 +1613,40 @@ export default function InventarioSemaforos() {
             timer: 2000
           })
         } else {
-          mostrarAlertaError(json.error || 'No se pudo eliminar el poste.', 'Error', 'Error al eliminar.')
+          // Si el servidor dio 404 (porque el poste era nuevo y nunca se guardó en BD), aplicar la eliminación local
+          const totales = recalcularTotalesDesdePostes(restantesLocales)
+          setControladorForm(prev => ({
+            ...prev,
+            ...totales,
+            postes: restantesLocales
+          }))
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'Poste eliminado',
+            showConfirmButton: false,
+            timer: 2000
+          })
         }
       } catch (err) {
         console.error('Error eliminando poste:', err)
-        mostrarAlertaError(err, 'Error', 'No se pudo eliminar el poste.')
+        const totales = recalcularTotalesDesdePostes(restantesLocales)
+        setControladorForm(prev => ({
+          ...prev,
+          ...totales,
+          postes: restantesLocales
+        }))
       } finally {
         setGuardandoModularSeccion(null)
       }
     } else {
-      handleEliminarPoste(pIdx)
+      const totales = recalcularTotalesDesdePostes(restantesLocales)
+      setControladorForm(prev => ({
+        ...prev,
+        ...totales,
+        postes: restantesLocales
+      }))
     }
   }
 
@@ -1604,9 +1690,7 @@ export default function InventarioSemaforos() {
     }
   }
 
-  const handleEditarControlador = (item) => {
-    setEditandoControladorId(item.id)
-
+  const mapearDatosControladorAForm = (item) => {
     let parsedDetalle = null
     if (item.cabezalesDetalle) {
       try {
@@ -1640,21 +1724,21 @@ export default function InventarioSemaforos() {
     const initRelevadoresMarca = item.tarjetaRelevadoresMarca || (item.tarjetaRelevadoresModelo?.includes('RC-308') || item.tarjetaRelevadoresModelo?.includes('Peek') ? 'Peek Traffic' : (item.tarjetaRelevadoresModelo?.includes('C5000') || item.modelo === 'C-5000' ? 'Oriux' : (item.tarjetaRelevadoresModelo && item.tarjetaRelevadoresModelo.includes('SEMEX') ? 'SEMEX' : (item.tarjetaRelevadoresModelo ? 'Otro' : 'Peek Traffic'))))
     const modoRelevadores = (initRelevadoresMarca === 'Peek Traffic' || initRelevadoresMarca === 'SEMEX' || initRelevadoresMarca === 'Oriux') ? initRelevadoresMarca : (initRelevadoresMarca ? 'Otro' : '')
 
-    setControladorForm({
-      modelo: item.modelo,
-      cruceroId: item.cruceroId,
+    return {
+      modelo: item.modelo || '',
+      cruceroId: item.cruceroId || '',
       ...totalesPostes,
       postes: postesCargados,
-      tarjetaRelevadora: item.tarjetaRelevadora,
+      tarjetaRelevadora: item.tarjetaRelevadora || false,
       tarjetaRelevadoraDetalle: item.tarjetaRelevadoraDetalle || '',
-      fuentePoder: item.fuentePoder,
-      cpu: item.cpu,
+      fuentePoder: item.fuentePoder || false,
+      cpu: item.cpu || false,
       cpuDetalle: item.cpuDetalle || '',
-      switch: item.switch,
-      fibraOptica: item.fibraOptica,
-      gps: item.gps,
+      switch: item.switch || false,
+      fibraOptica: item.fibraOptica || false,
+      gps: item.gps || false,
       gpsDetalle: item.gpsDetalle || '',
-      botonera: item.botonera,
+      botonera: item.botonera || false,
       // Inspección Exterior / Cimentación y Base
       cimientoCompleto: item.cimientoCompleto || '',
       cimientoCuantosDados: item.cimientoCuantosDados || '',
@@ -1699,10 +1783,31 @@ export default function InventarioSemaforos() {
       registrosPisoTapas: item.registrosPisoTapas !== undefined && item.registrosPisoTapas !== null ? String(item.registrosPisoTapas) : '',
       registrosPisoDanados: item.registrosPisoDanados !== undefined && item.registrosPisoDanados !== null ? item.registrosPisoDanados : '',
       registrosPisoCoordenadas: coordsAjustadas
-    })
+    }
+  }
+
+  const handleEditarControlador = async (item) => {
+    setEditandoControladorId(item.id)
+    setControladorForm(mapearDatosControladorAForm(item))
     setArchivoProgramacion(item.archivoProgramacion || null)
     setControladorErrores({})
     setModalControladorAbierto(true)
+
+    // Consultar el servidor para asegurar que tenemos la información más fresca (en vivo) por si otro técnico guardó
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/inventario/controladores/${item.id}`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      })
+      const json = await res.json().catch(() => ({}))
+      if (res.ok && json.data) {
+        setControladorForm(mapearDatosControladorAForm(json.data))
+        if (json.data.archivoProgramacion) {
+          setArchivoProgramacion(json.data.archivoProgramacion)
+        }
+      }
+    } catch (err) {
+      console.warn('No se pudo refrescar controlador en segundo plano:', err)
+    }
   }
 
   const handleEliminarControlador = async (id) => {
@@ -1873,7 +1978,8 @@ export default function InventarioSemaforos() {
   const handleAgregarPoste = () => {
     setControladorForm(prev => {
       const listaActual = prev.postes && prev.postes.length > 0 ? prev.postes : [crearPosteInicial(1, 'PCC-1')]
-      const nuevoPoste = crearPosteInicial(listaActual.length + 1, 'PCC-1')
+      const maxId = listaActual.reduce((max, p) => Math.max(max, Number(p.id) || 0), 0)
+      const nuevoPoste = crearPosteInicial(maxId + 1, 'PCC-1')
       const nuevosPostes = [...listaActual, nuevoPoste]
       const totales = recalcularTotalesDesdePostes(nuevosPostes)
       return {
@@ -1888,7 +1994,7 @@ export default function InventarioSemaforos() {
     setControladorForm(prev => {
       const listaActual = prev.postes || []
       if (listaActual.length <= 1) return prev
-      const nuevosPostes = listaActual.filter((_, idx) => idx !== pIdx).map((p, idx) => ({ ...p, id: idx + 1 }))
+      const nuevosPostes = listaActual.filter((_, idx) => idx !== pIdx)
       const totales = recalcularTotalesDesdePostes(nuevosPostes)
       return {
         ...prev,
@@ -4133,39 +4239,66 @@ export default function InventarioSemaforos() {
                   <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
                       <FaUpload size={13} style={{ color: '#691B31' }} />
-                      <span>Respaldo USB (.cfg, .bin, .dat): <span style={{ color: '#DC2626' }}>*</span></span>
+                      <span>Respaldo de programación descargado (USB / .zip): <span style={{ color: '#DC2626' }}>*</span></span>
                     </label>
 
-                    <label
-                      title="Seleccionar archivo desde USB o PC"
+                    <div
+                      title="Haz clic o arrastra un archivo de respaldo (.zip, .cfg, .bin, .dat, .rar)"
+                      onClick={() => archivoProgramacionInputRef.current?.click()}
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                          const file = e.dataTransfer.files[0]
+                          setArchivoProgramacion(file)
+                          setControladorForm(prev => ({ ...prev, respaldoProgramacionUsb: file.name }))
+                        }
+                      }}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '0.5rem',
-                        height: '38px',
+                        minHeight: '38px',
                         border: archivoProgramacion ? '1px solid #10B981' : '1px dashed #CBD5E1',
                         borderRadius: '6px',
                         backgroundColor: archivoProgramacion ? '#F0FDF4' : '#F8FAFC',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
-                        padding: '0 0.75rem',
+                        padding: '0.35rem 0.75rem',
                         boxSizing: 'border-box',
                         marginTop: 'auto'
                       }}
                       onMouseOver={(e) => { if (!archivoProgramacion) e.currentTarget.style.borderColor = '#BC955B' }}
                       onMouseOut={(e) => { if (!archivoProgramacion) e.currentTarget.style.borderColor = '#CBD5E1' }}
                     >
-                      <FaUpload size={18} color={archivoProgramacion ? '#10B981' : '#BC955B'} />
                       {archivoProgramacion ? (
-                        <span style={{ fontSize: '0.82rem', color: '#065F46', fontWeight: '600', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {typeof archivoProgramacion === 'string' ? archivoProgramacion.split('/').pop() : archivoProgramacion.name}
-                        </span>
+                        <>
+                          {String(typeof archivoProgramacion === 'string' ? archivoProgramacion : archivoProgramacion.name).toLowerCase().endsWith('.zip') ? (
+                            <FaFileArchive size={18} color="#059669" />
+                          ) : (
+                            <FaUpload size={18} color="#10B981" />
+                          )}
+                          <span style={{ fontSize: '0.82rem', color: '#065F46', fontWeight: '600', maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {typeof archivoProgramacion === 'string' ? archivoProgramacion.split('/').pop() : archivoProgramacion.name}
+                          </span>
+                          {archivoProgramacion instanceof File && (
+                            <span style={{ fontSize: '0.72rem', color: '#047857', fontWeight: '500' }}>
+                              ({archivoProgramacion.size > 1024 * 1024 ? `${(archivoProgramacion.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(archivoProgramacion.size / 1024)} KB`})
+                            </span>
+                          )}
+                        </>
                       ) : (
-                        <span style={{ fontSize: '0.8rem', color: '#64748B' }}>Seleccionar archivo</span>
+                        <>
+                          <FaUpload size={18} color="#BC955B" />
+                          <span style={{ fontSize: '0.8rem', color: '#64748B' }}>Subir archivo (.zip, .cfg, .bin, .dat)</span>
+                        </>
                       )}
                       <input
+                        ref={archivoProgramacionInputRef}
                         type="file"
+                        accept=".zip,.rar,.7z,.cfg,.bin,.dat,.txt,.tar,.gz,application/zip,application/x-zip-compressed,multipart/x-zip"
                         style={{ display: 'none' }}
                         onChange={(e) => {
                           if (e.target.files && e.target.files[0]) {
@@ -4175,7 +4308,7 @@ export default function InventarioSemaforos() {
                           }
                         }}
                       />
-                    </label>
+                    </div>
 
                     {archivoProgramacion && (
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.35rem' }}>
@@ -4195,6 +4328,7 @@ export default function InventarioSemaforos() {
                           onClick={() => {
                             setArchivoProgramacion(null)
                             setControladorForm(prev => ({ ...prev, respaldoProgramacionUsb: '' }))
+                            if (archivoProgramacionInputRef.current) archivoProgramacionInputRef.current.value = ''
                           }}
                           style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: 'none', border: 'none', color: '#EF4444', fontSize: '0.75rem', cursor: 'pointer', fontWeight: '600' }}
                         >
@@ -5083,27 +5217,37 @@ export default function InventarioSemaforos() {
                       {/* Datos del Poste */}
                       <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '0.85rem' }}>
                         <div>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                            <FaSign size={12} style={{ color: '#691B31' }} />
+                          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                             <span>Tipo / Función de poste: <span style={{ color: '#DC2626' }}>*</span></span>
                           </label>
-                          <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', minHeight: '36px', flexWrap: 'wrap' }}>
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: '3px',
+                            backgroundColor: '#F1F5F9',
+                            padding: '3px',
+                            borderRadius: '6px',
+                            border: '1px solid #CBD5E1',
+                            boxSizing: 'border-box'
+                          }}>
                             {[
-                              { val: 'mixto', label: 'Vehicular / Mixto', icon: <FaTrafficLight size={11} style={{ color: '#691B31' }} /> },
-                              { val: 'peatonal', label: 'Peatonal', icon: <FaWalking size={11} style={{ color: '#0284C7' }} /> }
-                            ].map(({ val, label, icon }) => (
-                              <label key={val} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: (poste.tipoPoste || 'mixto') === val ? '700' : '500', color: '#1E293B' }}>
-                                <input
-                                  type="radio"
-                                  name={`poste-${pIdx}-tipoPoste`}
-                                  value={val}
-                                  checked={(poste.tipoPoste || 'mixto') === val}
-                                  onChange={() => {
+                              { val: 'mixto', label: 'Vehicular / Mixto', icon: <FaTrafficLight size={11} /> },
+                              { val: 'peatonal', label: 'Peatonal', icon: <FaWalking size={11} /> }
+                            ].map(({ val, label, icon }) => {
+                              const isSel = (poste.tipoPoste || 'mixto') === val
+                              return (
+                                <button
+                                  key={val}
+                                  type="button"
+                                  onClick={() => {
                                     if (val === 'peatonal') {
                                       handleActualizarPosteMultiple(pIdx, {
                                         tipoPoste: 'peatonal',
                                         modeloPoste: (!poste.modeloPoste || poste.modeloPoste === 'PCC-1' || normalizarNombreModeloPoste(poste.modeloPoste) === 'MP-01') ? 'MP-01' : normalizarNombreModeloPoste(poste.modeloPoste),
                                         tienePeatonal: true,
+                                        tipoCabezal: 'Ninguno',
+                                        pantallaPiezas: '',
+                                        cabezalesGrupos: [],
                                         peatonalModelo: poste.peatonalModelo || MODELOS_PEATONAL_CATALOGO[0],
                                         peatonalModuloEstado: poste.peatonalModuloEstado || 'Operando',
                                         peatonalesLista: (poste.peatonalesLista && poste.peatonalesLista.length > 0) ? poste.peatonalesLista : [crearPeatonalInicial(1)]
@@ -5111,23 +5255,52 @@ export default function InventarioSemaforos() {
                                     } else {
                                       handleActualizarPosteMultiple(pIdx, {
                                         tipoPoste: 'mixto',
-                                        modeloPoste: (normalizarNombreModeloPoste(poste.modeloPoste) === 'MP-01') ? 'PCC-1' : (poste.modeloPoste || 'PCC-1')
+                                        modeloPoste: (normalizarNombreModeloPoste(poste.modeloPoste) === 'MP-01') ? 'PCC-1' : (poste.modeloPoste || 'PCC-1'),
+                                        tipoCabezal: 'LED',
+                                        cabezalesGrupos: (poste.cabezalesGrupos && poste.cabezalesGrupos.length > 0) ? poste.cabezalesGrupos : [
+                                          {
+                                            id: 1,
+                                            numLeds: 4,
+                                            leds: [
+                                              { numero: 1, color: 'Rojo', estado: 'Funciona' },
+                                              { numero: 2, color: 'Amarillo', estado: 'Funciona' },
+                                              { numero: 3, color: 'Verde', estado: 'Funciona' },
+                                              { numero: 4, color: 'Flecha Verde', estado: 'Funciona' }
+                                            ]
+                                          }
+                                        ]
                                       })
                                     }
                                   }}
-                                  style={{ accentColor: '#691B31', width: '15px', height: '15px', cursor: 'pointer' }}
-                                />
-                                {icon}
-                                {label}
-                              </label>
-                            ))}
+                                  style={{
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    padding: '0.45rem 0.5rem',
+                                    fontSize: '0.78rem',
+                                    fontWeight: isSel ? '700' : '500',
+                                    backgroundColor: isSel ? '#691B31' : 'transparent',
+                                    color: isSel ? '#FFFFFF' : '#475569',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.35rem',
+                                    boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                    transition: 'all 0.15s',
+                                    whiteSpace: 'nowrap'
+                                  }}
+                                >
+                                  {icon}
+                                  <span>{label}</span>
+                                </button>
+                              )
+                            })}
                           </div>
                         </div>
 
                         <div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.3rem' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', margin: 0 }}>
-                              <FaMapMarkerAlt size={12} style={{ color: '#691B31' }} />
+                            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', margin: 0 }}>
                               <span>Coordenadas del poste:</span>
                             </label>
                             <button
@@ -5212,8 +5385,7 @@ export default function InventarioSemaforos() {
 
                       <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '0.85rem' }}>
                         <div>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                            <FaSign size={12} style={{ color: '#691B31' }} />
+                          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                             <span>Modelo de poste: <span style={{ color: '#DC2626' }}>*</span></span>
                           </label>
                           <select
@@ -5241,31 +5413,51 @@ export default function InventarioSemaforos() {
                         </div>
 
                         <div>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                            <FaCheckSquare size={12} style={{ color: '#691B31' }} />
+                          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                             <span>Estado de tapa de registro: <span style={{ color: '#DC2626' }}>*</span></span>
                           </label>
-                          <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', minHeight: '36px', flexWrap: 'wrap' }}>
-                            {['Buena', 'Dañada', 'Faltante'].map((opcion) => (
-                              <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: poste.tapaRegistro === opcion ? '700' : '500', color: '#1E293B' }}>
-                                <input
-                                  type="radio"
-                                  name={`poste-${pIdx}-tapaRegistro`}
-                                  value={opcion}
-                                  checked={poste.tapaRegistro === opcion}
-                                  onChange={() => handleActualizarPoste(pIdx, 'tapaRegistro', opcion)}
-                                  style={{ accentColor: '#691B31', width: '15px', height: '15px', cursor: 'pointer' }}
-                                />
-                                {opcion}
-                              </label>
-                            ))}
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(4, 1fr)',
+                            gap: '3px',
+                            backgroundColor: '#F1F5F9',
+                            padding: '3px',
+                            borderRadius: '6px',
+                            border: '1px solid #CBD5E1',
+                            boxSizing: 'border-box'
+                          }}>
+                            {['Buena', 'Dañada', 'Faltante', 'No aplica'].map((opcion) => {
+                              const isSel = (poste.tapaRegistro || 'Buena') === opcion
+                              return (
+                                <button
+                                  key={opcion}
+                                  type="button"
+                                  onClick={() => handleActualizarPoste(pIdx, 'tapaRegistro', opcion)}
+                                  style={{
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    padding: '0.45rem 0.2rem',
+                                    fontSize: '0.78rem',
+                                    fontWeight: isSel ? '700' : '500',
+                                    backgroundColor: isSel ? '#691B31' : 'transparent',
+                                    color: isSel ? '#FFFFFF' : '#475569',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s',
+                                    whiteSpace: 'nowrap',
+                                    boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                    textAlign: 'center'
+                                  }}
+                                >
+                                  {opcion}
+                                </button>
+                              )
+                            })}
                           </div>
                         </div>
                       </div>
 
-                      <div style={{ marginBottom: '1rem' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                          <FaListUl size={12} style={{ color: '#691B31' }} />
+                      <div style={{ marginBottom: '1.25rem' }}>
+                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                           <span>Observaciones del poste:</span>
                         </label>
                         <input
@@ -5286,31 +5478,47 @@ export default function InventarioSemaforos() {
 
                       {/* Cabezales Vehiculares (Solo si no es exclusivo peatonal) */}
                       {poste.tipoPoste !== 'peatonal' && (
-                        <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '0.85rem', marginBottom: '1rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <div style={{
+                          border: '1px solid #E2E8F0',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '8px',
+                          padding: '1rem',
+                          marginTop: '1rem',
+                          marginBottom: '1.25rem',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                            <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                               <FaTrafficLight size={13} style={{ color: '#BC955B' }} /> Cabezales Vehiculares
                             </span>
-                            <span style={{ fontSize: '0.72rem', color: '#64748B' }}>Tipo y desglose de luces</span>
+                            <span style={{ fontSize: '0.74rem', color: '#64748B' }}>Tipo y desglose de luces</span>
                           </div>
-                          <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '0.75rem' }}>
+
+                          <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '0.85rem' }}>
                             <div>
-                              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                <FaTrafficLight size={12} style={{ color: '#691B31' }} />
+                              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                                 <span>Tipo de cabezal: <span style={{ color: '#DC2626' }}>*</span></span>
                               </label>
-                              <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', minHeight: '36px', flexWrap: 'wrap' }}>
+                              <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: '1fr 1fr',
+                                gap: '3px',
+                                backgroundColor: '#F1F5F9',
+                                padding: '3px',
+                                borderRadius: '6px',
+                                border: '1px solid #CBD5E1',
+                                boxSizing: 'border-box'
+                              }}>
                                 {[
-                                  { val: 'LED', label: 'LED', icon: <FaTrafficLight size={12} style={{ color: '#691B31' }} /> },
-                                  { val: 'Pantalla', label: 'Pantalla LED', icon: <FaDesktop size={12} style={{ color: '#691B31' }} /> }
-                                ].map(({ val, label, icon }) => (
-                                  <label key={val} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: (poste.tipoCabezal || 'LED') === val ? '700' : '500', color: '#1E293B' }}>
-                                    <input
-                                      type="radio"
-                                      name={`poste-${pIdx}-tipoCabezal`}
-                                      value={val}
-                                      checked={(poste.tipoCabezal || 'LED') === val}
-                                      onChange={() => {
+                                  { val: 'LED', label: 'LED', icon: <FaTrafficLight size={11} /> },
+                                  { val: 'Pantalla', label: 'Pantalla LED', icon: <FaDesktop size={11} /> }
+                                ].map(({ val, label, icon }) => {
+                                  const isSel = (poste.tipoCabezal || 'LED') === val
+                                  return (
+                                    <button
+                                      key={val}
+                                      type="button"
+                                      onClick={() => {
                                         const nuevoTipo = val
                                         const piezasVal = nuevoTipo === 'Pantalla' ? (poste.pantallaPiezas || '1') : ''
                                         const cantNum = parseInt(piezasVal, 10) || 0
@@ -5325,18 +5533,34 @@ export default function InventarioSemaforos() {
                                           pantallaEstado: 'Funciona'
                                         })
                                       }}
-                                      style={{ accentColor: '#691B31', width: '15px', height: '15px', cursor: 'pointer' }}
-                                    />
-                                    {icon}
-                                    {label}
-                                  </label>
-                                ))}
+                                      style={{
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        padding: '0.45rem 0.5rem',
+                                        fontSize: '0.78rem',
+                                        fontWeight: isSel ? '700' : '500',
+                                        backgroundColor: isSel ? '#691B31' : 'transparent',
+                                        color: isSel ? '#FFFFFF' : '#475569',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '0.35rem',
+                                        boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                        transition: 'all 0.15s',
+                                        whiteSpace: 'nowrap'
+                                      }}
+                                    >
+                                      {icon}
+                                      <span>{label}</span>
+                                    </button>
+                                  )
+                                })}
                               </div>
                             </div>
 
                             <div>
-                              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                <FaTrafficLight size={12} style={{ color: '#691B31' }} />
+                              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                                 <span>Modelo de cabezal: <span style={{ color: '#DC2626' }}>*</span></span>
                               </label>
                               <select
@@ -5376,8 +5600,7 @@ export default function InventarioSemaforos() {
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '0.85rem' }}>
                                 <div>
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                    <FaBoxes size={12} style={{ color: '#691B31' }} />
+                                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                                     <span>Cantidad de piezas: <span style={{ color: '#DC2626' }}>*</span></span>
                                   </label>
                                   <input
@@ -5392,8 +5615,7 @@ export default function InventarioSemaforos() {
 
                                 {piezasList.length > 0 ? (
                                   <div>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.5rem' }}>
-                                      <FaPowerOff size={12} style={{ color: '#691B31' }} />
+                                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.5rem' }}>
                                       <span>Estado de operación de cada pieza: <span style={{ color: '#DC2626' }}>*</span></span>
                                     </label>
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))', gap: '0.5rem' }}>
@@ -5459,10 +5681,10 @@ export default function InventarioSemaforos() {
                           {(poste.tipoCabezal || 'LED') === 'LED' && (() => {
                             const cabezalesGrupos = normalizarCabezalesDetalle(poste.cabezalesGrupos)
                             return (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                  <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                    <FaTrafficLight size={12} style={{ color: '#BC955B' }} /> Desglose de Cabezales LED:
+                                  <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    Desglose de Cabezales LED:
                                   </span>
                                   <button
                                     type="button"
@@ -5474,14 +5696,14 @@ export default function InventarioSemaforos() {
                                       backgroundColor: '#FFFFFF',
                                       border: '1px solid #CBD5E1',
                                       borderRadius: '5px',
-                                      padding: '0.2rem 0.55rem',
+                                      padding: '0.25rem 0.6rem',
                                       fontSize: '0.75rem',
                                       fontWeight: '700',
                                       color: '#691B31',
                                       cursor: 'pointer'
                                     }}
                                   >
-                                    <FaPlus size={10} style={{ color: '#BC955B' }} /> Otro cabezal
+                                    <FaPlus size={10} style={{ color: '#BC955B' }} /> + Otro cabezal
                                   </button>
                                 </div>
 
@@ -5494,19 +5716,18 @@ export default function InventarioSemaforos() {
                                       key={grupo.id || gIdx}
                                       style={{
                                         backgroundColor: '#F8FAFC',
-                                        padding: '0.65rem 0.8rem',
-                                        borderRadius: '6px',
+                                        padding: '0.75rem 0.85rem',
+                                        borderRadius: '8px',
                                         border: '1px solid #E2E8F0'
                                       }}
                                     >
-                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
-                                        <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+                                        <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                           <FaTrafficLight size={11} style={{ color: '#691B31' }} />
                                           Cabezal {cabezalesGrupos.length > 1 ? `#${gIdx + 1}` : ''}
                                         </span>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                                           <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                            <FaLightbulb size={11} style={{ color: '#691B31' }} />
                                             <span>LEDs:</span>
                                             <input
                                               type="number"
@@ -5532,7 +5753,7 @@ export default function InventarioSemaforos() {
                                       </div>
 
                                       {numLeds > 0 && (
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: '0.45rem' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '0.55rem' }}>
                                           {leds.map((led, idx) => {
                                             const colorActual = OPCIONES_COLORES_LED.find(c => c.valor === led.color) || OPCIONES_COLORES_LED[0]
                                             return (
@@ -5543,41 +5764,64 @@ export default function InventarioSemaforos() {
                                                   alignItems: 'center',
                                                   justifyContent: 'space-between',
                                                   backgroundColor: '#FFFFFF',
-                                                  padding: '0.35rem 0.5rem',
-                                                  borderRadius: '4px',
+                                                  padding: '0.45rem 0.65rem',
+                                                  borderRadius: '6px',
                                                   border: '1px solid #E2E8F0',
-                                                  gap: '0.4rem',
-                                                  flexWrap: 'wrap',
+                                                  gap: '0.5rem',
                                                   boxSizing: 'border-box'
                                                 }}
                                               >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flex: '1 1 120px', minWidth: '105px' }}>
-                                                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: colorActual.color, display: 'inline-block', flexShrink: 0 }} />
-                                                  <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#334155', minWidth: '22px', flexShrink: 0 }}>L{led.numero || idx + 1}</span>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flex: 1, minWidth: 0 }}>
+                                                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: colorActual.color, display: 'inline-block', flexShrink: 0, boxShadow: '0 0 3px rgba(0,0,0,0.2)' }} />
+                                                  <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#1E293B', minWidth: '22px', flexShrink: 0 }}>L{led.numero || idx + 1}</span>
                                                   <select
                                                     value={led.color || 'Rojo'}
                                                     onChange={(e) => handleCambiarLedEnPoste(pIdx, gIdx, idx, 'color', e.target.value)}
-                                                    style={{ flex: 1, minWidth: '65px', padding: '0.2rem 0.35rem', border: '1px solid #CBD5E1', borderRadius: '4px', fontSize: '0.78rem' }}
+                                                    style={{ flex: 1, minWidth: '65px', padding: '0.25rem 0.4rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.78rem', backgroundColor: '#F8FAFC' }}
                                                   >
                                                     {OPCIONES_COLORES_LED.map(c => (
                                                       <option key={c.valor} value={c.valor}>{c.label}</option>
                                                     ))}
                                                   </select>
                                                 </div>
-                                                <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', flexShrink: 0 }}>
-                                                  {['Funciona', 'No funciona'].map(est => (
-                                                    <label key={est} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: led.estado === est ? '700' : '500', color: led.estado === est ? (est === 'Funciona' ? '#16A34A' : '#DC2626') : '#64748B' }}>
-                                                      <input
-                                                        type="radio"
-                                                        name={`p-${pIdx}-g-${gIdx}-led-${idx}-estado`}
-                                                        value={est}
-                                                        checked={led.estado === est}
-                                                        onChange={() => handleCambiarLedEnPoste(pIdx, gIdx, idx, 'estado', est)}
-                                                        style={{ accentColor: '#691B31', width: '12px', height: '12px', cursor: 'pointer' }}
-                                                      />
-                                                      {est === 'Funciona' ? 'Funciona' : 'Falla'}
-                                                    </label>
-                                                  ))}
+                                                <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', flexShrink: 0 }}>
+                                                  {['Funciona', 'No funciona'].map((estado) => {
+                                                    const isChecked = (led.estado || 'Funciona') === estado
+                                                    return (
+                                                      <label
+                                                        key={estado}
+                                                        style={{
+                                                          display: 'inline-flex',
+                                                          alignItems: 'center',
+                                                          gap: '0.25rem',
+                                                          cursor: 'pointer',
+                                                          fontSize: '0.78rem',
+                                                          whiteSpace: 'nowrap',
+                                                          fontWeight: isChecked ? '700' : '500',
+                                                          color: isChecked ? (estado === 'Funciona' ? '#16A34A' : '#DC2626') : '#64748B'
+                                                        }}
+                                                      >
+                                                        <input
+                                                          type="radio"
+                                                          name={`p-${pIdx}-g-${gIdx}-led-${idx}-estado`}
+                                                          value={estado}
+                                                          checked={isChecked}
+                                                          onChange={() => handleCambiarLedEnPoste(pIdx, gIdx, idx, 'estado', estado)}
+                                                          style={{ accentColor: '#691B31', width: '13px', height: '13px', cursor: 'pointer' }}
+                                                        />
+                                                        <span
+                                                          style={{
+                                                            display: 'inline-block',
+                                                            width: '7px',
+                                                            height: '7px',
+                                                            borderRadius: '50%',
+                                                            backgroundColor: estado === 'Funciona' ? '#16A34A' : '#DC2626'
+                                                          }}
+                                                        />
+                                                        {estado}
+                                                      </label>
+                                                    )
+                                                  })}
                                                 </div>
                                               </div>
                                             )
@@ -5594,11 +5838,19 @@ export default function InventarioSemaforos() {
                       )}
 
                       {/* Semáforo Peatonal */}
-                      <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '0.85rem', marginBottom: '1rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div style={{
+                        border: '1px solid #E2E8F0',
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '8px',
+                        padding: '1rem',
+                        marginTop: '1rem',
+                        marginBottom: '1.25rem',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <FaWalking size={13} style={{ color: '#BC955B' }} /> Semáforo Peatonal
+                            <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                              <FaWalking size={14} style={{ color: '#BC955B' }} /> Semáforo Peatonal
                             </span>
                             {poste.tienePeatonal ? (() => {
                               const lista = poste.peatonalesLista || []
@@ -5606,53 +5858,63 @@ export default function InventarioSemaforos() {
                               const conAudible = lista.filter(pt => pt.tieneAudible).length
                               if (conCabezal === 0 && conAudible > 0) {
                                 return (
-                                  <span style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.72rem', fontWeight: '700', padding: '0.1rem 0.45rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <span style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.72rem', fontWeight: '700', padding: '0.15rem 0.45rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
                                     <FaVolumeUp size={10} /> Solo audible ({conAudible})
                                   </span>
                                 )
                               }
                               return (
-                                <span style={{ backgroundColor: '#F1F5F9', color: '#475569', fontSize: '0.72rem', fontWeight: '700', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>
+                                <span style={{ backgroundColor: '#F1F5F9', color: '#475569', fontSize: '0.72rem', fontWeight: '700', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
                                   {conCabezal} {conCabezal === 1 ? 'semáforo' : 'semáforos'}
                                   {conAudible > 0 && ` • ${conAudible} con audible`}
                                 </span>
                               )
                             })() : (
-                              <span style={{ backgroundColor: '#F1F5F9', color: '#94A3B8', fontSize: '0.72rem', fontWeight: '600', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>
+                              <span style={{ backgroundColor: '#F1F5F9', color: '#94A3B8', fontSize: '0.72rem', fontWeight: '600', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
                                 No instalado
                               </span>
                             )}
                           </div>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                              <FaWalking size={11} style={{ color: '#691B31' }} /> ¿Instalado en este poste?:
-                            </span>
-                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: poste.tienePeatonal ? '700' : '500', color: '#1E293B' }}>
-                              <input
-                                type="radio"
-                                name={`poste-${pIdx}-tienePeatonal`}
-                                checked={!!poste.tienePeatonal}
-                                onChange={() => handleActualizarPosteMultiple(pIdx, {
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>¿Instalado en este poste?:</span>
+                            <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleActualizarPosteMultiple(pIdx, {
                                   tienePeatonal: true,
                                   peatonalModelo: poste.peatonalModelo || MODELOS_PEATONAL_CATALOGO[0],
                                   peatonalModuloEstado: poste.peatonalModuloEstado || 'Operando'
                                 })}
-                                style={{ accentColor: '#691B31', width: '14px', height: '14px', cursor: 'pointer' }}
-                              />
-                              Sí
-                            </label>
-                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: !poste.tienePeatonal ? '700' : '500', color: '#1E293B' }}>
-                              <input
-                                type="radio"
-                                name={`poste-${pIdx}-tienePeatonal`}
-                                checked={!poste.tienePeatonal}
-                                onChange={() => handleActualizarPosteMultiple(pIdx, {
-                                  tienePeatonal: false
-                                })}
-                                style={{ accentColor: '#691B31', width: '14px', height: '14px', cursor: 'pointer' }}
-                              />
-                              No
-                            </label>
+                                style={{
+                                  border: 'none',
+                                  padding: '0.25rem 0.6rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: poste.tienePeatonal ? '700' : '500',
+                                  backgroundColor: poste.tienePeatonal ? '#691B31' : 'transparent',
+                                  color: poste.tienePeatonal ? '#FFFFFF' : '#475569',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Sí
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleActualizarPosteMultiple(pIdx, { tienePeatonal: false })}
+                                style={{
+                                  border: 'none',
+                                  padding: '0.25rem 0.6rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: !poste.tienePeatonal ? '700' : '500',
+                                  backgroundColor: !poste.tienePeatonal ? '#691B31' : 'transparent',
+                                  color: !poste.tienePeatonal ? '#FFFFFF' : '#475569',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                No
+                              </button>
+                            </div>
                           </div>
                         </div>
 
@@ -5698,8 +5960,7 @@ export default function InventarioSemaforos() {
 
                                 <div className="form-responsive-grid grid-2" style={{ gap: '0.65rem 0.85rem', marginBottom: '0.5rem' }}>
                                   <div>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                      <FaWalking size={10} style={{ color: '#691B31' }} />
+                                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
                                       <span>Modelo peatonal: <span style={{ color: '#DC2626' }}>*</span></span>
                                     </label>
                                     <select
@@ -5715,31 +5976,38 @@ export default function InventarioSemaforos() {
                                   </div>
 
                                   <div>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                      <FaCheckSquare size={10} style={{ color: '#691B31' }} />
+                                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
                                       <span>{pt.modelo && pt.modelo.toLowerCase().includes('sin cabezal') ? 'Estado del equipo / soporte:' : 'Estado del módulo:'} <span style={{ color: '#DC2626' }}>*</span></span>
                                     </label>
-                                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', minHeight: '34px', flexWrap: 'wrap' }}>
-                                      {['Operando', 'Dañado'].map((opcion) => (
-                                        <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: (pt.estado || 'Operando') === opcion ? '700' : '500', color: '#1E293B' }}>
-                                          <input
-                                            type="radio"
-                                            name={`poste-${pIdx}-peatonal-${ptIdx}-estado`}
-                                            value={opcion}
-                                            checked={(pt.estado || 'Operando') === opcion}
-                                            onChange={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'estado', opcion)}
-                                            style={{ accentColor: '#691B31', width: '14px', height: '14px', cursor: 'pointer' }}
-                                          />
-                                          {opcion}
-                                        </label>
-                                      ))}
+                                    <div style={{ display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', border: '1px solid #CBD5E1', minWidth: '160px' }}>
+                                      {['Operando', 'Dañado'].map((opcion) => {
+                                        const isSel = (pt.estado || 'Operando') === opcion
+                                        return (
+                                          <button
+                                            key={opcion}
+                                            type="button"
+                                            onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'estado', opcion)}
+                                            style={{
+                                              border: 'none',
+                                              borderRadius: '3px',
+                                              padding: '0.3rem 0.4rem',
+                                              fontSize: '0.78rem',
+                                              fontWeight: isSel ? '700' : '500',
+                                              backgroundColor: isSel ? (opcion === 'Operando' ? '#16A34A' : '#DC2626') : 'transparent',
+                                              color: isSel ? '#FFFFFF' : '#475569',
+                                              cursor: 'pointer'
+                                            }}
+                                          >
+                                            {opcion}
+                                          </button>
+                                        )
+                                      })}
                                     </div>
                                   </div>
                                 </div>
 
                                 <div>
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.76rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
-                                    <FaListUl size={10} style={{ color: '#691B31' }} />
+                                  <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
                                     <span>Observaciones de este semáforo peatonal:</span>
                                   </label>
                                   <input
@@ -5764,27 +6032,39 @@ export default function InventarioSemaforos() {
                                     <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                       <FaVolumeUp size={11} style={{ color: '#691B31' }} /> ¿Tiene dispositivo audible?:
                                     </span>
-                                    <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center' }}>
-                                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: pt.tieneAudible ? '700' : '500', color: '#1E293B' }}>
-                                        <input
-                                          type="radio"
-                                          name={`poste-${pIdx}-pt-${ptIdx}-tieneAudible`}
-                                          checked={!!pt.tieneAudible}
-                                          onChange={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'tieneAudible', true)}
-                                          style={{ accentColor: '#691B31', width: '13px', height: '13px', cursor: 'pointer' }}
-                                        />
+                                    <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'tieneAudible', true)}
+                                        style={{
+                                          border: 'none',
+                                          padding: '0.2rem 0.5rem',
+                                          borderRadius: '3px',
+                                          fontSize: '0.75rem',
+                                          fontWeight: pt.tieneAudible ? '700' : '500',
+                                          backgroundColor: pt.tieneAudible ? '#691B31' : 'transparent',
+                                          color: pt.tieneAudible ? '#FFFFFF' : '#475569',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
                                         Sí
-                                      </label>
-                                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: !pt.tieneAudible ? '700' : '500', color: '#1E293B' }}>
-                                        <input
-                                          type="radio"
-                                          name={`poste-${pIdx}-pt-${ptIdx}-tieneAudible`}
-                                          checked={!pt.tieneAudible}
-                                          onChange={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'tieneAudible', false)}
-                                          style={{ accentColor: '#691B31', width: '13px', height: '13px', cursor: 'pointer' }}
-                                        />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'tieneAudible', false)}
+                                        style={{
+                                          border: 'none',
+                                          padding: '0.2rem 0.5rem',
+                                          borderRadius: '3px',
+                                          fontSize: '0.75rem',
+                                          fontWeight: !pt.tieneAudible ? '700' : '500',
+                                          backgroundColor: !pt.tieneAudible ? '#691B31' : 'transparent',
+                                          color: !pt.tieneAudible ? '#FFFFFF' : '#475569',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
                                         No
-                                      </label>
+                                      </button>
                                     </div>
                                   </div>
 
@@ -5793,16 +6073,15 @@ export default function InventarioSemaforos() {
                                       backgroundColor: '#FFFFFF',
                                       border: '1px solid #CBD5E1',
                                       borderRadius: '6px',
-                                      padding: '0.55rem 0.75rem',
+                                      padding: '0.65rem 0.8rem',
                                       display: 'flex',
                                       flexDirection: 'column',
-                                      gap: '0.5rem',
-                                      marginTop: '0.25rem'
+                                      gap: '0.55rem',
+                                      marginTop: '0.35rem'
                                     }}>
                                       <div className="form-responsive-grid grid-2" style={{ gap: '0.65rem 0.85rem' }}>
                                         <div>
-                                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.76rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                            <FaVolumeUp size={10} style={{ color: '#691B31' }} />
+                                          <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
                                             <span>Modelo audible: <span style={{ color: '#DC2626' }}>*</span></span>
                                           </label>
                                           <input
@@ -5821,31 +6100,38 @@ export default function InventarioSemaforos() {
                                         </div>
 
                                         <div>
-                                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.76rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                            <FaCheckSquare size={10} style={{ color: '#691B31' }} />
+                                          <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
                                             <span>Estado audible: <span style={{ color: '#DC2626' }}>*</span></span>
                                           </label>
-                                          <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center', minHeight: '30px' }}>
-                                            {['Operando', 'Dañado'].map((opcion) => (
-                                              <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer', fontSize: '0.78rem', fontWeight: (pt.audibleEstado || 'Operando') === opcion ? '700' : '500', color: '#1E293B' }}>
-                                                <input
-                                                  type="radio"
-                                                  name={`poste-${pIdx}-pt-${ptIdx}-audibleEstado`}
-                                                  value={opcion}
-                                                  checked={(pt.audibleEstado || 'Operando') === opcion}
-                                                  onChange={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'audibleEstado', opcion)}
-                                                  style={{ accentColor: '#691B31', width: '13px', height: '13px', cursor: 'pointer' }}
-                                                />
-                                                {opcion}
-                                              </label>
-                                            ))}
+                                          <div style={{ display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', border: '1px solid #CBD5E1', minWidth: '150px' }}>
+                                            {['Operando', 'Dañado'].map((opcion) => {
+                                              const isSel = (pt.audibleEstado || 'Operando') === opcion
+                                              return (
+                                                <button
+                                                  key={opcion}
+                                                  type="button"
+                                                  onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'audibleEstado', opcion)}
+                                                  style={{
+                                                    border: 'none',
+                                                    borderRadius: '3px',
+                                                    padding: '0.25rem 0.35rem',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: isSel ? '700' : '500',
+                                                    backgroundColor: isSel ? (opcion === 'Operando' ? '#16A34A' : '#DC2626') : 'transparent',
+                                                    color: isSel ? '#FFFFFF' : '#475569',
+                                                    cursor: 'pointer'
+                                                  }}
+                                                >
+                                                  {opcion}
+                                                </button>
+                                              )
+                                            })}
                                           </div>
                                         </div>
                                       </div>
 
                                       <div>
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.74rem', fontWeight: '700', color: '#475569', marginBottom: '0.2rem' }}>
-                                          <FaListUl size={9} style={{ color: '#691B31' }} />
+                                        <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#475569', marginBottom: '0.2rem' }}>
                                           <span>Observaciones del audible:</span>
                                         </label>
                                         <input
@@ -5889,41 +6175,61 @@ export default function InventarioSemaforos() {
 
                       {/* Dispositivo Audible (solo para postes vehiculares/mixtos sin semáforo peatonal) */}
                       {poste.tipoPoste !== 'peatonal' && !poste.tienePeatonal && (
-                        <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '0.85rem', marginBottom: '1rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <FaVolumeUp size={13} style={{ color: '#BC955B' }} /> Dispositivo Audible
+                        <div style={{
+                          border: '1px solid #E2E8F0',
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: '8px',
+                          padding: '1rem',
+                          marginTop: '1rem',
+                          marginBottom: '1.25rem',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                              <FaVolumeUp size={14} style={{ color: '#BC955B' }} /> Dispositivo Audible
                             </span>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.75rem' }}>
-                              <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                                <FaVolumeUp size={11} style={{ color: '#691B31' }} /> ¿Instalado en este poste?:
-                              </span>
-                              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: poste.tieneAudible ? '700' : '500', color: '#1E293B' }}>
-                                <input
-                                  type="radio"
-                                  name={`poste-${pIdx}-tieneAudible`}
-                                  checked={!!poste.tieneAudible}
-                                  onChange={() => handleActualizarPosteMultiple(pIdx, {
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>¿Instalado en este poste?:</span>
+                              <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleActualizarPosteMultiple(pIdx, {
                                     tieneAudible: true,
                                     audibleModelo: poste.audibleModelo || 'Novax DS-100 Audible',
                                     audibleModuloEstado: poste.audibleModuloEstado || 'Operando'
                                   })}
-                                  style={{ accentColor: '#691B31', width: '14px', height: '14px', cursor: 'pointer' }}
-                                />
-                                Sí
-                              </label>
-                              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: !poste.tieneAudible ? '700' : '500', color: '#1E293B' }}>
-                                <input
-                                  type="radio"
-                                  name={`poste-${pIdx}-tieneAudible`}
-                                  checked={!poste.tieneAudible}
-                                  onChange={() => handleActualizarPosteMultiple(pIdx, {
+                                  style={{
+                                    border: 'none',
+                                    padding: '0.25rem 0.6rem',
+                                    borderRadius: '4px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: poste.tieneAudible ? '700' : '500',
+                                    backgroundColor: poste.tieneAudible ? '#691B31' : 'transparent',
+                                    color: poste.tieneAudible ? '#FFFFFF' : '#475569',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Sí
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleActualizarPosteMultiple(pIdx, {
                                     tieneAudible: false
                                   })}
-                                  style={{ accentColor: '#691B31', width: '14px', height: '14px', cursor: 'pointer' }}
-                                />
-                                No
-                              </label>
+                                  style={{
+                                    border: 'none',
+                                    padding: '0.25rem 0.6rem',
+                                    borderRadius: '4px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: !poste.tieneAudible ? '700' : '500',
+                                    backgroundColor: !poste.tieneAudible ? '#691B31' : 'transparent',
+                                    color: !poste.tieneAudible ? '#FFFFFF' : '#475569',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  No
+                                </button>
+                              </div>
                             </div>
                           </div>
 
@@ -5932,15 +6238,14 @@ export default function InventarioSemaforos() {
                               backgroundColor: '#F8FAFC',
                               border: '1px solid #E2E8F0',
                               borderRadius: '6px',
-                              padding: '0.65rem 0.8rem',
+                              padding: '0.75rem 0.85rem',
                               display: 'flex',
                               flexDirection: 'column',
                               gap: '0.55rem'
                             }}>
                               <div className="form-responsive-grid grid-2" style={{ gap: '0.65rem 0.85rem' }}>
                                 <div>
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                    <FaVolumeUp size={10} style={{ color: '#691B31' }} />
+                                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
                                     <span>Modelo audible: <span style={{ color: '#DC2626' }}>*</span></span>
                                   </label>
                                   <input
@@ -5959,31 +6264,38 @@ export default function InventarioSemaforos() {
                                 </div>
 
                                 <div>
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                    <FaCheckSquare size={10} style={{ color: '#691B31' }} />
+                                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
                                     <span>Estado audible: <span style={{ color: '#DC2626' }}>*</span></span>
                                   </label>
-                                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', minHeight: '34px', flexWrap: 'wrap' }}>
-                                    {['Operando', 'Dañado'].map((opcion) => (
-                                      <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: '0.8rem', fontWeight: (poste.audibleModuloEstado || 'Operando') === opcion ? '700' : '500', color: '#1E293B' }}>
-                                        <input
-                                          type="radio"
-                                          name={`poste-${pIdx}-audibleEstado`}
-                                          value={opcion}
-                                          checked={(poste.audibleModuloEstado || 'Operando') === opcion}
-                                          onChange={() => handleActualizarPoste(pIdx, 'audibleModuloEstado', opcion)}
-                                          style={{ accentColor: '#691B31', width: '14px', height: '14px', cursor: 'pointer' }}
-                                        />
-                                        {opcion}
-                                      </label>
-                                    ))}
+                                  <div style={{ display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', border: '1px solid #CBD5E1', minWidth: '150px' }}>
+                                    {['Operando', 'Dañado'].map((opcion) => {
+                                      const isSel = (poste.audibleModuloEstado || 'Operando') === opcion
+                                      return (
+                                        <button
+                                          key={opcion}
+                                          type="button"
+                                          onClick={() => handleActualizarPoste(pIdx, 'audibleModuloEstado', opcion)}
+                                          style={{
+                                            border: 'none',
+                                            borderRadius: '3px',
+                                            padding: '0.3rem 0.4rem',
+                                            fontSize: '0.78rem',
+                                            fontWeight: isSel ? '700' : '500',
+                                            backgroundColor: isSel ? (opcion === 'Operando' ? '#16A34A' : '#DC2626') : 'transparent',
+                                            color: isSel ? '#FFFFFF' : '#475569',
+                                            cursor: 'pointer'
+                                          }}
+                                        >
+                                          {opcion}
+                                        </button>
+                                      )
+                                    })}
                                   </div>
                                 </div>
                               </div>
 
                               <div>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.76rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
-                                  <FaListUl size={10} style={{ color: '#691B31' }} />
+                                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
                                   <span>Observaciones del audible:</span>
                                 </label>
                                 <input
@@ -6000,48 +6312,66 @@ export default function InventarioSemaforos() {
                       )}
 
                       {/* Cámaras Videodetectoras */}
-                      <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '0.85rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                            <FaVideo size={13} style={{ color: '#BC955B' }} /> Cámaras Videodetectoras
+                      <div style={{
+                        border: '1px solid #E2E8F0',
+                        backgroundColor: '#FFFFFF',
+                        borderRadius: '8px',
+                        padding: '1rem',
+                        marginTop: '1rem',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                            <FaVideo size={14} style={{ color: '#BC955B' }} /> Cámaras Videodetectoras
                           </span>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                              <FaVideo size={11} style={{ color: '#691B31' }} /> ¿Instalada en este poste?:
-                            </span>
-                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: poste.tieneCamara ? '700' : '500', color: '#1E293B' }}>
-                              <input
-                                type="radio"
-                                name={`poste-${pIdx}-tieneCamara`}
-                                checked={!!poste.tieneCamara}
-                                onChange={() => handleActualizarPosteMultiple(pIdx, {
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>¿Instalada en este poste?:</span>
+                            <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleActualizarPosteMultiple(pIdx, {
                                   tieneCamara: true,
                                   camaraModelo: poste.camaraModelo || MODELOS_CAMARA_CATALOGO[0],
                                   camaraCantidad: poste.camaraCantidad || '1'
                                 })}
-                                style={{ accentColor: '#691B31', width: '14px', height: '14px', cursor: 'pointer' }}
-                              />
-                              Sí
-                            </label>
-                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: !poste.tieneCamara ? '700' : '500', color: '#1E293B' }}>
-                              <input
-                                type="radio"
-                                name={`poste-${pIdx}-tieneCamara`}
-                                checked={!poste.tieneCamara}
-                                onChange={() => handleActualizarPoste(pIdx, 'tieneCamara', false)}
-                                style={{ accentColor: '#691B31', width: '14px', height: '14px', cursor: 'pointer' }}
-                              />
-                              No
-                            </label>
+                                style={{
+                                  border: 'none',
+                                  padding: '0.25rem 0.6rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: poste.tieneCamara ? '700' : '500',
+                                  backgroundColor: poste.tieneCamara ? '#691B31' : 'transparent',
+                                  color: poste.tieneCamara ? '#FFFFFF' : '#475569',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Sí
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleActualizarPoste(pIdx, 'tieneCamara', false)}
+                                style={{
+                                  border: 'none',
+                                  padding: '0.25rem 0.6rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: !poste.tieneCamara ? '700' : '500',
+                                  backgroundColor: !poste.tieneCamara ? '#691B31' : 'transparent',
+                                  color: !poste.tieneCamara ? '#FFFFFF' : '#475569',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                No
+                              </button>
+                            </div>
                           </div>
                         </div>
 
                         {poste.tieneCamara && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                             <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem' }}>
                               <div>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                  <FaVideo size={12} style={{ color: '#691B31' }} />
+                                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                                   <span>Modelo de cámara: <span style={{ color: '#DC2626' }}>*</span></span>
                                 </label>
                                 <select
@@ -6057,8 +6387,7 @@ export default function InventarioSemaforos() {
                               </div>
 
                               <div>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                  <FaBoxes size={12} style={{ color: '#691B31' }} />
+                                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                                   <span>Cantidad de equipos: <span style={{ color: '#DC2626' }}>*</span></span>
                                 </label>
                                 <input
@@ -6074,8 +6403,7 @@ export default function InventarioSemaforos() {
                             </div>
 
                             <div>
-                              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                <FaListUl size={12} style={{ color: '#691B31' }} />
+                              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                                 <span>Observaciones de la cámara:</span>
                               </label>
                               <textarea

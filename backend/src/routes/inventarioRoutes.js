@@ -21,7 +21,10 @@ const storage = multer.diskStorage({
     cb(null, `programacion-${Date.now()}${path.extname(file.originalname)}`);
   }
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB límite para respaldos USB / ZIP
+});
 
 const router = express.Router();
 
