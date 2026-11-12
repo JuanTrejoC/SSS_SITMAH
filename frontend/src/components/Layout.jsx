@@ -1,7 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Header from './Header/Header'
-import ThemeToggle from './ThemeToggle'
 import { useState, useEffect, Suspense } from 'react'
 import { useAuth } from '../context/AuthContext'
 import CargandoPagina from './CargandoPagina'
@@ -90,8 +89,6 @@ export default function Layout() {
           </Suspense>
         </main>
       </div>
-
-      <ThemeToggle />
     </div>
   )
 }

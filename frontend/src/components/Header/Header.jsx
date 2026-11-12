@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { FaExclamationCircle, FaCheckCircle, FaBars, FaLock, FaEye, FaEyeSlash, FaSearch } from 'react-icons/fa';
+import { FaExclamationCircle, FaCheckCircle, FaBars, FaLock, FaEye, FaEyeSlash, FaSearch, FaAdjust } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import NotificationCenter from './NotificationCenter';
 import BuscadorGlobalModal from './BuscadorGlobalModal';
+import ThemeToggle from '../ThemeToggle';
 import logoNuevo from '../../assets/logoSSS.png';
 import './Header.css';
 
@@ -222,6 +223,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
               </button>
 
               {(user.rol === 'administrador' || user.rol === 'admin' || user.rol === 'infraestructura') && <NotificationCenter />}
+              <ThemeToggle />
               <div className="app-header__profile" ref={profileRef}>
               <button 
                 className="app-header__profile-btn"
@@ -239,6 +241,28 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
                     {user.username && <span className="profile-username">@{user.username}</span>}
                     <span className="profile-role" style={{ textTransform: 'capitalize' }}>{user.rol}</span>
                   </div>
+                  {(user.rol === 'administrador' || user.rol === 'admin') && (
+                    <>
+                      <hr />
+                      <button
+                        type="button"
+                        className="profile-menu-btn"
+                        onClick={() => {
+                          const actual = localStorage.getItem('sitrach_grayscale') === 'true' || localStorage.getItem('sitmah_grayscale') === 'true'
+                          const nuevo = !actual
+                          if (nuevo) document.documentElement.classList.add('grayscale-theme')
+                          else document.documentElement.classList.remove('grayscale-theme')
+                          localStorage.setItem('sitrach_grayscale', String(nuevo))
+                          localStorage.setItem('sitmah_grayscale', String(nuevo))
+                          window.dispatchEvent(new Event('sitrach_theme_change'))
+                        }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%', textAlign: 'left', padding: '0.55rem 1rem', cursor: 'pointer', border: 'none', background: 'transparent' }}
+                      >
+                        <FaAdjust size={13} style={{ color: '#BC955B' }} />
+                        <span>Alternar Escala de Grises</span>
+                      </button>
+                    </>
+                  )}
                   <hr />
                   <button className="profile-menu-btn logout-btn" onClick={handleLogout}>
                     Cerrar Sesión

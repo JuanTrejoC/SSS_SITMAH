@@ -1,47 +1,92 @@
-import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { useState, useEffect, useCallback } from 'react'
 import { FaAdjust } from 'react-icons/fa'
+import { useAuth } from '../context/AuthContext'
 
-export default function ThemeToggle() {
+export default function ThemeToggle({ className = '', style = {} }) {
+  const { user } = useAuth() || {}
+  const esAdmin = user?.rol === 'administrador' || user?.rol === 'admin'
+
   const [esEscalaGrises, setEsEscalaGrises] = useState(() => {
     return localStorage.getItem('sitrach_grayscale') === 'true' || localStorage.getItem('sitmah_grayscale') === 'true'
   })
 
-  useEffect(() => {
-    if (esEscalaGrises) {
+  // Función para aplicar o remover la clase CSS de escala de grises
+  const aplicarTema = useCallback((activar) => {
+    if (activar) {
       document.documentElement.classList.add('grayscale-theme')
+      document.body.classList.add('grayscale-theme')
     } else {
       document.documentElement.classList.remove('grayscale-theme')
+      document.body.classList.remove('grayscale-theme')
     }
-    localStorage.setItem('sitrach_grayscale', String(esEscalaGrises))
-    localStorage.setItem('sitmah_grayscale', String(esEscalaGrises))
-  }, [esEscalaGrises])
+  }, [])
 
-  return createPortal(
+  // Aplicar tema al montar o cuando cambie el rol
+  useEffect(() => {
+    if (esAdmin) {
+      aplicarTema(esEscalaGrises)
+    } else {
+      aplicarTema(false)
+    }
+  }, [esAdmin, esEscalaGrises, aplicarTema])
+
+  // Escuchar cambios de tema entre pestañas o componentes
+  useEffect(() => {
+    const handleStorage = (e) => {
+      let nuevoValor = false
+      if (e?.detail !== undefined) {
+        nuevoValor = Boolean(e.detail)
+      } else {
+        nuevoValor = localStorage.getItem('sitrach_grayscale') === 'true' || localStorage.getItem('sitmah_grayscale') === 'true'
+      }
+      setEsEscalaGrises(nuevoValor)
+      if (esAdmin) {
+        aplicarTema(nuevoValor)
+      }
+    }
+
+    window.addEventListener('storage', handleStorage)
+    window.addEventListener('sitrach_theme_change', handleStorage)
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+      window.removeEventListener('sitrach_theme_change', handleStorage)
+    }
+  }, [esAdmin, aplicarTema])
+
+  // Solo se muestra para el Administrador General
+  if (!esAdmin) return null
+
+  const alternarTema = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const nuevo = !esEscalaGrises
+    // 1. Guardar en localStorage de inmediato
+    localStorage.setItem('sitrach_grayscale', String(nuevo))
+    localStorage.setItem('sitmah_grayscale', String(nuevo))
+    // 2. Aplicar al DOM de inmediato
+    aplicarTema(nuevo)
+    // 3. Actualizar estado local
+    setEsEscalaGrises(nuevo)
+    // 4. Notificar a otros escuchas con el valor exacto
+    window.dispatchEvent(new CustomEvent('sitrach_theme_change', { detail: nuevo }))
+  }
+
+  return (
     <button
-      onClick={() => setEsEscalaGrises(!esEscalaGrises)}
-      title={esEscalaGrises ? 'Restaurar colores' : 'Activar escala de grises'}
+      type="button"
+      onClick={alternarTema}
+      title={esEscalaGrises ? 'Restaurar colores originales' : 'Cambiar a escala de grises'}
       aria-label="Alternar escala de grises"
-      className="theme-toggle-btn"
+      className={`notification-bell-btn ${className}`}
       style={{
-        width: '42px',
-        height: '42px',
-        borderRadius: '50%',
-        border: '1px solid #6F7271',
-        backgroundColor: esEscalaGrises ? '#475569' : 'white',
-        color: esEscalaGrises ? 'white' : '#691B31',
+        marginRight: '0.45rem',
+        backgroundColor: esEscalaGrises ? '#BC955B' : 'rgba(255, 255, 255, 0.12)',
+        color: esEscalaGrises ? '#691B31' : '#BC955B',
         cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
-        transition: 'background 0.2s, transform 0.2s, color 0.2s',
+        ...style
       }}
-      onMouseOver={(e) => { e.currentTarget.style.transform = 'scale(1.08)' }}
-      onMouseOut={(e) => { e.currentTarget.style.transform = 'scale(1)' }}
     >
       <FaAdjust size={18} />
-    </button>,
-    document.body
+    </button>
   )
 }

@@ -2554,147 +2554,440 @@ export default function InventarioSemaforos() {
         loadImgBase64(escudoHidalgoSrc)
       ])
 
-      // Franja superior guinda
-      doc.setFillColor(105, 27, 49) // #691B31
-      doc.rect(0, 0, pageWidth, 5, 'F')
-
-      // Franja inferior guinda
-      doc.setFillColor(105, 27, 49)
-      doc.rect(0, pageHeight - 8, pageWidth, 8, 'F')
-      doc.setTextColor(255, 255, 255)
-      doc.setFontSize(8)
-      doc.text('SISTEMA INTEGRAL DE CONTROL SITRAC-H — DIRECCIÓN DE SEMÁFOROS Y CONTROL VIAL', 14, pageHeight - 3)
-      doc.text(`Página 1 de 1`, pageWidth - 14, pageHeight - 3, { align: 'right' })
-
       // Logos
       if (logoSitrach) doc.addImage(logoSitrach, 'PNG', 14, 7, 14, 14)
       if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', pageWidth - 26, 7, 12, 14)
 
       // Títulos
       doc.setTextColor(105, 27, 49)
-      doc.setFontSize(15)
+      doc.setFontSize(14)
       doc.setFont(undefined, 'bold')
-      doc.text('FICHA TÉCNICA DE CONTROLADOR SEMAFÓRICO', pageWidth / 2, 14, { align: 'center' })
+      doc.text('FICHA TÉCNICA DE CONTROLADOR SEMAFÓRICO', pageWidth / 2, 13.5, { align: 'center' })
 
       doc.setTextColor(188, 149, 91)
-      doc.setFontSize(8.5)
+      doc.setFontSize(8)
       doc.setFont(undefined, 'normal')
-      doc.text('SITRAC-H — SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 19, { align: 'center' })
+      doc.text('SITRAC-H — SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 18.5, { align: 'center' })
 
       // Recuadro del crucero / encabezado principal
       doc.setFillColor(248, 250, 252)
       doc.setDrawColor(203, 213, 225)
-      doc.roundedRect(14, 23, pageWidth - 28, 16, 2, 2, 'FD')
+      doc.roundedRect(14, 22, pageWidth - 28, 16, 2, 2, 'FD')
 
       doc.setTextColor(105, 27, 49)
-      doc.setFontSize(12)
+      doc.setFontSize(11.5)
       doc.setFont(undefined, 'bold')
-      doc.text(`CRUCERO: ${ctrl.crucero?.nombre || 'SIN ASIGNAR'}`, 18, 30)
+      doc.text(`CRUCERO: ${ctrl.crucero?.nombre || 'SIN ASIGNAR'}`, 18, 29)
 
       doc.setFontSize(8.5)
       doc.setTextColor(71, 85, 105)
       doc.setFont(undefined, 'normal')
-      doc.text(`Modelo: ${ctrl.modelo || '—'}   |   No. Gabinete: ${ctrl.numeroGabinete || '—'}   |   Fecha de consulta: ${new Date().toLocaleDateString('es-MX')}`, 18, 35)
+      doc.text(`Modelo: ${ctrl.modelo || '—'}   |   No. Gabinete: ${ctrl.numeroGabinete || '—'}   |   Fecha de consulta: ${new Date().toLocaleDateString('es-MX')}`, 18, 34.5)
 
-      // Tablas de contenido organizadas
+      // Normalizar postes y calcular estadísticas reales
       const postesNorm = normalizarPostesDetalle(ctrl.postesDetalle, ctrl)
-      const totalCabezales = (Number(ctrl.semaforos3Luces) || 0) + (Number(ctrl.semaforos4Luces) || 0)
-      const totalLeds = (Number(ctrl.totalLedsVerdes) || 0) + (Number(ctrl.totalLedsRojos) || 0) + (Number(ctrl.totalLedsAmarillos) || 0) + (Number(ctrl.totalFlechasVerdes) || 0) + (Number(ctrl.totalFlechasRojas) || 0)
 
-      const resumenGeneral = [
-        ['Semáforos 3 Luces', `${ctrl.semaforos3Luces || 0}`, 'LEDs Verdes', `${ctrl.totalLedsVerdes || 0} (Flechas: ${ctrl.totalFlechasVerdes || 0})`],
-        ['Semáforos 4 Luces', `${ctrl.semaforos4Luces || 0}`, 'LEDs Rojos', `${ctrl.totalLedsRojos || 0} (Flechas: ${ctrl.totalFlechasRojas || 0})`],
-        ['Total Cabezales', `${totalCabezales}`, 'LEDs Amarillos', `${ctrl.totalLedsAmarillos || 0}`],
-        ['Tipo / Modelo Cabezal', `${ctrl.tipoCabezal || 'LED'} — ${ctrl.cabezalModelo || 'N/A'}`, 'Total LEDs en Crucero', `${totalLeds}`]
+      let totalPantallasPiezas = 0
+      let pantallasOperando = 0
+      let pantallasFalla = 0
+
+      let totalCabezales3L = 0
+      let totalCabezales4L = 0
+      let totalLedsVerdes = 0
+      let totalLedsRojos = 0
+      let totalLedsAmarillos = 0
+      let totalFlechasVerdes = 0
+      let totalFlechasRojas = 0
+
+      let totalSemPeatonales = 0
+      let peatonalesOperando = 0
+      let peatonalesDanados = 0
+      let totalAudibles = 0
+      let audiblesOperando = 0
+      let audiblesDanados = 0
+
+      let totalCamarasPostes = 0
+
+      postesNorm.forEach(p => {
+        const esPeatonalExclusivo = p.tipoPoste === 'peatonal'
+
+        if (!esPeatonalExclusivo) {
+          const esPantalla = p.tipoCabezal === 'Pantalla' || p.tipoCabezal === 'Pantalla LED' ||
+            (p.cabezalModelo && p.cabezalModelo.toLowerCase().includes('pantalla')) ||
+            (Number(p.pantallaPiezas) > 0)
+
+          if (esPantalla) {
+            const pzas = (Array.isArray(p.pantallasLista) && p.pantallasLista.length > 0)
+              ? p.pantallasLista.length
+              : (Number(p.pantallaPiezas) || 1)
+            totalPantallasPiezas += pzas
+
+            if (Array.isArray(p.pantallasLista) && p.pantallasLista.length > 0) {
+              p.pantallasLista.forEach(pz => {
+                if (pz.estado === 'No funciona') pantallasFalla++
+                else pantallasOperando++
+              })
+            } else {
+              if (p.pantallaEstado === 'No funciona') pantallasFalla += pzas
+              else pantallasOperando += pzas
+            }
+          } else if ((p.tipoCabezal || 'LED') === 'LED') {
+            const grupos = normalizarCabezalesDetalle(p.cabezalesGrupos)
+            grupos.forEach(g => {
+              const numL = g.leds?.length || g.numLeds || 3
+              if (numL === 3) totalCabezales3L++
+              else if (numL >= 4) totalCabezales4L++
+
+              const leds = Array.isArray(g.leds) ? g.leds : []
+              leds.forEach(l => {
+                const col = (l.color || '').toLowerCase()
+                if (col.includes('verde') && col.includes('flecha')) totalFlechasVerdes++
+                else if (col.includes('rojo') && col.includes('flecha')) totalFlechasRojas++
+                else if (col.includes('verde')) totalLedsVerdes++
+                else if (col.includes('rojo')) totalLedsRojos++
+                else if (col.includes('amarillo')) totalLedsAmarillos++
+              })
+            })
+          }
+        }
+
+        // Semáforos peatonales y audibles
+        const peats = (Array.isArray(p.peatonalesLista) && p.peatonalesLista.length > 0)
+          ? p.peatonalesLista
+          : ((p.tienePeatonal || p.peatonalModelo) ? [{
+              estado: p.peatonalModuloEstado || 'Operando',
+              tieneAudible: p.tieneAudible,
+              audibleEstado: p.audibleModuloEstado || 'Operando'
+            }] : [])
+
+        peats.forEach(pt => {
+          totalSemPeatonales++
+          if (pt.estado === 'Dañado' || pt.estado === 'No funciona' || pt.estado === 'Falla') {
+            peatonalesDanados++
+          } else {
+            peatonalesOperando++
+          }
+
+          if (pt.tieneAudible) {
+            totalAudibles++
+            if (pt.audibleEstado === 'Dañado' || pt.audibleEstado === 'No funciona' || pt.audibleEstado === 'Falla') {
+              audiblesDanados++
+            } else {
+              audiblesOperando++
+            }
+          }
+        })
+
+        // Cámaras en este poste
+        if (p.tieneCamara || p.camaraCantidad || p.camaraModelo) {
+          totalCamarasPostes += (Number(p.camaraCantidad) || 1)
+        }
+      })
+
+      // Consolidar con campos del controlador si existen
+      const sem3L = totalCabezales3L || Number(ctrl.semaforos3Luces) || 0
+      const sem4L = totalCabezales4L || Number(ctrl.semaforos4Luces) || 0
+      const totalCabConvencionales = sem3L + sem4L
+
+      const ledsV = totalLedsVerdes || Number(ctrl.totalLedsVerdes) || 0
+      const ledsR = totalLedsRojos || Number(ctrl.totalLedsRojos) || 0
+      const ledsA = totalLedsAmarillos || Number(ctrl.totalLedsAmarillos) || 0
+      const flcV = totalFlechasVerdes || Number(ctrl.totalFlechasVerdes) || 0
+      const flcR = totalFlechasRojas || Number(ctrl.totalFlechasRojas) || 0
+      const totalLeds = ledsV + ledsR + ledsA + flcV + flcR
+
+      const cantPantallas = totalPantallasPiezas || (ctrl.pantallaLed ? (Number(ctrl.pantallaPiezas) || 1) : 0)
+      const cantCamaras = totalCamarasPostes || Number(ctrl.camaraCantidad) || 0
+
+      // 1. INSPECCIÓN EXTERIOR, CIMENTACIÓN Y BASE
+      const cimientoTexto = ctrl.cimientoCompleto === 'Sí'
+        ? '4 dados completos · Concreto firme'
+        : (ctrl.cimientoCuantosDados ? `Incompleto (${ctrl.cimientoCuantosDados} dados presentes)` : (ctrl.cimientoCompleto || '—'))
+
+      const tapaTexto = ctrl.tapaCableado === 'Sí'
+        ? 'Presente y asegurada'
+        : (ctrl.tapaCableado === 'No' ? 'Faltante / Dañada' : (ctrl.tapaCableado || '—'))
+
+      const tornilleriaTexto = ctrl.tornilleriaBaseCompleta === 'Sí'
+        ? '4 tornillos de anclaje completos'
+        : (ctrl.tornilleriaCuantosTornillos ? `Incompleta (${ctrl.tornilleriaCuantosTornillos} tornillos presentes)` : (ctrl.tornilleriaBaseCompleta || '—'))
+
+      const observacionesExteriorTexto = ctrl.observacionesExterior || ctrl.posteObservaciones || 'Sin observaciones registradas'
+
+      const seccion1Inspeccion = [
+        ['Cimentación de Base', cimientoTexto, 'Tapa de Cableado', tapaTexto],
+        ['Tornillería de Base', tornilleriaTexto, 'Condición General', (ctrl.cimientoCompleto === 'Sí' && ctrl.tornilleriaBaseCompleta === 'Sí') ? 'Firme y en buen estado' : 'Requiere atención'],
+        ['Observaciones Exterior', observacionesExteriorTexto, 'Estado Físico Gabinete', (ctrl.cimientoCompleto === 'Sí' && ctrl.tapaCableado === 'Sí') ? 'Firme y asegurado' : 'Pendiente de revisión']
       ]
 
       autoTable(doc, {
-        startY: 42,
-        margin: { left: 14, right: 14 },
-        head: [['1. CABEZALES SEMAFÓRICOS', 'CANTIDAD', '2. DESGLOSE DE LEDS', 'CANTIDAD']],
-        body: resumenGeneral,
+        startY: 41,
+        margin: { top: 12, left: 14, right: 14, bottom: 12 },
+        head: [['1. INSPECCIÓN EXTERIOR, CIMENTACIÓN Y BASE', 'ESTADO / CONDICIÓN', 'PARÁMETRO', 'ESTADO / CONDICIÓN']],
+        body: seccion1Inspeccion,
         theme: 'grid',
-        headStyles: { fillColor: [105, 27, 49], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
-        styles: { cellPadding: 2 }
+        headStyles: { fillColor: [105, 27, 49], textColor: [255, 255, 255], fontSize: 7.8, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.2, textColor: [30, 41, 59] },
+        styles: { cellPadding: 1.8 }
       })
 
-      const accesibilidad = [
-        ['Paso Peatonal', ctrl.pasoPeatonal ? 'ACTIVO / SÍ' : 'NO DISPONIBLE', 'Dispositivo Audible', ctrl.audible ? 'ACTIVO / SÍ' : 'NO DISPONIBLE'],
-        ['Pantalla LED', ctrl.pantallaLed ? 'INSTALADA / SÍ' : 'NO DISPONIBLE', 'Botonera Peatonal', ctrl.botonera ? 'INSTALADA / SÍ' : 'NO DISPONIBLE']
+      // 2. ELECTRÓNICA INTERNA — MÓDULO GPS
+      const seccion2Gps = [
+        [
+          'Módulo Receptor GPS',
+          ctrl.gps ? (ctrl.gpsModelo || 'Receptor Satelital GPS RC-308') : 'NO INSTALADO',
+          'Antena Exterior',
+          ctrl.gps ? (ctrl.gpsAntenaExterior || 'Instalada') : 'NO INSTALADA'
+        ],
+        [
+          'Componente Físico',
+          ctrl.gpsComponenteFisico || (ctrl.gps ? 'Operativo en gabinete' : 'No disponible'),
+          'Sincronización Horaria',
+          ctrl.gps ? 'Sincronización satelital activa' : 'Sin sincronización satelital'
+        ]
       ]
 
       autoTable(doc, {
-        startY: doc.lastAutoTable.finalY + 4,
-        margin: { left: 14, right: 14 },
-        head: [['3. ACCESIBILIDAD Y EQUIPAMIENTO PEATONAL', 'ESTADO', 'COMPONENTE', 'ESTADO']],
-        body: accesibilidad,
+        startY: doc.lastAutoTable.finalY + 3.5,
+        margin: { top: 12, left: 14, right: 14, bottom: 12 },
+        head: [['2. ELECTRÓNICA INTERNA — MÓDULO GPS', 'VALOR / DETALLE', 'PARÁMETRO', 'VALOR / DETALLE']],
+        body: seccion2Gps,
         theme: 'grid',
-        headStyles: { fillColor: [188, 149, 91], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
-        styles: { cellPadding: 2 }
+        headStyles: { fillColor: [188, 149, 91], textColor: [255, 255, 255], fontSize: 7.8, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.2, textColor: [30, 41, 59] },
+        styles: { cellPadding: 1.8 }
       })
 
-      const redElectronica = [
+      // 3. GABINETE, RED Y CONFIGURACIÓN
+      const tarjetaConflictosDetalle = (ctrl.tarjetaConflictosMarca || ctrl.tarjetaConflictosModelo)
+        ? `${ctrl.tarjetaConflictosMarca || ''} ${ctrl.tarjetaConflictosModelo || ''} [${ctrl.tarjetaConflictosEstado || 'Operativo'}]`.trim()
+        : (ctrl.tarjetaConflictosEstado ? `Estado: ${ctrl.tarjetaConflictosEstado}` : 'Sin registrar')
+
+      const relevadoresDetalle = (ctrl.tarjetaRelevadoresMarca || ctrl.tarjetaRelevadoresCantidad)
+        ? `${ctrl.tarjetaRelevadoresMarca || 'Peek Traffic'} ${ctrl.tarjetaRelevadoresModelo || 'RC-308'} (${ctrl.tarjetaRelevadoresCantidad || '8'} tarjetas)`.trim()
+        : (ctrl.tarjetaRelevadora ? 'Sí (Instaladas)' : 'No')
+
+      const seccion3Gabinete = [
+        ['Número de Gabinete (#)', ctrl.numeroGabinete || '—', 'Versión de Firmware', ctrl.versionFirmware || '—'],
         ['Dirección IP Local', ctrl.ipLocal || '—', 'Dirección IP Sistema', ctrl.ipSystem || '—'],
         ['Máscara de Red', ctrl.mascaraRed || '—', 'Puerta de Enlace (Gateway)', ctrl.gateway || '—'],
-        ['Versión de Firmware', ctrl.versionFirmware || '—', 'Ciclo Completo', ctrl.cicloCompleto || '—'],
-        ['Módulo GPS', ctrl.gps ? `SÍ (${ctrl.gpsModelo || 'Modelo N/A'})` : 'NO', 'Antena GPS', ctrl.gpsAntenaExterior || '—'],
-        ['Switch de Fibra', ctrl.switch ? `SÍ (${ctrl.switchFibraMarca || ''} ${ctrl.switchFibraModelo || ''})` : 'NO', 'Fibra Óptica / Receptor', ctrl.fibraOptica ? `SÍ (${ctrl.receptorFibraDispositivo || 'Receptor N/A'})` : 'NO'],
-        ['CPU / Relevadores / Fuente', `CPU: ${ctrl.cpu ? 'Sí' : 'No'} | Relés: ${ctrl.tarjetaRelevadora ? 'Sí' : 'No'} | Fuente: ${ctrl.fuentePoder ? 'Sí' : 'No'}`, 'Cámaras de Detección', ctrl.camaraCantidad ? `${ctrl.camaraCantidad} (${ctrl.camaraModelo || 'Cámaras'})` : (ctrl.camaraModelo || 'Ninguna')]
+        ['Ciclo Completo', ctrl.cicloCompleto ? `${ctrl.cicloCompleto} segundos` : '—', 'Respaldo Programación', ctrl.respaldoProgramacionUsb || 'Sin respaldo cargado'],
+        ['Tarjeta de Conflictos', tarjetaConflictosDetalle, 'Tarjetas de Relevadores', relevadoresDetalle]
       ]
 
       autoTable(doc, {
-        startY: doc.lastAutoTable.finalY + 4,
-        margin: { left: 14, right: 14 },
-        head: [['4. RED, CONECTIVIDAD Y ELECTRÓNICA INTERNA', 'VALOR', 'PARÁMETRO', 'VALOR']],
-        body: redElectronica,
+        startY: doc.lastAutoTable.finalY + 3.5,
+        margin: { top: 12, left: 14, right: 14, bottom: 12 },
+        head: [['3. GABINETE, RED Y CONFIGURACIÓN', 'VALOR / DETALLE', 'PARÁMETRO', 'VALOR / DETALLE']],
+        body: seccion3Gabinete,
         theme: 'grid',
-        headStyles: { fillColor: [105, 27, 49], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
-        styles: { cellPadding: 2 }
+        headStyles: { fillColor: [105, 27, 49], textColor: [255, 255, 255], fontSize: 7.8, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.2, textColor: [30, 41, 59] },
+        styles: { cellPadding: 1.8 }
       })
 
-      // Detalle de postes
-      const postesBody = postesNorm.length > 0
-        ? postesNorm.map((p, idx) => [
-            `Poste #${idx + 1}`,
-            p.tipoPoste === 'peatonal' ? 'Peatonal' : 'Vehicular / Mixto',
-            p.modeloPoste || p.modelo || p.posteModeloTipo || '—',
-            p.tapaRegistro || '—',
-            p.ubicacionPoste || p.coordenadas || '—',
-            p.observaciones || '—'
-          ])
-        : [['Sin postes', '—', '—', '—', '—', 'No se detallaron postes individuales']]
+      // 4. RED, CONECTIVIDAD Y ENERGÍA
+      const switchMarca = (ctrl.switchFibraMarca || '').trim()
+      let switchMod = (ctrl.switchFibraModelo || '').trim()
+      if (switchMarca && switchMod.toLowerCase().startsWith(switchMarca.toLowerCase())) {
+        switchMod = switchMod.slice(switchMarca.length).trim()
+      }
+      const switchNombreCompleto = switchMarca && switchMod ? `${switchMarca} ${switchMod}` : (switchMod || switchMarca || 'Switch Fibra')
+      const switchDetalle = ctrl.switch
+        ? `Sí (${switchNombreCompleto}${ctrl.switchFibraPuertos ? ` · ${ctrl.switchFibraPuertos}` : ''}${ctrl.switchFibraPuertosEnUso ? ` [${ctrl.switchFibraPuertosEnUso} en uso]` : ''})`
+        : 'NO'
+
+      const seccion4RedEnergia = [
+        ['Switch de Fibra Óptica', switchDetalle, 'Fuente de Poder Switch', ctrl.switchFibraFuente || (ctrl.switch ? 'Operativa' : 'No disponible')],
+        ['Receptor de Fibra Óptica', ctrl.receptorFibraDispositivo || (ctrl.fibraOptica ? 'Presente' : 'No disponible'), 'Cable de Fibra Óptica', ctrl.receptorFibraCable || (ctrl.fibraOptica ? 'Conectado' : 'No conectado')],
+        ['Alimentación / Supresor', ctrl.alimentacionSupresorPicos || (ctrl.fuentePoder ? 'Operando' : 'No disponible'), 'Conexiones Tarjeta Madre', ctrl.totalConexionesTarjetaMadre ? `${ctrl.totalConexionesTarjetaMadre} conexiones ocupadas` : '8 conexiones']
+      ]
 
       autoTable(doc, {
-        startY: doc.lastAutoTable.finalY + 4,
-        margin: { left: 14, right: 14 },
-        head: [['# POSTE', 'FUNCIÓN', 'MODELO', 'ESTADO TAPA', 'COORDENADAS', 'OBSERVACIONES']],
+        startY: doc.lastAutoTable.finalY + 3.5,
+        margin: { top: 12, left: 14, right: 14, bottom: 12 },
+        head: [['4. RED, CONECTIVIDAD Y ENERGÍA', 'VALOR / DETALLE', 'PARÁMETRO', 'VALOR / DETALLE']],
+        body: seccion4RedEnergia,
+        theme: 'grid',
+        headStyles: { fillColor: [188, 149, 91], textColor: [255, 255, 255], fontSize: 7.8, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.2, textColor: [30, 41, 59] },
+        styles: { cellPadding: 1.8 }
+      })
+
+      // 5. CENSO DE POSTES Y EQUIPAMIENTO (CABEZALES, PANTALLAS LED, PEATONALES Y CÁMARAS)
+      const resumenEquipamiento = [
+        [
+          'Pantallas LED Vehiculares',
+          cantPantallas > 0 ? `${cantPantallas} piezas (${pantallasOperando} operando${pantallasFalla > 0 ? `, ${pantallasFalla} falla` : ''})` : '0 piezas',
+          'Semáforos Convencionales',
+          `${totalCabConvencionales} cabezal(es) (${sem3L} de 3L, ${sem4L} de 4L)`
+        ],
+        [
+          'Semáforos Peatonales',
+          totalSemPeatonales > 0 ? `${totalSemPeatonales} instalados (${peatonalesOperando} op.${peatonalesDanados > 0 ? `, ${peatonalesDanados} dañados` : ''})` : (ctrl.pasoPeatonal ? 'ACTIVO / SÍ' : 'NO DISPONIBLE'),
+          'Dispositivos Peatonales Audibles',
+          totalAudibles > 0 ? `${totalAudibles} instalados (${audiblesOperando} op.${audiblesDanados > 0 ? `, ${audiblesDanados} dañados` : ''})` : (ctrl.audible ? 'ACTIVO / SÍ' : 'NO DISPONIBLE')
+        ],
+        [
+          'Cámaras de Detección',
+          cantCamaras > 0 ? `${cantCamaras} equipo(s) (${ctrl.camaraModelo || 'Peek Color Video Traffic Detection'})` : (ctrl.camaraModelo || 'Ninguna'),
+          'Total LEDs en Crucero',
+          `${totalLeds} LEDs (${ledsV}V [${flcV} flc], ${ledsR}R [${flcR} flc], ${ledsA}A)`
+        ]
+      ]
+
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 3.5,
+        margin: { top: 12, left: 14, right: 14, bottom: 12 },
+        head: [['5. CENSO DE EQUIPAMIENTO DEL CRUCERO (TOTALES)', 'CANTIDAD / ESTADO', 'PARÁMETRO', 'CANTIDAD / DETALLE']],
+        body: resumenEquipamiento,
+        theme: 'grid',
+        headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontSize: 7.8, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.2, textColor: [30, 41, 59] },
+        styles: { cellPadding: 1.8 }
+      })
+
+      const postesBody = postesNorm.length > 0
+        ? postesNorm.map((p, idx) => {
+            const func = p.tipoPoste === 'peatonal' ? 'Peatonal' : 'Vehicular'
+            const mod = p.modeloPoste || p.modelo || p.posteModeloTipo || '—'
+            const tipoMod = `${func} (${mod})`
+
+            const equipos = []
+            if (p.tipoPoste !== 'peatonal') {
+              const esPantalla = p.tipoCabezal === 'Pantalla' || p.tipoCabezal === 'Pantalla LED' ||
+                (p.cabezalModelo && p.cabezalModelo.toLowerCase().includes('pantalla')) ||
+                (Number(p.pantallaPiezas) > 0)
+
+              if (esPantalla) {
+                const pzas = (Array.isArray(p.pantallasLista) && p.pantallasLista.length > 0)
+                  ? p.pantallasLista.length
+                  : (Number(p.pantallaPiezas) || 1)
+                const fallas = Array.isArray(p.pantallasLista)
+                  ? p.pantallasLista.filter(x => x.estado === 'No funciona').length
+                  : (p.pantallaEstado === 'No funciona' ? pzas : 0)
+                equipos.push(`${pzas} Pantalla(s) LED${fallas > 0 ? ` (${fallas} no funciona)` : ' (Op.)'}`)
+              } else if ((p.tipoCabezal || 'LED') === 'LED') {
+                const grupos = normalizarCabezalesDetalle(p.cabezalesGrupos)
+                if (grupos.length > 0) {
+                  grupos.forEach((g, gI) => {
+                    const numL = g.leds?.length || g.numLeds || 3
+                    equipos.push(`Cabezal #${gI + 1} [${numL} LEDs] (${p.cabezalModelo || 'LV-1'})`)
+                  })
+                } else {
+                  equipos.push(`Cabezal LED (${p.cabezalModelo || 'LV-1'})`)
+                }
+              }
+            }
+
+            // Peatonales
+            if (Array.isArray(p.peatonalesLista) && p.peatonalesLista.length > 0) {
+              p.peatonalesLista.forEach((pt, ptI) => {
+                const est = pt.estado === 'Operando' ? 'Op.' : 'Dañado'
+                const aud = pt.tieneAudible ? ` + Aud (${pt.audibleEstado === 'Operando' ? 'Op.' : 'Dañado'})` : ''
+                equipos.push(`Peat. #${ptI + 1} [${est}]${aud}`)
+              })
+            } else if (p.tienePeatonal || p.peatonalModelo) {
+              const est = p.peatonalModuloEstado === 'Operando' ? 'Op.' : 'Dañado'
+              const aud = p.tieneAudible ? ` + Aud (${p.audibleModuloEstado === 'Operando' ? 'Op.' : 'Dañado'})` : ''
+              equipos.push(`Peatonal [${est}]${aud}`)
+            }
+
+            // Cámaras
+            if (p.tieneCamara || p.camaraCantidad || p.camaraModelo) {
+              const cant = Number(p.camaraCantidad) || 1
+              equipos.push(`${cant} Cámara(s) Peek`)
+            }
+
+            return [
+              `Poste #${idx + 1}`,
+              tipoMod,
+              p.tapaRegistro || p.estadoTapaRegistro || 'Buena',
+              p.ubicacionPoste || p.coordenadas || '—',
+              equipos.length > 0 ? equipos.join(' | ') : '—',
+              p.observaciones || '—'
+            ]
+          })
+        : [['Sin postes', '—', '—', '—', 'No se detallaron postes individuales', '—']]
+
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 3.5,
+        margin: { top: 12, left: 14, right: 14, bottom: 12 },
+        head: [['# POSTE', 'FUNCIÓN / MODELO', 'ESTADO TAPA', 'COORDENADAS GPS', 'EQUIPAMIENTO INSTALADO EN ESTE POSTE', 'OBSERVACIONES']],
         body: postesBody,
         theme: 'grid',
-        headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
-        styles: { cellPadding: 2 }
+        showHead: 'everyPage',
+        headStyles: { fillColor: [105, 27, 49], textColor: [255, 255, 255], fontSize: 7.2, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 6.8, textColor: [30, 41, 59] },
+        styles: { cellPadding: 1.5 },
+        columnStyles: {
+          0: { cellWidth: 15 },
+          1: { cellWidth: 26 },
+          2: { cellWidth: 18 },
+          3: { cellWidth: 32 },
+          4: { cellWidth: 55 },
+          5: { cellWidth: 'auto' }
+        }
       })
 
-      // Cimentación y Observaciones
-      const infraestructura = [
-        ['Cimiento Completo', ctrl.cimientoCompleto || '—', 'Dados de Cimentación', ctrl.cimientoCuantosDados || '—'],
-        ['Tapa de Cableado', ctrl.tapaCableado || '—', 'Tornillería Base', `${ctrl.tornilleriaBaseCompleta || '—'} (${ctrl.tornilleriaCuantosTornillos || '—'})`],
-        ['Registros de Piso Dañados', `${ctrl.registrosPisoDanados || 0} registro(s)`, 'Observaciones Generales', ctrl.observacionesExterior || ctrl.posteObservaciones || 'Sin observaciones registradas']
+      // 6. REGISTROS DE PISO
+      const seccion6Registros = [
+        [
+          'Cantidad de Tapas',
+          ctrl.registrosPisoTapas ? `${ctrl.registrosPisoTapas} tapas registradas` : 'Registros estándar',
+          'Registros Dañados',
+          ctrl.registrosPisoDanados !== undefined && ctrl.registrosPisoDanados !== null && ctrl.registrosPisoDanados !== ''
+            ? `${ctrl.registrosPisoDanados} registro(s) dañado(s)`
+            : '0 registros dañados'
+        ],
+        [
+          'Coordenadas / Distribución',
+          ctrl.registrosPisoCoordenadas || ctrl.coordenadasRegistros || (postesNorm.length > 0 ? 'En banqueta/camellón por poste' : 'En crucero'),
+          'Estado Infraestructura',
+          Number(ctrl.registrosPisoDanados) > 0 ? 'Requiere mantenimiento' : 'Operativa y en buen estado'
+        ],
+        [
+          'Observaciones de Registros',
+          ctrl.registrosPisoObservaciones || 'Sin anomalías registradas en canalizaciones ni registros subterráneos',
+          'Condición de Seguridad',
+          Number(ctrl.registrosPisoDanados) > 0 ? 'Riesgo peatonal / Atender' : 'Seguro y nivelado'
+        ]
       ]
 
       autoTable(doc, {
-        startY: doc.lastAutoTable.finalY + 4,
-        margin: { left: 14, right: 14 },
-        head: [['5. BASE, CIMENTACIÓN Y ESTADO FÍSICO', 'ESTADO', 'PARÁMETRO', 'OBSERVACIONES']],
-        body: infraestructura,
+        startY: doc.lastAutoTable.finalY + 3.5,
+        margin: { top: 12, left: 14, right: 14, bottom: 12 },
+        head: [['6. REGISTROS DE PISO', 'ESTADO / CONDICIÓN', 'PARÁMETRO', 'ESTADO / CONDICIÓN']],
+        body: seccion6Registros,
         theme: 'grid',
-        headStyles: { fillColor: [188, 149, 91], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
-        styles: { cellPadding: 2 }
+        headStyles: { fillColor: [188, 149, 91], textColor: [255, 255, 255], fontSize: 7.8, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.2, textColor: [30, 41, 59] },
+        styles: { cellPadding: 1.8 }
       })
+
+      // Aplicar franja superior, inferior y paginación a TODAS las páginas
+      const totalPages = doc.internal.getNumberOfPages()
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i)
+
+        // Franja superior guinda y dorada
+        doc.setFillColor(105, 27, 49) // #691B31
+        doc.rect(0, 0, pageWidth, 4, 'F')
+        doc.setFillColor(188, 149, 91) // #BC955B
+        doc.rect(0, 4, pageWidth, 0.8, 'F')
+
+        // Franja inferior dorada y guinda
+        doc.setFillColor(188, 149, 91)
+        doc.rect(0, pageHeight - 8.8, pageWidth, 0.8, 'F')
+        doc.setFillColor(105, 27, 49)
+        doc.rect(0, pageHeight - 8, pageWidth, 8, 'F')
+
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(7.5)
+        doc.setFont(undefined, 'normal')
+        doc.text('SISTEMA INTEGRAL DE CONTROL SITRAC-H — DIRECCIÓN DE SEMÁFOROS Y CONTROL VIAL', 14, pageHeight - 3)
+        doc.text(`Página ${i} de ${totalPages}`, pageWidth - 14, pageHeight - 3, { align: 'right' })
+      }
 
       const nomCrucero = (ctrl.crucero?.nombre || 'controlador').replace(/[^a-zA-Z0-9_-]/g, '_')
       doc.save(`Ficha_Tecnica_${nomCrucero}_${new Date().toISOString().slice(0, 10)}.pdf`)

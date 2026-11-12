@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { Navigate, useNavigate } from 'react-router-dom'
-import ThemeToggle from '../components/ThemeToggle'
 import { FaExclamationCircle, FaCheckCircle, FaLock, FaUser, FaEye, FaEyeSlash } from 'react-icons/fa'
 import logoSitmah from '../assets/logo.png'
 
@@ -349,8 +348,6 @@ export default function Login() {
           © {new Date().getFullYear()} SITRAC-H — Gobierno del Estado de Hidalgo
         </p>
       </div>
-
-      <ThemeToggle />
     </>
   )
 }

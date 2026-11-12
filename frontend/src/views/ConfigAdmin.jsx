@@ -245,11 +245,65 @@ export default function ConfigAdmin() {
 
     // Validación y construcción de payload
     if (catalogoSeleccionado === 'usuarios') {
-      if (!username || !email || !nombre || (!editandoId && !password) || !rol) {
-        Swal.fire('Atención', 'Complete todos los campos obligatorios', 'warning');
+      const emailTrim = (email || '').trim().toLowerCase()
+      const usernameTrim = (username || '').trim()
+
+      if (!usernameTrim || !emailTrim || !nombre.trim() || (!editandoId && !password) || !rol) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Campos incompletos',
+          text: 'Por favor complete todos los campos obligatorios.',
+          confirmButtonColor: '#691B31'
+        });
         return
       }
-      payload = { username, email, nombre, rol }
+
+      // Validación de contraseña mínima de 8 caracteres
+      if (!editandoId && password.length < 8) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Contraseña demasiado corta',
+          text: 'La contraseña debe tener al menos 8 caracteres por seguridad.',
+          confirmButtonColor: '#691B31'
+        });
+        return
+      }
+
+      if (editandoId && password && password.length < 8) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Contraseña demasiado corta',
+          text: 'La nueva contraseña debe tener al menos 8 caracteres.',
+          confirmButtonColor: '#691B31'
+        });
+        return
+      }
+
+      // Validación local inmediata de correo duplicado
+      const correoDuplicado = items.some(u => (!editandoId || u.id !== editandoId) && u.email?.toLowerCase().trim() === emailTrim)
+      if (correoDuplicado) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Correo ya registrado',
+          text: `El correo "${emailTrim}" ya pertenece a otro usuario en el sistema. Ingrese un correo diferente.`,
+          confirmButtonColor: '#691B31'
+        });
+        return
+      }
+
+      // Validación local inmediata de username duplicado
+      const usuarioDuplicado = items.some(u => (!editandoId || u.id !== editandoId) && u.username?.toLowerCase().trim() === usernameTrim.toLowerCase())
+      if (usuarioDuplicado) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Usuario ya registrado',
+          text: `El nombre de usuario (login) "${usernameTrim}" ya está registrado. Elija otro nombre.`,
+          confirmButtonColor: '#691B31'
+        });
+        return
+      }
+
+      payload = { username: usernameTrim, email: emailTrim, nombre: nombre.trim(), rol }
       if (password) payload.password = password
 
       url = editandoId
@@ -284,13 +338,20 @@ export default function ConfigAdmin() {
         },
         body: JSON.stringify(payload)
       })
-      const json = await response.json()
+      const json = await response.json().catch(() => ({}))
       if (response.ok && json.ok) {
         Swal.fire('Éxito', editandoId ? 'Modificado con éxito' : 'Creado con éxito', 'success')
         limpiarFormulario()
         cargarItems(catalogoSeleccionado)
       } else {
-        Swal.fire('Error', json.error || 'Operación fallida', 'error')
+        const msgError = json.error || json.message || 'Operación fallida'
+        const esDuplicado = msgError.toLowerCase().includes('correo') || msgError.toLowerCase().includes('email') || msgError.toLowerCase().includes('usuario') || msgError.toLowerCase().includes('login')
+        Swal.fire({
+          icon: esDuplicado ? 'warning' : 'error',
+          title: esDuplicado ? 'Datos ya registrados' : 'No se pudo guardar',
+          text: msgError,
+          confirmButtonColor: '#691B31'
+        })
       }
     } catch (err) {
       console.error('Error al guardar:', err)
@@ -531,33 +592,105 @@ export default function ConfigAdmin() {
                 <form onSubmit={guardarItem}>
 
                   {/* Campos dinámicos según el tipo de catálogo */}
-                  {catalogoSeleccionado === 'usuarios' && (
-                    <>
-                      <div style={{ marginBottom: '0.8rem' }}>
-                        <label style={{ fontSize: '0.8rem', fontWeight: '500', color: '#475569' }}>Nombre Completo</label>
-                        <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} style={{ width: '100%', padding: '0.55rem', border: '1px solid #9B9B9A', borderRadius: '6px', fontSize: '0.85rem', marginTop: '0.2rem' }} required />
-                      </div>
-                      <div style={{ marginBottom: '0.8rem' }}>
-                        <label style={{ fontSize: '0.8rem', fontWeight: '500', color: '#475569' }}>Usuario (Login)</label>
-                        <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} style={{ width: '100%', padding: '0.55rem', border: '1px solid #9B9B9A', borderRadius: '6px', fontSize: '0.85rem', marginTop: '0.2rem' }} required />
-                      </div>
-                      <div style={{ marginBottom: '0.8rem' }}>
-                        <label style={{ fontSize: '0.8rem', fontWeight: '500', color: '#475569' }}>Email</label>
-                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '0.55rem', border: '1px solid #9B9B9A', borderRadius: '6px', fontSize: '0.85rem', marginTop: '0.2rem' }} required />
-                      </div>
-                      <div style={{ marginBottom: '0.8rem' }}>
-                        <label style={{ fontSize: '0.8rem', fontWeight: '500', color: '#475569' }}>Contraseña {editandoId && <small style={{ color: '#6F7271' }}>(dejar vacío para no cambiar)</small>}</label>
-                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '0.55rem', border: '1px solid #9B9B9A', borderRadius: '6px', fontSize: '0.85rem', marginTop: '0.2rem' }} required={!editandoId} />
-                      </div>
-                      <div style={{ marginBottom: '1.2rem' }}>
-                        <label style={{ fontSize: '0.8rem', fontWeight: '500', color: '#475569' }}>Tipo de Usuario</label>
-                        <select value={rol} onChange={(e) => setRol(e.target.value)} style={{ width: '100%', padding: '0.55rem', border: '1px solid #9B9B9A', borderRadius: '6px', fontSize: '0.85rem', marginTop: '0.2rem', backgroundColor: 'white' }} required>
-                          <option value="administrador">Administrador General</option>
-                          <option value="infraestructura">Gestor de Infraestructura</option>
-                        </select>
-                      </div>
-                    </>
-                  )}
+                  {catalogoSeleccionado === 'usuarios' && (() => {
+                    const emailTrim = (email || '').trim().toLowerCase()
+                    const usernameTrim = (username || '').trim().toLowerCase()
+                    const emailExiste = emailTrim && items.some(u => (!editandoId || u.id !== editandoId) && u.email?.toLowerCase().trim() === emailTrim)
+                    const usernameExiste = usernameTrim && items.some(u => (!editandoId || u.id !== editandoId) && u.username?.toLowerCase().trim() === usernameTrim)
+                    const passInvalida = password && password.length < 8
+
+                    return (
+                      <>
+                        <div style={{ marginBottom: '0.8rem' }}>
+                          <label style={{ fontSize: '0.8rem', fontWeight: '500', color: '#475569' }}>Nombre Completo</label>
+                          <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Juan Pérez" style={{ width: '100%', padding: '0.55rem', border: '1px solid #9B9B9A', borderRadius: '6px', fontSize: '0.85rem', marginTop: '0.2rem' }} required />
+                        </div>
+
+                        <div style={{ marginBottom: '0.8rem' }}>
+                          <label style={{ fontSize: '0.8rem', fontWeight: '500', color: '#475569' }}>Usuario (Login)</label>
+                          <input
+                            type="text"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            placeholder="Ej. juan_perez"
+                            style={{
+                              width: '100%',
+                              padding: '0.55rem',
+                              border: usernameExiste ? '1.5px solid #DC2626' : '1px solid #9B9B9A',
+                              borderRadius: '6px',
+                              fontSize: '0.85rem',
+                              marginTop: '0.2rem'
+                            }}
+                            required
+                          />
+                          {usernameExiste && (
+                            <span style={{ fontSize: '0.74rem', color: '#DC2626', display: 'block', marginTop: '0.25rem', fontWeight: '600' }}>
+                              ⚠️ Este usuario ya está registrado en el sistema.
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ marginBottom: '0.8rem' }}>
+                          <label style={{ fontSize: '0.8rem', fontWeight: '500', color: '#475569' }}>Email</label>
+                          <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="ejemplo@sitrach.gob.mx"
+                            style={{
+                              width: '100%',
+                              padding: '0.55rem',
+                              border: emailExiste ? '1.5px solid #DC2626' : '1px solid #9B9B9A',
+                              borderRadius: '6px',
+                              fontSize: '0.85rem',
+                              marginTop: '0.2rem'
+                            }}
+                            required
+                          />
+                          {emailExiste && (
+                            <span style={{ fontSize: '0.74rem', color: '#DC2626', display: 'block', marginTop: '0.25rem', fontWeight: '600' }}>
+                              ⚠️ Este correo ya está registrado por otro usuario.
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ marginBottom: '0.8rem' }}>
+                          <label style={{ fontSize: '0.8rem', fontWeight: '500', color: '#475569' }}>
+                            Contraseña {editandoId && <small style={{ color: '#6F7271' }}>(dejar vacío para no cambiar)</small>}
+                          </label>
+                          <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            minLength={8}
+                            placeholder={editandoId ? '••••••••' : 'Mínimo 8 caracteres'}
+                            style={{
+                              width: '100%',
+                              padding: '0.55rem',
+                              border: passInvalida ? '1.5px solid #DC2626' : '1px solid #9B9B9A',
+                              borderRadius: '6px',
+                              fontSize: '0.85rem',
+                              marginTop: '0.2rem'
+                            }}
+                            required={!editandoId}
+                          />
+                          {passInvalida && (
+                            <span style={{ fontSize: '0.74rem', color: '#DC2626', display: 'block', marginTop: '0.25rem', fontWeight: '600' }}>
+                              ⚠️ La contraseña debe contener al menos 8 caracteres.
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ marginBottom: '1.2rem' }}>
+                          <label style={{ fontSize: '0.8rem', fontWeight: '500', color: '#475569' }}>Tipo de Usuario</label>
+                          <select value={rol} onChange={(e) => setRol(e.target.value)} style={{ width: '100%', padding: '0.55rem', border: '1px solid #9B9B9A', borderRadius: '6px', fontSize: '0.85rem', marginTop: '0.2rem', backgroundColor: 'white' }} required>
+                            <option value="administrador">Administrador General</option>
+                            <option value="infraestructura">Gestor de Infraestructura</option>
+                          </select>
+                        </div>
+                      </>
+                    )
+                  })()}
 
                   {catalogoSeleccionado === 'correos' && (
                     <>
