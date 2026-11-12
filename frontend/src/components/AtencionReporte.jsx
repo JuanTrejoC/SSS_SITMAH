@@ -96,7 +96,21 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
     if (cameraInputRef.current) {
       cameraInputRef.current.value = ''
     }
+    if (canvasRef.current) {
+      const canvas = canvasRef.current
+      const ctx = canvas.getContext('2d')
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.beginPath()
+    }
   }, [reporte?.id, reporte?.fechaResolucion, currentUser?.nombre, currentUser?.username])
+
+  const configurarCanvasCtx = (ctx) => {
+    if (!ctx) return
+    ctx.strokeStyle = '#1E293B'
+    ctx.lineWidth = 2.5
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+  }
 
   // Inicializar canvas de firma
   useEffect(() => {
@@ -104,29 +118,30 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
       const canvas = canvasRef.current
       if (canvas) {
         const ctx = canvas.getContext('2d')
-        ctx.strokeStyle = '#1E293B'
-        ctx.lineWidth = 2.5
-        ctx.lineCap = 'round'
-        ctx.lineJoin = 'round'
+        configurarCanvasCtx(ctx)
       }
     }
   }, [reporte.estado, reporte.id, modoEdicionResuelto, cambiarFirma])
 
-  // Métodos de dibujo en Canvas (Mouse y Touch)
+  // Métodos de dibujo en Canvas (Mouse y Touch) con escala precisa
   const getCoordinates = (e, canvas) => {
     const rect = canvas.getBoundingClientRect()
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches && e.touches.length > 0 ? e.touches[0].clientY : e.clientY
+    const scaleX = canvas.width / (rect.width || 1)
+    const scaleY = canvas.height / (rect.height || 1)
     return {
-      x: clientX - rect.left,
-      y: clientY - rect.top
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
     }
   }
 
   const iniciarDibujo = (e) => {
+    if (e.touches && e.cancelable) e.preventDefault()
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
+    configurarCanvasCtx(ctx)
     const { x, y } = getCoordinates(e, canvas)
     ctx.beginPath()
     ctx.moveTo(x, y)
@@ -135,21 +150,24 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
 
   const dibujar = (e) => {
     if (!dibujando) return
+    if (e.touches && e.cancelable) e.preventDefault()
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     const { x, y } = getCoordinates(e, canvas)
     ctx.lineTo(x, y)
     ctx.stroke()
-    setHayFirma(true)
+    if (!hayFirma) setHayFirma(true)
   }
 
-  const terminarDibujo = () => {
+  const terminarDibujo = (e) => {
     if (!dibujando) return
+    if (e && e.touches && e.cancelable) e.preventDefault()
     const canvas = canvasRef.current
     if (canvas) {
-      ctx = canvas.getContext('2d')
+      const ctx = canvas.getContext('2d')
       ctx.closePath()
+      ctx.beginPath()
     }
     setDibujando(false)
   }
@@ -159,8 +177,11 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
     if (canvas) {
       const ctx = canvas.getContext('2d')
       ctx.clearRect(0, 0, canvas.width, canvas.height)
-      setHayFirma(false)
+      ctx.beginPath()
+      configurarCanvasCtx(ctx)
     }
+    setHayFirma(false)
+    setDibujando(false)
   }
 
   const abrirCamara = () => {
@@ -655,7 +676,7 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
                       onMouseOver={e => e.currentTarget.style.backgroundColor = '#0369A1'}
                       onMouseOut={e => e.currentTarget.style.backgroundColor = '#0284C7'}
                     >
-                      <FaCamera /> Tomar Foto Directa
+                      <FaCamera /> Tomar Foto
                     </button>
                     <label
                       htmlFor={`input-evidencia-modificar-${reporte.id}`}
@@ -679,9 +700,6 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
                       <FaImages /> Subir de Archivo
                     </label>
                   </div>
-                  <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748B', marginTop: '0.4rem' }}>
-                    Opcional. Toma una foto con tu cámara o sube imágenes para sumarlas a las existentes.
-                  </span>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', backgroundColor: '#F8FAFC', padding: '0.85rem', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
@@ -1158,7 +1176,7 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
                   onMouseOver={e => e.currentTarget.style.backgroundColor = '#0369A1'}
                   onMouseOut={e => e.currentTarget.style.backgroundColor = '#0284C7'}
                 >
-                  <FaCamera /> Tomar Foto Directa
+                  <FaCamera /> Tomar Foto
                 </button>
                 <label
                   htmlFor={`input-evidencia-solucion-${reporte.id}`}
@@ -1182,11 +1200,6 @@ export default function AtencionReporte({ reporte, tipo, user: propUser, onActua
                   <FaImages /> Subir de Galería / Archivo
                 </label>
               </div>
-              <span style={{ display: 'block', fontSize: '0.75rem', color: '#64748B', marginTop: '0.5rem' }}>
-                {tipo === 'oficina'
-                  ? 'Toma una foto al instante con tu cámara o sube imágenes (hasta 3 fotografías, máx. 10 MB c/u)'
-                  : 'Toma fotos al instante con tu cámara o sube imágenes (puedes subir varias fotografías, máx. 10 MB c/u)'}
-              </span>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', backgroundColor: '#F8FAFC', padding: '0.85rem', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
