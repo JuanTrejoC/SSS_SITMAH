@@ -56,6 +56,7 @@ router.use(authAdmin);
 
 // Traffic Light Controllers Routes
 router.get('/controladores', asyncHandler(inventario.listarControladoresSemaforo));
+router.get('/controladores/export', asyncHandler(inventario.exportarControladoresExcel));
 router.post('/controladores', upload.single('archivoProgramacion'), asyncHandler(inventario.crearControladorSemaforo));
 router.get('/controladores/:id', asyncHandler(inventario.obtenerControladorSemaforo));
 router.get('/controladores/:id/descargar-programacion', asyncHandler(inventario.descargarProgramacion));

@@ -2,7 +2,7 @@ const { z } = require('zod');
 const prisma = require('../config/db');
 const { ok, fail } = require('../utils/response');
 const { parsePagination } = require('../utils/filters');
-const { exportarInventarioExistencias, exportarInventarioMobiliario, exportarHerramientasExcel } = require('../services/excelService');
+const { exportarInventarioExistencias, exportarInventarioMobiliario, exportarHerramientasExcel, exportarControladoresSemaforoExcel } = require('../services/excelService');
 
 function construirCondicionesBusquedaEquipo(search) {
   if (!search || !search.trim()) return [];
@@ -867,6 +867,48 @@ async function descargarProgramacion(req, res) {
   });
 }
 
+async function exportarControladoresExcel(req, res) {
+  const { search, modelo, ids } = req.query;
+  const where = {};
+
+  if (ids) {
+    const idArray = ids.split(',').map(Number).filter(Boolean);
+    if (idArray.length > 0) {
+      where.id = { in: idArray };
+    }
+  } else {
+    if (modelo && modelo !== 'TODOS') {
+      where.modelo = modelo;
+    }
+    if (search && search.trim()) {
+      where.OR = [
+        { modelo: { contains: search.trim() } },
+        { crucero: { nombre: { contains: search.trim() } } },
+        { numeroGabinete: { contains: search.trim() } },
+        { ipLocal: { contains: search.trim() } },
+        { versionFirmware: { contains: search.trim() } },
+      ];
+    }
+  }
+
+  const controladores = await prisma.controladorSemaforo.findMany({
+    where,
+    include: { crucero: true },
+    orderBy: { id: 'desc' },
+  });
+
+  const buffer = await exportarControladoresSemaforoExcel(controladores, { search, modelo, totalFiltrado: controladores.length });
+
+  res.setHeader(
+    'Content-Type',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  );
+  const fechaStr = new Date().toISOString().slice(0, 10);
+  const sufijo = (search || modelo || ids) ? '_filtrado' : '_completo';
+  res.setHeader('Content-Disposition', `attachment; filename="Controladores_Semaforicos_SITRAC-H${sufijo}_${fechaStr}.xlsx"`);
+  res.send(buffer);
+}
+
 // =========================================================================
 // FUNCIONES MODULARES PARA TRABAJO CONCURRENTE EN CRUCEROS (SECCIONES)
 // =========================================================================
@@ -1247,9 +1289,23 @@ async function eliminarPosteControlador(req, res) {
     list = [...existe.postesDetalle];
   }
 
-  const filtrados = list.filter(p => {
-    if (p.uid && p.uid === posteIdentificador) return false;
-    if (!isNaN(Number(posteIdentificador)) && Number(p.id) === Number(posteIdentificador)) return false;
+  let eliminado = false;
+  const filtrados = list.filter((p, idx) => {
+    if (eliminado) return true;
+    const matchUid = p.uid && p.uid === posteIdentificador;
+    const matchPstDb = typeof posteIdentificador === 'string' && posteIdentificador.startsWith('pst_db_') && (
+      String(p.id) === posteIdentificador.replace('pst_db_', '') ||
+      (idx + 1) === Number(posteIdentificador.replace('pst_db_', ''))
+    );
+    const matchNumeric = !isNaN(Number(posteIdentificador)) && (
+      Number(p.id) === Number(posteIdentificador) ||
+      (idx + 1) === Number(posteIdentificador)
+    );
+
+    if (matchUid || matchPstDb || matchNumeric) {
+      eliminado = true;
+      return false; // Eliminar únicamente este poste
+    }
     return true;
   });
 
@@ -1747,6 +1803,7 @@ module.exports = {
   actualizarControladorSemaforo,
   eliminarControladorSemaforo,
   descargarProgramacion,
+  exportarControladoresExcel,
   actualizarGabineteControlador,
   obtenerPostesControlador,
   agregarPosteControlador,

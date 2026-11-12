@@ -1,19 +1,24 @@
 import { useState, useEffect, useRef } from 'react'
 import Swal from 'sweetalert2'
+import * as XLSX from 'xlsx'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import logoSitrachSrc from '../assets/logoSSS.png'
+import escudoHidalgoSrc from '../assets/escudo_hidalgo.png'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../context/AuthContext'
 import { mostrarAlertaError, verificarConexion } from '../utils/conexionUtils'
 import {
-  FaRoad, FaPlus, FaEdit, FaTrashAlt, FaBoxes,
+  FaRoad, FaPlus, FaEdit, FaTrashAlt, FaBoxes, FaEye,
   FaChevronLeft, FaChevronRight, FaTimes,
   FaCogs, FaWrench, FaHdd, FaTools,
   FaWalking, FaVolumeUp, FaDesktop, FaCreditCard,
   FaPowerOff, FaMicrochip, FaNetworkWired, FaProjectDiagram,
-  FaMapMarkerAlt, FaHandPointer, FaSign, FaCheckSquare,
+  FaMapMarkerAlt, FaMap, FaHandPointer, FaSign, FaCheckSquare,
   FaCalendarAlt, FaUpload, FaHistory, FaDownload, FaExclamationTriangle,
   FaListUl, FaSearch, FaBuilding, FaTrafficLight, FaVideo, FaLayerGroup,
   FaCircle, FaExternalLinkAlt, FaBroadcastTower, FaLightbulb, FaSave, FaArrowDown, FaSyncAlt, FaCube,
-  FaUsers, FaBolt, FaFileArchive
+  FaUsers, FaBolt, FaFileArchive, FaFileExcel, FaFilePdf, FaExpand, FaCompress
 } from 'react-icons/fa'
 
 // ==================================================
@@ -321,7 +326,131 @@ const crearAudibleInicial = (id = 1, sentido = '') => ({
   observaciones: ''
 })
 
+const extraerCoordenadasValidas = (input) => {
+  if (!input) return null
+  if (typeof input === 'object' && input !== null) {
+    const lat = parseFloat(input.lat ?? input.latitude)
+    const lng = parseFloat(input.lng ?? input.lon ?? input.longitude)
+    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      return { lat, lng }
+    }
+  }
+  if (typeof input !== 'string') return null
+  const str = input.trim()
+  // Soporta separadores comunes como coma, espacio, pleca, punto y coma
+  const regex = /(-?\d+(?:\.\d+)?)[,\s/|;]+(-?\d+(?:\.\d+)?)/
+  const match = str.match(regex)
+  if (match) {
+    const lat = parseFloat(match[1])
+    const lng = parseFloat(match[2])
+    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      return { lat, lng }
+    }
+  }
+  return null
+}
+
 const generarPosteUid = () => `pst_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${Math.random().toString(36).substr(2, 5)}`
+
+const obtenerConfigColorLed = (color) => {
+  const str = String(color || '').trim()
+  const lower = str.toLowerCase()
+  if (lower.includes('amarill')) {
+    return { valor: 'Amarillo', label: 'Amarillo', color: '#D97706', bg: '#FEF3C7', border: '#F59E0B', isArrow: false, shadow: 'rgba(245, 158, 11, 0.4)' }
+  }
+  if (lower.includes('flecha verde')) {
+    return { valor: 'Flecha Verde', label: 'Flecha Verde', color: '#059669', bg: '#D1FAE5', dotBg: '#4ADE80', border: '#10B981', isArrow: true, shadow: 'rgba(16, 185, 129, 0.4)' }
+  }
+  if (lower.includes('flecha roja')) {
+    return { valor: 'Flecha Roja', label: 'Flecha Roja', color: '#B91C1C', bg: '#FEE2E2', dotBg: '#FCA5A5', border: '#DC2626', isArrow: true, shadow: 'rgba(185, 28, 28, 0.4)' }
+  }
+  if (lower.includes('verd')) {
+    return { valor: 'Verde', label: 'Verde', color: '#16A34A', bg: '#DCFCE7', border: '#22C55E', isArrow: false, shadow: 'rgba(16, 185, 129, 0.4)' }
+  }
+  if (lower.includes('ningun')) {
+    return { valor: 'Ninguno', label: 'Ninguno', color: '#94A3B8', bg: '#F1F5F9', border: '#CBD5E1', isArrow: false, shadow: 'transparent' }
+  }
+  // Por defecto 'Rojo' con configuración garantizada
+  return { valor: 'Rojo', label: 'Rojo', color: '#DC2626', bg: '#FEE2E2', border: '#EF4444', isArrow: false, shadow: 'rgba(239, 68, 68, 0.4)' }
+}
+
+const extraerListaCabezales = (item) => {
+  let list = []
+  if (typeof item?.postesDetalle === 'string') {
+    try { list = JSON.parse(item.postesDetalle) } catch (e) { list = [] }
+  } else if (Array.isArray(item?.postesDetalle)) {
+    list = item.postesDetalle
+  }
+
+  const cabezales = []
+
+  // Filtrar estrictamente postes que soporten cabezales vehiculares LED
+  const postesVehiculares = list.filter(p =>
+    p.tipoPoste !== 'peatonal' && (p.tipoCabezal || 'LED') === 'LED'
+  )
+
+  postesVehiculares.forEach((poste, pIdx) => {
+    const grupos = Array.isArray(poste.cabezalesGrupos) && poste.cabezalesGrupos.length > 0
+      ? poste.cabezalesGrupos
+      : []
+
+    grupos.forEach((grupo, gIdx) => {
+      const numLeds = Math.max(0, Number(grupo.numLeds) || 4)
+      if (numLeds === 0) return
+      const ledsRaw = Array.isArray(grupo.leds) ? grupo.leds.slice(0, numLeds) : []
+
+      cabezales.push({
+        id: `p${poste.id || pIdx + 1}-c${gIdx + 1}`,
+        numero: cabezales.length + 1,
+        posteIdx: poste.id || pIdx + 1,
+        posteModelo: poste.modeloPoste || 'Poste',
+        numLeds,
+        leds: ledsRaw.map((l, i) => ({
+          num: i + 1,
+          color: l.color || (i === 0 ? 'Rojo' : (i === 1 ? 'Amarillo' : (i === 2 ? 'Verde' : 'Flecha Verde'))),
+          estado: l.estado || 'Funciona'
+        }))
+      })
+    })
+  })
+
+  // Fallback si no hay postes detallados pero sí semaforos3Luces / semaforos4Luces en BD
+  if (cabezales.length === 0 && (Number(item?.semaforos3Luces) > 0 || Number(item?.semaforos4Luces) > 0)) {
+    const s3 = Number(item.semaforos3Luces) || 0
+    const s4 = Number(item.semaforos4Luces) || 0
+    for (let i = 0; i < s3; i++) {
+      cabezales.push({
+        id: `fb-3-${i}`,
+        numero: cabezales.length + 1,
+        posteIdx: 1,
+        posteModelo: 'Poste',
+        numLeds: 3,
+        leds: [
+          { num: 1, color: 'Rojo', estado: 'Funciona' },
+          { num: 2, color: 'Amarillo', estado: 'Funciona' },
+          { num: 3, color: 'Verde', estado: 'Funciona' }
+        ]
+      })
+    }
+    for (let i = 0; i < s4; i++) {
+      cabezales.push({
+        id: `fb-4-${i}`,
+        numero: cabezales.length + 1,
+        posteIdx: 1,
+        posteModelo: 'Poste',
+        numLeds: 4,
+        leds: [
+          { num: 1, color: 'Rojo', estado: 'Funciona' },
+          { num: 2, color: 'Amarillo', estado: 'Funciona' },
+          { num: 3, color: 'Verde', estado: 'Funciona' },
+          { num: 4, color: 'Flecha Verde', estado: 'Funciona' }
+        ]
+      })
+    }
+  }
+
+  return cabezales
+}
 
 const crearPosteInicial = (id = 1, modelo = 'PCC-1', tipo = null, uid = null) => {
   const modeloNorm = normalizarNombreModeloPoste(modelo)
@@ -333,8 +462,10 @@ const crearPosteInicial = (id = 1, modelo = 'PCC-1', tipo = null, uid = null) =>
     guardadoEnServidor: false,
     tipoPoste, // 'mixto' (Vehicular / Mixto) | 'peatonal' (Exclusivo Peatonal / Pedestal)
     ubicacionPoste: '', // ej. 'Banqueta Poniente', 'Camellón Central / Isleta', etc.
+    coordenadas: '',
     modeloPoste: esPeatonal ? 'MP-01' : (modeloNorm || 'PCC-1'),
     tapaRegistro: 'Buena',
+    estadoTapaRegistro: 'Buena',
     observaciones: '',
     tipoCabezal: esPeatonal ? 'Ninguno' : 'LED',
     cabezalModelo: esPeatonal ? '' : 'LV-1',
@@ -506,14 +637,19 @@ const normalizarPostesDetalle = (postesRaw, fallbackItem = null) => {
       const esUidValido = rawUid && typeof rawUid === 'string' && rawUid.length > 8 && !rawUid.match(/^pst_\d+$/)
       const uid = esUidValido ? rawUid : (p.id ? `pst_db_${p.id}` : generarPosteUid())
 
+      const rawCoords = p.ubicacionPoste || p.coordenadas || p.coordenada || p.gps || ''
+      const tapaVal = p.tapaRegistro || p.estadoTapaRegistro || 'Buena'
+
       return {
         uid,
         id: p.id || idx + 1,
         guardadoEnServidor: p.guardadoEnServidor !== undefined ? Boolean(p.guardadoEnServidor) : true,
         tipoPoste,
-        ubicacionPoste: p.ubicacionPoste || '',
+        ubicacionPoste: rawCoords,
+        coordenadas: rawCoords,
         modeloPoste,
-        tapaRegistro: p.tapaRegistro || 'Buena',
+        tapaRegistro: tapaVal,
+        estadoTapaRegistro: tapaVal,
         observaciones: p.observaciones || '',
         tipoCabezal: tipoPoste === 'peatonal' ? 'Ninguno' : (p.tipoCabezal || 'LED'),
         cabezalModelo: tipoPoste === 'peatonal' ? '' : (p.cabezalModelo || 'LV-1'),
@@ -558,9 +694,11 @@ const normalizarPostesDetalle = (postesRaw, fallbackItem = null) => {
       id: 1,
       guardadoEnServidor: true,
       tipoPoste: esPeatonal ? 'peatonal' : 'mixto',
-      ubicacionPoste: '',
+      ubicacionPoste: fallbackItem.coordenadas || fallbackItem.ubicacionPoste || '',
+      coordenadas: fallbackItem.coordenadas || fallbackItem.ubicacionPoste || '',
       modeloPoste: fallbackItem.posteModeloTipo || (esPeatonal ? 'MP-01' : (fallbackItem.modeloPoste || 'PCC-1')),
       tapaRegistro: fallbackItem.posteTapaRegistro || 'Buena',
+      estadoTapaRegistro: fallbackItem.posteTapaRegistro || 'Buena',
       observaciones: fallbackItem.posteObservaciones || '',
       tipoCabezal: esPeatonal ? 'Ninguno' : (fallbackItem.tipoCabezal || 'LED'),
       cabezalModelo: esPeatonal ? '' : (fallbackItem.cabezalModelo || 'LV-1'),
@@ -863,6 +1001,8 @@ export default function InventarioSemaforos() {
   // ==========================================
   const [controladores, setControladores] = useState([])
   const [todosLosControladores, setTodosLosControladores] = useState([])
+  const [busquedaControlador, setBusquedaControlador] = useState('')
+  const [filtroModeloControlador, setFiltroModeloControlador] = useState('')
   const [dbSemaforosTipo, setDbSemaforosTipo] = useState(null)
   const [dbSemaforosItem, setDbSemaforosItem] = useState(null)
   const [dbSemaforosExpandido, setDbSemaforosExpandido] = useState(false)
@@ -872,9 +1012,59 @@ export default function InventarioSemaforos() {
   const [limiteControladores] = useState(10)
   const [modalControladorAbierto, setModalControladorAbierto] = useState(false)
   const [editandoControladorId, setEditandoControladorId] = useState(null)
+  const [modoVisualizacion, setModoVisualizacion] = useState(false)
+  const [formPantallaCompleta, setFormPantallaCompleta] = useState(false)
   const [mostrarProgramacion, setMostrarProgramacion] = useState(false)
   const [archivoProgramacion, setArchivoProgramacion] = useState(null)
   const archivoProgramacionInputRef = useRef(null)
+
+  // Modelos únicos de controladores para el filtro select
+  const modelosDisponibles = Array.from(
+    new Set((todosLosControladores || []).map(c => c.modelo).filter(Boolean))
+  ).sort()
+
+  const hayFiltroControladorActivo = Boolean(
+    (busquedaControlador && busquedaControlador.trim()) ||
+    (filtroModeloControlador && filtroModeloControlador !== '') ||
+    (dbSemaforosTipo && tabActiva === 'controladores')
+  )
+
+  const controladoresFiltrados = (todosLosControladores || []).filter((ctrl) => {
+    if (filtroModeloControlador && filtroModeloControlador !== '') {
+      if ((ctrl.modelo || '').trim().toLowerCase() !== filtroModeloControlador.trim().toLowerCase()) {
+        return false
+      }
+    }
+    if (dbSemaforosTipo && tabActiva === 'controladores') {
+      if ((ctrl.modelo || '').trim().toLowerCase() !== dbSemaforosTipo.trim().toLowerCase()) {
+        return false
+      }
+    }
+    if (busquedaControlador && busquedaControlador.trim()) {
+      const q = busquedaControlador.trim().toLowerCase()
+      const cruceroNombre = (ctrl.crucero?.nombre || '').toLowerCase()
+      const cruceroUbicacion = (ctrl.crucero?.ubicacion || '').toLowerCase()
+      const modelo = (ctrl.modelo || '').toLowerCase()
+      const gabinete = (ctrl.numeroGabinete || '').toLowerCase()
+      const ip = (ctrl.ipLocal || '').toLowerCase()
+      const fw = (ctrl.versionFirmware || '').toLowerCase()
+      const obs = (ctrl.observacionesExterior || ctrl.posteObservaciones || '').toLowerCase()
+
+      const coincide = cruceroNombre.includes(q) ||
+        cruceroUbicacion.includes(q) ||
+        modelo.includes(q) ||
+        gabinete.includes(q) ||
+        ip.includes(q) ||
+        fw.includes(q) ||
+        obs.includes(q)
+      if (!coincide) return false
+    }
+    return true
+  })
+
+  const controladoresParaMostrar = hayFiltroControladorActivo
+    ? controladoresFiltrados
+    : controladores
 
   const [controladorForm, setControladorForm] = useState({
     modelo: '',
@@ -972,8 +1162,13 @@ export default function InventarioSemaforos() {
   const [controladorErrores, setControladorErrores] = useState({})
   const [capturandoGpsIndex, setCapturandoGpsIndex] = useState(null)
   const [capturandoGpsPosteIndex, setCapturandoGpsPosteIndex] = useState(null)
+  const [mapasPostesVisibles, setMapasPostesVisibles] = useState({})
+  const [mapasDanadasVisibles, setMapasDanadasVisibles] = useState({})
   const [guardandoModularSeccion, setGuardandoModularSeccion] = useState(null)
   const [guardandoIniciando, setGuardandoIniciando] = useState(false)
+  const [modalVerControladorAbierto, setModalVerControladorAbierto] = useState(false)
+  const [controladorParaVer, setControladorParaVer] = useState(null)
+  const [tabFichaActiva, setTabFichaActiva] = useState('postes')
 
   // ==========================================
   // EFECTOS Y CARGA DE DATOS
@@ -996,9 +1191,9 @@ export default function InventarioSemaforos() {
     cargarCatalogos()
   }, [])
 
-  const cargarExistencias = async () => {
+  const cargarExistencias = async (silencioso = false) => {
     if (!user?.token) return
-    setCargandoExistencias(true)
+    if (!silencioso) setCargandoExistencias(true)
     try {
       const res = await fetch(`${API_BASE_URL}/api/inventario/existencias?tipoInventario=semaforos`, {
         headers: { 'Authorization': `Bearer ${user.token}` }
@@ -1010,7 +1205,7 @@ export default function InventarioSemaforos() {
     } catch (err) {
       console.error('Error al cargar existencias:', err)
     } finally {
-      setCargandoExistencias(false)
+      if (!silencioso) setCargandoExistencias(false)
     }
   }
 
@@ -1031,9 +1226,9 @@ export default function InventarioSemaforos() {
     }
   }
 
-  const cargarControladores = async () => {
+  const cargarControladores = async (silencioso = false) => {
     if (!user?.token) return
-    setCargandoControladores(true)
+    if (!silencioso) setCargandoControladores(true)
     try {
       const res = await fetch(
         `${API_BASE_URL}/api/inventario/controladores?page=${paginaControladores}&limit=${limiteControladores}`,
@@ -1050,7 +1245,7 @@ export default function InventarioSemaforos() {
     } catch (err) {
       console.error('Error al cargar controladores:', err)
     } finally {
-      setCargandoControladores(false)
+      if (!silencioso) setCargandoControladores(false)
     }
   }
 
@@ -1065,15 +1260,14 @@ export default function InventarioSemaforos() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabActiva, paginaControladores])
 
-  // Sincronización automática en vivo (al enfocar la ventana y sondeo periódico para no requerir F5)
+  // Sincronización automática en vivo (al enfocar la ventana y sondeo periódico silencioso sin parpadeos de UI)
   useEffect(() => {
     const sincronizarDatosEnVivo = () => {
       cargarCatalogos()
       if (tabActiva === 'controladores') {
-        cargarControladores()
-        cargarTodosLosControladores()
+        cargarControladores(true)
       } else {
-        cargarExistencias()
+        cargarExistencias(true)
       }
     }
 
@@ -1091,14 +1285,13 @@ export default function InventarioSemaforos() {
     document.addEventListener('visibilitychange', handleVisibility)
 
     const interval = setInterval(() => {
-      // Auto-refrescar catálogo de cruceros siempre
-      cargarCatalogos()
-      // Refrescar controladores en segundo plano si no estamos editando en el modal
+      // Refrescar en segundo plano de forma 100% silenciosa para que la UI no parpadee ni se mueva
       if (tabActiva === 'controladores' && !modalControladorAbierto) {
-        cargarControladores()
-        cargarTodosLosControladores()
+        cargarControladores(true)
+      } else if (tabActiva === 'existencias' && !modalStockAbierto) {
+        cargarExistencias(true)
       }
-    }, 10000)
+    }, 15000)
 
     return () => {
       window.removeEventListener('focus', handleFocus)
@@ -1106,7 +1299,7 @@ export default function InventarioSemaforos() {
       clearInterval(interval)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabActiva, modalControladorAbierto, paginaControladores])
+  }, [tabActiva, modalControladorAbierto, modalStockAbierto, paginaControladores])
 
   // Prevent background scrolling when modals are open
   useEffect(() => {
@@ -1289,10 +1482,18 @@ export default function InventarioSemaforos() {
   // ==========================================
   // ACCIONES - CONTROLADORES INSTALADOS
   // ==========================================
-  const validarControlador = () => {
+  const validarControlador = (mostrarAlerta = true) => {
     const errores = {}
-    if (!controladorForm.modelo.trim()) errores.modelo = 'El modelo es obligatorio.'
-    if (!controladorForm.cruceroId) errores.cruceroId = 'El crucero es obligatorio.'
+
+    // 1. Cabecera principal
+    if (!controladorForm.modelo || !controladorForm.modelo.trim()) {
+      errores.modelo = 'El modelo del controlador es obligatorio.'
+    }
+    if (!controladorForm.cruceroId) {
+      errores.cruceroId = 'Debes seleccionar el crucero correspondiente.'
+    }
+
+    // 2. Sección 1: Cimentación y Tornillería
     if (controladorForm.cimientoCompleto === 'No') {
       const val = (controladorForm.cimientoCuantosDados || '').trim()
       if (!val) {
@@ -1315,8 +1516,94 @@ export default function InventarioSemaforos() {
         }
       }
     }
+
+    // 3. Sección 3: Gabinete, Red y Configuración
+    const esIpValida = (ip) => !ip || ip.trim() === '' || /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ip.trim())
+    if (controladorForm.ipLocal && !esIpValida(controladorForm.ipLocal)) {
+      errores.ipLocal = 'IP Local inválida (ej. 192.168.1.100).'
+    }
+    if (controladorForm.ipSystem && !esIpValida(controladorForm.ipSystem)) {
+      errores.ipSystem = 'IP System inválida (ej. 10.0.0.1).'
+    }
+    if (controladorForm.mascaraRed && !esIpValida(controladorForm.mascaraRed)) {
+      errores.mascaraRed = 'Máscara de red inválida (ej. 255.255.255.0).'
+    }
+    if (controladorForm.gateway && !esIpValida(controladorForm.gateway)) {
+      errores.gateway = 'Gateway inválido (ej. 192.168.1.1).'
+    }
+    if (controladorForm.cicloCompleto && String(controladorForm.cicloCompleto).trim() !== '') {
+      const ciclo = parseInt(controladorForm.cicloCompleto, 10)
+      if (isNaN(ciclo) || ciclo <= 0 || ciclo > 600) {
+        errores.cicloCompleto = 'El ciclo completo debe ser positivo (ej. 90 segundos).'
+      }
+    }
+    if (controladorForm.tarjetaRelevadoresCantidad && String(controladorForm.tarjetaRelevadoresCantidad).trim() !== '') {
+      const cantRel = parseInt(controladorForm.tarjetaRelevadoresCantidad, 10)
+      if (isNaN(cantRel) || cantRel < 0 || cantRel > 64) {
+        errores.tarjetaRelevadoresCantidad = 'La cantidad de relevadores debe ser entre 0 y 64.'
+      }
+    }
+
+    // 4. Sección 4: Switch de Fibra (Validación Lógica de Puertos)
+    const totalPuertos = parseInt(controladorForm.switchFibraPuertosTotal, 10)
+    const puertosUso = parseInt(controladorForm.switchFibraPuertosUso, 10)
+    if (controladorForm.switchFibraPuertosTotal !== '' && !isNaN(totalPuertos) && totalPuertos < 0) {
+      errores.switchFibraPuertosTotal = 'El total de puertos no puede ser negativo.'
+    }
+    if (controladorForm.switchFibraPuertosUso !== '' && !isNaN(puertosUso)) {
+      if (puertosUso < 0) {
+        errores.switchFibraPuertosUso = 'Los puertos en uso no pueden ser negativos.'
+      } else if (!isNaN(totalPuertos) && totalPuertos > 0 && puertosUso > totalPuertos) {
+        errores.switchFibraPuertosUso = `Los puertos en uso (${puertosUso}) no pueden superar el total de puertos (${totalPuertos}).`
+      }
+    }
+
+    // 5. Sección 6: Registros de Piso (Validación Lógica de Tapas y Dañadas)
+    const totalTapas = parseInt(controladorForm.registrosPisoTapas, 10)
+    const regDanados = parseInt(controladorForm.registrosPisoDanados, 10)
+    if (controladorForm.registrosPisoTapas !== '' && !isNaN(totalTapas) && totalTapas < 0) {
+      errores.registrosPisoTapas = 'La cantidad de tapas no puede ser negativa.'
+    }
+    if (controladorForm.registrosPisoDanados !== '' && !isNaN(regDanados)) {
+      if (regDanados < 0) {
+        errores.registrosPisoDanados = 'Los registros dañados no pueden ser negativos.'
+      } else if (!isNaN(totalTapas) && totalTapas >= 0 && regDanados > totalTapas) {
+        errores.registrosPisoDanados = `Los registros dañados (${regDanados}) no pueden superar el total de tapas (${totalTapas}).`
+      }
+    }
+
+    // 6. Equipamiento: Cámaras videodetectoras
+    if (controladorForm.camaraCantidad && String(controladorForm.camaraCantidad).trim() !== '') {
+      const cantC = parseInt(controladorForm.camaraCantidad, 10)
+      if (isNaN(cantC) || cantC < 0) {
+        errores.camaraCantidad = 'La cantidad de cámaras no puede ser negativa.'
+      }
+    }
+    if (Array.isArray(controladorForm.postes)) {
+      controladorForm.postes.forEach((p, idx) => {
+        if (p.tieneCamara) {
+          const cantCam = parseInt(p.camaraCantidad, 10)
+          if (p.camaraCantidad !== '' && !isNaN(cantCam) && cantCam < 1) {
+            errores[`poste_${idx}_camara`] = `Poste ${idx + 1}: La cantidad de cámaras no puede ser menor a 1.`
+          }
+        }
+      })
+    }
+
     setControladorErrores(errores)
-    return Object.keys(errores).length === 0
+
+    const esValido = Object.keys(errores).length === 0
+    if (!esValido && mostrarAlerta) {
+      const listaHtml = Object.values(errores).map(e => `<li>${e}</li>`).join('')
+      Swal.fire({
+        icon: 'warning',
+        title: 'Verifique los datos del controlador',
+        html: `<p style="font-size: 0.9rem; margin-bottom: 0.5rem; text-align: left;">Se detectaron inconsistencias en el formulario:</p><ul style="text-align: left; font-size: 0.85rem; color: #DC2626; padding-left: 1.25rem;">${listaHtml}</ul>`,
+        confirmButtonColor: '#691B31'
+      })
+    }
+
+    return esValido
   }
 
   const handleGuardarControlador = async (e) => {
@@ -1509,6 +1796,22 @@ export default function InventarioSemaforos() {
     if (!verificarConexion()) return
     if (!controladorForm.modelo.trim() || !controladorForm.cruceroId) {
       Swal.fire('Datos incompletos', 'Modelo y crucero son obligatorios.', 'warning')
+      return
+    }
+    // Validar coherencia en switch de fibra
+    const totalPuertos = parseInt(controladorForm.switchFibraPuertosTotal, 10)
+    const puertosUso = parseInt(controladorForm.switchFibraPuertosUso, 10)
+    if (!isNaN(totalPuertos) && !isNaN(puertosUso) && totalPuertos > 0 && puertosUso > totalPuertos) {
+      setControladorErrores(prev => ({
+        ...prev,
+        switchFibraPuertosUso: `Los puertos en uso (${puertosUso}) no pueden superar el total (${totalPuertos}).`
+      }))
+      Swal.fire({
+        icon: 'warning',
+        title: 'Inconsistencia en Switch de Fibra',
+        text: `Los puertos en uso (${puertosUso}) no pueden superar el total de puertos (${totalPuertos}).`,
+        confirmButtonColor: '#691B31'
+      })
       return
     }
 
@@ -1790,6 +2093,22 @@ export default function InventarioSemaforos() {
     if (!editandoControladorId) return
     if (!verificarConexion()) return
 
+    const totalTapas = parseInt(controladorForm.registrosPisoTapas, 10)
+    const regDanados = parseInt(controladorForm.registrosPisoDanados, 10)
+    if (!isNaN(totalTapas) && !isNaN(regDanados) && regDanados > totalTapas) {
+      setControladorErrores(prev => ({
+        ...prev,
+        registrosPisoDanados: `Los registros dañados (${regDanados}) no pueden superar el total de tapas (${totalTapas}).`
+      }))
+      Swal.fire({
+        icon: 'warning',
+        title: 'Inconsistencia en Registros de Piso',
+        text: `No puede haber más registros dañados (${regDanados}) que el total de tapas (${totalTapas}).`,
+        confirmButtonColor: '#691B31'
+      })
+      return
+    }
+
     setGuardandoModularSeccion('registros')
     try {
       const res = await fetch(`${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/registros-piso`, {
@@ -1923,8 +2242,57 @@ export default function InventarioSemaforos() {
     }
   }
 
+  const handleVerControlador = async (item) => {
+    setEditandoControladorId(item.id)
+    setControladorParaVer(item)
+    setModoVisualizacion(true)
+    setFormPantallaCompleta(true)
+    setControladorForm(mapearDatosControladorAForm(item))
+    setArchivoProgramacion(item.archivoProgramacion || null)
+    setControladorErrores({})
+    cargarCatalogos()
+
+    // Abrir automáticamente todos los mapas de postes con coordenadas válidas
+    const postesNorm = normalizarPostesDetalle(item.postesDetalle, item)
+    const mapasVis = {}
+    postesNorm.forEach((p, idx) => {
+      if (extraerCoordenadasValidas(p.ubicacionPoste || p.coordenadas)) {
+        mapasVis[idx] = true
+      }
+    })
+    setMapasPostesVisibles(mapasVis)
+
+    setModalControladorAbierto(true)
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/inventario/controladores/${item.id}`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      })
+      const json = await res.json().catch(() => ({}))
+      if (res.ok && json.data) {
+        setControladorParaVer(json.data)
+        setControladorForm(mapearDatosControladorAForm(json.data))
+        if (json.data.archivoProgramacion) {
+          setArchivoProgramacion(json.data.archivoProgramacion)
+        }
+        const freshPostes = normalizarPostesDetalle(json.data.postesDetalle, json.data)
+        const freshMapas = {}
+        freshPostes.forEach((p, idx) => {
+          if (extraerCoordenadasValidas(p.ubicacionPoste || p.coordenadas)) {
+            freshMapas[idx] = true
+          }
+        })
+        setMapasPostesVisibles(freshMapas)
+      }
+    } catch (err) {
+      console.warn('No se pudo refrescar controlador en segundo plano para vista:', err)
+    }
+  }
+
   const handleEditarControlador = async (item) => {
     setEditandoControladorId(item.id)
+    setModoVisualizacion(false)
+    setFormPantallaCompleta(false)
     setControladorForm(mapearDatosControladorAForm(item))
     setArchivoProgramacion(item.archivoProgramacion || null)
     setControladorErrores({})
@@ -1983,8 +2351,838 @@ export default function InventarioSemaforos() {
     }
   }
 
+  // ==========================================
+  // EXPORTACIÓN A EXCEL Y PDF (CONTROLADORES)
+  // ==========================================
+  const loadImgBase64 = (src) => new Promise((resolve) => {
+    if (!src) return resolve(null)
+    const img = new Image()
+    img.crossOrigin = 'Anonymous'
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth || img.width
+        canvas.height = img.naturalHeight || img.height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0)
+        resolve(canvas.toDataURL('image/png'))
+      } catch (e) {
+        resolve(null)
+      }
+    }
+    img.onerror = () => resolve(null)
+    img.src = src
+  })
+
+  const exportarControladoresExcel = async () => {
+    try {
+      Swal.fire({
+        title: 'Generando Reporte Excel...',
+        text: 'Por favor espere un momento.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      })
+
+      const params = new URLSearchParams()
+      if (hayFiltroControladorActivo) {
+        if (controladoresFiltrados && controladoresFiltrados.length > 0) {
+          params.append('ids', controladoresFiltrados.map(c => c.id).join(','))
+        }
+        if (busquedaControlador && busquedaControlador.trim()) {
+          params.append('search', busquedaControlador.trim())
+        }
+        if (filtroModeloControlador && filtroModeloControlador !== '') {
+          params.append('modelo', filtroModeloControlador)
+        }
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/inventario/controladores/export?${params.toString()}`, {
+        headers: { 'Authorization': `Bearer ${user.token}` }
+      })
+
+      if (res.ok) {
+        const blob = await res.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        const sufijo = hayFiltroControladorActivo ? '_filtrado' : '_completo'
+        const fechaStr = new Date().toISOString().slice(0, 10)
+        a.download = `Controladores_Semaforicos_SITRAC-H${sufijo}_${fechaStr}.xlsx`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+
+        Swal.close()
+        Swal.fire({
+          icon: 'success',
+          title: 'Reporte Excel generado',
+          text: 'El archivo Excel se descargó con el diseño ejecutivo oficial.',
+          timer: 2000,
+          showConfirmButton: false
+        })
+        return
+      }
+
+      throw new Error('Respuesta no exitosa del servidor')
+    } catch (err) {
+      console.warn('Generando con fallback local de Excel:', err)
+      // Fallback local mejorado y limpio (13 columnas estructuradas)
+      try {
+        const lista = hayFiltroControladorActivo
+          ? controladoresFiltrados
+          : (todosLosControladores && todosLosControladores.length > 0 ? todosLosControladores : controladores)
+
+        if (!lista || lista.length === 0) {
+          Swal.close()
+          Swal.fire('Atención', 'No hay controladores para exportar.', 'warning')
+          return
+        }
+
+        const dataToExport = lista.map((ctrl, index) => {
+          const postesNorm = normalizarPostesDetalle(ctrl.postesDetalle, ctrl)
+          const resumenPostes = postesNorm.length > 0
+            ? `${postesNorm.length} poste(s): ` + postesNorm.map((p, i) => {
+                const mod = p.modeloPoste || p.modelo || p.posteModeloTipo || 'S/M'
+                const tipo = p.tipoPoste === 'peatonal' ? 'Peatonal' : 'Vehicular'
+                return `[Poste ${i + 1}: ${mod} (${tipo})]`
+              }).join(', ')
+            : '0 postes'
+
+          const sem3L = Number(ctrl.semaforos3Luces) || 0
+          const sem4L = Number(ctrl.semaforos4Luces) || 0
+          const totalCab = sem3L + sem4L
+
+          const ledsV = Number(ctrl.totalLedsVerdes) || 0
+          const ledsR = Number(ctrl.totalLedsRojos) || 0
+          const ledsA = Number(ctrl.totalLedsAmarillos) || 0
+          const flechasV = Number(ctrl.totalFlechasVerdes) || 0
+          const flechasR = Number(ctrl.totalFlechasRojas) || 0
+          const totalLeds = ledsV + ledsR + ledsA + flechasV + flechasR
+
+          const peatPartes = []
+          if (ctrl.pasoPeatonal) peatPartes.push('Paso Peatonal')
+          if (ctrl.audible) peatPartes.push('Audible')
+          if (ctrl.pantallaLed) peatPartes.push('Pantalla LED')
+          if (ctrl.botonera) peatPartes.push('Botonera')
+          const peatStr = peatPartes.length > 0 ? peatPartes.join(', ') : 'Sin dispositivos'
+
+          const elecPartes = []
+          if (ctrl.cpu) elecPartes.push('CPU')
+          if (ctrl.tarjetaRelevadora) elecPartes.push('Relés')
+          if (ctrl.fuentePoder) elecPartes.push('Fuente')
+          if (ctrl.gps) elecPartes.push(`GPS (${ctrl.gpsModelo || 'Sí'})`)
+          const elecStr = elecPartes.length > 0 ? elecPartes.join(', ') : 'Básica'
+
+          const redPartes = []
+          if (ctrl.ipLocal) redPartes.push(`IP: ${ctrl.ipLocal}`)
+          if (ctrl.switch) redPartes.push('Switch')
+          if (ctrl.fibraOptica) redPartes.push('Fibra')
+          const redStr = redPartes.length > 0 ? redPartes.join(' | ') : 'Sin red'
+
+          return {
+            'No.': index + 1,
+            'Modelo': ctrl.modelo || '—',
+            'Crucero / Intersección': ctrl.crucero?.nombre || (ctrl.cruceroId ? `Crucero #${ctrl.cruceroId}` : 'Sin Asignar'),
+            'No. Gabinete': ctrl.numeroGabinete || '—',
+            'Cabezales (3L / 4L)': `3L: ${sem3L} | 4L: ${sem4L} (Total: ${totalCab})`,
+            'Desglose de LEDs': `V: ${ledsV} | R: ${ledsR} | A: ${ledsA} (Total: ${totalLeds})`,
+            'Accesibilidad Peatonal': peatStr,
+            'Electrónica Interna': elecStr,
+            'Red y Conectividad': redStr,
+            'Postes del Crucero': resumenPostes,
+            'Cámaras': ctrl.camaraCantidad ? `${ctrl.camaraCantidad} (${ctrl.camaraModelo || 'Cámaras'})` : (ctrl.camaraModelo || 'Ninguna'),
+            'Estado Base / Reg. Dañados': Number(ctrl.registrosPisoDanados) > 0 ? `⚠️ ${ctrl.registrosPisoDanados} Dañados` : 'Normal',
+            'Observaciones': ctrl.observacionesExterior || ctrl.posteObservaciones || 'Sin observaciones'
+          }
+        })
+
+        const ws = XLSX.utils.json_to_sheet(dataToExport)
+        ws['!cols'] = [
+          { wch: 6 },
+          { wch: 16 },
+          { wch: 34 },
+          { wch: 16 },
+          { wch: 22 },
+          { wch: 26 },
+          { wch: 28 },
+          { wch: 26 },
+          { wch: 26 },
+          { wch: 34 },
+          { wch: 18 },
+          { wch: 22 },
+          { wch: 34 }
+        ]
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'Controladores')
+        const fechaStr = new Date().toISOString().slice(0, 10)
+        const sufijo = hayFiltroControladorActivo ? '_filtrado' : '_completo'
+        XLSX.writeFile(wb, `Controladores_Semaforicos_SITRAC-H${sufijo}_${fechaStr}.xlsx`)
+
+        Swal.close()
+        Swal.fire({
+          icon: 'success',
+          title: 'Reporte Excel generado',
+          text: `Se descargó el reporte con ${lista.length} controlador(es).`,
+          timer: 2000,
+          showConfirmButton: false
+        })
+      } catch (e2) {
+        console.error('Error definitivo al exportar a Excel:', e2)
+        Swal.close()
+        Swal.fire('Error', 'No se pudo generar el reporte en Excel.', 'error')
+      }
+    }
+  }
+
+  const exportarFichaIndividualControladorPdf = async (ctrl) => {
+    if (!ctrl) return
+    try {
+      Swal.fire({
+        title: 'Generando Ficha Técnica PDF...',
+        text: 'Por favor espere un momento.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      })
+
+      const doc = new jsPDF('portrait', 'mm', 'letter')
+      const pageWidth = doc.internal.pageSize.width
+      const pageHeight = doc.internal.pageSize.height
+
+      const [logoSitrach, logoHidalgo] = await Promise.all([
+        loadImgBase64(logoSitrachSrc),
+        loadImgBase64(escudoHidalgoSrc)
+      ])
+
+      // Franja superior guinda
+      doc.setFillColor(105, 27, 49) // #691B31
+      doc.rect(0, 0, pageWidth, 5, 'F')
+
+      // Franja inferior guinda
+      doc.setFillColor(105, 27, 49)
+      doc.rect(0, pageHeight - 8, pageWidth, 8, 'F')
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(8)
+      doc.text('SISTEMA INTEGRAL DE CONTROL SITRAC-H — DIRECCIÓN DE SEMÁFOROS Y CONTROL VIAL', 14, pageHeight - 3)
+      doc.text(`Página 1 de 1`, pageWidth - 14, pageHeight - 3, { align: 'right' })
+
+      // Logos
+      if (logoSitrach) doc.addImage(logoSitrach, 'PNG', 14, 7, 14, 14)
+      if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', pageWidth - 26, 7, 12, 14)
+
+      // Títulos
+      doc.setTextColor(105, 27, 49)
+      doc.setFontSize(15)
+      doc.setFont(undefined, 'bold')
+      doc.text('FICHA TÉCNICA DE CONTROLADOR SEMAFÓRICO', pageWidth / 2, 14, { align: 'center' })
+
+      doc.setTextColor(188, 149, 91)
+      doc.setFontSize(8.5)
+      doc.setFont(undefined, 'normal')
+      doc.text('SITRAC-H — SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 19, { align: 'center' })
+
+      // Recuadro del crucero / encabezado principal
+      doc.setFillColor(248, 250, 252)
+      doc.setDrawColor(203, 213, 225)
+      doc.roundedRect(14, 23, pageWidth - 28, 16, 2, 2, 'FD')
+
+      doc.setTextColor(105, 27, 49)
+      doc.setFontSize(12)
+      doc.setFont(undefined, 'bold')
+      doc.text(`CRUCERO: ${ctrl.crucero?.nombre || 'SIN ASIGNAR'}`, 18, 30)
+
+      doc.setFontSize(8.5)
+      doc.setTextColor(71, 85, 105)
+      doc.setFont(undefined, 'normal')
+      doc.text(`Modelo: ${ctrl.modelo || '—'}   |   No. Gabinete: ${ctrl.numeroGabinete || '—'}   |   Fecha de consulta: ${new Date().toLocaleDateString('es-MX')}`, 18, 35)
+
+      // Tablas de contenido organizadas
+      const postesNorm = normalizarPostesDetalle(ctrl.postesDetalle, ctrl)
+      const totalCabezales = (Number(ctrl.semaforos3Luces) || 0) + (Number(ctrl.semaforos4Luces) || 0)
+      const totalLeds = (Number(ctrl.totalLedsVerdes) || 0) + (Number(ctrl.totalLedsRojos) || 0) + (Number(ctrl.totalLedsAmarillos) || 0) + (Number(ctrl.totalFlechasVerdes) || 0) + (Number(ctrl.totalFlechasRojas) || 0)
+
+      const resumenGeneral = [
+        ['Semáforos 3 Luces', `${ctrl.semaforos3Luces || 0}`, 'LEDs Verdes', `${ctrl.totalLedsVerdes || 0} (Flechas: ${ctrl.totalFlechasVerdes || 0})`],
+        ['Semáforos 4 Luces', `${ctrl.semaforos4Luces || 0}`, 'LEDs Rojos', `${ctrl.totalLedsRojos || 0} (Flechas: ${ctrl.totalFlechasRojas || 0})`],
+        ['Total Cabezales', `${totalCabezales}`, 'LEDs Amarillos', `${ctrl.totalLedsAmarillos || 0}`],
+        ['Tipo / Modelo Cabezal', `${ctrl.tipoCabezal || 'LED'} — ${ctrl.cabezalModelo || 'N/A'}`, 'Total LEDs en Crucero', `${totalLeds}`]
+      ]
+
+      autoTable(doc, {
+        startY: 42,
+        margin: { left: 14, right: 14 },
+        head: [['1. CABEZALES SEMAFÓRICOS', 'CANTIDAD', '2. DESGLOSE DE LEDS', 'CANTIDAD']],
+        body: resumenGeneral,
+        theme: 'grid',
+        headStyles: { fillColor: [105, 27, 49], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
+        styles: { cellPadding: 2 }
+      })
+
+      const accesibilidad = [
+        ['Paso Peatonal', ctrl.pasoPeatonal ? 'ACTIVO / SÍ' : 'NO DISPONIBLE', 'Dispositivo Audible', ctrl.audible ? 'ACTIVO / SÍ' : 'NO DISPONIBLE'],
+        ['Pantalla LED', ctrl.pantallaLed ? 'INSTALADA / SÍ' : 'NO DISPONIBLE', 'Botonera Peatonal', ctrl.botonera ? 'INSTALADA / SÍ' : 'NO DISPONIBLE']
+      ]
+
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 4,
+        margin: { left: 14, right: 14 },
+        head: [['3. ACCESIBILIDAD Y EQUIPAMIENTO PEATONAL', 'ESTADO', 'COMPONENTE', 'ESTADO']],
+        body: accesibilidad,
+        theme: 'grid',
+        headStyles: { fillColor: [188, 149, 91], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
+        styles: { cellPadding: 2 }
+      })
+
+      const redElectronica = [
+        ['Dirección IP Local', ctrl.ipLocal || '—', 'Dirección IP Sistema', ctrl.ipSystem || '—'],
+        ['Máscara de Red', ctrl.mascaraRed || '—', 'Puerta de Enlace (Gateway)', ctrl.gateway || '—'],
+        ['Versión de Firmware', ctrl.versionFirmware || '—', 'Ciclo Completo', ctrl.cicloCompleto || '—'],
+        ['Módulo GPS', ctrl.gps ? `SÍ (${ctrl.gpsModelo || 'Modelo N/A'})` : 'NO', 'Antena GPS', ctrl.gpsAntenaExterior || '—'],
+        ['Switch de Fibra', ctrl.switch ? `SÍ (${ctrl.switchFibraMarca || ''} ${ctrl.switchFibraModelo || ''})` : 'NO', 'Fibra Óptica / Receptor', ctrl.fibraOptica ? `SÍ (${ctrl.receptorFibraDispositivo || 'Receptor N/A'})` : 'NO'],
+        ['CPU / Relevadores / Fuente', `CPU: ${ctrl.cpu ? 'Sí' : 'No'} | Relés: ${ctrl.tarjetaRelevadora ? 'Sí' : 'No'} | Fuente: ${ctrl.fuentePoder ? 'Sí' : 'No'}`, 'Cámaras de Detección', ctrl.camaraCantidad ? `${ctrl.camaraCantidad} (${ctrl.camaraModelo || 'Cámaras'})` : (ctrl.camaraModelo || 'Ninguna')]
+      ]
+
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 4,
+        margin: { left: 14, right: 14 },
+        head: [['4. RED, CONECTIVIDAD Y ELECTRÓNICA INTERNA', 'VALOR', 'PARÁMETRO', 'VALOR']],
+        body: redElectronica,
+        theme: 'grid',
+        headStyles: { fillColor: [105, 27, 49], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
+        styles: { cellPadding: 2 }
+      })
+
+      // Detalle de postes
+      const postesBody = postesNorm.length > 0
+        ? postesNorm.map((p, idx) => [
+            `Poste #${idx + 1}`,
+            p.tipoPoste === 'peatonal' ? 'Peatonal' : 'Vehicular / Mixto',
+            p.modeloPoste || p.modelo || p.posteModeloTipo || '—',
+            p.tapaRegistro || '—',
+            p.ubicacionPoste || p.coordenadas || '—',
+            p.observaciones || '—'
+          ])
+        : [['Sin postes', '—', '—', '—', '—', 'No se detallaron postes individuales']]
+
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 4,
+        margin: { left: 14, right: 14 },
+        head: [['# POSTE', 'FUNCIÓN', 'MODELO', 'ESTADO TAPA', 'COORDENADAS', 'OBSERVACIONES']],
+        body: postesBody,
+        theme: 'grid',
+        headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
+        styles: { cellPadding: 2 }
+      })
+
+      // Cimentación y Observaciones
+      const infraestructura = [
+        ['Cimiento Completo', ctrl.cimientoCompleto || '—', 'Dados de Cimentación', ctrl.cimientoCuantosDados || '—'],
+        ['Tapa de Cableado', ctrl.tapaCableado || '—', 'Tornillería Base', `${ctrl.tornilleriaBaseCompleta || '—'} (${ctrl.tornilleriaCuantosTornillos || '—'})`],
+        ['Registros de Piso Dañados', `${ctrl.registrosPisoDanados || 0} registro(s)`, 'Observaciones Generales', ctrl.observacionesExterior || ctrl.posteObservaciones || 'Sin observaciones registradas']
+      ]
+
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 4,
+        margin: { left: 14, right: 14 },
+        head: [['5. BASE, CIMENTACIÓN Y ESTADO FÍSICO', 'ESTADO', 'PARÁMETRO', 'OBSERVACIONES']],
+        body: infraestructura,
+        theme: 'grid',
+        headStyles: { fillColor: [188, 149, 91], textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 7.5, textColor: [30, 41, 59] },
+        styles: { cellPadding: 2 }
+      })
+
+      const nomCrucero = (ctrl.crucero?.nombre || 'controlador').replace(/[^a-zA-Z0-9_-]/g, '_')
+      doc.save(`Ficha_Tecnica_${nomCrucero}_${new Date().toISOString().slice(0, 10)}.pdf`)
+
+      Swal.close()
+      Swal.fire({
+        icon: 'success',
+        title: 'Ficha Técnica descargada',
+        text: 'El documento PDF se generó exitosamente.',
+        timer: 2000,
+        showConfirmButton: false
+      })
+    } catch (err) {
+      console.error('Error al generar ficha técnica individual PDF:', err)
+      Swal.close()
+      Swal.fire('Error', 'No se pudo generar la ficha técnica en PDF.', 'error')
+    }
+  }
+
+  const exportarControladoresPdf = async () => {
+    let lista = hayFiltroControladorActivo
+      ? controladoresFiltrados
+      : (todosLosControladores && todosLosControladores.length > 0 ? todosLosControladores : controladores)
+
+    // Si aún no se cargaron todos los controladores, consultarlos al servidor
+    if (!hayFiltroControladorActivo && (!lista || lista.length <= 10)) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/inventario/controladores?page=1&limit=1000`, {
+          headers: { 'Authorization': `Bearer ${user.token}` }
+        })
+        const json = await res.json().catch(() => ({}))
+        if (res.ok && json.data?.items?.length) {
+          lista = json.data.items
+          setTodosLosControladores(lista)
+        }
+      } catch (e) {
+        console.warn('Fallback a controladores locales para exportación PDF:', e)
+      }
+    }
+
+    if (!lista || lista.length === 0) {
+      Swal.fire('Atención', 'No hay controladores para exportar.', 'warning')
+      return
+    }
+
+    // Si hay exactamente 1 controlador filtrado, exportar su ficha técnica completa
+    if (lista.length === 1) {
+      return exportarFichaIndividualControladorPdf(lista[0])
+    }
+
+    try {
+      Swal.fire({
+        title: 'Generando Reporte PDF...',
+        text: 'Por favor espere un momento.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      })
+
+      const doc = new jsPDF('landscape', 'mm', 'letter')
+      const pageWidth = doc.internal.pageSize.width
+      const pageHeight = doc.internal.pageSize.height
+
+      const [logoSitrach, logoHidalgo] = await Promise.all([
+        loadImgBase64(logoSitrachSrc),
+        loadImgBase64(escudoHidalgoSrc)
+      ])
+
+      const drawHeaderFooter = (data) => {
+        // Franja superior guinda
+        doc.setFillColor(105, 27, 49)
+        doc.rect(0, 0, pageWidth, 5, 'F')
+
+        // Franja inferior guinda
+        doc.setFillColor(105, 27, 49)
+        doc.rect(0, pageHeight - 8, pageWidth, 8, 'F')
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(8)
+        doc.setFont(undefined, 'normal')
+        doc.text('SISTEMA INTEGRAL DE CONTROL SITRAC-H — INVENTARIO DE CONTROLADORES SEMAFÓRICOS', 14, pageHeight - 3)
+        doc.text(`Página ${data.pageNumber}`, pageWidth - 14, pageHeight - 3, { align: 'right' })
+
+        if (data.pageNumber === 1) {
+          if (logoSitrach) doc.addImage(logoSitrach, 'PNG', 14, 7, 14, 14)
+          if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', pageWidth - 26, 7, 12, 14)
+
+          doc.setTextColor(105, 27, 49)
+          doc.setFontSize(14)
+          doc.setFont(undefined, 'bold')
+          doc.text('REPORTE GENERAL DE CONTROLADORES SEMAFÓRICOS', pageWidth / 2, 12, { align: 'center' })
+
+          doc.setTextColor(188, 149, 91)
+          doc.setFontSize(8.5)
+          doc.setFont(undefined, 'normal')
+          doc.text('SITRAC-H — SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 16.5, { align: 'center' })
+
+          // Texto de filtros y fecha
+          const filtroTexto = hayFiltroControladorActivo
+            ? `Filtro aplicado: ${filtroModeloControlador ? `Modelo "${filtroModeloControlador}" ` : ''}${busquedaControlador ? `Búsqueda "${busquedaControlador}"` : ''} (${lista.length} controladores)`
+            : `Inventario Completo — Total: ${lista.length} controladores instalados`
+          const fechaGenerado = `Generado: ${new Date().toLocaleDateString('es-MX')} ${new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}`
+
+          doc.setTextColor(105, 27, 49)
+          doc.setFontSize(7.5)
+          doc.setFont(undefined, 'bold')
+          doc.text(filtroTexto, 32, 21.5)
+
+          doc.setTextColor(100, 116, 139)
+          doc.setFont(undefined, 'normal')
+          doc.text(fechaGenerado, pageWidth - 28, 21.5, { align: 'right' })
+
+          // Tarjetas KPI de resumen
+          const totalCabezales = lista.reduce((acc, c) => acc + (Number(c.semaforos3Luces) || 0) + (Number(c.semaforos4Luces) || 0), 0)
+          const totalLeds = lista.reduce((acc, c) => acc + (Number(c.totalLedsVerdes) || 0) + (Number(c.totalLedsRojos) || 0) + (Number(c.totalLedsAmarillos) || 0) + (Number(c.totalFlechasVerdes) || 0) + (Number(c.totalFlechasRojas) || 0), 0)
+          const conPeatonal = lista.filter(c => c.pasoPeatonal).length
+          const conAudible = lista.filter(c => c.audible).length
+
+          const cardW = 56
+          const cardH = 14
+          const gap = 8
+          const startX = (pageWidth - (4 * cardW + 3 * gap)) / 2
+
+          const drawKpiCard = (x, y, titulo, valor, subtitulo) => {
+            doc.setFillColor(248, 250, 252)
+            doc.setDrawColor(203, 213, 225)
+            doc.roundedRect(x, y, cardW, cardH, 2, 2, 'FD')
+
+            doc.setFontSize(6.5)
+            doc.setTextColor(100, 116, 139)
+            doc.setFont(undefined, 'bold')
+            doc.text(titulo, x + cardW / 2, y + 4.5, { align: 'center' })
+
+            doc.setFontSize(11)
+            doc.setTextColor(105, 27, 49)
+            doc.text(String(valor), x + cardW / 2, y + 9.5, { align: 'center' })
+
+            if (subtitulo) {
+              doc.setFontSize(5.5)
+              doc.setTextColor(148, 163, 184)
+              doc.setFont(undefined, 'normal')
+              doc.text(subtitulo, x + cardW / 2, y + 12.5, { align: 'center' })
+            }
+          }
+
+          drawKpiCard(startX, 26, 'TOTAL CONTROLADORES', lista.length, 'Registrados en el reporte')
+          drawKpiCard(startX + (cardW + gap), 26, 'TOTAL CABEZALES', totalCabezales, 'Semáforos 3 y 4 luces')
+          drawKpiCard(startX + 2 * (cardW + gap), 26, 'TOTAL DE LEDS', totalLeds, 'Verdes, Rojos y Amarillos')
+          drawKpiCard(startX + 3 * (cardW + gap), 26, 'ACCESIBILIDAD', `${conPeatonal} Peat / ${conAudible} Aud`, 'Cruceros con paso o sonido')
+        } else {
+          // Encabezado páginas siguientes
+          if (logoSitrach) doc.addImage(logoSitrach, 'PNG', 14, 6.5, 9, 9)
+          if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', pageWidth - 22, 6.5, 8, 9)
+          doc.setTextColor(105, 27, 49)
+          doc.setFontSize(10)
+          doc.setFont(undefined, 'bold')
+          doc.text('REPORTE GENERAL DE CONTROLADORES SEMAFÓRICOS (Continuación)', pageWidth / 2, 10, { align: 'center' })
+          doc.setTextColor(188, 149, 91)
+          doc.setFontSize(7.5)
+          doc.setFont(undefined, 'normal')
+          doc.text('SITRAC-H — SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 14, { align: 'center' })
+        }
+      }
+
+      const tableColumn = [
+        '#',
+        'MODELO',
+        'CRUCERO / UBICACIÓN',
+        'GABINETE / IP',
+        'CABEZALES\n(3L / 4L)',
+        'LEDS\n(V / R / A)',
+        'COMPONENTES ACTIVOS',
+        'POSTES',
+        'REG. PISO / OBS.'
+      ]
+
+      const tableRows = lista.map((ctrl, idx) => {
+        const crucero = ctrl.crucero?.nombre || (ctrl.cruceroId ? `Crucero #${ctrl.cruceroId}` : 'Sin asignar')
+        const gabineteIp = [
+          ctrl.numeroGabinete ? `Gab: ${ctrl.numeroGabinete}` : null,
+          ctrl.ipLocal ? `IP: ${ctrl.ipLocal}` : null
+        ].filter(Boolean).join('\n') || '—'
+
+        const cabezales = `3L: ${ctrl.semaforos3Luces || 0}\n4L: ${ctrl.semaforos4Luces || 0}`
+        const fCount = Number(ctrl.totalFlechasVerdes) || (Number(ctrl.semaforos4Luces) > 0 ? Number(ctrl.semaforos4Luces) : 0)
+        const leds = fCount > 0
+          ? `V: ${ctrl.totalLedsVerdes || 0} | R: ${ctrl.totalLedsRojos || 0}\nA: ${ctrl.totalLedsAmarillos || 0} | 4L: ${fCount}`
+          : `V: ${ctrl.totalLedsVerdes || 0} | R: ${ctrl.totalLedsRojos || 0}\nA: ${ctrl.totalLedsAmarillos || 0}`
+
+        const componentes = []
+        if (ctrl.pasoPeatonal) componentes.push('Peatonal')
+        if (ctrl.audible) componentes.push('Audible')
+        if (ctrl.pantallaLed) componentes.push('Pantalla LED')
+        if (ctrl.gps) componentes.push('GPS')
+        if (ctrl.switch) componentes.push('Switch')
+        if (ctrl.fibraOptica) componentes.push('Fibra')
+        const compStr = componentes.length > 0 ? componentes.join(', ') : 'Ninguno'
+
+        const postesNorm = normalizarPostesDetalle(ctrl.postesDetalle, ctrl)
+        const postesStr = postesNorm.length > 0
+          ? `${postesNorm.length} poste(s):\n` + postesNorm.slice(0, 3).map((p, i) => `• P${i + 1}: ${p.modeloPoste || p.modelo || 'Poste'}`).join('\n') + (postesNorm.length > 3 ? `\n(+${postesNorm.length - 3} más)` : '')
+          : '0 postes'
+
+        const obs = []
+        if (Number(ctrl.registrosPisoDanados) > 0) obs.push(`Reg. Dañados: ${ctrl.registrosPisoDanados}`)
+        if (ctrl.observacionesExterior) obs.push(ctrl.observacionesExterior.slice(0, 45) + (ctrl.observacionesExterior.length > 45 ? '...' : ''))
+        const obsStr = obs.length > 0 ? obs.join('\n') : 'Normal'
+
+        return [
+          idx + 1,
+          ctrl.modelo || '—',
+          crucero,
+          gabineteIp,
+          cabezales,
+          leds,
+          compStr,
+          postesStr,
+          obsStr
+        ]
+      })
+
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 44,
+        margin: { top: 18, bottom: 14, left: 14, right: 14 },
+        showHead: 'everyPage',
+        pageBreak: 'auto',
+        theme: 'grid',
+        styles: { fontSize: 7, cellPadding: 2, halign: 'center', valign: 'middle', overflow: 'linebreak' },
+        headStyles: { fillColor: [105, 27, 49], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+        alternateRowStyles: { fillColor: [255, 251, 240] },
+        columnStyles: {
+          0: { cellWidth: 8 },
+          1: { cellWidth: 20, fontStyle: 'bold', halign: 'left' },
+          2: { cellWidth: 50, halign: 'left' },
+          3: { cellWidth: 30, halign: 'left' },
+          4: { cellWidth: 22 },
+          5: { cellWidth: 24 },
+          6: { cellWidth: 40, halign: 'left' },
+          7: { cellWidth: 28, halign: 'left' },
+          8: { cellWidth: 'auto', halign: 'left' }
+        },
+        didDrawPage: drawHeaderFooter
+      })
+
+      const fechaStr = new Date().toISOString().slice(0, 10)
+      const sufijo = hayFiltroControladorActivo ? '_filtrado' : '_completo'
+      doc.save(`Reporte_Controladores_SITRAC-H${sufijo}_${fechaStr}.pdf`)
+
+      Swal.close()
+      Swal.fire({
+        icon: 'success',
+        title: 'Reporte PDF descargado',
+        text: `Se descargó el reporte con ${lista.length} controlador(es).`,
+        timer: 2000,
+        showConfirmButton: false
+      })
+    } catch (err) {
+      console.error('Error al generar PDF de controladores:', err)
+      Swal.close()
+      Swal.fire('Error', 'No se pudo generar el reporte en PDF.', 'error')
+    }
+  }
+
+  const exportarExistenciasPdf = async (tipo = 'disponibles') => {
+    try {
+      const esDanada = tipo === 'danadas' || tabActiva === 'danadas'
+
+      let lista = existencias.filter(item => {
+        const nombre = (item.nombre || '').toLowerCase()
+        const estado = (item.estadoFisico || '').toLowerCase()
+        const esPiezaDanada = nombre.includes('reemplazada') || ['dañada', 'danada', 'reparacion', 'en reparación'].includes(estado)
+        return esDanada ? esPiezaDanada : !esPiezaDanada
+      })
+
+      if (busquedaExistencias && busquedaExistencias.trim()) {
+        lista = lista.filter(item => coincideBusquedaSemaforo(item, busquedaExistencias))
+      }
+
+      if (!lista || lista.length === 0) {
+        Swal.fire({
+          title: 'Sin refacciones',
+          text: `No hay refacciones ${esDanada ? 'dañadas' : 'disponibles'} para exportar en este momento.`,
+          icon: 'warning',
+          confirmButtonColor: '#691B31'
+        })
+        return
+      }
+
+      Swal.fire({
+        title: 'Generando Reporte PDF...',
+        text: 'Por favor espere un momento.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      })
+
+      const doc = new jsPDF('landscape', 'mm', 'letter')
+      const pageWidth = doc.internal.pageSize.width
+      const pageHeight = doc.internal.pageSize.height
+
+      const [logoSitrach, logoHidalgo] = await Promise.all([
+        loadImgBase64(logoSitrachSrc),
+        loadImgBase64(escudoHidalgoSrc)
+      ])
+
+      const totalPiezas = lista.reduce((acc, r) => acc + (Number(r.cantidad) || 0), 0)
+      const totalItems = lista.length
+      const tituloDoc = esDanada
+        ? 'REPORTE DE PIEZAS DAÑADAS Y REEMPLAZADAS'
+        : 'REPORTE GENERAL DE EXISTENCIAS Y REFACCIONES EN STOCK'
+      const subtituloDoc = esDanada
+        ? 'COMPONENTES RETIRADOS O EN PROCESO DE EVALUACIÓN / REPARACIÓN'
+        : 'REFACCIONES EN BUEN ESTADO DISPONIBLES PARA INSTALACIÓN EN CRUCEROS'
+
+      const drawHeaderFooter = (data) => {
+        // Franja superior institucional guinda y dorada
+        doc.setFillColor(105, 27, 49)
+        doc.rect(0, 0, pageWidth, 5, 'F')
+        doc.setFillColor(188, 149, 91)
+        doc.rect(0, 5, pageWidth, 1, 'F')
+
+        // Franja inferior institucional
+        doc.setFillColor(105, 27, 49)
+        doc.rect(0, pageHeight - 8, pageWidth, 8, 'F')
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(8)
+        doc.setFont(undefined, 'normal')
+        doc.text('SISTEMA INTEGRAL DE CONTROL SITRAC-H — INVENTARIO DE SEMÁFOROS Y REFACCIONES', 14, pageHeight - 3)
+        doc.text(`Página ${data.pageNumber}`, pageWidth - 14, pageHeight - 3, { align: 'right' })
+
+        if (data.pageNumber === 1) {
+          if (logoSitrach) doc.addImage(logoSitrach, 'PNG', 14, 7.5, 14, 14)
+          if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', pageWidth - 26, 7.5, 12, 14)
+
+          doc.setTextColor(105, 27, 49)
+          doc.setFontSize(13.5)
+          doc.setFont(undefined, 'bold')
+          doc.text(tituloDoc, pageWidth / 2, 12, { align: 'center' })
+
+          doc.setTextColor(188, 149, 91)
+          doc.setFontSize(8.5)
+          doc.setFont(undefined, 'normal')
+          doc.text('SITRAC-H — SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 16.5, { align: 'center' })
+
+          const filtroTexto = busquedaExistencias && busquedaExistencias.trim()
+            ? `Filtro: Búsqueda "${busquedaExistencias.trim()}" (${lista.length} refacciones / ${totalPiezas} piezas en stock)`
+            : `${subtituloDoc} — Total: ${totalPiezas} unidades registradas`
+          const fechaGenerado = `Generado: ${new Date().toLocaleDateString('es-MX')} ${new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}`
+
+          doc.setTextColor(105, 27, 49)
+          doc.setFontSize(7.5)
+          doc.setFont(undefined, 'bold')
+          doc.text(filtroTexto, 32, 21.5)
+
+          doc.setTextColor(100, 116, 139)
+          doc.setFont(undefined, 'normal')
+          doc.text(fechaGenerado, pageWidth - 28, 21.5, { align: 'right' })
+
+          // Tarjetas KPI
+          const cardW = 60
+          const cardH = 14
+          const gap = 10
+          const startX = (pageWidth - (3 * cardW + 2 * gap)) / 2
+
+          const drawKpiCard = (x, y, titulo, valor, subtitulo) => {
+            doc.setFillColor(248, 250, 252)
+            doc.setDrawColor(203, 213, 225)
+            doc.roundedRect(x, y, cardW, cardH, 2, 2, 'FD')
+
+            doc.setFontSize(6.5)
+            doc.setTextColor(100, 116, 139)
+            doc.setFont(undefined, 'bold')
+            doc.text(titulo, x + cardW / 2, y + 4.5, { align: 'center' })
+
+            doc.setFontSize(11)
+            doc.setTextColor(105, 27, 49)
+            doc.text(String(valor), x + cardW / 2, y + 9.5, { align: 'center' })
+
+            if (subtitulo) {
+              doc.setFontSize(5.5)
+              doc.setTextColor(148, 163, 184)
+              doc.setFont(undefined, 'normal')
+              doc.text(subtitulo, x + cardW / 2, y + 12.5, { align: 'center' })
+            }
+          }
+
+          drawKpiCard(startX, 26, 'TOTAL DE PIEZAS EN STOCK', `${totalPiezas} Unidades`, esDanada ? 'Piezas retiradas / dañadas' : 'Piezas en existencia')
+          drawKpiCard(startX + (cardW + gap), 26, 'LÍNEAS DE REFACCIÓN', `${totalItems} Registros`, 'Componentes clasificados')
+          drawKpiCard(startX + 2 * (cardW + gap), 26, 'ESTADO FÍSICO', esDanada ? 'Dañadas / Por Reparar' : '100% Buen Estado', esDanada ? 'Inventario de bajas' : 'Listas para instalación')
+        } else {
+          if (logoSitrach) doc.addImage(logoSitrach, 'PNG', 14, 6.5, 9, 9)
+          if (logoHidalgo) doc.addImage(logoHidalgo, 'PNG', pageWidth - 22, 6.5, 8, 9)
+          doc.setTextColor(105, 27, 49)
+          doc.setFontSize(10)
+          doc.setFont(undefined, 'bold')
+          doc.text(`${tituloDoc} (Continuación)`, pageWidth / 2, 10, { align: 'center' })
+          doc.setTextColor(188, 149, 91)
+          doc.setFontSize(7.5)
+          doc.setFont(undefined, 'normal')
+          doc.text('SITRAC-H — SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL', pageWidth / 2, 14, { align: 'center' })
+        }
+      }
+
+      const tableColumn = [
+        '#',
+        'COMPONENTE / REFACCIÓN',
+        'CATEGORÍA',
+        'MARCA',
+        'MODELO',
+        'CANTIDAD',
+        'NO. SERIE',
+        'NO. INVENTARIO',
+        'ESTADO FÍSICO'
+      ]
+
+      const tableRows = lista.map((item, idx) => [
+        String(idx + 1),
+        item.nombre || 'Componente',
+        (item.categoria || 'Componente').toUpperCase(),
+        item.marca || 'SEMEX',
+        item.modelo || '-',
+        `${item.cantidad || 0} pza(s)`,
+        item.numeroSerie || '-',
+        item.numeroInventario || '-',
+        item.estadoFisico || (esDanada ? 'Dañada' : 'Buen Estado')
+      ])
+
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 44,
+        margin: { top: 20, right: 14, bottom: 12, left: 14 },
+        styles: {
+          fontSize: 7.5,
+          cellPadding: 2.2,
+          valign: 'middle',
+          overflow: 'linebreak',
+          lineColor: [226, 232, 240],
+          lineWidth: 0.2
+        },
+        headStyles: {
+          fillColor: [105, 27, 49],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          halign: 'center',
+          fontSize: 7.5
+        },
+        alternateRowStyles: {
+          fillColor: [253, 251, 247]
+        },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 10 },
+          1: { cellWidth: 50, fontStyle: 'bold' },
+          2: { halign: 'center', cellWidth: 26 },
+          3: { halign: 'center', cellWidth: 24 },
+          4: { halign: 'center', cellWidth: 26 },
+          5: { halign: 'center', fontStyle: 'bold', cellWidth: 22 },
+          6: { halign: 'center', cellWidth: 32 },
+          7: { halign: 'center', cellWidth: 32 },
+          8: { halign: 'center', cellWidth: 26 }
+        },
+        didDrawPage: drawHeaderFooter
+      })
+
+      const dateStr = new Date().toISOString().split('T')[0]
+      const fileNombre = esDanada
+        ? `Refacciones_Danadas_SITRAC-H_${dateStr}.pdf`
+        : `Existencias_Refacciones_SITRAC-H_${dateStr}.pdf`
+
+      doc.save(fileNombre)
+      Swal.close()
+      Swal.fire({
+        icon: 'success',
+        title: 'Reporte PDF descargado',
+        text: `Se descargó el reporte con ${lista.length} refacciones.`,
+        timer: 2000,
+        showConfirmButton: false
+      })
+    } catch (err) {
+      console.error('Error al exportar existencias a PDF:', err)
+      Swal.close()
+      Swal.fire('Error', 'No se pudo generar el reporte PDF de existencias.', 'error')
+    }
+  }
+
   const resetControladorForm = () => {
     setEditandoControladorId(null)
+    setModoVisualizacion(false)
+    setFormPantallaCompleta(false)
     const posteInit = []
     const totalesInit = recalcularTotalesDesdePostes(posteInit)
     setControladorForm({
@@ -2051,12 +3249,125 @@ export default function InventarioSemaforos() {
     setControladorErrores({})
   }
 
+  const handleCambiarRegistrosTapas = (valor) => {
+    if (valor === '') {
+      setControladorForm(prev => ({ ...prev, registrosPisoTapas: '' }))
+      setControladorErrores(prev => ({ ...prev, registrosPisoTapas: undefined }))
+      return
+    }
+    const total = Math.max(0, parseInt(valor, 10) || 0)
+    setControladorForm(prev => {
+      const prevDanados = parseInt(prev.registrosPisoDanados, 10)
+      let nuevoDanados = prev.registrosPisoDanados
+      let coords = prev.registrosPisoCoordenadas
+      if (!isNaN(prevDanados) && prevDanados > total) {
+        nuevoDanados = total
+        coords = ajustarCoordenadasDanadas(prev.registrosPisoCoordenadas, total)
+      }
+      return {
+        ...prev,
+        registrosPisoTapas: total,
+        registrosPisoDanados: nuevoDanados,
+        registrosPisoCoordenadas: coords
+      }
+    })
+    setControladorErrores(prev => ({
+      ...prev,
+      registrosPisoTapas: undefined,
+      registrosPisoDanados: undefined
+    }))
+  }
+
   const handleCambiarRegistrosDanados = (valor) => {
-    const cant = Math.max(0, parseInt(valor, 10) || 0)
+    if (valor === '') {
+      setControladorForm(prev => ({
+        ...prev,
+        registrosPisoDanados: '',
+        registrosPisoCoordenadas: []
+      }))
+      setControladorErrores(prev => ({ ...prev, registrosPisoDanados: undefined }))
+      return
+    }
+
+    let cant = Math.max(0, parseInt(valor, 10) || 0)
+    const totalTapas = parseInt(controladorForm.registrosPisoTapas, 10)
+
+    if (!isNaN(totalTapas) && totalTapas >= 0) {
+      if (cant > totalTapas) {
+        cant = totalTapas
+        setControladorErrores(prev => ({
+          ...prev,
+          registrosPisoDanados: `No puede haber más registros dañados que el total de tapas (${totalTapas}). Se ajustó al máximo posible.`
+        }))
+      } else {
+        setControladorErrores(prev => ({ ...prev, registrosPisoDanados: undefined }))
+      }
+    } else {
+      setControladorErrores(prev => ({ ...prev, registrosPisoDanados: undefined }))
+    }
+
     setControladorForm(prev => ({
       ...prev,
-      registrosPisoDanados: valor === '' ? '' : cant,
+      registrosPisoDanados: cant,
       registrosPisoCoordenadas: ajustarCoordenadasDanadas(prev.registrosPisoCoordenadas, cant)
+    }))
+  }
+
+  const handleCambiarSwitchPuertosTotal = (valor) => {
+    if (valor === '') {
+      setControladorForm(prev => ({ ...prev, switchFibraPuertosTotal: '', switch: true }))
+      setControladorErrores(prev => ({ ...prev, switchFibraPuertosTotal: undefined }))
+      return
+    }
+    const total = Math.max(0, parseInt(valor, 10) || 0)
+    setControladorForm(prev => {
+      const prevUso = parseInt(prev.switchFibraPuertosUso, 10)
+      let nuevoUso = prev.switchFibraPuertosUso
+      if (!isNaN(prevUso) && prevUso > total) {
+        nuevoUso = String(total)
+      }
+      return {
+        ...prev,
+        switchFibraPuertosTotal: String(total),
+        switchFibraPuertosUso: nuevoUso,
+        switch: true
+      }
+    })
+    setControladorErrores(prev => ({
+      ...prev,
+      switchFibraPuertosTotal: undefined,
+      switchFibraPuertosUso: undefined
+    }))
+  }
+
+  const handleCambiarSwitchPuertosUso = (valor) => {
+    if (valor === '') {
+      setControladorForm(prev => ({ ...prev, switchFibraPuertosUso: '', switch: true }))
+      setControladorErrores(prev => ({ ...prev, switchFibraPuertosUso: undefined }))
+      return
+    }
+
+    let uso = Math.max(0, parseInt(valor, 10) || 0)
+    const total = parseInt(controladorForm.switchFibraPuertosTotal, 10)
+
+    if (!isNaN(total) && total > 0) {
+      if (uso > total) {
+        uso = total
+        setControladorErrores(prev => ({
+          ...prev,
+          switchFibraPuertosUso: `Los puertos en uso no pueden superar el total de puertos (${total}). Se ajustó al máximo posible.`
+        }))
+      } else {
+        setControladorErrores(prev => ({ ...prev, switchFibraPuertosUso: undefined }))
+      }
+    } else {
+      setControladorErrores(prev => ({ ...prev, switchFibraPuertosUso: undefined }))
+    }
+
+    setControladorForm(prev => ({
+      ...prev,
+      switchFibraPuertosUso: String(uso),
+      switch: true
     }))
   }
 
@@ -2083,6 +3394,7 @@ export default function InventarioSemaforos() {
       (pos) => {
         const coordsStr = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`
         handleCambiarCoordenada(index, coordsStr)
+        setMapasDanadasVisibles(prev => ({ ...prev, [index]: true }))
         setCapturandoGpsIndex(null)
       },
       (err) => {
@@ -2104,6 +3416,7 @@ export default function InventarioSemaforos() {
       (pos) => {
         const coordsStr = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`
         handleActualizarPoste(pIdx, 'ubicacionPoste', coordsStr)
+        setMapasPostesVisibles(prev => ({ ...prev, [pIdx]: true }))
         setCapturandoGpsPosteIndex(null)
       },
       (err) => {
@@ -2149,12 +3462,18 @@ export default function InventarioSemaforos() {
       const nuevosPostes = listaActual.map((p, idx) => {
         if (idx !== pIdx) return p
         const updated = { ...p, [campo]: valor }
-        if (campo === 'ubicacionPoste' && Array.isArray(p.peatonalesLista)) {
+        if ((campo === 'ubicacionPoste' || campo === 'coordenadas') && Array.isArray(p.peatonalesLista)) {
+          updated.coordenadas = valor
+          updated.ubicacionPoste = valor
           updated.peatonalesLista = p.peatonalesLista.map(pt => ({
             ...pt,
             coordenadas: valor,
             sentido: valor
           }))
+        } else if (campo === 'ubicacionPoste') {
+          updated.coordenadas = valor
+        } else if (campo === 'coordenadas') {
+          updated.ubicacionPoste = valor
         }
         if (campo === 'audibleModelo' || campo === 'audibleModuloEstado' || campo === 'audibleObservaciones') {
           const mod = campo === 'audibleModelo' ? valor : (updated.audibleModelo || 'Novax DS-100 Audible')
@@ -2538,6 +3857,118 @@ export default function InventarioSemaforos() {
     })
   }
 
+  const renderDatoConsulta = (valor, fallback = 'Sin registrar', isMono = false) => {
+    if (valor === undefined || valor === null || String(valor).trim() === '') {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', marginTop: '0.2rem', minHeight: '26px' }}>
+          <span style={{ color: '#94A3B8', fontSize: '0.85rem', fontStyle: 'italic', fontWeight: '400' }}>
+            {fallback}
+          </span>
+        </div>
+      )
+    }
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        marginTop: '0.2rem',
+        minHeight: '26px',
+        fontWeight: '600',
+        color: '#0F172A',
+        fontSize: '0.88rem',
+        fontFamily: isMono ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' : 'inherit'
+      }}>
+        {String(valor)}
+      </div>
+    )
+  }
+
+  const renderBadgeConsulta = (valor, label = null) => {
+    if (!valor || valor === '') {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', marginTop: '0.2rem', minHeight: '26px' }}>
+          <span style={{ color: '#94A3B8', fontSize: '0.85rem', fontStyle: 'italic', fontWeight: '400' }}>
+            Sin registrar
+          </span>
+        </div>
+      )
+    }
+    const str = String(valor).trim()
+    const strLower = str.toLowerCase()
+    const esPositivo = ['sí', 'si', 'operando', 'operativo', 'operativa', 'instalada', 'instalado', 'buena', 'bueno', 'presente', 'conectado', 'correcto'].includes(strLower)
+    const esNegativo = ['no', 'dañado', 'dañada', 'faltante', 'fuera de servicio', 'inoperativo', 'sin operar', 'falla', 'desconectado', 'no tiene'].includes(strLower)
+
+    if (esPositivo) {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.2rem', minHeight: '26px' }}>
+          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10B981', display: 'inline-block', flexShrink: 0 }}></span>
+          <span style={{ color: '#0F172A', fontSize: '0.88rem', fontWeight: '600' }}>
+            {label || str}
+          </span>
+        </div>
+      )
+    } else if (esNegativo) {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', marginTop: '0.2rem', minHeight: '26px' }}>
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            padding: '0.15rem 0.55rem',
+            borderRadius: '4px',
+            fontSize: '0.82rem',
+            fontWeight: '700',
+            backgroundColor: '#FEF2F2',
+            color: '#B91C1C',
+            border: '1px solid #FECACA'
+          }}>
+            ● {label || str}
+          </span>
+        </div>
+      )
+    }
+
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', marginTop: '0.2rem', minHeight: '26px' }}>
+        <span style={{ color: '#1E293B', fontSize: '0.88rem', fontWeight: '600' }}>
+          {label || str}
+        </span>
+      </div>
+    )
+  }
+
+  const renderObservacionesConsulta = (valor, placeholder = 'Sin observaciones registradas') => {
+    if (!valor || String(valor).trim() === '') {
+      return (
+        <div style={{
+          marginTop: '0.2rem',
+          minHeight: '26px',
+          display: 'flex',
+          alignItems: 'center',
+          color: '#94A3B8',
+          fontSize: '0.85rem',
+          fontStyle: 'italic'
+        }}>
+          {placeholder}
+        </div>
+      )
+    }
+    return (
+      <div style={{
+        marginTop: '0.25rem',
+        padding: '0.45rem 0.65rem',
+        backgroundColor: '#FFFFFF',
+        borderRadius: '6px',
+        border: '1px solid #E2E8F0',
+        fontSize: '0.85rem',
+        color: '#1E293B',
+        lineHeight: 1.45
+      }}>
+        {valor}
+      </div>
+    )
+  }
+
   return (
     <main style={{ padding: '2rem', flex: 1, backgroundColor: '#f8fafc', overflowY: 'auto' }}>
 
@@ -2554,31 +3985,106 @@ export default function InventarioSemaforos() {
 
         {/* BOTONES DE CREACIÓN SEGÚN TAB */}
         {tabActiva === 'existencias' ? (
-          <button
-            onClick={() => { resetStockForm(); setModalStockAbierto(true); }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#691B31', color: 'white',
-              border: 'none', padding: '0.65rem 1.25rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
-              transition: 'background 0.2s', boxShadow: '0 4px 6px rgba(105,27,49,0.15)'
-            }}
-            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#A02142'}
-            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#691B31'}
-          >
-            <FaPlus /> Ingresar Existencias
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => exportarExistenciasPdf('disponibles')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#e11d48', color: 'white',
+                border: 'none', padding: '0.65rem 1.25rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
+                boxShadow: '0 4px 6px rgba(225,29,72,0.2)', transition: 'background-color 0.2s', fontSize: '0.95rem'
+              }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#be123c'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#e11d48'}
+              title={busquedaExistencias.trim() ? `Exportar refacciones filtradas a PDF` : 'Exportar todas las existencias disponibles a PDF'}
+            >
+              <FaFilePdf /> Exportar a PDF
+            </button>
+
+            <button
+              onClick={() => { resetStockForm(); setModalStockAbierto(true); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#691B31', color: 'white',
+                border: 'none', padding: '0.65rem 1.25rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
+                transition: 'background 0.2s', boxShadow: '0 4px 6px rgba(105,27,49,0.15)', fontSize: '0.95rem'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#A02142'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#691B31'}
+            >
+              <FaPlus /> Ingresar Existencias
+            </button>
+          </div>
+        ) : tabActiva === 'danadas' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => exportarExistenciasPdf('danadas')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#e11d48', color: 'white',
+                border: 'none', padding: '0.65rem 1.25rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
+                boxShadow: '0 4px 6px rgba(225,29,72,0.2)', transition: 'background-color 0.2s', fontSize: '0.95rem'
+              }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#be123c'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#e11d48'}
+              title="Descargar Reporte PDF de Piezas Dañadas / Reemplazadas"
+            >
+              <FaFilePdf /> Exportar a PDF
+            </button>
+
+            <button
+              onClick={() => { resetStockForm(); setModalStockAbierto(true); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#691B31', color: 'white',
+                border: 'none', padding: '0.65rem 1.25rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
+                transition: 'background 0.2s', boxShadow: '0 4px 6px rgba(105,27,49,0.15)', fontSize: '0.95rem'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#A02142'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#691B31'}
+            >
+              <FaPlus /> Ingresar Existencias
+            </button>
+          </div>
         ) : (
-          <button
-            onClick={() => { resetControladorForm(); cargarCatalogos(); setModalControladorAbierto(true); }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#691B31', color: 'white',
-              border: 'none', padding: '0.65rem 1.25rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
-              transition: 'background 0.2s', boxShadow: '0 4px 6px rgba(105,27,49,0.15)'
-            }}
-            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#A02142'}
-            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#691B31'}
-          >
-            <FaPlus /> Registrar Controlador
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={exportarControladoresExcel}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#10b981', color: 'white',
+                border: 'none', padding: '0.65rem 1.25rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
+                boxShadow: '0 4px 6px rgba(16,185,129,0.2)', transition: 'background-color 0.2s', fontSize: '0.95rem'
+              }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#059669'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#10b981'}
+              title={hayFiltroControladorActivo ? `Exportar ${controladoresFiltrados.length} controlador(es) filtrado(s) a Excel` : 'Exportar todos los controladores a Excel'}
+            >
+              <FaFileExcel /> Exportar a Excel {hayFiltroControladorActivo ? `(${controladoresFiltrados.length})` : ''}
+            </button>
+
+            <button
+              onClick={exportarControladoresPdf}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#e11d48', color: 'white',
+                border: 'none', padding: '0.65rem 1.25rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
+                boxShadow: '0 4px 6px rgba(225,29,72,0.2)', transition: 'background-color 0.2s', fontSize: '0.95rem'
+              }}
+              onMouseOver={e => e.currentTarget.style.backgroundColor = '#be123c'}
+              onMouseOut={e => e.currentTarget.style.backgroundColor = '#e11d48'}
+              title={hayFiltroControladorActivo ? `Exportar ${controladoresFiltrados.length} controlador(es) filtrado(s) a PDF` : 'Exportar todos los controladores a PDF'}
+            >
+              <FaFilePdf /> Exportar a PDF {hayFiltroControladorActivo ? `(${controladoresFiltrados.length})` : ''}
+            </button>
+
+            <button
+              onClick={() => { resetControladorForm(); cargarCatalogos(); setModalControladorAbierto(true); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#691B31', color: 'white',
+                border: 'none', padding: '0.65rem 1.25rem', borderRadius: '8px', fontWeight: '600', cursor: 'pointer',
+                transition: 'background 0.2s', boxShadow: '0 4px 6px rgba(105,27,49,0.15)', fontSize: '0.95rem'
+              }}
+              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#A02142'}
+              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#691B31'}
+            >
+              <FaPlus /> Registrar Controlador
+            </button>
+          </div>
         )}
       </div>
 
@@ -3295,141 +4801,434 @@ export default function InventarioSemaforos() {
       {/* TAB C: CONTROLADORES INSTALADOS                              */}
       {/* ============================================================ */}
       {tabActiva === 'controladores' && (
-        <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.03)', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
-          {cargandoControladores ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#6F7271' }}>Cargando controladores...</div>
-          ) : controladores.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem', color: '#6F7271' }}>No se han registrado controladores en el sistema.</div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #E2E8F0' }}>
-                    <th style={{ padding: '1.25rem 1rem', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.75px', color: '#691B31' }}>Modelo</th>
-                    <th style={{ padding: '1.25rem 1rem', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.75px', color: '#6F7271' }}>Ubicación (Crucero)</th>
-                    <th style={{ padding: '1.25rem 1rem', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.75px', color: '#6F7271', textAlign: 'center' }}>Cabezales</th>
-                    <th style={{ padding: '1.25rem 1rem', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.75px', color: '#6F7271', textAlign: 'center' }}>Leds (V / R / A)</th>
-                    <th style={{ padding: '1.25rem 1rem', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.75px', color: '#6F7271' }}>Componentes</th>
-                    <th style={{ padding: '1.25rem 1rem', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.75px', color: '#6F7271', textAlign: 'center' }}>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {controladores.map((item, index) => (
-                    <tr
-                      key={item.id}
-                      style={{
-                        borderBottom: '1px solid #E2E8F0',
-                        backgroundColor: index % 2 === 0 ? 'white' : '#fcfbf9',
-                        transition: 'background 0.15s'
-                      }}
-                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : '#fcfbf9'}
-                    >
-                      <td style={{ padding: '1rem', fontWeight: '700', color: '#691B31' }}>{item.modelo}</td>
-                      <td style={{ padding: '1rem', color: '#6F7271', fontWeight: '500' }}>{item.crucero?.nombre || 'Sin Crucero'}</td>
-                      <td style={{ padding: '1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.85rem' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                          <span style={{ color: '#16a34a' }}>3 leds: {item.semaforos3Luces || 0}</span>
-                          <span style={{ color: '#0284c7' }}>4 leds: {item.semaforos4Luces || 0}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '1rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} title="Verdes">
-                            <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 4px rgba(16,185,129,0.4)' }}></span>
-                            <span style={{ fontWeight: '700', color: '#334155', fontSize: '0.9rem' }}>{item.totalLedsVerdes}</span>
-                          </span>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} title="Rojos">
-                            <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 4px rgba(239,68,68,0.4)' }}></span>
-                            <span style={{ fontWeight: '700', color: '#334155', fontSize: '0.9rem' }}>{item.totalLedsRojos}</span>
-                          </span>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} title="Amarillos">
-                            <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#f59e0b', boxShadow: '0 0 4px rgba(245,158,11,0.4)' }}></span>
-                            <span style={{ fontWeight: '700', color: '#334155', fontSize: '0.9rem' }}>{item.totalLedsAmarillos}</span>
-                          </span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '1rem', fontSize: '0.8rem' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                          {item.pasoPeatonal && <span style={{ backgroundColor: '#DDC9A3', color: '#691B31', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>Paso Peatonal</span>}
-                          {item.audible && <span style={{ backgroundColor: '#E2E8F0', color: '#6F7271', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>Audible</span>}
-                          {item.pantallaLed && <span style={{ backgroundColor: '#E2E8F0', color: '#6F7271', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>Pantalla LED</span>}
-                          {item.tarjetaRelevadora && <span style={{ backgroundColor: '#E2E8F0', color: '#6F7271', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>Relés</span>}
-                          {item.fuentePoder && <span style={{ backgroundColor: '#E2E8F0', color: '#6F7271', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>Fuente</span>}
-                          {item.cpu && <span style={{ backgroundColor: '#E2E8F0', color: '#6F7271', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>CPU</span>}
-                          {item.switch && <span style={{ backgroundColor: '#E2E8F0', color: '#6F7271', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>Switch</span>}
-                          {item.fibraOptica && <span style={{ backgroundColor: '#E2E8F0', color: '#6F7271', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>Fibra</span>}
-                          {item.gps && <span style={{ backgroundColor: '#E2E8F0', color: '#6F7271', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>GPS</span>}
-                          {item.botonera && <span style={{ backgroundColor: '#E2E8F0', color: '#6F7271', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>Botonera</span>}
-                          {(item.camaraModelo || item.camaraCantidad) && <span style={{ backgroundColor: '#E2E8F0', color: '#6F7271', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>Cámaras</span>}
-                          {Number(item.registrosPisoDanados) > 0 && (
-                            <span style={{ backgroundColor: '#FEE2E2', color: '#991B1B', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: '700', border: '1px solid #FCA5A5', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }} title={`${item.registrosPisoDanados} registro(s) de piso dañado(s)`}>
-                              <FaExclamationTriangle size={10} style={{ color: '#DC2626' }} /> {item.registrosPisoDanados} Reg. Dañado{Number(item.registrosPisoDanados) > 1 ? 's' : ''}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td style={{ padding: '1rem', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
-                          <button
-                            onClick={() => handleEditarControlador(item)}
-                            title="Editar"
-                            style={{ backgroundColor: '#BC955B', color: 'white', border: 'none', padding: '0.4rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#d4ae73'}
-                            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#BC955B'}
-                          >
-                            <FaEdit size={14} />
-                          </button>
-                          <button
-                            onClick={() => handleEliminarControlador(item.id)}
-                            title="Eliminar"
-                            style={{ backgroundColor: '#A02142', color: 'white', border: 'none', padding: '0.4rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                            onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#691B31'}
-                            onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#A02142'}
-                          >
-                            <FaTrashAlt size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+        <div>
+          {/* BARRA DE BÚSQUEDA Y FILTRADO DE CONTROLADORES */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1.25rem',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {/* SELECTOR DE MODELO */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: '700', color: '#691B31' }}>Modelo:</span>
+                <select
+                  value={filtroModeloControlador}
+                  onChange={(e) => setFiltroModeloControlador(e.target.value)}
+                  style={{
+                    padding: '0.65rem 1rem',
+                    border: '2px solid #E2E8F0',
+                    borderRadius: '8px',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: '#334155',
+                    backgroundColor: '#ffffff',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                  }}
+                >
+                  <option value="">Todos los modelos</option>
+                  {modelosDisponibles.map(m => (
+                    <option key={m} value={m}>{m}</option>
                   ))}
-                </tbody>
-              </table>
+                </select>
+              </div>
 
-              {/* PAGINACIÓN */}
-              {totalControladores > limiteControladores && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid #E2E8F0' }}>
-                  <span style={{ fontSize: '0.85rem', color: '#6F7271' }}>
-                    Mostrando controladores {((paginaControladores - 1) * limiteControladores) + 1} a {Math.min(paginaControladores * limiteControladores, totalControladores)} de {totalControladores}
-                  </span>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button
-                      disabled={paginaControladores === 1}
-                      onClick={() => setPaginaControladores(p => Math.max(1, p - 1))}
-                      style={{
-                        display: 'flex', alignItems: 'center', padding: '0.4rem 0.8rem', border: '1px solid #CBD5E1',
-                        borderRadius: '6px', backgroundColor: paginaControladores === 1 ? '#F1F5F9' : 'white',
-                        cursor: paginaControladores === 1 ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      <FaChevronLeft size={10} />
-                    </button>
-                    <button
-                      disabled={paginaControladores * limiteControladores >= totalControladores}
-                      onClick={() => setPaginaControladores(p => p + 1)}
-                      style={{
-                        display: 'flex', alignItems: 'center', padding: '0.4rem 0.8rem', border: '1px solid #CBD5E1',
-                        borderRadius: '6px', backgroundColor: paginaControladores * limiteControladores >= totalControladores ? '#F1F5F9' : 'white',
-                        cursor: paginaControladores * limiteControladores >= totalControladores ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      <FaChevronRight size={10} />
-                    </button>
-                  </div>
-                </div>
+              {/* CONTADOR / BADGE */}
+              <span style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: '600' }}>
+                Mostrando {controladoresParaMostrar.length} de {todosLosControladores.length || totalControladores} controlador(es)
+                {hayFiltroControladorActivo && ' (filtrados)'}
+              </span>
+
+              {/* BOTÓN LIMPIAR FILTROS */}
+              {hayFiltroControladorActivo && (
+                <button
+                  onClick={() => {
+                    setBusquedaControlador('')
+                    setFiltroModeloControlador('')
+                    setDbSemaforosTipo(null)
+                  }}
+                  style={{
+                    backgroundColor: '#F1F5F9',
+                    border: '1px solid #CBD5E1',
+                    borderRadius: '6px',
+                    padding: '0.35rem 0.75rem',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    color: '#64748B',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem'
+                  }}
+                  title="Restablecer filtros"
+                >
+                  <FaTimes size={11} /> Limpiar filtro
+                </button>
               )}
             </div>
-          )}
+
+            {/* DERECHA: BÚSQUEDA */}
+            <div style={{ position: 'relative', width: '100%', maxWidth: '380px' }}>
+              <input
+                type="text"
+                placeholder="Buscar por crucero, modelo, no. gabinete, IP..."
+                value={busquedaControlador}
+                onChange={(e) => setBusquedaControlador(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.65rem 2.75rem 0.65rem 1.25rem',
+                  border: '2px solid #E2E8F0',
+                  borderRadius: '9999px',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#1E293B',
+                  backgroundColor: '#ffffff',
+                  outline: 'none',
+                  transition: 'all 0.2s',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#BC955B'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(188,149,91,0.15)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#E2E8F0'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              />
+              <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#BC955B', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+                <FaSearch size={14} />
+              </span>
+            </div>
+          </div>
+
+          <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.03)', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
+            {cargandoControladores ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: '#6F7271' }}>Cargando controladores...</div>
+            ) : controladoresParaMostrar.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: '#6F7271' }}>
+                {hayFiltroControladorActivo
+                  ? 'No se encontraron controladores que coincidan con la búsqueda o filtro aplicado.'
+                  : 'No se han registrado controladores en el sistema.'}
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #E2E8F0' }}>
+                      <th style={{ padding: '1.25rem 1rem', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.75px', color: '#691B31' }}>Modelo</th>
+                      <th style={{ padding: '1.25rem 1rem', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.75px', color: '#6F7271' }}>Ubicación (Crucero)</th>
+                      <th style={{ padding: '1.25rem 1rem', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.75px', color: '#6F7271', textAlign: 'center' }}>Cabezales</th>
+                      <th style={{ padding: '1.25rem 1rem', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.75px', color: '#6F7271', textAlign: 'center' }}>Leds (V / R / A)</th>
+                      <th style={{ padding: '1.25rem 1rem', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.75px', color: '#6F7271' }}>Componentes</th>
+                      <th style={{ padding: '1.25rem 1rem', fontSize: '0.75rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.75px', color: '#6F7271', textAlign: 'center' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {controladoresParaMostrar.map((item, index) => (
+                      <tr
+                        key={item.id}
+                        style={{
+                          borderBottom: '1px solid #E2E8F0',
+                          backgroundColor: index % 2 === 0 ? 'white' : '#fcfbf9',
+                          transition: 'background 0.15s'
+                        }}
+                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? 'white' : '#fcfbf9'}
+                      >
+                        <td style={{ padding: '1rem', fontWeight: '700', color: '#691B31' }}>{item.modelo}</td>
+                        <td style={{ padding: '1rem', color: '#6F7271', fontWeight: '500' }}>{item.crucero?.nombre || 'Sin Crucero'}</td>
+                        {(() => {
+                          const cabezales = extraerListaCabezales(item)
+                          let s3 = Number(item.semaforos3Luces) || 0
+                          let s4 = Number(item.semaforos4Luces) || 0
+
+                          // Sincronizar conteo de cabezales si provienen de postesDetalle
+                          if (s3 === 0 && s4 === 0 && cabezales.length > 0) {
+                            cabezales.forEach(c => {
+                              if (c.numLeds === 3) s3++
+                              else if (c.numLeds === 4) s4++
+                            })
+                          }
+
+                          let s3_v = 0, s3_r = 0, s3_a = 0
+                          let s4_v = 0, s4_r = 0, s4_a = 0, s4_fl = 0
+                          let color4to = 'Flecha Verde'
+
+                          if (cabezales.length > 0) {
+                            cabezales.forEach(c => {
+                              if (c.numLeds === 3) {
+                                c.leds.forEach(l => {
+                                  if (l.color === 'Verde') s3_v++
+                                  else if (l.color === 'Rojo') s3_r++
+                                  else if (l.color === 'Amarillo') s3_a++
+                                })
+                              } else if (c.numLeds === 4) {
+                                c.leds.forEach((l, idx) => {
+                                  if (idx === 3) {
+                                    s4_fl++
+                                    if (l.color) color4to = l.color
+                                  } else if (l.color === 'Verde') s4_v++
+                                  else if (l.color === 'Rojo') s4_r++
+                                  else if (l.color === 'Amarillo') s4_a++
+                                })
+                              }
+                            })
+                          }
+
+                          // Fallbacks si no vinieron LEDs detallados en postesDetalle pero sí semaforos3Luces / semaforos4Luces
+                          if (s3_v === 0 && s3_r === 0 && s3_a === 0 && s3 > 0) {
+                            s3_v = s3
+                            s3_r = s3
+                            s3_a = s3
+                          }
+                          if (s4_v === 0 && s4_r === 0 && s4_a === 0 && s4 > 0) {
+                            s4_v = s4
+                            s4_r = s4
+                            s4_a = s4
+                            s4_fl = Number(item.totalFlechasVerdes) || Number(item.totalFlechasRojas) || s4
+                            if (Number(item.totalFlechasRojas) > 0 && Number(item.totalFlechasVerdes) === 0) {
+                              color4to = 'Flecha Roja'
+                            }
+                          }
+
+                          const cfg4 = obtenerConfigColorLed(color4to)
+
+                          return (
+                            <>
+                              <td style={{ padding: '0.85rem 1rem', textAlign: 'center', fontWeight: '600', fontSize: '0.85rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', justifyContent: 'center' }}>
+                                  <div style={{ height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <span style={{ color: '#16a34a' }}>3 leds: {s3}</span>
+                                  </div>
+                                  <div style={{ height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <span style={{ color: '#0284c7' }}>4 leds: {s4}</span>
+                                  </div>
+                                </div>
+                              </td>
+                              <td style={{ padding: '0.85rem 1rem' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', justifyContent: 'center' }}>
+                                  {/* FILA 1: A LA ALTURA DE 3 LEDS */}
+                                  <div style={{ height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
+                                    {s3 > 0 || (s3 === 0 && s4 === 0) ? (
+                                      <>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} title="3L - Verdes">
+                                          <span style={{ display: 'inline-block', width: '11px', height: '11px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 3px rgba(16,185,129,0.4)' }}></span>
+                                          <span style={{ fontWeight: '700', color: '#334155', fontSize: '0.88rem' }}>{s3_v}</span>
+                                        </span>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} title="3L - Rojos">
+                                          <span style={{ display: 'inline-block', width: '11px', height: '11px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 3px rgba(239,68,68,0.4)' }}></span>
+                                          <span style={{ fontWeight: '700', color: '#334155', fontSize: '0.88rem' }}>{s3_r}</span>
+                                        </span>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} title="3L - Amarillos">
+                                          <span style={{ display: 'inline-block', width: '11px', height: '11px', borderRadius: '50%', backgroundColor: '#f59e0b', boxShadow: '0 0 3px rgba(245,158,11,0.4)' }}></span>
+                                          <span style={{ fontWeight: '700', color: '#334155', fontSize: '0.88rem' }}>{s3_a}</span>
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <span style={{ fontSize: '0.78rem', color: '#94A3B8', fontStyle: 'italic' }}>—</span>
+                                    )}
+                                  </div>
+
+                                  {/* FILA 2: A LA ALTURA DE 4 LEDS */}
+                                  <div style={{ height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
+                                    {s4 > 0 ? (
+                                      <>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} title="4L - Verdes">
+                                          <span style={{ display: 'inline-block', width: '11px', height: '11px', borderRadius: '50%', backgroundColor: '#10b981', boxShadow: '0 0 3px rgba(16,185,129,0.4)' }}></span>
+                                          <span style={{ fontWeight: '700', color: '#334155', fontSize: '0.88rem' }}>{s4_v}</span>
+                                        </span>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} title="4L - Rojos">
+                                          <span style={{ display: 'inline-block', width: '11px', height: '11px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 3px rgba(239,68,68,0.4)' }}></span>
+                                          <span style={{ fontWeight: '700', color: '#334155', fontSize: '0.88rem' }}>{s4_r}</span>
+                                        </span>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} title="4L - Amarillos">
+                                          <span style={{ display: 'inline-block', width: '11px', height: '11px', borderRadius: '50%', backgroundColor: '#f59e0b', boxShadow: '0 0 3px rgba(245,158,11,0.4)' }}></span>
+                                          <span style={{ fontWeight: '700', color: '#334155', fontSize: '0.88rem' }}>{s4_a}</span>
+                                        </span>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} title={`${color4to} (4L - Flecha)`}>
+                                          <span
+                                            style={{
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              width: '11px',
+                                              height: '11px',
+                                              borderRadius: '50%',
+                                              backgroundColor: cfg4.dotBg || (cfg4.isArrow ? '#4ADE80' : cfg4.bg),
+                                              color: '#000000',
+                                              fontSize: '7px',
+                                              lineHeight: 1,
+                                              fontWeight: '900',
+                                              boxShadow: `0 0 3px ${cfg4.shadow}`
+                                            }}
+                                          >
+                                            {cfg4.isArrow ? '↗' : ''}
+                                          </span>
+                                          <span style={{ fontWeight: '700', color: '#334155', fontSize: '0.88rem' }}>{s4_fl}</span>
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <span style={{ fontSize: '0.78rem', color: '#94A3B8', fontStyle: 'italic' }}>—</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                            </>
+                          )
+                        })()}
+                        {/* COMPONENTES: EXCLUSIVAMENTE VIDEODETECTORAS, PASO PEATONAL Y AUDIBLE */}
+                        <td style={{ padding: '1rem', fontSize: '0.8rem' }}>
+                          {(() => {
+                            const postesNorm = normalizarPostesDetalle(item?.postesDetalle, item)
+                            const tienePeatonal = Boolean(
+                              item.pasoPeatonal ||
+                              (Array.isArray(postesNorm) && postesNorm.some(p => p.tienePeatonal)) ||
+                              (typeof item.postesDetalle === 'string' && item.postesDetalle.toLowerCase().includes('"tienepeatonal":true'))
+                            )
+                            const tieneAudible = Boolean(
+                              item.audible ||
+                              (Array.isArray(postesNorm) && postesNorm.some(p => p.tieneAudible)) ||
+                              (typeof item.postesDetalle === 'string' && item.postesDetalle.toLowerCase().includes('"tieneaudible":true'))
+                            )
+                            const tieneCamara = Boolean(
+                              item.camaraModelo ||
+                              Number(item.camaraCantidad) > 0 ||
+                              (Array.isArray(postesNorm) && postesNorm.some(p => p.tieneCamara)) ||
+                              (typeof item.postesDetalle === 'string' && item.postesDetalle.toLowerCase().includes('"tienecamara":true'))
+                            )
+                            const cantCamaras = (Array.isArray(postesNorm) && postesNorm.some(p => p.tieneCamara))
+                              ? postesNorm.reduce((acc, p) => p.tieneCamara ? acc + (parseInt(p.camaraCantidad, 10) || 1) : acc, 0)
+                              : (parseInt(item.camaraCantidad, 10) || (item.camaraModelo ? 1 : 0))
+
+                            const ninguno = !tienePeatonal && !tieneAudible && !tieneCamara
+
+                            return (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', alignItems: 'center' }}>
+                                {tienePeatonal && (
+                                  <span style={{ backgroundColor: '#DDC9A3', color: '#691B31', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>
+                                    Paso Peatonal
+                                  </span>
+                                )}
+                                {tieneAudible && (
+                                  <span style={{ backgroundColor: '#E2E8F0', color: '#6F7271', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>
+                                    Audible
+                                  </span>
+                                )}
+                                {tieneCamara && (
+                                  <span style={{ backgroundColor: '#E2E8F0', color: '#6F7271', padding: '0.15rem 0.4rem', borderRadius: '4px', fontWeight: '600' }}>
+                                    Videodetectoras{cantCamaras > 1 ? ` (${cantCamaras})` : ''}
+                                  </span>
+                                )}
+                                {ninguno && (
+                                  <span style={{ fontSize: '0.75rem', color: '#94A3B8', fontStyle: 'italic' }}>
+                                    Sin equipamiento
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })()}
+                        </td>
+                        <td style={{ padding: '1rem', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem' }}>
+                            <button
+                              onClick={() => handleVerControlador(item)}
+                              title="Visualizar detalles e infraestructura del controlador"
+                              style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '0.4rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#0369a1'}
+                              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#0284c7'}
+                            >
+                              <FaEye size={14} />
+                            </button>
+                            <button
+                              onClick={() => exportarFichaIndividualControladorPdf(item)}
+                              title="Descargar Ficha Técnica en PDF"
+                              style={{ backgroundColor: '#e11d48', color: 'white', border: 'none', padding: '0.4rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#be123c'}
+                              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#e11d48'}
+                            >
+                              <FaFilePdf size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleEditarControlador(item)}
+                              title="Editar"
+                              style={{ backgroundColor: '#BC955B', color: 'white', border: 'none', padding: '0.4rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#d4ae73'}
+                              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#BC955B'}
+                            >
+                              <FaEdit size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleEliminarControlador(item.id)}
+                              title="Eliminar"
+                              style={{ backgroundColor: '#A02142', color: 'white', border: 'none', padding: '0.4rem', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#691B31'}
+                              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#A02142'}
+                            >
+                              <FaTrashAlt size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                {/* PAGINACIÓN */}
+                {!hayFiltroControladorActivo && totalControladores > limiteControladores && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', borderTop: '1px solid #E2E8F0' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#6F7271' }}>
+                      Mostrando controladores {((paginaControladores - 1) * limiteControladores) + 1} a {Math.min(paginaControladores * limiteControladores, totalControladores)} de {totalControladores}
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        disabled={paginaControladores === 1}
+                        onClick={() => setPaginaControladores(p => Math.max(1, p - 1))}
+                        style={{
+                          display: 'flex', alignItems: 'center', padding: '0.4rem 0.8rem', border: '1px solid #CBD5E1',
+                          borderRadius: '6px', backgroundColor: paginaControladores === 1 ? '#F1F5F9' : 'white',
+                          cursor: paginaControladores === 1 ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        <FaChevronLeft size={10} />
+                      </button>
+                      <button
+                        disabled={paginaControladores * limiteControladores >= totalControladores}
+                        onClick={() => setPaginaControladores(p => p + 1)}
+                        style={{
+                          display: 'flex', alignItems: 'center', padding: '0.4rem 0.8rem', border: '1px solid #CBD5E1',
+                          borderRadius: '6px', backgroundColor: paginaControladores * limiteControladores >= totalControladores ? '#F1F5F9' : 'white',
+                          cursor: paginaControladores * limiteControladores >= totalControladores ? 'not-allowed' : 'pointer'
+                        }}
+                      >
+                        <FaChevronRight size={10} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {hayFiltroControladorActivo && (
+                  <div style={{ padding: '0.75rem 1rem', borderTop: '1px solid #E2E8F0', backgroundColor: '#F8FAFC', fontSize: '0.825rem', color: '#64748B', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Mostrando {controladoresParaMostrar.length} controlador(es) coincidentes con el filtro actual.</span>
+                    <button
+                      onClick={() => {
+                        setBusquedaControlador('')
+                        setFiltroModeloControlador('')
+                        setDbSemaforosTipo(null)
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#691B31', fontWeight: '700', cursor: 'pointer', fontSize: '0.825rem' }}
+                    >
+                      Mostrar todos
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -3602,148 +5401,349 @@ export default function InventarioSemaforos() {
       {/* MODAL - REGISTRAR / EDITAR CONTROLADOR                       */}
       {/* ============================================================ */}
       {modalControladorAbierto && (
-        <div className="modal-controlador-overlay">
-          <div className="modal-controlador-card">
-            <button
-              onClick={() => setModalControladorAbierto(false)}
-              style={{ position: 'absolute', top: '1rem', right: '1rem', border: 'none', background: 'none', cursor: 'pointer', color: '#9B9B9A', zIndex: 10 }}
-              title="Cerrar"
-            >
-              <FaTimes size={18} />
-            </button>
+        <div className={`modal-controlador-overlay ${formPantallaCompleta ? 'fullscreen' : ''}`}>
+          <div className={`modal-controlador-card ${formPantallaCompleta ? 'fullscreen' : ''} ${modoVisualizacion ? 'modo-consulta' : ''}`}>
+            <div style={{ maxWidth: formPantallaCompleta ? '1020px' : '100%', margin: '0 auto', width: '100%' }}>
+              {/* ENCABEZADO DEL MODAL */}
+              {modoVisualizacion ? (
+                <div style={{
+                  position: 'relative',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  borderBottom: '2px solid #E2E8F0',
+                  paddingBottom: '0.85rem',
+                  marginBottom: '1.25rem',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem',
+                  paddingRight: '48px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap', maxWidth: 'calc(100% - 150px)' }}>
+                    <div style={{
+                      backgroundColor: '#691B31',
+                      color: 'white',
+                      borderRadius: '8px',
+                      width: '42px',
+                      height: '42px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 2px 4px rgba(105,27,49,0.2)',
+                      flexShrink: 0
+                    }}>
+                      <FaTrafficLight size={22} style={{ color: '#FDE68A' }} />
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                        <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#1E293B', letterSpacing: '-0.02em' }}>
+                          Controlador Semafórico
+                        </h2>
+                        <span style={{
+                          backgroundColor: '#691B31',
+                          color: '#FFFFFF',
+                          padding: '0.15rem 0.55rem',
+                          borderRadius: '4px',
+                          fontSize: '0.78rem',
+                          fontWeight: '700',
+                          letterSpacing: '0.5px'
+                        }}>
+                          {controladorForm.modelo || 'Sin modelo'}
+                        </span>
+                        <span style={{
+                          backgroundColor: '#F1F5F9',
+                          color: '#475569',
+                          border: '1px solid #CBD5E1',
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '4px',
+                          fontSize: '0.74rem',
+                          fontWeight: '600'
+                        }}>
+                          Activo Semafórico
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.84rem', color: '#64748B', fontWeight: '500', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <FaMapMarkerAlt size={12} style={{ color: '#691B31' }} />
+                        <span style={{ fontWeight: '700', color: '#334155' }}>Crucero:</span> {listaCruceros.find(c => String(c.id) === String(controladorForm.cruceroId))?.nombre || controladorParaVer?.crucero?.nombre || controladorParaVer?.cruceroNombre || 'Sin crucero especificado'}
+                      </div>
+                    </div>
+                  </div>
 
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#691B31', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', paddingRight: '2rem' }}>
-              <FaTrafficLight size={20} style={{ color: '#BC955B', flexShrink: 0 }} />
-              <span>{editandoControladorId ? 'Actualizar Controlador Semafórico' : 'Registrar Nuevo Controlador Semafórico'}</span>
-            </h2>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setFormPantallaCompleta(!formPantallaCompleta)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        backgroundColor: '#F1F5F9',
+                        color: '#334155',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '6px',
+                        padding: '0.45rem 0.85rem',
+                        fontWeight: '600',
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s'
+                      }}
+                      onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#E2E8F0'; }}
+                      onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#F1F5F9'; }}
+                      title={formPantallaCompleta ? "Salir de pantalla completa (Pantalla normal)" : "Pantalla completa"}
+                    >
+                      {formPantallaCompleta ? <FaCompress size={13} /> : <FaExpand size={13} />}
+                      <span>{formPantallaCompleta ? 'Pantalla normal' : 'Pantalla Completa'}</span>
+                    </button>
+                  </div>
 
-            <form onSubmit={handleGuardarControlador}>
+                  {/* Botón de cerrar fijo siempre en la esquina superior derecha */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setModalControladorAbierto(false)
+                      setModoVisualizacion(false)
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: '0px',
+                      right: '0px',
+                      backgroundColor: '#F1F5F9',
+                      color: '#475569',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: '8px',
+                      width: '36px',
+                      height: '36px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      zIndex: 10
+                    }}
+                    onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#E2E8F0'; e.currentTarget.style.color = '#0F172A'; }}
+                    onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#F1F5F9'; e.currentTarget.style.color = '#475569'; }}
+                    title="Cerrar vista"
+                  >
+                    <FaTimes size={18} />
+                  </button>
+                </div>
+              ) : (
+                <div style={{
+                  position: 'relative',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  borderBottom: '2px solid #E2E8F0',
+                  paddingBottom: '0.85rem',
+                  marginBottom: '1.25rem',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem',
+                  paddingRight: '48px'
+                }}>
+                  <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#691B31', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <FaTrafficLight size={20} style={{ color: '#BC955B', flexShrink: 0 }} />
+                    <span>{editandoControladorId ? 'Actualizar Controlador Semafórico' : 'Registrar Nuevo Controlador Semafórico'}</span>
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setModalControladorAbierto(false)}
+                    style={{
+                      position: 'absolute',
+                      top: '0px',
+                      right: '0px',
+                      backgroundColor: '#F1F5F9',
+                      color: '#475569',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: '8px',
+                      width: '36px',
+                      height: '36px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      zIndex: 10
+                    }}
+                    onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#E2E8F0'; e.currentTarget.style.color = '#0F172A'; }}
+                    onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#F1F5F9'; e.currentTarget.style.color = '#475569'; }}
+                    title="Cerrar"
+                  >
+                    <FaTimes size={18} />
+                  </button>
+                </div>
+              )}
+
+              <form onSubmit={modoVisualizacion ? (e) => e.preventDefault() : handleGuardarControlador}>
+                <div style={{ pointerEvents: modoVisualizacion ? 'none' : 'auto', userSelect: 'text' }}>
+              {!modoVisualizacion && (
               <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '1rem' }}>
                 <div>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                    <FaMicrochip size={13} style={{ color: '#691B31' }} /> Modelo *
+                    <FaMicrochip size={13} style={{ color: '#691B31' }} /> Modelo {!modoVisualizacion && <span className="req-star" style={{ color: '#DC2626' }}>*</span>}
                   </label>
-                  <select
-                    value={controladorForm.modelo}
-                    onChange={(e) => {
-                      const nuevoModelo = e.target.value
-                      if (nuevoModelo === 'C-3000') {
-                        setControladorForm(prev => {
-                          const switchMod = prev.switchFibraModelo && MODELOS_SWITCH_MOXA_CATALOGO.some(m => m.modelo === prev.switchFibraModelo) ? prev.switchFibraModelo : 'Moxa EDS-208 / 308'
-                          const switchObj = MODELOS_SWITCH_MOXA_CATALOGO.find(m => m.modelo === switchMod)
-                          return {
+                  {modoVisualizacion ? (
+                    <div style={{
+                      padding: '0.6rem 0.85rem',
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: '8px',
+                      fontSize: '0.92rem',
+                      fontWeight: '700',
+                      color: '#691B31',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      minHeight: '40px',
+                      boxSizing: 'border-box'
+                    }}>
+                      <FaTrafficLight size={15} style={{ color: '#BC955B' }} />
+                      <span>{controladorForm.modelo || 'Sin modelo asignado'}</span>
+                    </div>
+                  ) : (
+                    <select
+                      value={controladorForm.modelo}
+                      onChange={(e) => {
+                        const nuevoModelo = e.target.value
+                        if (nuevoModelo === 'C-3000') {
+                          setControladorForm(prev => {
+                            const switchMod = prev.switchFibraModelo && MODELOS_SWITCH_MOXA_CATALOGO.some(m => m.modelo === prev.switchFibraModelo) ? prev.switchFibraModelo : 'Moxa EDS-208 / 308'
+                            const switchObj = MODELOS_SWITCH_MOXA_CATALOGO.find(m => m.modelo === switchMod)
+                            return {
+                              ...prev,
+                              modelo: 'C-3000',
+                              // Tarjeta de Conflictos para C-3000 (Solo marca y modelo)
+                              tarjetaConflictosMarcaModo: 'Peek Traffic',
+                              tarjetaConflictosMarca: 'Peek Traffic',
+                              tarjetaConflictosModelo: prev.tarjetaConflictosModelo && MODELOS_TARJETA_CONFLICTOS_PEEK.includes(prev.tarjetaConflictosModelo) ? prev.tarjetaConflictosModelo : 'Model 2010E',
+                              // Switch de Fibra para C-3000 (Marca, modelo y total de puertos según modelo)
+                              switchFibraMarcaModo: 'Moxa',
+                              switchFibraMarca: 'Moxa',
+                              switchFibraModelo: switchMod,
+                              switchFibraPuertosTotal: switchObj ? switchObj.puertos : '8',
+                              switch: true,
+                              // Relevadores para C-3000 (Solo marca y modelo)
+                              tarjetaRelevadoresMarcaModo: 'Peek Traffic',
+                              tarjetaRelevadoresMarca: 'Peek Traffic',
+                              tarjetaRelevadoresModelo: prev.tarjetaRelevadoresModelo && MODELOS_RELEVADORES_PEEK.includes(prev.tarjetaRelevadoresModelo) ? prev.tarjetaRelevadoresModelo : 'RC-308',
+                              tarjetaRelevadora: true
+                            }
+                          })
+                        } else if (nuevoModelo === 'C-5000') {
+                          setControladorForm(prev => ({
                             ...prev,
-                            modelo: 'C-3000',
-                            // Tarjeta de Conflictos para C-3000 (Solo marca y modelo)
-                            tarjetaConflictosMarcaModo: 'Peek Traffic',
-                            tarjetaConflictosMarca: 'Peek Traffic',
-                            tarjetaConflictosModelo: prev.tarjetaConflictosModelo && MODELOS_TARJETA_CONFLICTOS_PEEK.includes(prev.tarjetaConflictosModelo) ? prev.tarjetaConflictosModelo : 'Model 2010E',
-                            // Switch de Fibra para C-3000 (Marca, modelo y total de puertos según modelo)
-                            switchFibraMarcaModo: 'Moxa',
-                            switchFibraMarca: 'Moxa',
-                            switchFibraModelo: switchMod,
-                            switchFibraPuertosTotal: switchObj ? switchObj.puertos : '8',
+                            modelo: 'C-5000',
+                            // Tarjeta de Conflictos para C-5000 (Solo marca y modelo)
+                            tarjetaConflictosMarcaModo: 'Oriux (Peek Traffic)',
+                            tarjetaConflictosMarca: 'Oriux (Peek Traffic)',
+                            tarjetaConflictosModelo: 'C5000 MMU Integrado',
+                            // Switch de Fibra para C-5000 (Marca, modelo y total de puertos según modelo)
+                            switchFibraMarcaModo: 'Oriux',
+                            switchFibraMarca: 'Oriux',
+                            switchFibraModelo: 'C5000 ATC CPU Ports',
+                            switchFibraPuertosTotal: '2',
                             switch: true,
-                            // Relevadores para C-3000 (Solo marca y modelo)
-                            tarjetaRelevadoresMarcaModo: 'Peek Traffic',
-                            tarjetaRelevadoresMarca: 'Peek Traffic',
-                            tarjetaRelevadoresModelo: prev.tarjetaRelevadoresModelo && MODELOS_RELEVADORES_PEEK.includes(prev.tarjetaRelevadoresModelo) ? prev.tarjetaRelevadoresModelo : 'RC-308',
+                            // Relevadores para C-5000 (Solo marca y modelo)
+                            tarjetaRelevadoresMarcaModo: 'Oriux',
+                            tarjetaRelevadoresMarca: 'Oriux',
+                            tarjetaRelevadoresModelo: 'C5000 Card-Based Load Switch',
                             tarjetaRelevadora: true
-                          }
-                        })
-                      } else if (nuevoModelo === 'C-5000') {
-                        setControladorForm(prev => ({
-                          ...prev,
-                          modelo: 'C-5000',
-                          // Tarjeta de Conflictos para C-5000 (Solo marca y modelo)
-                          tarjetaConflictosMarcaModo: 'Oriux (Peek Traffic)',
-                          tarjetaConflictosMarca: 'Oriux (Peek Traffic)',
-                          tarjetaConflictosModelo: 'C5000 MMU Integrado',
-                          // Switch de Fibra para C-5000 (Marca, modelo y total de puertos según modelo)
-                          switchFibraMarcaModo: 'Oriux',
-                          switchFibraMarca: 'Oriux',
-                          switchFibraModelo: 'C5000 ATC CPU Ports',
-                          switchFibraPuertosTotal: '2',
-                          switch: true,
-                          // Relevadores para C-5000 (Solo marca y modelo)
-                          tarjetaRelevadoresMarcaModo: 'Oriux',
-                          tarjetaRelevadoresMarca: 'Oriux',
-                          tarjetaRelevadoresModelo: 'C5000 Card-Based Load Switch',
-                          tarjetaRelevadora: true
-                        }))
-                      } else {
-                        setControladorForm(prev => ({
-                          ...prev,
-                          modelo: nuevoModelo
-                        }))
-                      }
-                    }}
-                    onFocus={(e) => { e.currentTarget.style.borderColor = '#BC955B'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(188,149,91,0.15)' }}
-                    onBlur={(e) => { e.currentTarget.style.borderColor = controladorErrores.modelo ? '#A02142' : '#CBD5E1'; e.currentTarget.style.boxShadow = 'none' }}
-                    style={{
-                      width: '100%', padding: '0.6rem 0.75rem',
-                      border: `1px solid ${controladorErrores.modelo ? '#A02142' : '#CBD5E1'}`,
-                      borderRadius: '8px', fontSize: '0.9rem', fontWeight: '500', color: '#1E293B',
-                      backgroundColor: '#fff', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s',
-                      boxSizing: 'border-box', cursor: 'pointer'
-                    }}
-                  >
-                    <option value="">-- Seleccionar Modelo --</option>
-                    <option value="C-3000">C-3000</option>
-                    <option value="C-5000">C-5000</option>
-                  </select>
+                          }))
+                        } else {
+                          setControladorForm(prev => ({
+                            ...prev,
+                            modelo: nuevoModelo
+                          }))
+                        }
+                      }}
+                      onFocus={(e) => { e.currentTarget.style.borderColor = '#BC955B'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(188,149,91,0.15)' }}
+                      onBlur={(e) => { e.currentTarget.style.borderColor = controladorErrores.modelo ? '#A02142' : '#CBD5E1'; e.currentTarget.style.boxShadow = 'none' }}
+                      style={{
+                        width: '100%', padding: '0.6rem 0.75rem',
+                        border: `1px solid ${controladorErrores.modelo ? '#A02142' : '#CBD5E1'}`,
+                        borderRadius: '8px', fontSize: '0.9rem', fontWeight: '500', color: '#1E293B',
+                        backgroundColor: '#fff', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s',
+                        boxSizing: 'border-box', cursor: 'pointer'
+                      }}
+                    >
+                      <option value="">-- Seleccionar Modelo --</option>
+                      <option value="C-3000">C-3000</option>
+                      <option value="C-5000">C-5000</option>
+                    </select>
+                  )}
                   {controladorErrores.modelo && <span style={{ fontSize: '0.75rem', color: '#A02142' }}>{controladorErrores.modelo}</span>}
                 </div>
 
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.35rem' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: '700', color: '#334155' }}>
-                      <FaMapMarkerAlt size={13} style={{ color: '#691B31' }} /> Crucero *
+                      <FaMapMarkerAlt size={13} style={{ color: '#691B31' }} /> Crucero {!modoVisualizacion && <span className="req-star" style={{ color: '#DC2626' }}>*</span>}
                     </label>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
-                      <button
-                        type="button"
-                        onClick={handleCrearNuevoCruceroRapido}
-                        title="Registrar un nuevo crucero si no aparece en la lista"
-                        style={{
-                          background: '#F1F5F9',
-                          border: '1px solid #CBD5E1',
-                          color: '#691B31',
-                          fontSize: '0.72rem',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.25rem',
-                          padding: '0.15rem 0.5rem',
-                          borderRadius: '4px'
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#E2E8F0'}
-                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#F1F5F9'}
-                      >
-                        <FaPlus size={9} style={{ color: '#BC955B' }} /> + Nuevo crucero
-                      </button>
-                    </div>
+                    {!modoVisualizacion && (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <button
+                          type="button"
+                          onClick={handleCrearNuevoCruceroRapido}
+                          title="Registrar un nuevo crucero si no aparece en la lista"
+                          style={{
+                            background: '#F1F5F9',
+                            border: '1px solid #CBD5E1',
+                            color: '#691B31',
+                            fontSize: '0.72rem',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            padding: '0.15rem 0.5rem',
+                            borderRadius: '4px'
+                          }}
+                          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#E2E8F0'}
+                          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#F1F5F9'}
+                        >
+                          <FaPlus size={9} style={{ color: '#BC955B' }} /> Nuevo crucero
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <select
-                    value={controladorForm.cruceroId}
-                    onChange={(e) => setControladorForm({ ...controladorForm, cruceroId: e.target.value })}
-                    onFocus={() => cargarCatalogos()}
-                    style={{
-                      width: '100%', padding: '0.6rem', border: `1px solid ${controladorErrores.cruceroId ? '#A02142' : '#CBD5E1'}`,
-                      borderRadius: '8px', fontSize: '0.9rem'
-                    }}
-                  >
-                    <option value="">-- Seleccionar Crucero --</option>
-                    {listaCruceros.map((c) => (
-                      <option key={c.id} value={c.id}>{c.nombre}</option>
-                    ))}
-                  </select>
+                  {modoVisualizacion ? (
+                    <div style={{
+                      padding: '0.6rem 0.85rem',
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: '8px',
+                      fontSize: '0.92rem',
+                      fontWeight: '700',
+                      color: '#1E293B',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      minHeight: '40px',
+                      boxSizing: 'border-box'
+                    }}>
+                      <FaMapMarkerAlt size={14} style={{ color: '#691B31' }} />
+                      <span>{listaCruceros.find(c => String(c.id) === String(controladorForm.cruceroId))?.nombre || controladorParaVer?.crucero?.nombre || controladorParaVer?.cruceroNombre || 'Sin crucero especificado'}</span>
+                    </div>
+                  ) : (
+                    <select
+                      value={controladorForm.cruceroId}
+                      onChange={(e) => setControladorForm({ ...controladorForm, cruceroId: e.target.value })}
+                      onFocus={() => cargarCatalogos()}
+                      style={{
+                        width: '100%', padding: '0.6rem', border: `1px solid ${controladorErrores.cruceroId ? '#A02142' : '#CBD5E1'}`,
+                        borderRadius: '8px', fontSize: '0.9rem'
+                      }}
+                    >
+                      <option value="">-- Seleccionar Crucero --</option>
+                      {listaCruceros.map((c) => (
+                        <option key={c.id} value={c.id}>{c.nombre}</option>
+                      ))}
+                    </select>
+                  )}
                   {controladorErrores.cruceroId && <span style={{ fontSize: '0.75rem', color: '#A02142' }}>{controladorErrores.cruceroId}</span>}
                 </div>
               </div>
+              )}
 
-              {!editandoControladorId && (
+              {!editandoControladorId && !modoVisualizacion && (
                 <div style={{
                   display: 'flex',
                   justifyContent: 'flex-end',
@@ -3810,13 +5810,13 @@ export default function InventarioSemaforos() {
                       alignItems: 'center',
                       gap: '0.45rem'
                     }}>
-                      <FaBuilding size={14} style={{ color: '#BC955B' }} /> Inspección Exterior, Cimentación y Base
+                      <FaBuilding size={14} style={{ color: '#BC955B' }} /> Sección 1: Inspección Exterior, Cimentación y Base
                     </h4>
                     <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
                       Revisión física del poste / crucero
                     </span>
                   </div>
-                  {editandoControladorId && (
+                  {editandoControladorId && !modoVisualizacion && (
                     <button
                       type="button"
                       onClick={handleGuardarGabineteModular}
@@ -3848,33 +5848,42 @@ export default function InventarioSemaforos() {
                   <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
                       <FaCube size={13} style={{ color: '#691B31', marginTop: '2px', flexShrink: 0 }} />
-                      <span>Cimiento: ¿4 dados completos y en buen estado? <span style={{ color: '#DC2626' }}>*</span></span>
+                      <span>{modoVisualizacion ? 'Cimentación de Base' : 'Cimiento: ¿4 dados completos y en buen estado?'} <span style={{ color: '#DC2626' }}>*</span></span>
                     </label>
                     <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', marginTop: '0.35rem', minHeight: '32px' }}>
-                      {['Sí', 'No'].map((opcion) => (
-                        <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.cimientoCompleto === opcion ? '700' : '500', color: '#1E293B' }}>
-                          <input
-                            type="radio"
-                            name="cimientoCompleto"
-                            value={opcion}
-                            checked={controladorForm.cimientoCompleto === opcion}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              setControladorForm({
-                                ...controladorForm,
-                                cimientoCompleto: val,
-                                cimientoCuantosDados: val === 'Sí' ? '' : controladorForm.cimientoCuantosDados
-                              })
-                            }}
-                            style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                          />
-                          {opcion}
-                        </label>
-                      ))}
+                      {modoVisualizacion ? (
+                        renderBadgeConsulta(
+                          controladorForm.cimientoCompleto,
+                          controladorForm.cimientoCompleto === 'Sí'
+                            ? '4 dados completos · Concreto firme'
+                            : (controladorForm.cimientoCuantosDados ? `Incompleto (${controladorForm.cimientoCuantosDados} dados presentes)` : 'Incompleto')
+                        )
+                      ) : (
+                        ['Sí', 'No'].map((opcion) => (
+                          <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.cimientoCompleto === opcion ? '700' : '500', color: '#1E293B' }}>
+                            <input
+                              type="radio"
+                              name="cimientoCompleto"
+                              value={opcion}
+                              checked={controladorForm.cimientoCompleto === opcion}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setControladorForm({
+                                  ...controladorForm,
+                                  cimientoCompleto: val,
+                                  cimientoCuantosDados: val === 'Sí' ? '' : controladorForm.cimientoCuantosDados
+                                })
+                              }}
+                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            {opcion}
+                          </label>
+                        ))
+                      )}
                     </div>
 
-                    {/* Subcampo condicional: solo si respondió No */}
-                    {controladorForm.cimientoCompleto === 'No' && (
+                    {/* Subcampo condicional: solo si respondió No y no está en modo visualización */}
+                    {!modoVisualizacion && controladorForm.cimientoCompleto === 'No' && (
                       <div style={{ marginTop: '0.65rem', paddingTop: '0.65rem', borderTop: '1px dashed #CBD5E1' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#1E293B', marginBottom: '0.35rem' }}>
                           <FaCube size={11} style={{ color: '#691B31' }} /> <span>¿Cuántos dados tiene? <span style={{ color: '#DC2626' }}>*</span></span>
@@ -3930,22 +5939,29 @@ export default function InventarioSemaforos() {
                   }}>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                       <FaCheckSquare size={13} style={{ color: '#691B31', marginTop: '2px', flexShrink: 0 }} />
-                      <span>Tapa de cableado: ¿Presente y en buen estado? <span style={{ color: '#DC2626' }}>*</span></span>
+                      <span>{modoVisualizacion ? 'Tapa de Cableado' : 'Tapa de cableado: ¿Presente y en buen estado?'} <span style={{ color: '#DC2626' }}>*</span></span>
                     </label>
                     <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', marginTop: '0.35rem', minHeight: '32px' }}>
-                      {['Sí', 'No'].map((opcion) => (
-                        <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.tapaCableado === opcion ? '700' : '500', color: '#1E293B' }}>
-                          <input
-                            type="radio"
-                            name="tapaCableado"
-                            value={opcion}
-                            checked={controladorForm.tapaCableado === opcion}
-                            onChange={(e) => setControladorForm({ ...controladorForm, tapaCableado: e.target.value })}
-                            style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                          />
-                          {opcion}
-                        </label>
-                      ))}
+                      {modoVisualizacion ? (
+                        renderBadgeConsulta(
+                          controladorForm.tapaCableado,
+                          controladorForm.tapaCableado === 'Sí' ? 'Presente y asegurada' : 'Faltante / Dañada'
+                        )
+                      ) : (
+                        ['Sí', 'No'].map((opcion) => (
+                          <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.tapaCableado === opcion ? '700' : '500', color: '#1E293B' }}>
+                            <input
+                              type="radio"
+                              name="tapaCableado"
+                              value={opcion}
+                              checked={controladorForm.tapaCableado === opcion}
+                              onChange={(e) => setControladorForm({ ...controladorForm, tapaCableado: e.target.value })}
+                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            {opcion}
+                          </label>
+                        ))
+                      )}
                     </div>
                   </div>
 
@@ -3953,33 +5969,42 @@ export default function InventarioSemaforos() {
                   <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
                       <FaWrench size={13} style={{ color: '#691B31', marginTop: '2px', flexShrink: 0 }} />
-                      <span>Tornillería: ¿4 tornillos de base completos? <span style={{ color: '#DC2626' }}>*</span></span>
+                      <span>{modoVisualizacion ? 'Tornillería de Base' : 'Tornillería: ¿4 tornillos de base completos?'} <span style={{ color: '#DC2626' }}>*</span></span>
                     </label>
                     <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', marginTop: '0.35rem', minHeight: '32px' }}>
-                      {['Sí', 'No'].map((opcion) => (
-                        <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.tornilleriaBaseCompleta === opcion ? '700' : '500', color: '#1E293B' }}>
-                          <input
-                            type="radio"
-                            name="tornilleriaBaseCompleta"
-                            value={opcion}
-                            checked={controladorForm.tornilleriaBaseCompleta === opcion}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              setControladorForm({
-                                ...controladorForm,
-                                tornilleriaBaseCompleta: val,
-                                tornilleriaCuantosTornillos: val === 'Sí' ? '' : controladorForm.tornilleriaCuantosTornillos
-                              })
-                            }}
-                            style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                          />
-                          {opcion}
-                        </label>
-                      ))}
+                      {modoVisualizacion ? (
+                        renderBadgeConsulta(
+                          controladorForm.tornilleriaBaseCompleta,
+                          controladorForm.tornilleriaBaseCompleta === 'Sí'
+                            ? '4 tornillos de anclaje completos'
+                            : (controladorForm.tornilleriaCuantosTornillos ? `Incompleta (${controladorForm.tornilleriaCuantosTornillos} tornillos presentes)` : 'Incompleta')
+                        )
+                      ) : (
+                        ['Sí', 'No'].map((opcion) => (
+                          <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.tornilleriaBaseCompleta === opcion ? '700' : '500', color: '#1E293B' }}>
+                            <input
+                              type="radio"
+                              name="tornilleriaBaseCompleta"
+                              value={opcion}
+                              checked={controladorForm.tornilleriaBaseCompleta === opcion}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setControladorForm({
+                                  ...controladorForm,
+                                  tornilleriaBaseCompleta: val,
+                                  tornilleriaCuantosTornillos: val === 'Sí' ? '' : controladorForm.tornilleriaCuantosTornillos
+                                })
+                              }}
+                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            {opcion}
+                          </label>
+                        ))
+                      )}
                     </div>
 
-                    {/* Subcampo condicional: solo si respondió No */}
-                    {controladorForm.tornilleriaBaseCompleta === 'No' && (
+                    {/* Subcampo condicional: solo si respondió No y no está en modo visualización */}
+                    {!modoVisualizacion && controladorForm.tornilleriaBaseCompleta === 'No' && (
                       <div style={{ marginTop: '0.65rem', paddingTop: '0.65rem', borderTop: '1px dashed #CBD5E1' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#1E293B', marginBottom: '0.35rem' }}>
                           <FaWrench size={11} style={{ color: '#691B31' }} /> <span>¿Cuántos tornillos tiene? <span style={{ color: '#DC2626' }}>*</span></span>
@@ -4029,23 +6054,27 @@ export default function InventarioSemaforos() {
                       <FaListUl size={13} style={{ color: '#691B31', flexShrink: 0 }} />
                       <span>Observaciones exterior</span>
                     </label>
-                    <textarea
-                      rows={3}
-                      placeholder="Detalles de pintura, golpes, corrosión o estado general..."
-                      value={controladorForm.observacionesExterior}
-                      onChange={(e) => setControladorForm({ ...controladorForm, observacionesExterior: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        boxSizing: 'border-box',
-                        resize: 'vertical',
-                        fontFamily: 'inherit',
-                        marginTop: '0.35rem'
-                      }}
-                    />
+                    {modoVisualizacion ? (
+                      renderObservacionesConsulta(controladorForm.observacionesExterior)
+                    ) : (
+                      <textarea
+                        rows={3}
+                        placeholder="Detalles de pintura, golpes, corrosión o estado general..."
+                        value={controladorForm.observacionesExterior}
+                        onChange={(e) => setControladorForm({ ...controladorForm, observacionesExterior: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem 0.75rem',
+                          border: '1px solid #CBD5E1',
+                          borderRadius: '6px',
+                          fontSize: '0.85rem',
+                          boxSizing: 'border-box',
+                          resize: 'vertical',
+                          fontFamily: 'inherit',
+                          marginTop: '0.35rem'
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -4090,49 +6119,64 @@ export default function InventarioSemaforos() {
                 <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.5rem' }}>
                     <FaMapMarkerAlt size={13} style={{ color: '#691B31' }} />
-                    <span>GPS: <span style={{ color: '#DC2626' }}>*</span></span>
+                    <span>{modoVisualizacion ? 'Módulo Receptor GPS' : 'GPS:'} <span style={{ color: '#DC2626' }}>*</span></span>
                   </label>
-                  <div style={{ display: 'flex', gap: '1.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <label style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.45rem',
-                      cursor: 'pointer',
-                      fontSize: '0.88rem',
-                      fontWeight: (controladorForm.gpsModelo === 'Receptor Satelital GPS RC-308' || controladorForm.gpsModelo === 'Modelo A') ? '700' : '500',
-                      color: '#1E293B'
-                    }}>
-                      <input
-                        type="radio"
-                        name="gpsModelo"
-                        value="Receptor Satelital GPS RC-308"
-                        checked={controladorForm.gpsModelo === 'Receptor Satelital GPS RC-308' || controladorForm.gpsModelo === 'Modelo A'}
-                        onChange={() => setControladorForm({ ...controladorForm, gpsModelo: 'Receptor Satelital GPS RC-308', gps: true })}
-                        style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                      />
-                      Receptor Satelital GPS RC-308
-                    </label>
+                  {modoVisualizacion ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.2rem', minHeight: '26px' }}>
+                      {controladorForm.gpsModelo ? (
+                        <>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2563EB', display: 'inline-block', flexShrink: 0 }}></span>
+                          <span style={{ color: '#0F172A', fontSize: '0.9rem', fontWeight: '600' }}>
+                            {controladorForm.gpsModelo}
+                          </span>
+                        </>
+                      ) : (
+                        <span style={{ color: '#94A3B8', fontSize: '0.85rem', fontStyle: 'italic', fontWeight: '400' }}>Sin GPS registrado</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '1.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <label style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        cursor: 'pointer',
+                        fontSize: '0.88rem',
+                        fontWeight: (controladorForm.gpsModelo === 'Receptor Satelital GPS RC-308' || controladorForm.gpsModelo === 'Modelo A') ? '700' : '500',
+                        color: '#1E293B'
+                      }}>
+                        <input
+                          type="radio"
+                          name="gpsModelo"
+                          value="Receptor Satelital GPS RC-308"
+                          checked={controladorForm.gpsModelo === 'Receptor Satelital GPS RC-308' || controladorForm.gpsModelo === 'Modelo A'}
+                          onChange={() => setControladorForm({ ...controladorForm, gpsModelo: 'Receptor Satelital GPS RC-308', gps: true })}
+                          style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                        />
+                        Receptor Satelital GPS RC-308
+                      </label>
 
-                    <label style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.45rem',
-                      cursor: 'pointer',
-                      fontSize: '0.88rem',
-                      fontWeight: (controladorForm.gpsModelo === 'Sincronizador Satelital Integrado ATC-3000' || controladorForm.gpsModelo === 'Modelo B') ? '700' : '500',
-                      color: '#1E293B'
-                    }}>
-                      <input
-                        type="radio"
-                        name="gpsModelo"
-                        value="Sincronizador Satelital Integrado ATC-3000"
-                        checked={controladorForm.gpsModelo === 'Sincronizador Satelital Integrado ATC-3000' || controladorForm.gpsModelo === 'Modelo B'}
-                        onChange={() => setControladorForm({ ...controladorForm, gpsModelo: 'Sincronizador Satelital Integrado ATC-3000', gpsComponenteFisico: '', gps: true })}
-                        style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                      />
-                      Sincronizador Satelital Integrado ATC-3000
-                    </label>
-                  </div>
+                      <label style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        cursor: 'pointer',
+                        fontSize: '0.88rem',
+                        fontWeight: (controladorForm.gpsModelo === 'Sincronizador Satelital Integrado ATC-3000' || controladorForm.gpsModelo === 'Modelo B') ? '700' : '500',
+                        color: '#1E293B'
+                      }}>
+                        <input
+                          type="radio"
+                          name="gpsModelo"
+                          value="Sincronizador Satelital Integrado ATC-3000"
+                          checked={controladorForm.gpsModelo === 'Sincronizador Satelital Integrado ATC-3000' || controladorForm.gpsModelo === 'Modelo B'}
+                          onChange={() => setControladorForm({ ...controladorForm, gpsModelo: 'Sincronizador Satelital Integrado ATC-3000', gpsComponenteFisico: '', gps: true })}
+                          style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                        />
+                        Sincronizador Satelital Integrado ATC-3000
+                      </label>
+                    </div>
+                  )}
                 </div>
 
                 {/* Subcampos condicionales según modelo GPS */}
@@ -4152,21 +6196,25 @@ export default function InventarioSemaforos() {
                           <FaMicrochip size={13} style={{ color: '#691B31' }} />
                           <span>Componente físico: <span style={{ color: '#DC2626' }}>*</span></span>
                         </label>
-                        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                          {['Operativo', 'Dañado'].map((opcion) => (
-                            <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.gpsComponenteFisico === opcion ? '700' : '500', color: '#1E293B' }}>
-                              <input
-                                type="radio"
-                                name="gpsComponenteFisico"
-                                value={opcion}
-                                checked={controladorForm.gpsComponenteFisico === opcion}
-                                onChange={(e) => setControladorForm({ ...controladorForm, gpsComponenteFisico: e.target.value })}
-                                style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                              />
-                              {opcion}
-                            </label>
-                          ))}
-                        </div>
+                        {modoVisualizacion ? (
+                          renderBadgeConsulta(controladorForm.gpsComponenteFisico)
+                        ) : (
+                          <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                            {['Operativo', 'Dañado'].map((opcion) => (
+                              <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.gpsComponenteFisico === opcion ? '700' : '500', color: '#1E293B' }}>
+                                <input
+                                  type="radio"
+                                  name="gpsComponenteFisico"
+                                  value={opcion}
+                                  checked={controladorForm.gpsComponenteFisico === opcion}
+                                  onChange={(e) => setControladorForm({ ...controladorForm, gpsComponenteFisico: e.target.value })}
+                                  style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                />
+                                {opcion}
+                              </label>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -4183,21 +6231,25 @@ export default function InventarioSemaforos() {
                         <FaBroadcastTower size={13} style={{ color: '#691B31' }} />
                         <span>Antena exterior: <span style={{ color: '#DC2626' }}>*</span></span>
                       </label>
-                      <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        {['Instalada', 'Dañada'].map((opcion) => (
-                          <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.gpsAntenaExterior === opcion ? '700' : '500', color: '#1E293B' }}>
-                            <input
-                              type="radio"
-                              name="gpsAntenaExterior"
-                              value={opcion}
-                              checked={controladorForm.gpsAntenaExterior === opcion}
-                              onChange={(e) => setControladorForm({ ...controladorForm, gpsAntenaExterior: e.target.value })}
-                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                            />
-                            {opcion}
-                          </label>
-                        ))}
-                      </div>
+                      {modoVisualizacion ? (
+                        renderBadgeConsulta(controladorForm.gpsAntenaExterior)
+                      ) : (
+                        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          {['Instalada', 'Dañada'].map((opcion) => (
+                            <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.gpsAntenaExterior === opcion ? '700' : '500', color: '#1E293B' }}>
+                              <input
+                                type="radio"
+                                name="gpsAntenaExterior"
+                                value={opcion}
+                                checked={controladorForm.gpsAntenaExterior === opcion}
+                                onChange={(e) => setControladorForm({ ...controladorForm, gpsAntenaExterior: e.target.value })}
+                                style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                              />
+                              {opcion}
+                            </label>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -4244,263 +6296,391 @@ export default function InventarioSemaforos() {
                   <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
                       <FaHdd size={13} style={{ color: '#691B31' }} />
-                      <span>Número de Gabinete (#): <span style={{ color: '#DC2626' }}>*</span></span>
+                      <span>Número de Gabinete (#): {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="ej. GAB-01"
-                      value={controladorForm.numeroGabinete}
-                      onChange={(e) => setControladorForm({ ...controladorForm, numeroGabinete: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        boxSizing: 'border-box',
-                        marginTop: 'auto'
-                      }}
-                    />
+                    {modoVisualizacion ? (
+                      renderDatoConsulta(controladorForm.numeroGabinete)
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="ej. GAB-01"
+                        value={controladorForm.numeroGabinete}
+                        onChange={(e) => setControladorForm({ ...controladorForm, numeroGabinete: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem 0.75rem',
+                          border: '1px solid #CBD5E1',
+                          borderRadius: '6px',
+                          fontSize: '0.85rem',
+                          boxSizing: 'border-box',
+                          marginTop: 'auto'
+                        }}
+                      />
+                    )}
                   </div>
 
                   {/* Versión de Firmware */}
                   <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
                       <FaMicrochip size={13} style={{ color: '#691B31' }} />
-                      <span>Versión de Firmware: <span style={{ color: '#DC2626' }}>*</span></span>
+                      <span>Versión de Firmware: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="ej. v2.4.1"
-                      value={controladorForm.versionFirmware}
-                      onChange={(e) => setControladorForm({ ...controladorForm, versionFirmware: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        boxSizing: 'border-box',
-                        marginTop: 'auto'
-                      }}
-                    />
+                    {modoVisualizacion ? (
+                      renderDatoConsulta(controladorForm.versionFirmware)
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="ej. v2.4.1"
+                        value={controladorForm.versionFirmware}
+                        onChange={(e) => setControladorForm({ ...controladorForm, versionFirmware: e.target.value })}
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem 0.75rem',
+                          border: '1px solid #CBD5E1',
+                          borderRadius: '6px',
+                          fontSize: '0.85rem',
+                          boxSizing: 'border-box',
+                          marginTop: 'auto'
+                        }}
+                      />
+                    )}
                   </div>
 
                   {/* IP Local */}
                   <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
                       <FaNetworkWired size={13} style={{ color: '#691B31' }} />
-                      <span>IP Local: <span style={{ color: '#DC2626' }}>*</span></span>
+                      <span>IP Local: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="ej. 192.168.1.100"
-                      value={controladorForm.ipLocal}
-                      onChange={(e) => setControladorForm({ ...controladorForm, ipLocal: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        boxSizing: 'border-box',
-                        marginTop: 'auto'
-                      }}
-                    />
+                    {modoVisualizacion ? (
+                      renderDatoConsulta(controladorForm.ipLocal, 'Sin registrar', true)
+                    ) : (
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="ej. 192.168.1.100"
+                          value={controladorForm.ipLocal}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setControladorForm(prev => ({ ...prev, ipLocal: val }))
+                            if (controladorErrores.ipLocal) {
+                              setControladorErrores(prev => ({ ...prev, ipLocal: undefined }))
+                            }
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem 0.75rem',
+                            border: `1px solid ${controladorErrores.ipLocal ? '#DC2626' : '#CBD5E1'}`,
+                            backgroundColor: controladorErrores.ipLocal ? '#FEF2F2' : '#FFFFFF',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                            boxSizing: 'border-box',
+                            marginTop: 'auto'
+                          }}
+                        />
+                        {controladorErrores.ipLocal && (
+                          <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                            <FaExclamationTriangle size={10} /> {controladorErrores.ipLocal}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* IP System */}
                   <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
                       <FaNetworkWired size={13} style={{ color: '#691B31' }} />
-                      <span>IP System: <span style={{ color: '#DC2626' }}>*</span></span>
+                      <span>IP System: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="ej. 10.0.0.1"
-                      value={controladorForm.ipSystem}
-                      onChange={(e) => setControladorForm({ ...controladorForm, ipSystem: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        boxSizing: 'border-box',
-                        marginTop: 'auto'
-                      }}
-                    />
+                    {modoVisualizacion ? (
+                      renderDatoConsulta(controladorForm.ipSystem, 'Sin registrar', true)
+                    ) : (
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="ej. 10.0.0.1"
+                          value={controladorForm.ipSystem}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setControladorForm(prev => ({ ...prev, ipSystem: val }))
+                            if (controladorErrores.ipSystem) {
+                              setControladorErrores(prev => ({ ...prev, ipSystem: undefined }))
+                            }
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem 0.75rem',
+                            border: `1px solid ${controladorErrores.ipSystem ? '#DC2626' : '#CBD5E1'}`,
+                            backgroundColor: controladorErrores.ipSystem ? '#FEF2F2' : '#FFFFFF',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                            boxSizing: 'border-box',
+                            marginTop: 'auto'
+                          }}
+                        />
+                        {controladorErrores.ipSystem && (
+                          <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                            <FaExclamationTriangle size={10} /> {controladorErrores.ipSystem}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Máscara de Red */}
                   <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
                       <FaNetworkWired size={13} style={{ color: '#691B31' }} />
-                      <span>Máscara de Red: <span style={{ color: '#DC2626' }}>*</span></span>
+                      <span>Máscara de Red: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="ej. 255.255.255.0"
-                      value={controladorForm.mascaraRed}
-                      onChange={(e) => setControladorForm({ ...controladorForm, mascaraRed: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        boxSizing: 'border-box',
-                        marginTop: 'auto'
-                      }}
-                    />
+                    {modoVisualizacion ? (
+                      renderDatoConsulta(controladorForm.mascaraRed, 'Sin registrar', true)
+                    ) : (
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="ej. 255.255.255.0"
+                          value={controladorForm.mascaraRed}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setControladorForm(prev => ({ ...prev, mascaraRed: val }))
+                            if (controladorErrores.mascaraRed) {
+                              setControladorErrores(prev => ({ ...prev, mascaraRed: undefined }))
+                            }
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem 0.75rem',
+                            border: `1px solid ${controladorErrores.mascaraRed ? '#DC2626' : '#CBD5E1'}`,
+                            backgroundColor: controladorErrores.mascaraRed ? '#FEF2F2' : '#FFFFFF',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                            boxSizing: 'border-box',
+                            marginTop: 'auto'
+                          }}
+                        />
+                        {controladorErrores.mascaraRed && (
+                          <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                            <FaExclamationTriangle size={10} /> {controladorErrores.mascaraRed}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Gateway */}
                   <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
                       <FaNetworkWired size={13} style={{ color: '#691B31' }} />
-                      <span>Gateway: <span style={{ color: '#DC2626' }}>*</span></span>
+                      <span>Gateway: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="ej. 192.168.1.1"
-                      value={controladorForm.gateway}
-                      onChange={(e) => setControladorForm({ ...controladorForm, gateway: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        boxSizing: 'border-box',
-                        marginTop: 'auto'
-                      }}
-                    />
+                    {modoVisualizacion ? (
+                      renderDatoConsulta(controladorForm.gateway, 'Sin registrar', true)
+                    ) : (
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="ej. 192.168.1.1"
+                          value={controladorForm.gateway}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setControladorForm(prev => ({ ...prev, gateway: val }))
+                            if (controladorErrores.gateway) {
+                              setControladorErrores(prev => ({ ...prev, gateway: undefined }))
+                            }
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem 0.75rem',
+                            border: `1px solid ${controladorErrores.gateway ? '#DC2626' : '#CBD5E1'}`,
+                            backgroundColor: controladorErrores.gateway ? '#FEF2F2' : '#FFFFFF',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                            boxSizing: 'border-box',
+                            marginTop: 'auto'
+                          }}
+                        />
+                        {controladorErrores.gateway && (
+                          <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                            <FaExclamationTriangle size={10} /> {controladorErrores.gateway}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Ciclo completo */}
                   <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
                       <FaHistory size={13} style={{ color: '#691B31' }} />
-                      <span>Ciclo completo: <span style={{ color: '#DC2626' }}>*</span></span>
+                      <span>Ciclo completo: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                     </label>
-                    <input
-                      type="text"
-                      placeholder="ej. 90 segundos"
-                      value={controladorForm.cicloCompleto}
-                      onChange={(e) => setControladorForm({ ...controladorForm, cicloCompleto: e.target.value })}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        boxSizing: 'border-box',
-                        marginTop: 'auto'
-                      }}
-                    />
+                    {modoVisualizacion ? (
+                      renderDatoConsulta(controladorForm.cicloCompleto)
+                    ) : (
+                      <div>
+                        <input
+                          type="text"
+                          placeholder="ej. 90 segundos"
+                          value={controladorForm.cicloCompleto}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setControladorForm(prev => ({ ...prev, cicloCompleto: val }))
+                            if (controladorErrores.cicloCompleto) {
+                              setControladorErrores(prev => ({ ...prev, cicloCompleto: undefined }))
+                            }
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem 0.75rem',
+                            border: `1px solid ${controladorErrores.cicloCompleto ? '#DC2626' : '#CBD5E1'}`,
+                            backgroundColor: controladorErrores.cicloCompleto ? '#FEF2F2' : '#FFFFFF',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                            boxSizing: 'border-box',
+                            marginTop: 'auto'
+                          }}
+                        />
+                        {controladorErrores.cicloCompleto && (
+                          <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                            <FaExclamationTriangle size={10} /> {controladorErrores.cicloCompleto}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Respaldo de programación descargado (USB) */}
                   <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
                       <FaUpload size={13} style={{ color: '#691B31' }} />
-                      <span>Respaldo de programación descargado (USB / .zip): <span style={{ color: '#DC2626' }}>*</span></span>
+                      <span>Respaldo de programación descargado (USB / .zip): {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                     </label>
 
-                    <div
-                      title="Haz clic o arrastra un archivo de respaldo (.zip, .cfg, .bin, .dat, .rar)"
-                      onClick={() => archivoProgramacionInputRef.current?.click()}
-                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                          const file = e.dataTransfer.files[0]
-                          setArchivoProgramacion(file)
-                          setControladorForm(prev => ({ ...prev, respaldoProgramacionUsb: file.name }))
-                        }
-                      }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem',
-                        minHeight: '38px',
-                        border: archivoProgramacion ? '1px solid #10B981' : '1px dashed #CBD5E1',
-                        borderRadius: '6px',
-                        backgroundColor: archivoProgramacion ? '#F0FDF4' : '#F8FAFC',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        padding: '0.35rem 0.75rem',
-                        boxSizing: 'border-box',
-                        marginTop: 'auto'
-                      }}
-                      onMouseOver={(e) => { if (!archivoProgramacion) e.currentTarget.style.borderColor = '#BC955B' }}
-                      onMouseOut={(e) => { if (!archivoProgramacion) e.currentTarget.style.borderColor = '#CBD5E1' }}
-                    >
-                      {archivoProgramacion ? (
-                        <>
-                          {String(typeof archivoProgramacion === 'string' ? archivoProgramacion : archivoProgramacion.name).toLowerCase().endsWith('.zip') ? (
-                            <FaFileArchive size={18} color="#059669" />
-                          ) : (
-                            <FaUpload size={18} color="#10B981" />
-                          )}
-                          <span style={{ fontSize: '0.82rem', color: '#065F46', fontWeight: '600', maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {typeof archivoProgramacion === 'string' ? archivoProgramacion.split('/').pop() : archivoProgramacion.name}
+                    {modoVisualizacion ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.45rem 0.75rem', backgroundColor: '#F8FAFC', borderRadius: '6px', border: '1px solid #E2E8F0', marginTop: 'auto', minHeight: '38px' }}>
+                        {archivoProgramacion ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <FaFileArchive size={16} color="#059669" />
+                              <span style={{ fontSize: '0.82rem', color: '#065F46', fontWeight: '700' }}>
+                                {typeof archivoProgramacion === 'string' ? archivoProgramacion.split('/').pop() : archivoProgramacion.name}
+                              </span>
+                            </div>
+                            {typeof archivoProgramacion === 'string' && editandoControladorId && (
+                              <button
+                                type="button"
+                                onClick={() => window.open(`${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/descargar-programacion`, '_blank')}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: '#E0F2FE', border: '1px solid #BAE6FD', color: '#0369A1', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: '700' }}
+                              >
+                                <FaDownload size={11} /> Descargar
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ color: '#94A3B8', fontSize: '0.82rem', fontStyle: 'italic', fontWeight: '500' }}>
+                            Sin respaldo cargado
                           </span>
-                          {archivoProgramacion instanceof File && (
-                            <span style={{ fontSize: '0.72rem', color: '#047857', fontWeight: '500' }}>
-                              ({archivoProgramacion.size > 1024 * 1024 ? `${(archivoProgramacion.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(archivoProgramacion.size / 1024)} KB`})
-                            </span>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <FaUpload size={18} color="#BC955B" />
-                          <span style={{ fontSize: '0.8rem', color: '#64748B' }}>Subir archivo (.zip, .cfg, .bin, .dat)</span>
-                        </>
-                      )}
-                      <input
-                        ref={archivoProgramacionInputRef}
-                        type="file"
-                        accept=".zip,.rar,.7z,.cfg,.bin,.dat,.txt,.tar,.gz,application/zip,application/x-zip-compressed,multipart/x-zip"
-                        style={{ display: 'none' }}
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            const file = e.target.files[0]
-                            setArchivoProgramacion(file)
-                            setControladorForm(prev => ({ ...prev, respaldoProgramacionUsb: file.name }))
-                          }
-                        }}
-                      />
-                    </div>
-
-                    {archivoProgramacion && (
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.35rem' }}>
-                        {typeof archivoProgramacion === 'string' && editandoControladorId && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              window.open(`${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/descargar-programacion`, '_blank')
-                            }}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: 'none', border: 'none', color: '#0284C7', fontSize: '0.75rem', cursor: 'pointer', fontWeight: '600' }}
-                          >
-                            <FaDownload size={11} /> Descargar
-                          </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setArchivoProgramacion(null)
-                            setControladorForm(prev => ({ ...prev, respaldoProgramacionUsb: '' }))
-                            if (archivoProgramacionInputRef.current) archivoProgramacionInputRef.current.value = ''
-                          }}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: 'none', border: 'none', color: '#EF4444', fontSize: '0.75rem', cursor: 'pointer', fontWeight: '600' }}
-                        >
-                          <FaTimes size={11} /> Quitar
-                        </button>
                       </div>
+                    ) : (
+                      <>
+                        <div
+                          title="Haz clic o arrastra un archivo de respaldo (.zip, .cfg, .bin, .dat, .rar)"
+                          onClick={() => archivoProgramacionInputRef.current?.click()}
+                          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                              const file = e.dataTransfer.files[0]
+                              setArchivoProgramacion(file)
+                              setControladorForm(prev => ({ ...prev, respaldoProgramacionUsb: file.name }))
+                            }
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem',
+                            minHeight: '38px',
+                            border: archivoProgramacion ? '1px solid #10B981' : '1px dashed #CBD5E1',
+                            borderRadius: '6px',
+                            backgroundColor: archivoProgramacion ? '#F0FDF4' : '#F8FAFC',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            padding: '0.35rem 0.75rem',
+                            boxSizing: 'border-box',
+                            marginTop: 'auto'
+                          }}
+                          onMouseOver={(e) => { if (!archivoProgramacion) e.currentTarget.style.borderColor = '#BC955B' }}
+                          onMouseOut={(e) => { if (!archivoProgramacion) e.currentTarget.style.borderColor = '#CBD5E1' }}
+                        >
+                          {archivoProgramacion ? (
+                            <>
+                              {String(typeof archivoProgramacion === 'string' ? archivoProgramacion : archivoProgramacion.name).toLowerCase().endsWith('.zip') ? (
+                                <FaFileArchive size={18} color="#059669" />
+                              ) : (
+                                <FaUpload size={18} color="#10B981" />
+                              )}
+                              <span style={{ fontSize: '0.82rem', color: '#065F46', fontWeight: '600', maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {typeof archivoProgramacion === 'string' ? archivoProgramacion.split('/').pop() : archivoProgramacion.name}
+                              </span>
+                              {archivoProgramacion instanceof File && (
+                                <span style={{ fontSize: '0.72rem', color: '#047857', fontWeight: '500' }}>
+                                  ({archivoProgramacion.size > 1024 * 1024 ? `${(archivoProgramacion.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(archivoProgramacion.size / 1024)} KB`})
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <FaUpload size={18} color="#BC955B" />
+                              <span style={{ fontSize: '0.8rem', color: '#64748B' }}>Subir archivo (.zip, .cfg, .bin, .dat)</span>
+                            </>
+                          )}
+                          <input
+                            ref={archivoProgramacionInputRef}
+                            type="file"
+                            accept=".zip,.rar,.7z,.cfg,.bin,.dat,.txt,.tar,.gz,application/zip,application/x-zip-compressed,multipart/x-zip"
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                const file = e.target.files[0]
+                                setArchivoProgramacion(file)
+                                setControladorForm(prev => ({ ...prev, respaldoProgramacionUsb: file.name }))
+                              }
+                            }}
+                          />
+                        </div>
+
+                        {archivoProgramacion && (
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.35rem' }}>
+                            {typeof archivoProgramacion === 'string' && editandoControladorId && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  window.open(`${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/descargar-programacion`, '_blank')
+                                }}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: 'none', border: 'none', color: '#0284C7', fontSize: '0.75rem', cursor: 'pointer', fontWeight: '600', pointerEvents: 'auto' }}
+                              >
+                                <FaDownload size={11} /> Descargar
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setArchivoProgramacion(null)
+                                setControladorForm(prev => ({ ...prev, respaldoProgramacionUsb: '' }))
+                                if (archivoProgramacionInputRef.current) archivoProgramacionInputRef.current.value = ''
+                              }}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: 'none', border: 'none', color: '#EF4444', fontSize: '0.75rem', cursor: 'pointer', fontWeight: '600' }}
+                            >
+                              <FaTimes size={11} /> Quitar
+                            </button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -4524,71 +6704,77 @@ export default function InventarioSemaforos() {
                       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                           <FaExclamationTriangle size={12} style={{ color: '#691B31' }} />
-                          <span>Marca: <span style={{ color: '#DC2626' }}>*</span></span>
+                          <span>Marca: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                         </label>
-                        <select
-                          value={controladorForm.tarjetaConflictosMarcaModo || (controladorForm.modelo === 'C-5000' ? 'Oriux (Peek Traffic)' : 'Peek Traffic')}
-                          onChange={(e) => {
-                            const val = e.target.value
-                            if (val === 'Peek Traffic') {
-                              setControladorForm(prev => ({
-                                ...prev,
-                                tarjetaConflictosMarcaModo: 'Peek Traffic',
-                                tarjetaConflictosMarca: 'Peek Traffic',
-                                tarjetaConflictosModelo: prev.tarjetaConflictosModelo && MODELOS_TARJETA_CONFLICTOS_PEEK.includes(prev.tarjetaConflictosModelo) ? prev.tarjetaConflictosModelo : 'Model 2010E'
-                              }))
-                            } else if (val === 'Oriux (Peek Traffic)') {
-                              setControladorForm(prev => ({
-                                ...prev,
-                                tarjetaConflictosMarcaModo: 'Oriux (Peek Traffic)',
-                                tarjetaConflictosMarca: 'Oriux (Peek Traffic)',
-                                tarjetaConflictosModelo: 'C5000 MMU Integrado'
-                              }))
-                            } else if (val === 'Otro') {
-                              setControladorForm(prev => ({
-                                ...prev,
-                                tarjetaConflictosMarcaModo: 'Otro',
-                                tarjetaConflictosMarca: prev.tarjetaConflictosMarca && prev.tarjetaConflictosMarca !== 'Peek Traffic' && prev.tarjetaConflictosMarca !== 'Oriux (Peek Traffic)' ? prev.tarjetaConflictosMarca : '',
-                                tarjetaConflictosModelo: ''
-                              }))
-                            }
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem 0.65rem',
-                            border: '1px solid #CBD5E1',
-                            borderRadius: '6px',
-                            fontSize: '0.85rem',
-                            boxSizing: 'border-box',
-                            backgroundColor: 'white',
-                            color: '#1E293B',
-                            cursor: 'pointer',
-                            marginTop: 'auto'
-                          }}
-                        >
-                          {controladorForm.modelo === 'C-5000' || controladorForm.tarjetaConflictosMarcaModo === 'Oriux (Peek Traffic)' ? (
-                            <option value="Oriux (Peek Traffic)">Oriux (Peek Traffic)</option>
-                          ) : (
-                            <option value="Peek Traffic">Peek Traffic</option>
-                          )}
-                          <option value="Otro">Otro (especificar)</option>
-                        </select>
-                        {controladorForm.tarjetaConflictosMarcaModo === 'Otro' && (
-                          <input
-                            type="text"
-                            placeholder="Especificar otra marca..."
-                            value={controladorForm.tarjetaConflictosMarca || ''}
-                            onChange={(e) => setControladorForm({ ...controladorForm, tarjetaConflictosMarca: e.target.value })}
-                            style={{
-                              width: '100%',
-                              padding: '0.45rem 0.65rem',
-                              border: '1px solid #CBD5E1',
-                              borderRadius: '6px',
-                              fontSize: '0.82rem',
-                              boxSizing: 'border-box',
-                              marginTop: '0.4rem'
-                            }}
-                          />
+                        {modoVisualizacion ? (
+                          renderDatoConsulta(controladorForm.tarjetaConflictosMarca || (controladorForm.modelo === 'C-5000' ? 'Oriux (Peek Traffic)' : 'Peek Traffic'))
+                        ) : (
+                          <>
+                            <select
+                              value={controladorForm.tarjetaConflictosMarcaModo || (controladorForm.modelo === 'C-5000' ? 'Oriux (Peek Traffic)' : 'Peek Traffic')}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                if (val === 'Peek Traffic') {
+                                  setControladorForm(prev => ({
+                                    ...prev,
+                                    tarjetaConflictosMarcaModo: 'Peek Traffic',
+                                    tarjetaConflictosMarca: 'Peek Traffic',
+                                    tarjetaConflictosModelo: prev.tarjetaConflictosModelo && MODELOS_TARJETA_CONFLICTOS_PEEK.includes(prev.tarjetaConflictosModelo) ? prev.tarjetaConflictosModelo : 'Model 2010E'
+                                  }))
+                                } else if (val === 'Oriux (Peek Traffic)') {
+                                  setControladorForm(prev => ({
+                                    ...prev,
+                                    tarjetaConflictosMarcaModo: 'Oriux (Peek Traffic)',
+                                    tarjetaConflictosMarca: 'Oriux (Peek Traffic)',
+                                    tarjetaConflictosModelo: 'C5000 MMU Integrado'
+                                  }))
+                                } else if (val === 'Otro') {
+                                  setControladorForm(prev => ({
+                                    ...prev,
+                                    tarjetaConflictosMarcaModo: 'Otro',
+                                    tarjetaConflictosMarca: prev.tarjetaConflictosMarca && prev.tarjetaConflictosMarca !== 'Peek Traffic' && prev.tarjetaConflictosMarca !== 'Oriux (Peek Traffic)' ? prev.tarjetaConflictosMarca : '',
+                                    tarjetaConflictosModelo: ''
+                                  }))
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem 0.65rem',
+                                border: '1px solid #CBD5E1',
+                                borderRadius: '6px',
+                                fontSize: '0.85rem',
+                                boxSizing: 'border-box',
+                                backgroundColor: 'white',
+                                color: '#1E293B',
+                                cursor: 'pointer',
+                                marginTop: 'auto'
+                              }}
+                            >
+                              {controladorForm.modelo === 'C-5000' || controladorForm.tarjetaConflictosMarcaModo === 'Oriux (Peek Traffic)' ? (
+                                <option value="Oriux (Peek Traffic)">Oriux (Peek Traffic)</option>
+                              ) : (
+                                <option value="Peek Traffic">Peek Traffic</option>
+                              )}
+                              <option value="Otro">Otro (especificar)</option>
+                            </select>
+                            {controladorForm.tarjetaConflictosMarcaModo === 'Otro' && (
+                              <input
+                                type="text"
+                                placeholder="Especificar otra marca..."
+                                value={controladorForm.tarjetaConflictosMarca || ''}
+                                onChange={(e) => setControladorForm({ ...controladorForm, tarjetaConflictosMarca: e.target.value })}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.45rem 0.65rem',
+                                  border: '1px solid #CBD5E1',
+                                  borderRadius: '6px',
+                                  fontSize: '0.82rem',
+                                  boxSizing: 'border-box',
+                                  marginTop: '0.4rem'
+                                }}
+                              />
+                            )}
+                          </>
                         )}
                       </div>
 
@@ -4596,9 +6782,11 @@ export default function InventarioSemaforos() {
                       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                           <FaExclamationTriangle size={12} style={{ color: '#691B31' }} />
-                          <span>Modelo: <span style={{ color: '#DC2626' }}>*</span></span>
+                          <span>Modelo: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                         </label>
-                        {controladorForm.tarjetaConflictosMarcaModo === 'Otro' ? (
+                        {modoVisualizacion ? (
+                          renderDatoConsulta(controladorForm.tarjetaConflictosModelo, 'Sin modelo especificado')
+                        ) : controladorForm.tarjetaConflictosMarcaModo === 'Otro' ? (
                           <input
                             type="text"
                             placeholder="Especificar modelo de tarjeta..."
@@ -4652,23 +6840,27 @@ export default function InventarioSemaforos() {
                     <div style={{ paddingTop: '0.4rem', borderTop: '1px solid #F1F5F9' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                         <FaExclamationTriangle size={12} style={{ color: '#691B31' }} />
-                        <span>Estado de operación: <span style={{ color: '#DC2626' }}>*</span></span>
+                        <span>Estado de operación: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                       </label>
-                      <div style={{ display: 'flex', gap: '1.75rem', alignItems: 'center' }}>
-                        {['Correcto', 'Falla'].map((opcion) => (
-                          <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.tarjetaConflictosEstado === opcion ? '700' : '500', color: '#1E293B' }}>
-                            <input
-                              type="radio"
-                              name="tarjetaConflictosEstado"
-                              value={opcion}
-                              checked={controladorForm.tarjetaConflictosEstado === opcion}
-                              onChange={(e) => setControladorForm({ ...controladorForm, tarjetaConflictosEstado: e.target.value })}
-                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                            />
-                            {opcion}
-                          </label>
-                        ))}
-                      </div>
+                      {modoVisualizacion ? (
+                        renderBadgeConsulta(controladorForm.tarjetaConflictosEstado)
+                      ) : (
+                        <div style={{ display: 'flex', gap: '1.75rem', alignItems: 'center' }}>
+                          {['Correcto', 'Falla'].map((opcion) => (
+                            <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.tarjetaConflictosEstado === opcion ? '700' : '500', color: '#1E293B' }}>
+                              <input
+                                type="radio"
+                                name="tarjetaConflictosEstado"
+                                value={opcion}
+                                checked={controladorForm.tarjetaConflictosEstado === opcion}
+                                onChange={(e) => setControladorForm({ ...controladorForm, tarjetaConflictosEstado: e.target.value })}
+                                style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                              />
+                              {opcion}
+                            </label>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -4692,80 +6884,86 @@ export default function InventarioSemaforos() {
                       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                           <FaCreditCard size={12} style={{ color: '#691B31' }} />
-                          <span>Marca: <span style={{ color: '#DC2626' }}>*</span></span>
+                          <span>Marca: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                         </label>
-                        <select
-                          value={controladorForm.tarjetaRelevadoresMarcaModo || (controladorForm.modelo === 'C-5000' ? 'Oriux' : 'Peek Traffic')}
-                          onChange={(e) => {
-                            const val = e.target.value
-                            if (val === 'Peek Traffic') {
-                              setControladorForm(prev => ({
-                                ...prev,
-                                tarjetaRelevadoresMarcaModo: 'Peek Traffic',
-                                tarjetaRelevadoresMarca: 'Peek Traffic',
-                                tarjetaRelevadoresModelo: MODELOS_RELEVADORES_PEEK.includes(prev.tarjetaRelevadoresModelo) ? prev.tarjetaRelevadoresModelo : 'RC-308',
-                                tarjetaRelevadora: true
-                              }))
-                            } else if (val === 'SEMEX') {
-                              setControladorForm(prev => ({
-                                ...prev,
-                                tarjetaRelevadoresMarcaModo: 'SEMEX',
-                                tarjetaRelevadoresMarca: 'SEMEX',
-                                tarjetaRelevadoresModelo: MODELOS_RELEVADORES_SEMEX.includes(prev.tarjetaRelevadoresModelo) ? prev.tarjetaRelevadoresModelo : 'SEMEX SG-16',
-                                tarjetaRelevadora: true
-                              }))
-                            } else if (val === 'Oriux') {
-                              setControladorForm(prev => ({
-                                ...prev,
-                                tarjetaRelevadoresMarcaModo: 'Oriux',
-                                tarjetaRelevadoresMarca: 'Oriux',
-                                tarjetaRelevadoresModelo: 'C5000 Card-Based Load Switch',
-                                tarjetaRelevadora: true
-                              }))
-                            } else if (val === 'Otro') {
-                              setControladorForm(prev => ({
-                                ...prev,
-                                tarjetaRelevadoresMarcaModo: 'Otro',
-                                tarjetaRelevadoresMarca: (prev.tarjetaRelevadoresMarca && !['Peek Traffic', 'SEMEX', 'Oriux'].includes(prev.tarjetaRelevadoresMarca)) ? prev.tarjetaRelevadoresMarca : '',
-                                tarjetaRelevadoresModelo: '',
-                                tarjetaRelevadora: true
-                              }))
-                            }
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem 0.65rem',
-                            border: '1px solid #CBD5E1',
-                            borderRadius: '6px',
-                            fontSize: '0.85rem',
-                            boxSizing: 'border-box',
-                            backgroundColor: 'white',
-                            color: '#1E293B',
-                            cursor: 'pointer',
-                            marginTop: 'auto'
-                          }}
-                        >
-                          <option value="Peek Traffic">Peek Traffic</option>
-                          <option value="SEMEX">SEMEX</option>
-                          <option value="Oriux">Oriux</option>
-                          <option value="Otro">Otro (especificar)</option>
-                        </select>
-                        {controladorForm.tarjetaRelevadoresMarcaModo === 'Otro' && (
-                          <input
-                            type="text"
-                            placeholder="Especificar otra marca..."
-                            value={controladorForm.tarjetaRelevadoresMarca || ''}
-                            onChange={(e) => setControladorForm(prev => ({ ...prev, tarjetaRelevadoresMarca: e.target.value, tarjetaRelevadora: true }))}
-                            style={{
-                              width: '100%',
-                              padding: '0.45rem 0.65rem',
-                              border: '1px solid #CBD5E1',
-                              borderRadius: '6px',
-                              fontSize: '0.82rem',
-                              boxSizing: 'border-box',
-                              marginTop: '0.4rem'
-                            }}
-                          />
+                        {modoVisualizacion ? (
+                          renderDatoConsulta(controladorForm.tarjetaRelevadoresMarca || (controladorForm.modelo === 'C-5000' ? 'Oriux' : 'Peek Traffic'))
+                        ) : (
+                          <>
+                            <select
+                              value={controladorForm.tarjetaRelevadoresMarcaModo || (controladorForm.modelo === 'C-5000' ? 'Oriux' : 'Peek Traffic')}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                if (val === 'Peek Traffic') {
+                                  setControladorForm(prev => ({
+                                    ...prev,
+                                    tarjetaRelevadoresMarcaModo: 'Peek Traffic',
+                                    tarjetaRelevadoresMarca: 'Peek Traffic',
+                                    tarjetaRelevadoresModelo: MODELOS_RELEVADORES_PEEK.includes(prev.tarjetaRelevadoresModelo) ? prev.tarjetaRelevadoresModelo : 'RC-308',
+                                    tarjetaRelevadora: true
+                                  }))
+                                } else if (val === 'SEMEX') {
+                                  setControladorForm(prev => ({
+                                    ...prev,
+                                    tarjetaRelevadoresMarcaModo: 'SEMEX',
+                                    tarjetaRelevadoresMarca: 'SEMEX',
+                                    tarjetaRelevadoresModelo: MODELOS_RELEVADORES_SEMEX.includes(prev.tarjetaRelevadoresModelo) ? prev.tarjetaRelevadoresModelo : 'SEMEX SG-16',
+                                    tarjetaRelevadora: true
+                                  }))
+                                } else if (val === 'Oriux') {
+                                  setControladorForm(prev => ({
+                                    ...prev,
+                                    tarjetaRelevadoresMarcaModo: 'Oriux',
+                                    tarjetaRelevadoresMarca: 'Oriux',
+                                    tarjetaRelevadoresModelo: 'C5000 Card-Based Load Switch',
+                                    tarjetaRelevadora: true
+                                  }))
+                                } else if (val === 'Otro') {
+                                  setControladorForm(prev => ({
+                                    ...prev,
+                                    tarjetaRelevadoresMarcaModo: 'Otro',
+                                    tarjetaRelevadoresMarca: (prev.tarjetaRelevadoresMarca && !['Peek Traffic', 'SEMEX', 'Oriux'].includes(prev.tarjetaRelevadoresMarca)) ? prev.tarjetaRelevadoresMarca : '',
+                                    tarjetaRelevadoresModelo: '',
+                                    tarjetaRelevadora: true
+                                  }))
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem 0.65rem',
+                                border: '1px solid #CBD5E1',
+                                borderRadius: '6px',
+                                fontSize: '0.85rem',
+                                boxSizing: 'border-box',
+                                backgroundColor: 'white',
+                                color: '#1E293B',
+                                cursor: 'pointer',
+                                marginTop: 'auto'
+                              }}
+                            >
+                              <option value="Peek Traffic">Peek Traffic</option>
+                              <option value="SEMEX">SEMEX</option>
+                              <option value="Oriux">Oriux</option>
+                              <option value="Otro">Otro (especificar)</option>
+                            </select>
+                            {controladorForm.tarjetaRelevadoresMarcaModo === 'Otro' && (
+                              <input
+                                type="text"
+                                placeholder="Especificar otra marca..."
+                                value={controladorForm.tarjetaRelevadoresMarca || ''}
+                                onChange={(e) => setControladorForm(prev => ({ ...prev, tarjetaRelevadoresMarca: e.target.value, tarjetaRelevadora: true }))}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.45rem 0.65rem',
+                                  border: '1px solid #CBD5E1',
+                                  borderRadius: '6px',
+                                  fontSize: '0.82rem',
+                                  boxSizing: 'border-box',
+                                  marginTop: '0.4rem'
+                                }}
+                              />
+                            )}
+                          </>
                         )}
                       </div>
 
@@ -4773,9 +6971,11 @@ export default function InventarioSemaforos() {
                       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                           <FaCreditCard size={12} style={{ color: '#691B31' }} />
-                          <span>Modelo: <span style={{ color: '#DC2626' }}>*</span></span>
+                          <span>Modelo: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                         </label>
-                        {controladorForm.tarjetaRelevadoresMarcaModo === 'Otro' ? (
+                        {modoVisualizacion ? (
+                          renderDatoConsulta(controladorForm.tarjetaRelevadoresModelo, 'Sin modelo especificado')
+                        ) : controladorForm.tarjetaRelevadoresMarcaModo === 'Otro' ? (
                           <input
                             type="text"
                             placeholder="Especificar modelo de relevador..."
@@ -4831,23 +7031,43 @@ export default function InventarioSemaforos() {
                       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                           <FaBoxes size={12} style={{ color: '#691B31' }} />
-                          <span>Cantidad instalada: <span style={{ color: '#DC2626' }}>*</span></span>
+                          <span>Cantidad instalada: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                         </label>
-                        <input
-                          type="text"
-                          placeholder="ej. 8 o 16 piezas"
-                          value={controladorForm.tarjetaRelevadoresCantidad || ''}
-                          onChange={(e) => setControladorForm(prev => ({ ...prev, tarjetaRelevadoresCantidad: e.target.value, tarjetaRelevadora: true }))}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem 0.65rem',
-                            border: '1px solid #CBD5E1',
-                            borderRadius: '6px',
-                            fontSize: '0.85rem',
-                            boxSizing: 'border-box',
-                            marginTop: 'auto'
-                          }}
-                        />
+                        {modoVisualizacion ? (
+                          renderDatoConsulta(controladorForm.tarjetaRelevadoresCantidad, 'Sin registrar')
+                        ) : (
+                          <div>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="ej. 8 o 16 piezas"
+                              value={controladorForm.tarjetaRelevadoresCantidad || ''}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setControladorForm(prev => ({ ...prev, tarjetaRelevadoresCantidad: val, tarjetaRelevadora: true }))
+                                if (controladorErrores.tarjetaRelevadoresCantidad) {
+                                  setControladorErrores(prev => ({ ...prev, tarjetaRelevadoresCantidad: undefined }))
+                                }
+                              }}
+                              onWheel={(e) => e.target.blur()}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem 0.65rem',
+                                border: `1px solid ${controladorErrores.tarjetaRelevadoresCantidad ? '#DC2626' : '#CBD5E1'}`,
+                                backgroundColor: controladorErrores.tarjetaRelevadoresCantidad ? '#FEF2F2' : '#FFFFFF',
+                                borderRadius: '6px',
+                                fontSize: '0.85rem',
+                                boxSizing: 'border-box',
+                                marginTop: 'auto'
+                              }}
+                            />
+                            {controladorErrores.tarjetaRelevadoresCantidad && (
+                              <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                                <FaExclamationTriangle size={10} /> {controladorErrores.tarjetaRelevadoresCantidad}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -4883,7 +7103,7 @@ export default function InventarioSemaforos() {
                     alignItems: 'center',
                     gap: '0.45rem'
                   }}>
-                    <FaProjectDiagram size={14} style={{ color: '#BC955B' }} /> Sección C: Red, Conectividad y Energía
+                    <FaProjectDiagram size={14} style={{ color: '#BC955B' }} /> Sección 4: Red, Conectividad y Energía
                   </h4>
                   <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
                     Switch de fibra, conexiones y alimentación
@@ -4902,62 +7122,81 @@ export default function InventarioSemaforos() {
                     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                         <FaProjectDiagram size={12} style={{ color: '#691B31' }} />
-                        <span>Marca: <span style={{ color: '#DC2626' }}>*</span></span>
+                        <span>Marca: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                       </label>
-                      <select
-                        value={controladorForm.switchFibraMarcaModo || (controladorForm.modelo === 'C-5000' ? 'Oriux' : 'Moxa')}
-                        onChange={(e) => {
-                          const val = e.target.value
-                          if (val === 'Moxa') {
-                            setControladorForm(prev => {
-                              const switchMod = prev.switchFibraModelo && MODELOS_SWITCH_MOXA_CATALOGO.some(m => m.modelo === prev.switchFibraModelo) ? prev.switchFibraModelo : 'Moxa EDS-208 / 308'
-                              const switchObj = MODELOS_SWITCH_MOXA_CATALOGO.find(m => m.modelo === switchMod)
-                              return {
-                                ...prev,
-                                switchFibraMarcaModo: 'Moxa',
-                                switchFibraMarca: 'Moxa',
-                                switchFibraModelo: switchMod,
-                                switchFibraPuertosTotal: switchObj ? switchObj.puertos : '8',
-                                switch: true
+                      {modoVisualizacion ? (
+                        renderDatoConsulta(controladorForm.switchFibraMarca || (controladorForm.modelo === 'C-5000' ? 'Oriux' : 'Moxa'))
+                      ) : (
+                        <>
+                          <select
+                            value={controladorForm.switchFibraMarcaModo || (controladorForm.modelo === 'C-5000' ? 'Oriux' : 'Moxa')}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              if (val === 'Moxa') {
+                                setControladorForm(prev => {
+                                  const switchMod = prev.switchFibraModelo && MODELOS_SWITCH_MOXA_CATALOGO.some(m => m.modelo === prev.switchFibraModelo) ? prev.switchFibraModelo : 'Moxa EDS-208 / 308'
+                                  const switchObj = MODELOS_SWITCH_MOXA_CATALOGO.find(m => m.modelo === switchMod)
+                                  const newTotal = switchObj ? parseInt(switchObj.puertos, 10) : 8
+                                  const prevUso = parseInt(prev.switchFibraPuertosUso, 10)
+                                  const nuevoUso = (!isNaN(prevUso) && prevUso > newTotal) ? String(newTotal) : prev.switchFibraPuertosUso
+                                  return {
+                                    ...prev,
+                                    switchFibraMarcaModo: 'Moxa',
+                                    switchFibraMarca: 'Moxa',
+                                    switchFibraModelo: switchMod,
+                                    switchFibraPuertosTotal: switchObj ? switchObj.puertos : '8',
+                                    switchFibraPuertosUso: nuevoUso,
+                                    switch: true
+                                  }
+                                })
+                                setControladorErrores(prev => ({ ...prev, switchFibraPuertosTotal: undefined, switchFibraPuertosUso: undefined }))
+                              } else if (val === 'Oriux') {
+                                setControladorForm(prev => {
+                                  const newTotal = 2
+                                  const prevUso = parseInt(prev.switchFibraPuertosUso, 10)
+                                  const nuevoUso = (!isNaN(prevUso) && prevUso > newTotal) ? String(newTotal) : prev.switchFibraPuertosUso
+                                  return {
+                                    ...prev,
+                                    switchFibraMarcaModo: 'Oriux',
+                                    switchFibraMarca: 'Oriux',
+                                    switchFibraModelo: 'C5000 ATC CPU Ports',
+                                    switchFibraPuertosTotal: '2',
+                                    switchFibraPuertosUso: nuevoUso,
+                                    switch: true
+                                  }
+                                })
+                                setControladorErrores(prev => ({ ...prev, switchFibraPuertosTotal: undefined, switchFibraPuertosUso: undefined }))
+                              } else if (val === 'Otro') {
+                                setControladorForm(prev => ({
+                                  ...prev,
+                                  switchFibraMarcaModo: 'Otro',
+                                  switchFibraMarca: (prev.switchFibraMarca && prev.switchFibraMarca !== 'Moxa' && prev.switchFibraMarca !== 'Oriux') ? prev.switchFibraMarca : '',
+                                  switchFibraModelo: '',
+                                  switchFibraPuertosTotal: '',
+                                  switch: true
+                                }))
+                                setControladorErrores(prev => ({ ...prev, switchFibraPuertosTotal: undefined, switchFibraPuertosUso: undefined }))
                               }
-                            })
-                          } else if (val === 'Oriux') {
-                            setControladorForm(prev => ({
-                              ...prev,
-                              switchFibraMarcaModo: 'Oriux',
-                              switchFibraMarca: 'Oriux',
-                              switchFibraModelo: 'C5000 ATC CPU Ports',
-                              switchFibraPuertosTotal: '2',
-                              switch: true
-                            }))
-                          } else if (val === 'Otro') {
-                            setControladorForm(prev => ({
-                              ...prev,
-                              switchFibraMarcaModo: 'Otro',
-                              switchFibraMarca: (prev.switchFibraMarca && prev.switchFibraMarca !== 'Moxa' && prev.switchFibraMarca !== 'Oriux') ? prev.switchFibraMarca : '',
-                              switchFibraModelo: '',
-                              switchFibraPuertosTotal: '',
-                              switch: true
-                            }))
-                          }
-                        }}
-                        style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', backgroundColor: 'white', color: '#1E293B', cursor: 'pointer', marginTop: 'auto' }}
-                      >
-                        {controladorForm.modelo === 'C-5000' || controladorForm.switchFibraMarcaModo === 'Oriux' ? (
-                          <option value="Oriux">Oriux</option>
-                        ) : (
-                          <option value="Moxa">Moxa</option>
-                        )}
-                        <option value="Otro">Otro (especificar)</option>
-                      </select>
-                      {controladorForm.switchFibraMarcaModo === 'Otro' && (
-                        <input
-                          type="text"
-                          placeholder="Especificar marca (ej. Cisco, RuggedCom)..."
-                          value={controladorForm.switchFibraMarca || ''}
-                          onChange={(e) => setControladorForm({ ...controladorForm, switchFibraMarca: e.target.value, switch: true })}
-                          style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.82rem', boxSizing: 'border-box', marginTop: '0.4rem' }}
-                        />
+                            }}
+                            style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', backgroundColor: 'white', color: '#1E293B', cursor: 'pointer', marginTop: 'auto' }}
+                          >
+                            {controladorForm.modelo === 'C-5000' || controladorForm.switchFibraMarcaModo === 'Oriux' ? (
+                              <option value="Oriux">Oriux</option>
+                            ) : (
+                              <option value="Moxa">Moxa</option>
+                            )}
+                            <option value="Otro">Otro (especificar)</option>
+                          </select>
+                          {controladorForm.switchFibraMarcaModo === 'Otro' && (
+                            <input
+                              type="text"
+                              placeholder="Especificar marca (ej. Cisco, RuggedCom)..."
+                              value={controladorForm.switchFibraMarca || ''}
+                              onChange={(e) => setControladorForm({ ...controladorForm, switchFibraMarca: e.target.value, switch: true })}
+                              style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.82rem', boxSizing: 'border-box', marginTop: '0.4rem' }}
+                            />
+                          )}
+                        </>
                       )}
                     </div>
 
@@ -4965,9 +7204,11 @@ export default function InventarioSemaforos() {
                     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                         <FaHdd size={12} style={{ color: '#691B31' }} />
-                        <span>Modelo: <span style={{ color: '#DC2626' }}>*</span></span>
+                        <span>Modelo: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                       </label>
-                      {controladorForm.switchFibraMarcaModo === 'Otro' ? (
+                      {modoVisualizacion ? (
+                        renderDatoConsulta(controladorForm.switchFibraModelo, 'Sin modelo especificado')
+                      ) : controladorForm.switchFibraMarcaModo === 'Otro' ? (
                         <input
                           type="text"
                           placeholder="Especificar modelo de switch..."
@@ -4984,12 +7225,22 @@ export default function InventarioSemaforos() {
                               ? MODELOS_SWITCH_ORIUX_CATALOGO
                               : MODELOS_SWITCH_MOXA_CATALOGO
                             const found = catalogo.find(m => m.modelo === mod)
-                            setControladorForm(prev => ({
-                              ...prev,
-                              switchFibraModelo: mod,
-                              switchFibraPuertosTotal: found ? found.puertos : prev.switchFibraPuertosTotal,
-                              switch: true
-                            }))
+                            const newTotal = found ? parseInt(found.puertos, 10) : undefined
+                            setControladorForm(prev => {
+                              const prevUso = parseInt(prev.switchFibraPuertosUso, 10)
+                              let nuevoUso = prev.switchFibraPuertosUso
+                              if (newTotal !== undefined && !isNaN(prevUso) && prevUso > newTotal) {
+                                nuevoUso = String(newTotal)
+                              }
+                              return {
+                                ...prev,
+                                switchFibraModelo: mod,
+                                switchFibraPuertosTotal: found ? found.puertos : prev.switchFibraPuertosTotal,
+                                switchFibraPuertosUso: nuevoUso,
+                                switch: true
+                              }
+                            })
+                            setControladorErrores(prev => ({ ...prev, switchFibraPuertosTotal: undefined, switchFibraPuertosUso: undefined }))
                           }}
                           style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', backgroundColor: 'white', color: '#1E293B', cursor: 'pointer', marginTop: 'auto' }}
                         >
@@ -5013,30 +7264,75 @@ export default function InventarioSemaforos() {
                     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                         <FaNetworkWired size={12} style={{ color: '#691B31' }} />
-                        <span>Total de puertos: <span style={{ color: '#DC2626' }}>*</span></span>
+                        <span>Total de puertos: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                       </label>
-                      <input
-                        type="text"
-                        placeholder="ej. 2, 8 o 10 puertos"
-                        value={controladorForm.switchFibraPuertosTotal || ''}
-                        onChange={(e) => setControladorForm({ ...controladorForm, switchFibraPuertosTotal: e.target.value, switch: true })}
-                        style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', marginTop: 'auto' }}
-                      />
+                      {modoVisualizacion ? (
+                        renderDatoConsulta(controladorForm.switchFibraPuertosTotal ? `${controladorForm.switchFibraPuertosTotal} puertos` : '', 'Sin registrar')
+                      ) : (
+                        <div>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="ej. 2, 8 o 10 puertos"
+                            value={controladorForm.switchFibraPuertosTotal || ''}
+                            onChange={(e) => handleCambiarSwitchPuertosTotal(e.target.value)}
+                            onWheel={(e) => e.target.blur()}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem 0.65rem',
+                              border: `1px solid ${controladorErrores.switchFibraPuertosTotal ? '#DC2626' : '#CBD5E1'}`,
+                              backgroundColor: controladorErrores.switchFibraPuertosTotal ? '#FEF2F2' : '#FFFFFF',
+                              borderRadius: '6px',
+                              fontSize: '0.85rem',
+                              boxSizing: 'border-box',
+                              marginTop: 'auto'
+                            }}
+                          />
+                          {controladorErrores.switchFibraPuertosTotal && (
+                            <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                              <FaExclamationTriangle size={10} /> {controladorErrores.switchFibraPuertosTotal}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* 4. Puertos en uso */}
                     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                         <FaNetworkWired size={12} style={{ color: '#691B31' }} />
-                        <span>Puertos en uso: <span style={{ color: '#DC2626' }}>*</span></span>
+                        <span>Puertos en uso: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                       </label>
-                      <input
-                        type="text"
-                        placeholder="ej. 4 puertos"
-                        value={controladorForm.switchFibraPuertosUso || ''}
-                        onChange={(e) => setControladorForm({ ...controladorForm, switchFibraPuertosUso: e.target.value, switch: true })}
-                        style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', marginTop: 'auto' }}
-                      />
+                      {modoVisualizacion ? (
+                        renderDatoConsulta(controladorForm.switchFibraPuertosUso ? `${controladorForm.switchFibraPuertosUso} puertos` : '', 'Sin registrar')
+                      ) : (
+                        <div>
+                          <input
+                            type="number"
+                            min="0"
+                            max={controladorForm.switchFibraPuertosTotal !== '' && !isNaN(parseInt(controladorForm.switchFibraPuertosTotal, 10)) ? parseInt(controladorForm.switchFibraPuertosTotal, 10) : undefined}
+                            placeholder="ej. 4 puertos"
+                            value={controladorForm.switchFibraPuertosUso || ''}
+                            onChange={(e) => handleCambiarSwitchPuertosUso(e.target.value)}
+                            onWheel={(e) => e.target.blur()}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem 0.65rem',
+                              border: `1px solid ${controladorErrores.switchFibraPuertosUso ? '#DC2626' : '#CBD5E1'}`,
+                              backgroundColor: controladorErrores.switchFibraPuertosUso ? '#FEF2F2' : '#FFFFFF',
+                              borderRadius: '6px',
+                              fontSize: '0.85rem',
+                              boxSizing: 'border-box',
+                              marginTop: 'auto'
+                            }}
+                          />
+                          {controladorErrores.switchFibraPuertosUso && (
+                            <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                              <FaExclamationTriangle size={10} /> {controladorErrores.switchFibraPuertosUso}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -5044,23 +7340,27 @@ export default function InventarioSemaforos() {
                   <div style={{ paddingTop: '0.5rem', borderTop: '1px solid #F1F5F9' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                       <FaPowerOff size={12} style={{ color: '#691B31' }} />
-                      <span>Fuentes de poder del switch: <span style={{ color: '#DC2626' }}>*</span></span>
+                      <span>Fuentes de poder del switch: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                     </label>
-                    <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      {['Operativa', 'Sin operar'].map((opcion) => (
-                        <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.switchFibraFuentePoder === opcion ? '700' : '500', color: '#1E293B' }}>
-                          <input
-                            type="radio"
-                            name="switchFibraFuentePoder"
-                            value={opcion}
-                            checked={controladorForm.switchFibraFuentePoder === opcion}
-                            onChange={(e) => setControladorForm({ ...controladorForm, switchFibraFuentePoder: e.target.value, switch: true })}
-                            style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                          />
-                          {opcion}
-                        </label>
-                      ))}
-                    </div>
+                    {modoVisualizacion ? (
+                      renderBadgeConsulta(controladorForm.switchFibraFuentePoder)
+                    ) : (
+                      <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {['Operativa', 'Sin operar'].map((opcion) => (
+                          <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.switchFibraFuentePoder === opcion ? '700' : '500', color: '#1E293B' }}>
+                            <input
+                              type="radio"
+                              name="switchFibraFuentePoder"
+                              value={opcion}
+                              checked={controladorForm.switchFibraFuentePoder === opcion}
+                              onChange={(e) => setControladorForm({ ...controladorForm, switchFibraFuentePoder: e.target.value, switch: true })}
+                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            {opcion}
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -5075,46 +7375,54 @@ export default function InventarioSemaforos() {
                     <div>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                         <FaHdd size={12} style={{ color: '#691B31' }} />
-                        <span>Dispositivo receptor: <span style={{ color: '#DC2626' }}>*</span></span>
+                        <span>Dispositivo receptor: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                       </label>
-                      <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '34px' }}>
-                        {['Presente', 'No tiene'].map((opcion) => (
-                          <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.receptorFibraDispositivo === opcion ? '700' : '500', color: '#1E293B' }}>
-                            <input
-                              type="radio"
-                              name="receptorFibraDispositivo"
-                              value={opcion}
-                              checked={controladorForm.receptorFibraDispositivo === opcion}
-                              onChange={(e) => setControladorForm({ ...controladorForm, receptorFibraDispositivo: e.target.value, fibraOptica: opcion === 'Presente' })}
-                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                            />
-                            {opcion}
-                          </label>
-                        ))}
-                      </div>
+                      {modoVisualizacion ? (
+                        renderBadgeConsulta(controladorForm.receptorFibraDispositivo)
+                      ) : (
+                        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '34px' }}>
+                          {['Presente', 'No tiene'].map((opcion) => (
+                            <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.receptorFibraDispositivo === opcion ? '700' : '500', color: '#1E293B' }}>
+                              <input
+                                type="radio"
+                                name="receptorFibraDispositivo"
+                                value={opcion}
+                                checked={controladorForm.receptorFibraDispositivo === opcion}
+                                onChange={(e) => setControladorForm({ ...controladorForm, receptorFibraDispositivo: e.target.value, fibraOptica: opcion === 'Presente' })}
+                                style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                              />
+                              {opcion}
+                            </label>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Cable de fibra óptica */}
                     <div>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                         <FaProjectDiagram size={12} style={{ color: '#691B31' }} />
-                        <span>Cable de fibra óptica: <span style={{ color: '#DC2626' }}>*</span></span>
+                        <span>Cable de fibra óptica: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                       </label>
-                      <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '34px' }}>
-                        {['Conectado', 'Desconectado', 'No tiene'].map((opcion) => (
-                          <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.receptorFibraCable === opcion ? '700' : '500', color: '#1E293B' }}>
-                            <input
-                              type="radio"
-                              name="receptorFibraCable"
-                              value={opcion}
-                              checked={controladorForm.receptorFibraCable === opcion}
-                              onChange={(e) => setControladorForm({ ...controladorForm, receptorFibraCable: e.target.value })}
-                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                            />
-                            {opcion}
-                          </label>
-                        ))}
-                      </div>
+                      {modoVisualizacion ? (
+                        renderBadgeConsulta(controladorForm.receptorFibraCable)
+                      ) : (
+                        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '34px' }}>
+                          {['Conectado', 'Desconectado', 'No tiene'].map((opcion) => (
+                            <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.receptorFibraCable === opcion ? '700' : '500', color: '#1E293B' }}>
+                              <input
+                                type="radio"
+                                name="receptorFibraCable"
+                                value={opcion}
+                                checked={controladorForm.receptorFibraCable === opcion}
+                                onChange={(e) => setControladorForm({ ...controladorForm, receptorFibraCable: e.target.value })}
+                                style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                              />
+                              {opcion}
+                            </label>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -5129,16 +7437,20 @@ export default function InventarioSemaforos() {
                       </span>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                         <FaMicrochip size={12} style={{ color: '#691B31' }} />
-                        <span>Total de conexiones ocupadas: <span style={{ color: '#DC2626' }}>*</span></span>
+                        <span>Total de conexiones ocupadas: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                       </label>
                     </div>
-                    <input
-                      type="text"
-                      placeholder="ej. 12 conexiones"
-                      value={controladorForm.conexionesTarjetaMadre}
-                      onChange={(e) => setControladorForm({ ...controladorForm, conexionesTarjetaMadre: e.target.value })}
-                      style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', marginTop: 'auto' }}
-                    />
+                    {modoVisualizacion ? (
+                      renderDatoConsulta(controladorForm.conexionesTarjetaMadre, 'Sin registrar')
+                    ) : (
+                      <input
+                        type="text"
+                        placeholder="ej. 12 conexiones"
+                        value={controladorForm.conexionesTarjetaMadre}
+                        onChange={(e) => setControladorForm({ ...controladorForm, conexionesTarjetaMadre: e.target.value })}
+                        style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', marginTop: 'auto' }}
+                      />
+                    )}
                   </div>
 
                   {/* Alimentación Eléctrica / Fuente de poder */}
@@ -5149,24 +7461,28 @@ export default function InventarioSemaforos() {
                       </span>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                         <FaPowerOff size={12} style={{ color: '#691B31' }} />
-                        <span>Supresor de picos: <span style={{ color: '#DC2626' }}>*</span></span>
+                        <span>Supresor de picos: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                       </label>
                     </div>
-                    <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '38px', marginTop: 'auto' }}>
-                      {['Operando', 'Dañado'].map((opcion) => (
-                        <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.fuentePoderSupresorPicos === opcion ? '700' : '500', color: '#1E293B' }}>
-                          <input
-                            type="radio"
-                            name="fuentePoderSupresorPicos"
-                            value={opcion}
-                            checked={controladorForm.fuentePoderSupresorPicos === opcion}
-                            onChange={(e) => setControladorForm({ ...controladorForm, fuentePoderSupresorPicos: e.target.value, fuentePoder: true })}
-                            style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                          />
-                          {opcion}
-                        </label>
-                      ))}
-                    </div>
+                    {modoVisualizacion ? (
+                      renderBadgeConsulta(controladorForm.fuentePoderSupresorPicos)
+                    ) : (
+                      <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '38px', marginTop: 'auto' }}>
+                        {['Operando', 'Dañado'].map((opcion) => (
+                          <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.fuentePoderSupresorPicos === opcion ? '700' : '500', color: '#1E293B' }}>
+                            <input
+                              type="radio"
+                              name="fuentePoderSupresorPicos"
+                              value={opcion}
+                              checked={controladorForm.fuentePoderSupresorPicos === opcion}
+                              onChange={(e) => setControladorForm({ ...controladorForm, fuentePoderSupresorPicos: e.target.value, fuentePoder: true })}
+                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            {opcion}
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -5201,7 +7517,7 @@ export default function InventarioSemaforos() {
                       alignItems: 'center',
                       gap: '0.45rem'
                     }}>
-                      <FaSign size={14} style={{ color: '#BC955B' }} /> Postes y Equipamiento del Crucero
+                      <FaSign size={14} style={{ color: '#BC955B' }} /> Sección 5: Postes y Equipamiento del Crucero
                     </h4>
                     <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '500' }}>
                       Detalle de postes, cabezales vehiculares, paso peatonal y detección
@@ -5213,33 +7529,40 @@ export default function InventarioSemaforos() {
                       <FaBoxes size={11} style={{ color: '#691B31' }} />
                       {(controladorForm.postes || []).length} poste{((controladorForm.postes || []).length !== 1) ? 's' : ''} en crucero
                     </span>
-                    <button
-                      type="button"
-                      onClick={handleAgregarPoste}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                        backgroundColor: '#FFFFFF',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        padding: '0.35rem 0.75rem',
-                        fontSize: '0.8rem',
-                        fontWeight: '700',
-                        color: '#691B31',
-                        cursor: 'pointer',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                        transition: 'all 0.15s'
-                      }}
-                      onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#F8FAFC'; e.currentTarget.style.borderColor = '#691B31'; }}
-                      onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.borderColor = '#CBD5E1'; }}
-                    >
-                      <FaPlus size={10} style={{ color: '#BC955B' }} /> Agregar poste
-                    </button>
+                    {!modoVisualizacion && (
+                      <button
+                        type="button"
+                        onClick={handleAgregarPoste}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #CBD5E1',
+                          borderRadius: '6px',
+                          padding: '0.35rem 0.75rem',
+                          fontSize: '0.8rem',
+                          fontWeight: '700',
+                          color: '#691B31',
+                          cursor: 'pointer',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                          transition: 'all 0.15s'
+                        }}
+                        onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#F8FAFC'; e.currentTarget.style.borderColor = '#691B31'; }}
+                        onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.borderColor = '#CBD5E1'; }}
+                      >
+                        <FaPlus size={10} style={{ color: '#BC955B' }} /> Agregar poste
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* Listado de Postes (Se muestra únicamente si el usuario agrega postes) */}
+                {/* Listado de Postes */}
+                {(controladorForm.postes || []).length === 0 && modoVisualizacion && (
+                  <div style={{ padding: '1.25rem', textAlign: 'center', color: '#94A3B8', fontStyle: 'italic', fontSize: '0.85rem', backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px dashed #CBD5E1' }}>
+                    No hay postes registrados en la infraestructura de este controlador.
+                  </div>
+                )}
                 {(controladorForm.postes || []).length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.85rem' }}>
                     {(controladorForm.postes || []).map((poste, pIdx) => (
@@ -5302,272 +7625,384 @@ export default function InventarioSemaforos() {
                           )}
                         </div>
 
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.65rem' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleEliminarPosteModular(pIdx)}
-                            disabled={guardandoModularSeccion === `poste-del-${pIdx}`}
-                            title="Eliminar este poste"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.3rem',
-                              background: 'none',
-                              border: 'none',
-                              color: '#DC2626',
-                              fontSize: '0.78rem',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              padding: '0.2rem 0.4rem',
-                              borderRadius: '4px'
-                            }}
-                            onMouseOver={(e) => e.currentTarget.style.textDecoration = 'underline'}
-                            onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}
-                          >
-                            <FaTrashAlt size={11} /> {guardandoModularSeccion === `poste-del-${pIdx}` ? 'Borrando...' : 'Eliminar este poste'}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Datos del Poste */}
-                      <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '0.85rem' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                            <span>Tipo / Función de poste: <span style={{ color: '#DC2626' }}>*</span></span>
-                          </label>
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: '3px',
-                            backgroundColor: '#F1F5F9',
-                            padding: '3px',
-                            borderRadius: '6px',
-                            border: '1px solid #CBD5E1',
-                            boxSizing: 'border-box'
-                          }}>
-                            {[
-                              { val: 'mixto', label: 'Vehicular / Mixto', icon: <FaTrafficLight size={11} /> },
-                              { val: 'peatonal', label: 'Peatonal', icon: <FaWalking size={11} /> }
-                            ].map(({ val, label, icon }) => {
-                              const isSel = (poste.tipoPoste || 'mixto') === val
-                              return (
-                                <button
-                                  key={val}
-                                  type="button"
-                                  onClick={() => {
-                                    if (val === 'peatonal') {
-                                      handleActualizarPosteMultiple(pIdx, {
-                                        tipoPoste: 'peatonal',
-                                        modeloPoste: (!poste.modeloPoste || poste.modeloPoste === 'PCC-1' || normalizarNombreModeloPoste(poste.modeloPoste) === 'MP-01') ? 'MP-01' : normalizarNombreModeloPoste(poste.modeloPoste),
-                                        tienePeatonal: true,
-                                        tipoCabezal: 'Ninguno',
-                                        pantallaPiezas: '',
-                                        cabezalesGrupos: [],
-                                        peatonalModelo: poste.peatonalModelo || MODELOS_PEATONAL_CATALOGO[0],
-                                        peatonalModuloEstado: poste.peatonalModuloEstado || 'Operando',
-                                        peatonalesLista: (poste.peatonalesLista && poste.peatonalesLista.length > 0) ? poste.peatonalesLista : [crearPeatonalInicial(1)]
-                                      })
-                                    } else {
-                                      handleActualizarPosteMultiple(pIdx, {
-                                        tipoPoste: 'mixto',
-                                        modeloPoste: (normalizarNombreModeloPoste(poste.modeloPoste) === 'MP-01') ? 'PCC-1' : (poste.modeloPoste || 'PCC-1'),
-                                        tipoCabezal: 'LED',
-                                        cabezalesGrupos: (poste.cabezalesGrupos && poste.cabezalesGrupos.length > 0) ? poste.cabezalesGrupos : [
-                                          {
-                                            id: 1,
-                                            numLeds: 4,
-                                            leds: [
-                                              { numero: 1, color: 'Rojo', estado: 'Funciona' },
-                                              { numero: 2, color: 'Amarillo', estado: 'Funciona' },
-                                              { numero: 3, color: 'Verde', estado: 'Funciona' },
-                                              { numero: 4, color: 'Flecha Verde', estado: 'Funciona' }
-                                            ]
-                                          }
-                                        ]
-                                      })
-                                    }
-                                  }}
-                                  style={{
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    padding: '0.45rem 0.5rem',
-                                    fontSize: '0.78rem',
-                                    fontWeight: isSel ? '700' : '500',
-                                    backgroundColor: isSel ? '#691B31' : 'transparent',
-                                    color: isSel ? '#FFFFFF' : '#475569',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '0.35rem',
-                                    boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                    transition: 'all 0.15s',
-                                    whiteSpace: 'nowrap'
-                                  }}
-                                >
-                                  {icon}
-                                  <span>{label}</span>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.3rem' }}>
-                            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', margin: 0 }}>
-                              <span>Coordenadas del poste:</span>
-                            </label>
+                        {!modoVisualizacion && (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.65rem' }}>
                             <button
                               type="button"
-                              onClick={() => handleObtenerGpsPoste(pIdx)}
-                              disabled={capturandoGpsPosteIndex === pIdx}
+                              onClick={() => handleEliminarPosteModular(pIdx)}
+                              disabled={guardandoModularSeccion === `poste-del-${pIdx}`}
+                              title="Eliminar este poste"
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '0.25rem',
-                                backgroundColor: capturandoGpsPosteIndex === pIdx ? '#E2E8F0' : '#FEF3C7',
-                                color: '#92400E',
-                                border: '1px solid #FCD34D',
-                                borderRadius: '4px',
-                                padding: '0.15rem 0.45rem',
-                                fontSize: '0.72rem',
-                                fontWeight: '700',
-                                cursor: capturandoGpsPosteIndex === pIdx ? 'wait' : 'pointer'
+                                gap: '0.3rem',
+                                background: 'none',
+                                border: 'none',
+                                color: '#DC2626',
+                                fontSize: '0.78rem',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                padding: '0.2rem 0.4rem',
+                                borderRadius: '4px'
                               }}
-                              title="Capturar ubicación GPS actual del poste"
+                              onMouseOver={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                              onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}
                             >
-                              <FaMapMarkerAlt size={10} />
-                              {capturandoGpsPosteIndex === pIdx ? 'Obteniendo GPS...' : 'GPS actual'}
+                              <FaTrashAlt size={11} /> {guardandoModularSeccion === `poste-del-${pIdx}` ? 'Borrando...' : 'Eliminar este poste'}
                             </button>
                           </div>
-                          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                            <input
-                              type="text"
-                              list={`sugerencias-ubicacion-postes-${pIdx}`}
-                              placeholder="ej. 20.123456, -98.765432"
-                              value={poste.ubicacionPoste || ''}
-                              onChange={(e) => handleActualizarPoste(pIdx, 'ubicacionPoste', e.target.value)}
+                        )}
+                      </div>
+
+                      {/* Datos del Poste */}
+                      {(() => {
+                        const coordsPoste = extraerCoordenadasValidas(poste.ubicacionPoste)
+                        const mapaVisible = mapasPostesVisibles[pIdx] !== false && Boolean(coordsPoste)
+
+                        return (
+                          <>
+                            <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: coordsPoste && mapaVisible ? '0.65rem' : '0.85rem' }}>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                                  <span>Tipo / Función de poste: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                </label>
+                                {modoVisualizacion ? (
+                                  <div style={{ display: 'flex', alignItems: 'center', minHeight: '34px' }}>
+                                    <span style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.4rem',
+                                      padding: '0.35rem 0.8rem',
+                                      borderRadius: '6px',
+                                      fontSize: '0.85rem',
+                                      fontWeight: '700',
+                                      backgroundColor: (poste.tipoPoste || 'mixto') === 'peatonal' ? '#EFF6FF' : '#FDF2F8',
+                                      color: (poste.tipoPoste || 'mixto') === 'peatonal' ? '#1D4ED8' : '#691B31',
+                                      border: (poste.tipoPoste || 'mixto') === 'peatonal' ? '1px solid #BFDBFE' : '1px solid #FBCFE8'
+                                    }}>
+                                      {(poste.tipoPoste || 'mixto') === 'peatonal' ? <FaWalking size={12} /> : <FaTrafficLight size={12} />}
+                                      {(poste.tipoPoste || 'mixto') === 'peatonal' ? 'Peatonal' : 'Vehicular / Mixto'}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '1fr 1fr',
+                                    gap: '3px',
+                                    backgroundColor: '#F1F5F9',
+                                    padding: '3px',
+                                    borderRadius: '6px',
+                                    border: '1px solid #CBD5E1',
+                                    boxSizing: 'border-box'
+                                  }}>
+                                    {[
+                                      { val: 'mixto', label: 'Vehicular / Mixto', icon: <FaTrafficLight size={11} /> },
+                                      { val: 'peatonal', label: 'Peatonal', icon: <FaWalking size={11} /> }
+                                    ].map(({ val, label, icon }) => {
+                                      const isSel = (poste.tipoPoste || 'mixto') === val
+                                      return (
+                                        <button
+                                          key={val}
+                                          type="button"
+                                          onClick={() => {
+                                            if (val === 'peatonal') {
+                                              handleActualizarPosteMultiple(pIdx, {
+                                                tipoPoste: 'peatonal',
+                                                modeloPoste: (!poste.modeloPoste || poste.modeloPoste === 'PCC-1' || normalizarNombreModeloPoste(poste.modeloPoste) === 'MP-01') ? 'MP-01' : normalizarNombreModeloPoste(poste.modeloPoste),
+                                                tienePeatonal: true,
+                                                tipoCabezal: 'Ninguno',
+                                                pantallaPiezas: '',
+                                                cabezalesGrupos: [],
+                                                peatonalModelo: poste.peatonalModelo || MODELOS_PEATONAL_CATALOGO[0],
+                                                peatonalModuloEstado: poste.peatonalModuloEstado || 'Operando',
+                                                peatonalesLista: (poste.peatonalesLista && poste.peatonalesLista.length > 0) ? poste.peatonalesLista : [crearPeatonalInicial(1)]
+                                              })
+                                            } else {
+                                              handleActualizarPosteMultiple(pIdx, {
+                                                tipoPoste: 'mixto',
+                                                modeloPoste: (normalizarNombreModeloPoste(poste.modeloPoste) === 'MP-01') ? 'PCC-1' : (poste.modeloPoste || 'PCC-1'),
+                                                tipoCabezal: 'LED',
+                                                cabezalesGrupos: (poste.cabezalesGrupos && poste.cabezalesGrupos.length > 0) ? poste.cabezalesGrupos : [
+                                                  {
+                                                    id: 1,
+                                                    numLeds: 4,
+                                                    leds: [
+                                                      { numero: 1, color: 'Rojo', estado: 'Funciona' },
+                                                      { numero: 2, color: 'Amarillo', estado: 'Funciona' },
+                                                      { numero: 3, color: 'Verde', estado: 'Funciona' },
+                                                      { numero: 4, color: 'Flecha Verde', estado: 'Funciona' }
+                                                    ]
+                                                  }
+                                                ]
+                                              })
+                                            }
+                                          }}
+                                          style={{
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            padding: '0.45rem 0.5rem',
+                                            fontSize: '0.78rem',
+                                            fontWeight: isSel ? '700' : '500',
+                                            backgroundColor: isSel ? '#691B31' : 'transparent',
+                                            color: isSel ? '#FFFFFF' : '#475569',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: '0.35rem',
+                                            boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                            transition: 'all 0.15s',
+                                            whiteSpace: 'nowrap'
+                                          }}
+                                        >
+                                          {icon}
+                                          <span>{label}</span>
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.35rem' }}>
+                                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', margin: 0 }}>
+                                    <span>Coordenadas del poste:</span>
+                                  </label>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    {coordsPoste && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setMapasPostesVisibles(prev => ({
+                                          ...prev,
+                                          [pIdx]: mapaVisible ? false : true
+                                        }))}
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.25rem',
+                                          padding: '0.15rem 0.45rem',
+                                          backgroundColor: mapaVisible ? '#EFF6FF' : '#F1F5F9',
+                                          color: mapaVisible ? '#1D4ED8' : '#475569',
+                                          border: mapaVisible ? '1px solid #BFDBFE' : '1px solid #CBD5E1',
+                                          borderRadius: '4px',
+                                          fontSize: '0.72rem',
+                                          fontWeight: '700',
+                                          cursor: 'pointer',
+                                          whiteSpace: 'nowrap',
+                                          transition: 'all 0.15s',
+                                          pointerEvents: 'auto'
+                                        }}
+                                        title={mapaVisible ? 'Ocultar mapa interactivo' : 'Mostrar mapa interactivo'}
+                                      >
+                                        <FaMap size={10} />
+                                        <span>{mapaVisible ? 'Ocultar mapa' : 'Ver mapa'}</span>
+                                      </button>
+                                    )}
+                                    {!modoVisualizacion && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleObtenerGpsPoste(pIdx)}
+                                        disabled={capturandoGpsPosteIndex === pIdx}
+                                        style={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.25rem',
+                                          backgroundColor: capturandoGpsPosteIndex === pIdx ? '#E2E8F0' : '#FEF3C7',
+                                          color: '#92400E',
+                                          border: '1px solid #FCD34D',
+                                          borderRadius: '4px',
+                                          padding: '0.15rem 0.45rem',
+                                          fontSize: '0.72rem',
+                                          fontWeight: '700',
+                                          cursor: capturandoGpsPosteIndex === pIdx ? 'wait' : 'pointer'
+                                        }}
+                                        title="Capturar ubicación GPS actual del poste"
+                                      >
+                                        <FaMapMarkerAlt size={10} />
+                                        {capturandoGpsPosteIndex === pIdx ? 'Obteniendo GPS...' : 'GPS actual'}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                                {modoVisualizacion ? (
+                                  renderDatoConsulta(poste.ubicacionPoste, 'Sin coordenadas registradas')
+                                ) : (
+                                  <>
+                                    <input
+                                      type="text"
+                                      list={`sugerencias-ubicacion-postes-${pIdx}`}
+                                      placeholder="ej. 20.123456, -98.765432"
+                                      value={poste.ubicacionPoste || ''}
+                                      onChange={(e) => {
+                                        handleActualizarPoste(pIdx, 'ubicacionPoste', e.target.value)
+                                        if (extraerCoordenadasValidas(e.target.value)) {
+                                          setMapasPostesVisibles(prev => ({ ...prev, [pIdx]: true }))
+                                        }
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        padding: '0.45rem 0.65rem',
+                                        border: '1px solid #CBD5E1',
+                                        borderRadius: '6px',
+                                        fontSize: '0.85rem',
+                                        boxSizing: 'border-box'
+                                      }}
+                                    />
+                                    <datalist id={`sugerencias-ubicacion-postes-${pIdx}`}>
+                                      <option value="Camellón Central (Isleta)" />
+                                      <option value="Banqueta Poniente" />
+                                      <option value="Banqueta Oriente" />
+                                      <option value="Banqueta Norte" />
+                                      <option value="Banqueta Sur" />
+                                      <option value="Esquina Norponiente" />
+                                      <option value="Esquina Surponiente" />
+                                      <option value="Esquina Nororiente" />
+                                      <option value="Esquina Suroriente" />
+                                    </datalist>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* MAPA DEL POSTE A TODO LO ANCHO DE LA TARJETA */}
+                            {coordsPoste && mapaVisible && (
+                              <div style={{
+                                marginBottom: '0.85rem',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                border: '1px solid #CBD5E1',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                backgroundColor: '#ffffff',
+                                pointerEvents: 'auto'
+                              }}>
+                                <div style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  padding: '0.35rem 0.65rem',
+                                  backgroundColor: '#F8FAFC',
+                                  borderBottom: '1px solid #E2E8F0',
+                                  fontSize: '0.74rem',
+                                  color: '#475569'
+                                }}>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                                    <FaMapMarkerAlt size={11} style={{ color: '#DC2626' }} />
+                                    <span>Ubicación GPS del poste #{pIdx + 1}: <strong style={{ color: '#1E293B' }}>{coordsPoste.lat.toFixed(6)}, {coordsPoste.lng.toFixed(6)}</strong></span>
+                                  </span>
+                                  <a
+                                    href={`https://www.google.com/maps?q=${coordsPoste.lat},${coordsPoste.lng}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{
+                                      color: '#2563EB',
+                                      textDecoration: 'none',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '0.25rem',
+                                      fontSize: '0.72rem',
+                                      fontWeight: '600'
+                                    }}
+                                    title="Abrir en Google Maps externo"
+                                  >
+                                    <FaExternalLinkAlt size={9} /> Abrir en Google Maps
+                                  </a>
+                                </div>
+                                <iframe
+                                  title={`Mapa del poste #${pIdx + 1}`}
+                                  src={`https://maps.google.com/maps?q=${coordsPoste.lat},${coordsPoste.lng}&hl=es&z=17&output=embed`}
+                                  style={{
+                                    width: '100%',
+                                    height: '210px',
+                                    border: 'none',
+                                    display: 'block'
+                                  }}
+                                  loading="lazy"
+                                />
+                              </div>
+                            )}
+                          </>
+                        )
+                      })()}
+
+                      <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '0.85rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                            <span>Modelo de poste: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                          </label>
+                          {modoVisualizacion ? (
+                            renderDatoConsulta(normalizarNombreModeloPoste(poste.modeloPoste) || 'Sin modelo')
+                          ) : (
+                            <select
+                              value={normalizarNombreModeloPoste(poste.modeloPoste)}
+                              onChange={(e) => handleActualizarPoste(pIdx, 'modeloPoste', e.target.value)}
                               style={{
-                                flex: 1,
                                 width: '100%',
                                 padding: '0.45rem 0.65rem',
                                 border: '1px solid #CBD5E1',
                                 borderRadius: '6px',
                                 fontSize: '0.85rem',
+                                backgroundColor: 'white',
+                                color: '#1E293B',
                                 boxSizing: 'border-box'
                               }}
-                            />
-                            {poste.ubicacionPoste && poste.ubicacionPoste.includes(',') && (
-                              <a
-                                href={`https://www.google.com/maps?q=${encodeURIComponent(poste.ubicacionPoste.trim())}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.25rem',
-                                  padding: '0.45rem 0.55rem',
-                                  backgroundColor: '#EFF6FF',
-                                  color: '#1D4ED8',
-                                  border: '1px solid #BFDBFE',
-                                  borderRadius: '6px',
-                                  fontSize: '0.75rem',
-                                  fontWeight: '600',
-                                  textDecoration: 'none',
-                                  whiteSpace: 'nowrap'
-                                }}
-                                title="Ver ubicación del poste en Google Maps"
-                              >
-                                <FaExternalLinkAlt size={10} />
-                                <span>Mapa</span>
-                              </a>
-                            )}
-                          </div>
-                          <datalist id={`sugerencias-ubicacion-postes-${pIdx}`}>
-                            <option value="Camellón Central (Isleta)" />
-                            <option value="Banqueta Poniente" />
-                            <option value="Banqueta Oriente" />
-                            <option value="Banqueta Norte" />
-                            <option value="Banqueta Sur" />
-                            <option value="Esquina Norponiente" />
-                            <option value="Esquina Surponiente" />
-                            <option value="Esquina Nororiente" />
-                            <option value="Esquina Suroriente" />
-                          </datalist>
+                            >
+                              <option value="">-- Seleccionar modelo de poste --</option>
+                              {MODELOS_POSTES_CATALOGO.map((modelo) => (
+                                <option key={modelo} value={modelo}>{modelo}</option>
+                              ))}
+                              {poste.modeloPoste && !MODELOS_POSTES_CATALOGO.includes(normalizarNombreModeloPoste(poste.modeloPoste)) && (
+                                <option value={poste.modeloPoste}>{poste.modeloPoste}</option>
+                              )}
+                            </select>
+                          )}
                         </div>
-                      </div>
 
-                      <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '0.85rem' }}>
                         <div>
                           <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                            <span>Modelo de poste: <span style={{ color: '#DC2626' }}>*</span></span>
+                            <span>Estado de tapa de registro: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                           </label>
-                          <select
-                            value={normalizarNombreModeloPoste(poste.modeloPoste)}
-                            onChange={(e) => handleActualizarPoste(pIdx, 'modeloPoste', e.target.value)}
-                            style={{
-                              width: '100%',
-                              padding: '0.45rem 0.65rem',
-                              border: '1px solid #CBD5E1',
+                          {modoVisualizacion ? (
+                            renderBadgeConsulta(poste.tapaRegistro || 'Buena')
+                          ) : (
+                            <div style={{
+                              display: 'grid',
+                              gridTemplateColumns: 'repeat(4, 1fr)',
+                              gap: '3px',
+                              backgroundColor: '#F1F5F9',
+                              padding: '3px',
                               borderRadius: '6px',
-                              fontSize: '0.85rem',
-                              backgroundColor: 'white',
-                              color: '#1E293B',
+                              border: '1px solid #CBD5E1',
                               boxSizing: 'border-box'
-                            }}
-                          >
-                            <option value="">-- Seleccionar modelo de poste --</option>
-                            {MODELOS_POSTES_CATALOGO.map((modelo) => (
-                              <option key={modelo} value={modelo}>{modelo}</option>
-                            ))}
-                            {poste.modeloPoste && !MODELOS_POSTES_CATALOGO.includes(normalizarNombreModeloPoste(poste.modeloPoste)) && (
-                              <option value={poste.modeloPoste}>{poste.modeloPoste}</option>
-                            )}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                            <span>Estado de tapa de registro: <span style={{ color: '#DC2626' }}>*</span></span>
-                          </label>
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(4, 1fr)',
-                            gap: '3px',
-                            backgroundColor: '#F1F5F9',
-                            padding: '3px',
-                            borderRadius: '6px',
-                            border: '1px solid #CBD5E1',
-                            boxSizing: 'border-box'
-                          }}>
-                            {['Buena', 'Dañada', 'Faltante', 'No aplica'].map((opcion) => {
-                              const isSel = (poste.tapaRegistro || 'Buena') === opcion
-                              return (
-                                <button
-                                  key={opcion}
-                                  type="button"
-                                  onClick={() => handleActualizarPoste(pIdx, 'tapaRegistro', opcion)}
-                                  style={{
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    padding: '0.45rem 0.2rem',
-                                    fontSize: '0.78rem',
-                                    fontWeight: isSel ? '700' : '500',
-                                    backgroundColor: isSel ? '#691B31' : 'transparent',
-                                    color: isSel ? '#FFFFFF' : '#475569',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s',
-                                    whiteSpace: 'nowrap',
-                                    boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                    textAlign: 'center'
-                                  }}
-                                >
-                                  {opcion}
-                                </button>
-                              )
-                            })}
-                          </div>
+                            }}>
+                              {['Buena', 'Dañada', 'Faltante', 'No aplica'].map((opcion) => {
+                                const isSel = (poste.tapaRegistro || 'Buena') === opcion
+                                return (
+                                  <button
+                                    key={opcion}
+                                    type="button"
+                                    onClick={() => handleActualizarPoste(pIdx, 'tapaRegistro', opcion)}
+                                    style={{
+                                      border: 'none',
+                                      borderRadius: '4px',
+                                      padding: '0.45rem 0.2rem',
+                                      fontSize: '0.78rem',
+                                      fontWeight: isSel ? '700' : '500',
+                                      backgroundColor: isSel ? '#691B31' : 'transparent',
+                                      color: isSel ? '#FFFFFF' : '#475569',
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s',
+                                      whiteSpace: 'nowrap',
+                                      boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                      textAlign: 'center'
+                                    }}
+                                  >
+                                    {opcion}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -5575,20 +8010,24 @@ export default function InventarioSemaforos() {
                         <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                           <span>Observaciones del poste:</span>
                         </label>
-                        <input
-                          type="text"
-                          placeholder="Detalles de golpes, corrosión, cableado expuesto o estado general..."
-                          value={poste.observaciones || ''}
-                          onChange={(e) => handleActualizarPoste(pIdx, 'observaciones', e.target.value)}
-                          style={{
-                            width: '100%',
-                            padding: '0.45rem 0.65rem',
-                            border: '1px solid #CBD5E1',
-                            borderRadius: '6px',
-                            fontSize: '0.85rem',
-                            boxSizing: 'border-box'
-                          }}
-                        />
+                        {modoVisualizacion ? (
+                          renderObservacionesConsulta(poste.observaciones, 'Sin observaciones registradas')
+                        ) : (
+                          <input
+                            type="text"
+                            placeholder="Detalles de golpes, corrosión, cableado expuesto o estado general..."
+                            value={poste.observaciones || ''}
+                            onChange={(e) => handleActualizarPoste(pIdx, 'observaciones', e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '0.45rem 0.65rem',
+                              border: '1px solid #CBD5E1',
+                              borderRadius: '6px',
+                              fontSize: '0.85rem',
+                              boxSizing: 'border-box'
+                            }}
+                          />
+                        )}
                       </div>
 
                       {/* Cabezales Vehiculares (Solo si no es exclusivo peatonal) */}
@@ -5612,94 +8051,118 @@ export default function InventarioSemaforos() {
                           <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '0.85rem' }}>
                             <div>
                               <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                <span>Tipo de cabezal: <span style={{ color: '#DC2626' }}>*</span></span>
+                                <span>Tipo de cabezal: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                               </label>
-                              <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: '1fr 1fr',
-                                gap: '3px',
-                                backgroundColor: '#F1F5F9',
-                                padding: '3px',
-                                borderRadius: '6px',
-                                border: '1px solid #CBD5E1',
-                                boxSizing: 'border-box'
-                              }}>
-                                {[
-                                  { val: 'LED', label: 'LED', icon: <FaTrafficLight size={11} /> },
-                                  { val: 'Pantalla', label: 'Pantalla LED', icon: <FaDesktop size={11} /> }
-                                ].map(({ val, label, icon }) => {
-                                  const isSel = (poste.tipoCabezal || 'LED') === val
-                                  return (
-                                    <button
-                                      key={val}
-                                      type="button"
-                                      onClick={() => {
-                                        const nuevoTipo = val
-                                        const piezasVal = nuevoTipo === 'Pantalla' ? (poste.pantallaPiezas || '1') : ''
-                                        const cantNum = parseInt(piezasVal, 10) || 0
-                                        const pantallasInit = cantNum > 0
-                                          ? Array.from({ length: cantNum }, (_, i) => ({ numero: i + 1, estado: 'Funciona' }))
-                                          : []
-                                        handleActualizarPosteMultiple(pIdx, {
-                                          tipoCabezal: nuevoTipo,
-                                          cabezalModelo: nuevoTipo === 'Pantalla' ? 'Semáforo de pantalla LED' : (poste.cabezalModelo === 'Semáforo de pantalla LED' ? 'LV-1' : (poste.cabezalModelo || 'LV-1')),
-                                          pantallaPiezas: piezasVal,
-                                          pantallasLista: nuevoTipo === 'Pantalla' ? (poste.pantallasLista?.length ? poste.pantallasLista : pantallasInit) : [],
-                                          pantallaEstado: 'Funciona'
-                                        })
-                                      }}
-                                      style={{
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        padding: '0.45rem 0.5rem',
-                                        fontSize: '0.78rem',
-                                        fontWeight: isSel ? '700' : '500',
-                                        backgroundColor: isSel ? '#691B31' : 'transparent',
-                                        color: isSel ? '#FFFFFF' : '#475569',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: '0.35rem',
-                                        boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                        transition: 'all 0.15s',
-                                        whiteSpace: 'nowrap'
-                                      }}
-                                    >
-                                      {icon}
-                                      <span>{label}</span>
-                                    </button>
-                                  )
-                                })}
-                              </div>
+                              {modoVisualizacion ? (
+                                <div style={{ display: 'flex', alignItems: 'center', minHeight: '34px' }}>
+                                  <span style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.35rem',
+                                    padding: '0.3rem 0.75rem',
+                                    borderRadius: '6px',
+                                    fontSize: '0.85rem',
+                                    fontWeight: '700',
+                                    backgroundColor: (poste.tipoCabezal || 'LED') === 'Pantalla' ? '#EFF6FF' : '#F1F5F9',
+                                    color: (poste.tipoCabezal || 'LED') === 'Pantalla' ? '#1D4ED8' : '#334155',
+                                    border: (poste.tipoCabezal || 'LED') === 'Pantalla' ? '1px solid #BFDBFE' : '1px solid #CBD5E1'
+                                  }}>
+                                    {(poste.tipoCabezal || 'LED') === 'Pantalla' ? <FaDesktop size={12} /> : <FaTrafficLight size={12} />}
+                                    {(poste.tipoCabezal || 'LED') === 'Pantalla' ? 'Pantalla LED' : 'LED'}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: '1fr 1fr',
+                                  gap: '3px',
+                                  backgroundColor: '#F1F5F9',
+                                  padding: '3px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #CBD5E1',
+                                  boxSizing: 'border-box'
+                                }}>
+                                  {[
+                                    { val: 'LED', label: 'LED', icon: <FaTrafficLight size={11} /> },
+                                    { val: 'Pantalla', label: 'Pantalla LED', icon: <FaDesktop size={11} /> }
+                                  ].map(({ val, label, icon }) => {
+                                    const isSel = (poste.tipoCabezal || 'LED') === val
+                                    return (
+                                      <button
+                                        key={val}
+                                        type="button"
+                                        onClick={() => {
+                                          const nuevoTipo = val
+                                          const piezasVal = nuevoTipo === 'Pantalla' ? (poste.pantallaPiezas || '1') : ''
+                                          const cantNum = parseInt(piezasVal, 10) || 0
+                                          const pantallasInit = cantNum > 0
+                                            ? Array.from({ length: cantNum }, (_, i) => ({ numero: i + 1, estado: 'Funciona' }))
+                                            : []
+                                          handleActualizarPosteMultiple(pIdx, {
+                                            tipoCabezal: nuevoTipo,
+                                            cabezalModelo: nuevoTipo === 'Pantalla' ? 'Semáforo de pantalla LED' : (poste.cabezalModelo === 'Semáforo de pantalla LED' ? 'LV-1' : (poste.cabezalModelo || 'LV-1')),
+                                            pantallaPiezas: piezasVal,
+                                            pantallasLista: nuevoTipo === 'Pantalla' ? (poste.pantallasLista?.length ? poste.pantallasLista : pantallasInit) : [],
+                                            pantallaEstado: 'Funciona'
+                                          })
+                                        }}
+                                        style={{
+                                          border: 'none',
+                                          borderRadius: '4px',
+                                          padding: '0.45rem 0.5rem',
+                                          fontSize: '0.78rem',
+                                          fontWeight: isSel ? '700' : '500',
+                                          backgroundColor: isSel ? '#691B31' : 'transparent',
+                                          color: isSel ? '#FFFFFF' : '#475569',
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          gap: '0.35rem',
+                                          boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                          transition: 'all 0.15s',
+                                          whiteSpace: 'nowrap'
+                                        }}
+                                      >
+                                        {icon}
+                                        <span>{label}</span>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              )}
                             </div>
 
                             <div>
                               <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                <span>Modelo de cabezal: <span style={{ color: '#DC2626' }}>*</span></span>
+                                <span>Modelo de cabezal: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                               </label>
-                              <select
-                                value={poste.cabezalModelo || ''}
-                                onChange={(e) => handleActualizarPoste(pIdx, 'cabezalModelo', e.target.value)}
-                                style={{
-                                  width: '100%',
-                                  padding: '0.45rem 0.65rem',
-                                  border: '1px solid #CBD5E1',
-                                  borderRadius: '6px',
-                                  fontSize: '0.85rem',
-                                  backgroundColor: 'white',
-                                  color: '#1E293B',
-                                  boxSizing: 'border-box'
-                                }}
-                              >
-                                <option value="">-- Seleccionar modelo de cabezal --</option>
-                                {MODELOS_CABEZAL_CATALOGO.map((modelo) => (
-                                  <option key={modelo} value={modelo}>{modelo}</option>
-                                ))}
-                                {poste.cabezalModelo && !MODELOS_CABEZAL_CATALOGO.includes(poste.cabezalModelo) && (
-                                  <option value={poste.cabezalModelo}>{poste.cabezalModelo}</option>
-                                )}
-                              </select>
+                              {modoVisualizacion ? (
+                                renderDatoConsulta(poste.cabezalModelo, 'Sin modelo especificado')
+                              ) : (
+                                <select
+                                  value={poste.cabezalModelo || ''}
+                                  onChange={(e) => handleActualizarPoste(pIdx, 'cabezalModelo', e.target.value)}
+                                  style={{
+                                    width: '100%',
+                                    padding: '0.45rem 0.65rem',
+                                    border: '1px solid #CBD5E1',
+                                    borderRadius: '6px',
+                                    fontSize: '0.85rem',
+                                    backgroundColor: 'white',
+                                    color: '#1E293B',
+                                    boxSizing: 'border-box'
+                                  }}
+                                >
+                                  <option value="">-- Seleccionar modelo de cabezal --</option>
+                                  {MODELOS_CABEZAL_CATALOGO.map((modelo) => (
+                                    <option key={modelo} value={modelo}>{modelo}</option>
+                                  ))}
+                                  {poste.cabezalModelo && !MODELOS_CABEZAL_CATALOGO.includes(poste.cabezalModelo) && (
+                                    <option value={poste.cabezalModelo}>{poste.cabezalModelo}</option>
+                                  )}
+                                </select>
+                              )}
                             </div>
                           </div>
 
@@ -5716,22 +8179,26 @@ export default function InventarioSemaforos() {
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '0.85rem' }}>
                                 <div>
                                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                    <span>Cantidad de piezas: <span style={{ color: '#DC2626' }}>*</span></span>
+                                    <span>Cantidad de piezas: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                                   </label>
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    placeholder="ej. 1, 2, 3..."
-                                    value={poste.pantallaPiezas === 0 || poste.pantallaPiezas === '0' ? '' : (poste.pantallaPiezas ?? '')}
-                                    onChange={(e) => handleCambiarPantallaPiezasEnPoste(pIdx, e.target.value)}
-                                    style={{ width: '100%', maxWidth: '240px', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                                  />
+                                  {modoVisualizacion ? (
+                                    renderDatoConsulta(`${poste.pantallaPiezas || 0} piezas`)
+                                  ) : (
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      placeholder="ej. 1, 2, 3..."
+                                      value={poste.pantallaPiezas === 0 || poste.pantallaPiezas === '0' ? '' : (poste.pantallaPiezas ?? '')}
+                                      onChange={(e) => handleCambiarPantallaPiezasEnPoste(pIdx, e.target.value)}
+                                      style={{ width: '100%', maxWidth: '240px', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                                    />
+                                  )}
                                 </div>
 
                                 {piezasList.length > 0 ? (
                                   <div>
                                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.5rem' }}>
-                                      <span>Estado de operación de cada pieza: <span style={{ color: '#DC2626' }}>*</span></span>
+                                      <span>Estado de operación de cada pieza: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                                     </label>
                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))', gap: '0.5rem' }}>
                                       {piezasList.map((pieza) => (
@@ -5752,33 +8219,51 @@ export default function InventarioSemaforos() {
                                             <FaDesktop size={11} style={{ color: '#691B31' }} />
                                             Pieza #{pieza.numero}
                                           </span>
-                                          <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center' }}>
-                                            {['Funciona', 'No funciona'].map((estado) => (
-                                              <label
-                                                key={estado}
-                                                style={{
-                                                  display: 'inline-flex',
-                                                  alignItems: 'center',
-                                                  gap: '0.25rem',
-                                                  cursor: 'pointer',
-                                                  fontSize: '0.8rem',
-                                                  fontWeight: (pieza.estado || 'Funciona') === estado ? '700' : '500',
-                                                  color: (pieza.estado || 'Funciona') === estado ? (estado === 'Funciona' ? '#16A34A' : '#DC2626') : '#64748B'
-                                                }}
-                                              >
-                                                <input
-                                                  type="radio"
-                                                  name={`poste-${pIdx}-pieza-${pieza.numero}-estado`}
-                                                  value={estado}
-                                                  checked={(pieza.estado || 'Funciona') === estado}
-                                                  onChange={() => handleCambiarEstadoPiezaPantalla(pIdx, pieza.numero, estado)}
-                                                  style={{ accentColor: '#691B31', width: '13px', height: '13px', cursor: 'pointer' }}
-                                                />
-                                                <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', backgroundColor: estado === 'Funciona' ? '#16A34A' : '#DC2626' }} />
-                                                {estado}
-                                              </label>
-                                            ))}
-                                          </div>
+                                          {modoVisualizacion ? (
+                                            <span style={{
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '0.35rem',
+                                              fontSize: '0.78rem',
+                                              fontWeight: '700',
+                                              padding: '0.2rem 0.55rem',
+                                              borderRadius: '5px',
+                                              backgroundColor: (pieza.estado || 'Funciona') === 'Funciona' ? '#DCFCE7' : '#FEE2E2',
+                                              color: (pieza.estado || 'Funciona') === 'Funciona' ? '#15803D' : '#B91C1C',
+                                              border: (pieza.estado || 'Funciona') === 'Funciona' ? '1px solid #86EFAC' : '1px solid #FCA5A5'
+                                            }}>
+                                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: (pieza.estado || 'Funciona') === 'Funciona' ? '#16A34A' : '#DC2626' }} />
+                                              {(pieza.estado || 'Funciona') === 'Funciona' ? 'Funciona' : 'No funciona'}
+                                            </span>
+                                          ) : (
+                                            <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center' }}>
+                                              {['Funciona', 'No funciona'].map((estado) => (
+                                                <label
+                                                  key={estado}
+                                                  style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.25rem',
+                                                    cursor: 'pointer',
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: (pieza.estado || 'Funciona') === estado ? '700' : '500',
+                                                    color: (pieza.estado || 'Funciona') === estado ? (estado === 'Funciona' ? '#16A34A' : '#DC2626') : '#64748B'
+                                                  }}
+                                                >
+                                                  <input
+                                                    type="radio"
+                                                    name={`poste-${pIdx}-pieza-${pieza.numero}-estado`}
+                                                    value={estado}
+                                                    checked={(pieza.estado || 'Funciona') === estado}
+                                                    onChange={() => handleCambiarEstadoPiezaPantalla(pIdx, pieza.numero, estado)}
+                                                    style={{ accentColor: '#691B31', width: '13px', height: '13px', cursor: 'pointer' }}
+                                                  />
+                                                  <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', backgroundColor: estado === 'Funciona' ? '#16A34A' : '#DC2626' }} />
+                                                  {estado}
+                                                </label>
+                                              ))}
+                                            </div>
+                                          )}
                                         </div>
                                       ))}
                                     </div>
@@ -5801,25 +8286,27 @@ export default function InventarioSemaforos() {
                                   <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                     Desglose de Cabezales LED:
                                   </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleAgregarGrupoCabezalEnPoste(pIdx)}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '0.3rem',
-                                      backgroundColor: '#FFFFFF',
-                                      border: '1px solid #CBD5E1',
-                                      borderRadius: '5px',
-                                      padding: '0.25rem 0.6rem',
-                                      fontSize: '0.75rem',
-                                      fontWeight: '700',
-                                      color: '#691B31',
-                                      cursor: 'pointer'
-                                    }}
-                                  >
-                                    <FaPlus size={10} style={{ color: '#BC955B' }} /> + Otro cabezal
-                                  </button>
+                                  {!modoVisualizacion && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAgregarGrupoCabezalEnPoste(pIdx)}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.3rem',
+                                        backgroundColor: '#FFFFFF',
+                                        border: '1px solid #CBD5E1',
+                                        borderRadius: '5px',
+                                        padding: '0.25rem 0.6rem',
+                                        fontSize: '0.75rem',
+                                        fontWeight: '700',
+                                        color: '#691B31',
+                                        cursor: 'pointer'
+                                      }}
+                                    >
+                                      <FaPlus size={10} style={{ color: '#BC955B' }} /> + Otro cabezal
+                                    </button>
+                                  )}
                                 </div>
 
                                 {cabezalesGrupos.map((grupo, gIdx) => {
@@ -5842,19 +8329,32 @@ export default function InventarioSemaforos() {
                                           Cabezal {cabezalesGrupos.length > 1 ? `#${gIdx + 1}` : ''}
                                         </span>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                                          <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                            <span>LEDs:</span>
-                                            <input
-                                              type="number"
-                                              min="0"
-                                              max="12"
-                                              value={numLeds || ''}
-                                              onChange={(e) => handleCambiarNumLedsEnPoste(pIdx, gIdx, e.target.value)}
-                                              onWheel={(e) => e.target.blur()}
-                                              style={{ width: '45px', padding: '0.2rem 0.35rem', border: '1px solid #CBD5E1', borderRadius: '4px', fontSize: '0.8rem', textAlign: 'center', fontWeight: '700' }}
-                                            />
-                                          </label>
-                                          {cabezalesGrupos.length > 1 && (
+                                          {modoVisualizacion ? (
+                                            <span style={{
+                                              fontSize: '0.78rem',
+                                              fontWeight: '700',
+                                              color: '#334155',
+                                              backgroundColor: '#E2E8F0',
+                                              padding: '0.2rem 0.55rem',
+                                              borderRadius: '5px'
+                                            }}>
+                                              {numLeds} LEDs
+                                            </span>
+                                          ) : (
+                                            <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                              <span>LEDs:</span>
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                max="12"
+                                                value={numLeds || ''}
+                                                onChange={(e) => handleCambiarNumLedsEnPoste(pIdx, gIdx, e.target.value)}
+                                                onWheel={(e) => e.target.blur()}
+                                                style={{ width: '45px', padding: '0.2rem 0.35rem', border: '1px solid #CBD5E1', borderRadius: '4px', fontSize: '0.8rem', textAlign: 'center', fontWeight: '700' }}
+                                              />
+                                            </label>
+                                          )}
+                                          {cabezalesGrupos.length > 1 && !modoVisualizacion && (
                                             <button
                                               type="button"
                                               onClick={() => handleEliminarGrupoCabezalEnPoste(pIdx, gIdx)}
@@ -5868,55 +8368,183 @@ export default function InventarioSemaforos() {
                                       </div>
 
                                       {numLeds > 0 && (
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: '0.6rem' }}>
+                                        <div className="cabezal-leds-grid">
                                           {leds.map((led, idx) => {
-                                            const colorActual = OPCIONES_COLORES_LED.find(c => c.valor === led.color) || OPCIONES_COLORES_LED[0]
+                                            const colorActual = obtenerConfigColorLed(led.color)
+                                            const isFunciona = (led.estado || 'Funciona') === 'Funciona'
+
+                                            if (modoVisualizacion) {
+                                              return (
+                                                <div
+                                                  key={`p-${pIdx}-g-${gIdx}-led-${led.numero || idx + 1}`}
+                                                  style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    backgroundColor: '#FFFFFF',
+                                                    padding: '0.35rem 0.5rem',
+                                                    borderRadius: '7px',
+                                                    border: '1px solid #E2E8F0',
+                                                    gap: '0.35rem',
+                                                    boxSizing: 'border-box',
+                                                    minWidth: 0
+                                                  }}
+                                                >
+                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+                                                    <span
+                                                      style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        width: '22px',
+                                                        height: '22px',
+                                                        minWidth: '22px',
+                                                        minHeight: '22px',
+                                                        borderRadius: '50%',
+                                                        border: `2px solid ${colorActual.color}`,
+                                                        backgroundColor: '#FFFFFF',
+                                                        flexShrink: 0
+                                                      }}
+                                                      title={`Color: ${colorActual.label}`}
+                                                    >
+                                                      <span
+                                                        style={{
+                                                          width: '13px',
+                                                          height: '13px',
+                                                          borderRadius: '50%',
+                                                          backgroundColor: colorActual.color
+                                                        }}
+                                                      />
+                                                    </span>
+                                                    <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#1E293B', minWidth: '18px', flexShrink: 0 }}>
+                                                      L{led.numero || idx + 1}
+                                                    </span>
+                                                    <div
+                                                      style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        width: '104px',
+                                                        padding: '0.2rem 0.35rem',
+                                                        border: '1px solid #CBD5E1',
+                                                        borderLeft: `4px solid ${colorActual.color}`,
+                                                        borderRadius: '6px',
+                                                        fontSize: '0.78rem',
+                                                        fontWeight: '600',
+                                                        backgroundColor: '#FFFFFF',
+                                                        color: '#1E293B',
+                                                        boxSizing: 'border-box'
+                                                      }}
+                                                    >
+                                                      <span>{colorActual.label}</span>
+                                                      <span style={{ fontSize: '0.6rem', color: '#64748B' }}>▼</span>
+                                                    </div>
+                                                  </div>
+                                                  <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexShrink: 0, marginLeft: 'auto', pointerEvents: 'none' }}>
+                                                    {['Funciona', 'No funciona'].map((estado) => {
+                                                      const isChecked = (led.estado || 'Funciona') === estado
+                                                      const esFunc = estado === 'Funciona'
+                                                      return (
+                                                        <label
+                                                          key={estado}
+                                                          style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '0.2rem',
+                                                            cursor: 'default',
+                                                            fontSize: '0.74rem',
+                                                            whiteSpace: 'nowrap',
+                                                            fontWeight: isChecked ? '700' : '500',
+                                                            color: isChecked ? (esFunc ? '#16A34A' : '#DC2626') : '#64748B'
+                                                          }}
+                                                        >
+                                                          <input
+                                                            type="radio"
+                                                            name={`view-p-${pIdx}-g-${gIdx}-led-${idx}-estado`}
+                                                            value={estado}
+                                                            checked={isChecked}
+                                                            disabled
+                                                            readOnly
+                                                            style={{ accentColor: '#691B31', width: '13px', height: '13px', cursor: 'default', margin: 0 }}
+                                                          />
+                                                          <span
+                                                            style={{
+                                                              display: 'inline-block',
+                                                              width: '5px',
+                                                              height: '5px',
+                                                              borderRadius: '50%',
+                                                              backgroundColor: esFunc ? '#16A34A' : '#DC2626',
+                                                              flexShrink: 0
+                                                            }}
+                                                          />
+                                                          {estado}
+                                                        </label>
+                                                      )
+                                                    })}
+                                                  </div>
+                                                </div>
+                                              )
+                                            }
+
                                             return (
                                               <div
                                                 key={`p-${pIdx}-g-${gIdx}-led-${led.numero || idx + 1}`}
                                                 style={{
                                                   display: 'flex',
-                                                  flexWrap: 'wrap',
                                                   alignItems: 'center',
                                                   justifyContent: 'space-between',
                                                   backgroundColor: '#FFFFFF',
-                                                  padding: '0.5rem 0.7rem',
+                                                  padding: '0.35rem 0.5rem',
                                                   borderRadius: '7px',
                                                   border: '1px solid #E2E8F0',
-                                                  gap: '0.45rem 0.75rem',
-                                                  boxSizing: 'border-box'
+                                                  gap: '0.35rem',
+                                                  boxSizing: 'border-box',
+                                                  minWidth: 0
                                                 }}
                                               >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flex: '1 1 140px', minWidth: '125px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
                                                   <span
                                                     style={{
-                                                      width: '13px',
-                                                      height: '13px',
+                                                      display: 'inline-flex',
+                                                      alignItems: 'center',
+                                                      justifyContent: 'center',
+                                                      width: '22px',
+                                                      height: '22px',
+                                                      minWidth: '22px',
+                                                      minHeight: '22px',
                                                       borderRadius: '50%',
-                                                      backgroundColor: colorActual.color,
-                                                      display: 'inline-block',
-                                                      flexShrink: 0,
-                                                      boxShadow: `0 0 0 2px #FFFFFF, 0 0 0 3.5px ${colorActual.color}`
+                                                      border: `2px solid ${colorActual.color}`,
+                                                      backgroundColor: '#FFFFFF',
+                                                      flexShrink: 0
                                                     }}
                                                     title={`Color: ${colorActual.label}`}
-                                                  />
-                                                  <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#1E293B', minWidth: '22px', flexShrink: 0 }}>
+                                                  >
+                                                    <span
+                                                      style={{
+                                                        width: '13px',
+                                                        height: '13px',
+                                                        borderRadius: '50%',
+                                                        backgroundColor: colorActual.color
+                                                      }}
+                                                    />
+                                                  </span>
+                                                  <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#1E293B', minWidth: '18px', flexShrink: 0 }}>
                                                     L{led.numero || idx + 1}
                                                   </span>
                                                   <select
                                                     value={led.color || 'Rojo'}
                                                     onChange={(e) => handleCambiarLedEnPoste(pIdx, gIdx, idx, 'color', e.target.value)}
                                                     style={{
-                                                      flex: 1,
-                                                      minWidth: '95px',
-                                                      padding: '0.3rem 0.5rem',
+                                                      width: '104px',
+                                                      padding: '0.2rem 0.35rem',
                                                       border: '1px solid #CBD5E1',
                                                       borderLeft: `4px solid ${colorActual.color}`,
                                                       borderRadius: '6px',
-                                                      fontSize: '0.8rem',
+                                                      fontSize: '0.78rem',
                                                       fontWeight: '600',
-                                                      backgroundColor: '#F8FAFC',
-                                                      color: '#1E293B'
+                                                      backgroundColor: '#FFFFFF',
+                                                      color: '#1E293B',
+                                                      cursor: 'pointer'
                                                     }}
                                                   >
                                                     {OPCIONES_COLORES_LED.map(c => (
@@ -5924,21 +8552,22 @@ export default function InventarioSemaforos() {
                                                     ))}
                                                   </select>
                                                 </div>
-                                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
+                                                <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
                                                   {['Funciona', 'No funciona'].map((estado) => {
                                                     const isChecked = (led.estado || 'Funciona') === estado
+                                                    const esFunc = estado === 'Funciona'
                                                     return (
                                                       <label
                                                         key={estado}
                                                         style={{
                                                           display: 'inline-flex',
                                                           alignItems: 'center',
-                                                          gap: '0.3rem',
+                                                          gap: '0.2rem',
                                                           cursor: 'pointer',
-                                                          fontSize: '0.8rem',
+                                                          fontSize: '0.74rem',
                                                           whiteSpace: 'nowrap',
                                                           fontWeight: isChecked ? '700' : '500',
-                                                          color: isChecked ? (estado === 'Funciona' ? '#16A34A' : '#DC2626') : '#64748B'
+                                                          color: isChecked ? (esFunc ? '#16A34A' : '#DC2626') : '#64748B'
                                                         }}
                                                       >
                                                         <input
@@ -5947,15 +8576,16 @@ export default function InventarioSemaforos() {
                                                           value={estado}
                                                           checked={isChecked}
                                                           onChange={() => handleCambiarLedEnPoste(pIdx, gIdx, idx, 'estado', estado)}
-                                                          style={{ accentColor: '#691B31', width: '15px', height: '15px', cursor: 'pointer' }}
+                                                          style={{ accentColor: '#691B31', width: '13px', height: '13px', cursor: 'pointer', margin: 0 }}
                                                         />
                                                         <span
                                                           style={{
                                                             display: 'inline-block',
-                                                            width: '8px',
-                                                            height: '8px',
+                                                            width: '5px',
+                                                            height: '5px',
                                                             borderRadius: '50%',
-                                                            backgroundColor: estado === 'Funciona' ? '#16A34A' : '#DC2626'
+                                                            backgroundColor: esFunc ? '#16A34A' : '#DC2626',
+                                                            flexShrink: 0
                                                           }}
                                                         />
                                                         {estado}
@@ -5965,7 +8595,7 @@ export default function InventarioSemaforos() {
                                                 </div>
                                               </div>
                                             )
-                                          })}
+                                           })}
                                         </div>
                                       )}
                                     </div>
@@ -6017,44 +8647,48 @@ export default function InventarioSemaforos() {
                           </div>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                             <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>¿Instalado en este poste?:</span>
-                            <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
-                              <button
-                                type="button"
-                                onClick={() => handleActualizarPosteMultiple(pIdx, {
-                                  tienePeatonal: true,
-                                  peatonalModelo: poste.peatonalModelo || MODELOS_PEATONAL_CATALOGO[0],
-                                  peatonalModuloEstado: poste.peatonalModuloEstado || 'Operando'
-                                })}
-                                style={{
-                                  border: 'none',
-                                  padding: '0.25rem 0.6rem',
-                                  borderRadius: '4px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: poste.tienePeatonal ? '700' : '500',
-                                  backgroundColor: poste.tienePeatonal ? '#691B31' : 'transparent',
-                                  color: poste.tienePeatonal ? '#FFFFFF' : '#475569',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Sí
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleActualizarPosteMultiple(pIdx, { tienePeatonal: false })}
-                                style={{
-                                  border: 'none',
-                                  padding: '0.25rem 0.6rem',
-                                  borderRadius: '4px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: !poste.tienePeatonal ? '700' : '500',
-                                  backgroundColor: !poste.tienePeatonal ? '#691B31' : 'transparent',
-                                  color: !poste.tienePeatonal ? '#FFFFFF' : '#475569',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                No
-                              </button>
-                            </div>
+                            {modoVisualizacion ? (
+                              renderBadgeConsulta(poste.tienePeatonal ? 'Sí' : 'No')
+                            ) : (
+                              <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleActualizarPosteMultiple(pIdx, {
+                                    tienePeatonal: true,
+                                    peatonalModelo: poste.peatonalModelo || MODELOS_PEATONAL_CATALOGO[0],
+                                    peatonalModuloEstado: poste.peatonalModuloEstado || 'Operando'
+                                  })}
+                                  style={{
+                                    border: 'none',
+                                    padding: '0.25rem 0.6rem',
+                                    borderRadius: '4px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: poste.tienePeatonal ? '700' : '500',
+                                    backgroundColor: poste.tienePeatonal ? '#691B31' : 'transparent',
+                                    color: poste.tienePeatonal ? '#FFFFFF' : '#475569',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Sí
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleActualizarPosteMultiple(pIdx, { tienePeatonal: false })}
+                                  style={{
+                                    border: 'none',
+                                    padding: '0.25rem 0.6rem',
+                                    borderRadius: '4px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: !poste.tienePeatonal ? '700' : '500',
+                                    backgroundColor: !poste.tienePeatonal ? '#691B31' : 'transparent',
+                                    color: !poste.tienePeatonal ? '#FFFFFF' : '#475569',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  No
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -6076,73 +8710,83 @@ export default function InventarioSemaforos() {
                                       <FaWalking size={11} style={{ color: '#691B31' }} />
                                       Semáforo Peatonal #{ptIdx + 1}
                                     </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleEliminarPeatonalEnPoste(pIdx, ptIdx)}
-                                      style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        color: '#DC2626',
-                                        fontSize: '0.75rem',
-                                        fontWeight: '700',
-                                        cursor: 'pointer',
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '0.25rem',
-                                        padding: '0.15rem 0.35rem'
-                                      }}
-                                      title="Quitar este semáforo peatonal"
-                                    >
-                                      <FaTrashAlt size={10} /> Quitar
-                                    </button>
+                                    {!modoVisualizacion && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleEliminarPeatonalEnPoste(pIdx, ptIdx)}
+                                        style={{
+                                          background: 'none',
+                                          border: 'none',
+                                          color: '#DC2626',
+                                          fontSize: '0.75rem',
+                                          fontWeight: '700',
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '0.25rem',
+                                          padding: '0.15rem 0.35rem'
+                                        }}
+                                        title="Quitar este semáforo peatonal"
+                                      >
+                                        <FaTrashAlt size={10} /> Quitar
+                                      </button>
+                                    )}
                                   </div>
                                 )}
 
                                 <div className="form-responsive-grid grid-2" style={{ gap: '0.65rem 0.85rem', marginBottom: '0.5rem' }}>
                                   <div>
                                     <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                      <span>Modelo peatonal: <span style={{ color: '#DC2626' }}>*</span></span>
+                                      <span>Modelo peatonal: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                                     </label>
-                                    <select
-                                      value={pt.modelo || ''}
-                                      onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'modelo', e.target.value)}
-                                      style={{ width: '100%', padding: '0.4rem 0.6rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.82rem', backgroundColor: 'white', color: '#1E293B', boxSizing: 'border-box' }}
-                                    >
-                                      <option value="">-- Modelo peatonal --</option>
-                                      {MODELOS_PEATONAL_CATALOGO.map((modelo) => (
-                                        <option key={modelo} value={modelo}>{modelo}</option>
-                                      ))}
-                                    </select>
+                                    {modoVisualizacion ? (
+                                      renderDatoConsulta(pt.modelo || 'Sin modelo')
+                                    ) : (
+                                      <select
+                                        value={pt.modelo || ''}
+                                        onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'modelo', e.target.value)}
+                                        style={{ width: '100%', padding: '0.4rem 0.6rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.82rem', backgroundColor: 'white', color: '#1E293B', boxSizing: 'border-box' }}
+                                      >
+                                        <option value="">-- Modelo peatonal --</option>
+                                        {MODELOS_PEATONAL_CATALOGO.map((modelo) => (
+                                          <option key={modelo} value={modelo}>{modelo}</option>
+                                        ))}
+                                      </select>
+                                    )}
                                   </div>
 
                                   <div>
                                     <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                      <span>{pt.modelo && pt.modelo.toLowerCase().includes('sin cabezal') ? 'Estado del equipo / soporte:' : 'Estado del módulo:'} <span style={{ color: '#DC2626' }}>*</span></span>
+                                      <span>{pt.modelo && pt.modelo.toLowerCase().includes('sin cabezal') ? 'Estado del equipo / soporte:' : 'Estado del módulo:'} {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                                     </label>
-                                    <div style={{ display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', border: '1px solid #CBD5E1', minWidth: '160px' }}>
-                                      {['Operando', 'Dañado'].map((opcion) => {
-                                        const isSel = (pt.estado || 'Operando') === opcion
-                                        return (
-                                          <button
-                                            key={opcion}
-                                            type="button"
-                                            onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'estado', opcion)}
-                                            style={{
-                                              border: 'none',
-                                              borderRadius: '3px',
-                                              padding: '0.3rem 0.4rem',
-                                              fontSize: '0.78rem',
-                                              fontWeight: isSel ? '700' : '500',
-                                              backgroundColor: isSel ? (opcion === 'Operando' ? '#16A34A' : '#DC2626') : 'transparent',
-                                              color: isSel ? '#FFFFFF' : '#475569',
-                                              cursor: 'pointer'
-                                            }}
-                                          >
-                                            {opcion}
-                                          </button>
-                                        )
-                                      })}
-                                    </div>
+                                    {modoVisualizacion ? (
+                                      renderBadgeConsulta(pt.estado || 'Operando')
+                                    ) : (
+                                      <div style={{ display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', border: '1px solid #CBD5E1', minWidth: '160px' }}>
+                                        {['Operando', 'Dañado'].map((opcion) => {
+                                          const isSel = (pt.estado || 'Operando') === opcion
+                                          return (
+                                            <button
+                                              key={opcion}
+                                              type="button"
+                                              onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'estado', opcion)}
+                                              style={{
+                                                border: 'none',
+                                                borderRadius: '3px',
+                                                padding: '0.3rem 0.4rem',
+                                                fontSize: '0.78rem',
+                                                fontWeight: isSel ? '700' : '500',
+                                                backgroundColor: isSel ? (opcion === 'Operando' ? '#16A34A' : '#DC2626') : 'transparent',
+                                                color: isSel ? '#FFFFFF' : '#475569',
+                                                cursor: 'pointer'
+                                              }}
+                                            >
+                                              {opcion}
+                                            </button>
+                                          )
+                                        })}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
 
@@ -6150,13 +8794,17 @@ export default function InventarioSemaforos() {
                                   <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
                                     <span>Observaciones de este semáforo peatonal:</span>
                                   </label>
-                                  <input
-                                    type="text"
-                                    placeholder="Detalles sobre mica, leds apagados, soporte, orientación..."
-                                    value={pt.observaciones || ''}
-                                    onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'observaciones', e.target.value)}
-                                    style={{ width: '100%', padding: '0.35rem 0.55rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.8rem', boxSizing: 'border-box' }}
-                                  />
+                                  {modoVisualizacion ? (
+                                    renderObservacionesConsulta(pt.observaciones, 'Sin observaciones registradas')
+                                  ) : (
+                                    <input
+                                      type="text"
+                                      placeholder="Detalles sobre mica, leds apagados, soporte, orientación..."
+                                      value={pt.observaciones || ''}
+                                      onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'observaciones', e.target.value)}
+                                      style={{ width: '100%', padding: '0.35rem 0.55rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.8rem', boxSizing: 'border-box' }}
+                                    />
+                                  )}
                                 </div>
 
                                 {/* Dispositivo Audible integrado para este semáforo peatonal */}
@@ -6172,40 +8820,44 @@ export default function InventarioSemaforos() {
                                     <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                       <FaVolumeUp size={11} style={{ color: '#691B31' }} /> ¿Tiene dispositivo audible?:
                                     </span>
-                                    <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'tieneAudible', true)}
-                                        style={{
-                                          border: 'none',
-                                          padding: '0.2rem 0.5rem',
-                                          borderRadius: '3px',
-                                          fontSize: '0.75rem',
-                                          fontWeight: pt.tieneAudible ? '700' : '500',
-                                          backgroundColor: pt.tieneAudible ? '#691B31' : 'transparent',
-                                          color: pt.tieneAudible ? '#FFFFFF' : '#475569',
-                                          cursor: 'pointer'
-                                        }}
-                                      >
-                                        Sí
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'tieneAudible', false)}
-                                        style={{
-                                          border: 'none',
-                                          padding: '0.2rem 0.5rem',
-                                          borderRadius: '3px',
-                                          fontSize: '0.75rem',
-                                          fontWeight: !pt.tieneAudible ? '700' : '500',
-                                          backgroundColor: !pt.tieneAudible ? '#691B31' : 'transparent',
-                                          color: !pt.tieneAudible ? '#FFFFFF' : '#475569',
-                                          cursor: 'pointer'
-                                        }}
-                                      >
-                                        No
-                                      </button>
-                                    </div>
+                                    {modoVisualizacion ? (
+                                      renderBadgeConsulta(pt.tieneAudible ? 'Sí' : 'No')
+                                    ) : (
+                                      <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'tieneAudible', true)}
+                                          style={{
+                                            border: 'none',
+                                            padding: '0.2rem 0.5rem',
+                                            borderRadius: '3px',
+                                            fontSize: '0.75rem',
+                                            fontWeight: pt.tieneAudible ? '700' : '500',
+                                            backgroundColor: pt.tieneAudible ? '#691B31' : 'transparent',
+                                            color: pt.tieneAudible ? '#FFFFFF' : '#475569',
+                                            cursor: 'pointer'
+                                          }}
+                                        >
+                                          Sí
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'tieneAudible', false)}
+                                          style={{
+                                            border: 'none',
+                                            padding: '0.2rem 0.5rem',
+                                            borderRadius: '3px',
+                                            fontSize: '0.75rem',
+                                            fontWeight: !pt.tieneAudible ? '700' : '500',
+                                            backgroundColor: !pt.tieneAudible ? '#691B31' : 'transparent',
+                                            color: !pt.tieneAudible ? '#FFFFFF' : '#475569',
+                                            cursor: 'pointer'
+                                          }}
+                                        >
+                                          No
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
 
                                   {pt.tieneAudible && (
@@ -6222,51 +8874,61 @@ export default function InventarioSemaforos() {
                                       <div className="form-responsive-grid grid-2" style={{ gap: '0.65rem 0.85rem' }}>
                                         <div>
                                           <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                            <span>Modelo audible: <span style={{ color: '#DC2626' }}>*</span></span>
+                                            <span>Modelo audible: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                                           </label>
-                                          <input
-                                            type="text"
-                                            list={`sugerencias-audible-${pIdx}-${ptIdx}`}
-                                            placeholder="ej. Novax DS-100 Audible"
-                                            value={pt.audibleModelo || ''}
-                                            onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'audibleModelo', e.target.value)}
-                                            style={{ width: '100%', padding: '0.35rem 0.55rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.8rem', boxSizing: 'border-box' }}
-                                          />
-                                          <datalist id={`sugerencias-audible-${pIdx}-${ptIdx}`}>
-                                            <option value="Novax DS-100 Audible" />
-                                            <option value="Novax Audible Peatonal" />
-                                            <option value="Dispositivo Audible Genérico" />
-                                          </datalist>
+                                          {modoVisualizacion ? (
+                                            renderDatoConsulta(pt.audibleModelo, 'Sin modelo')
+                                          ) : (
+                                            <>
+                                              <input
+                                                type="text"
+                                                list={`sugerencias-audible-${pIdx}-${ptIdx}`}
+                                                placeholder="ej. Novax DS-100 Audible"
+                                                value={pt.audibleModelo || ''}
+                                                onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'audibleModelo', e.target.value)}
+                                                style={{ width: '100%', padding: '0.35rem 0.55rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.8rem', boxSizing: 'border-box' }}
+                                              />
+                                              <datalist id={`sugerencias-audible-${pIdx}-${ptIdx}`}>
+                                                <option value="Novax DS-100 Audible" />
+                                                <option value="Novax Audible Peatonal" />
+                                                <option value="Dispositivo Audible Genérico" />
+                                              </datalist>
+                                            </>
+                                          )}
                                         </div>
 
                                         <div>
                                           <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                            <span>Estado audible: <span style={{ color: '#DC2626' }}>*</span></span>
+                                            <span>Estado audible: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                                           </label>
-                                          <div style={{ display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', border: '1px solid #CBD5E1', minWidth: '150px' }}>
-                                            {['Operando', 'Dañado'].map((opcion) => {
-                                              const isSel = (pt.audibleEstado || 'Operando') === opcion
-                                              return (
-                                                <button
-                                                  key={opcion}
-                                                  type="button"
-                                                  onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'audibleEstado', opcion)}
-                                                  style={{
-                                                    border: 'none',
-                                                    borderRadius: '3px',
-                                                    padding: '0.25rem 0.35rem',
-                                                    fontSize: '0.75rem',
-                                                    fontWeight: isSel ? '700' : '500',
-                                                    backgroundColor: isSel ? (opcion === 'Operando' ? '#16A34A' : '#DC2626') : 'transparent',
-                                                    color: isSel ? '#FFFFFF' : '#475569',
-                                                    cursor: 'pointer'
-                                                  }}
-                                                >
-                                                  {opcion}
-                                                </button>
-                                              )
-                                            })}
-                                          </div>
+                                          {modoVisualizacion ? (
+                                            renderBadgeConsulta(pt.audibleEstado || 'Operando')
+                                          ) : (
+                                            <div style={{ display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', border: '1px solid #CBD5E1', minWidth: '150px' }}>
+                                              {['Operando', 'Dañado'].map((opcion) => {
+                                                const isSel = (pt.audibleEstado || 'Operando') === opcion
+                                                return (
+                                                  <button
+                                                    key={opcion}
+                                                    type="button"
+                                                    onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'audibleEstado', opcion)}
+                                                    style={{
+                                                      border: 'none',
+                                                      borderRadius: '3px',
+                                                      padding: '0.25rem 0.35rem',
+                                                      fontSize: '0.75rem',
+                                                      fontWeight: isSel ? '700' : '500',
+                                                      backgroundColor: isSel ? (opcion === 'Operando' ? '#16A34A' : '#DC2626') : 'transparent',
+                                                      color: isSel ? '#FFFFFF' : '#475569',
+                                                      cursor: 'pointer'
+                                                    }}
+                                                  >
+                                                    {opcion}
+                                                  </button>
+                                                )
+                                              })}
+                                            </div>
+                                          )}
                                         </div>
                                       </div>
 
@@ -6274,13 +8936,17 @@ export default function InventarioSemaforos() {
                                         <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#475569', marginBottom: '0.2rem' }}>
                                           <span>Observaciones del audible:</span>
                                         </label>
-                                        <input
-                                          type="text"
-                                          placeholder="Observaciones sobre volumen, pulsador, cableado o fallas..."
-                                          value={pt.audibleObservaciones || ''}
-                                          onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'audibleObservaciones', e.target.value)}
-                                          style={{ width: '100%', padding: '0.3rem 0.5rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.78rem', boxSizing: 'border-box' }}
-                                        />
+                                        {modoVisualizacion ? (
+                                          renderObservacionesConsulta(pt.audibleObservaciones, 'Sin observaciones registradas')
+                                        ) : (
+                                          <input
+                                            type="text"
+                                            placeholder="Observaciones sobre volumen, pulsador, cableado o fallas..."
+                                            value={pt.audibleObservaciones || ''}
+                                            onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'audibleObservaciones', e.target.value)}
+                                            style={{ width: '100%', padding: '0.3rem 0.5rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.78rem', boxSizing: 'border-box' }}
+                                          />
+                                        )}
                                       </div>
                                     </div>
                                   )}
@@ -6288,27 +8954,29 @@ export default function InventarioSemaforos() {
                               </div>
                             ))}
 
-                            <button
-                              type="button"
-                              onClick={() => handleAgregarPeatonalEnPoste(pIdx)}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.4rem',
-                                backgroundColor: '#FFFFFF',
-                                border: '1px dashed #691B31',
-                                color: '#691B31',
-                                fontSize: '0.8rem',
-                                fontWeight: '700',
-                                padding: '0.4rem 0.75rem',
-                                borderRadius: '5px',
-                                cursor: 'pointer',
-                                width: 'fit-content',
-                                alignSelf: 'flex-start'
-                              }}
-                            >
-                              <FaPlus size={10} style={{ color: '#BC955B' }} /> + Agregar otro semáforo peatonal en este poste
-                            </button>
+                            {!modoVisualizacion && (
+                              <button
+                                type="button"
+                                onClick={() => handleAgregarPeatonalEnPoste(pIdx)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.4rem',
+                                  backgroundColor: '#FFFFFF',
+                                  border: '1px dashed #691B31',
+                                  color: '#691B31',
+                                  fontSize: '0.8rem',
+                                  fontWeight: '700',
+                                  padding: '0.4rem 0.75rem',
+                                  borderRadius: '5px',
+                                  cursor: 'pointer',
+                                  width: 'fit-content',
+                                  alignSelf: 'flex-start'
+                                }}
+                              >
+                                <FaPlus size={10} style={{ color: '#BC955B' }} /> + Agregar otro semáforo peatonal en este poste
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -6330,46 +8998,50 @@ export default function InventarioSemaforos() {
                             </span>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                               <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>¿Instalado en este poste?:</span>
-                              <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleActualizarPosteMultiple(pIdx, {
-                                    tieneAudible: true,
-                                    audibleModelo: poste.audibleModelo || 'Novax DS-100 Audible',
-                                    audibleModuloEstado: poste.audibleModuloEstado || 'Operando'
-                                  })}
-                                  style={{
-                                    border: 'none',
-                                    padding: '0.25rem 0.6rem',
-                                    borderRadius: '4px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: poste.tieneAudible ? '700' : '500',
-                                    backgroundColor: poste.tieneAudible ? '#691B31' : 'transparent',
-                                    color: poste.tieneAudible ? '#FFFFFF' : '#475569',
-                                    cursor: 'pointer'
-                                  }}
-                                >
-                                  Sí
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleActualizarPosteMultiple(pIdx, {
-                                    tieneAudible: false
-                                  })}
-                                  style={{
-                                    border: 'none',
-                                    padding: '0.25rem 0.6rem',
-                                    borderRadius: '4px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: !poste.tieneAudible ? '700' : '500',
-                                    backgroundColor: !poste.tieneAudible ? '#691B31' : 'transparent',
-                                    color: !poste.tieneAudible ? '#FFFFFF' : '#475569',
-                                    cursor: 'pointer'
-                                  }}
-                                >
-                                  No
-                                </button>
-                              </div>
+                              {modoVisualizacion ? (
+                                renderBadgeConsulta(poste.tieneAudible ? 'Sí' : 'No')
+                              ) : (
+                                <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleActualizarPosteMultiple(pIdx, {
+                                      tieneAudible: true,
+                                      audibleModelo: poste.audibleModelo || 'Novax DS-100 Audible',
+                                      audibleModuloEstado: poste.audibleModuloEstado || 'Operando'
+                                    })}
+                                    style={{
+                                      border: 'none',
+                                      padding: '0.25rem 0.6rem',
+                                      borderRadius: '4px',
+                                      fontSize: '0.78rem',
+                                      fontWeight: poste.tieneAudible ? '700' : '500',
+                                      backgroundColor: poste.tieneAudible ? '#691B31' : 'transparent',
+                                      color: poste.tieneAudible ? '#FFFFFF' : '#475569',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    Sí
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleActualizarPosteMultiple(pIdx, {
+                                      tieneAudible: false
+                                    })}
+                                    style={{
+                                      border: 'none',
+                                      padding: '0.25rem 0.6rem',
+                                      borderRadius: '4px',
+                                      fontSize: '0.78rem',
+                                      fontWeight: !poste.tieneAudible ? '700' : '500',
+                                      backgroundColor: !poste.tieneAudible ? '#691B31' : 'transparent',
+                                      color: !poste.tieneAudible ? '#FFFFFF' : '#475569',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    No
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -6386,51 +9058,61 @@ export default function InventarioSemaforos() {
                               <div className="form-responsive-grid grid-2" style={{ gap: '0.65rem 0.85rem' }}>
                                 <div>
                                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                    <span>Modelo audible: <span style={{ color: '#DC2626' }}>*</span></span>
+                                    <span>Modelo audible: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                                   </label>
-                                  <input
-                                    type="text"
-                                    list={`sugerencias-audible-${pIdx}`}
-                                    placeholder="ej. Novax DS-100 Audible"
-                                    value={poste.audibleModelo || ''}
-                                    onChange={(e) => handleActualizarPoste(pIdx, 'audibleModelo', e.target.value)}
-                                    style={{ width: '100%', padding: '0.4rem 0.6rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.82rem', boxSizing: 'border-box' }}
-                                  />
-                                  <datalist id={`sugerencias-audible-${pIdx}`}>
-                                    <option value="Novax DS-100 Audible" />
-                                    <option value="Novax Audible Peatonal" />
-                                    <option value="Dispositivo Audible Genérico" />
-                                  </datalist>
+                                  {modoVisualizacion ? (
+                                    renderDatoConsulta(poste.audibleModelo, 'Sin modelo especificado')
+                                  ) : (
+                                    <>
+                                      <input
+                                        type="text"
+                                        list={`sugerencias-audible-${pIdx}`}
+                                        placeholder="ej. Novax DS-100 Audible"
+                                        value={poste.audibleModelo || ''}
+                                        onChange={(e) => handleActualizarPoste(pIdx, 'audibleModelo', e.target.value)}
+                                        style={{ width: '100%', padding: '0.4rem 0.6rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                                      />
+                                      <datalist id={`sugerencias-audible-${pIdx}`}>
+                                        <option value="Novax DS-100 Audible" />
+                                        <option value="Novax Audible Peatonal" />
+                                        <option value="Dispositivo Audible Genérico" />
+                                      </datalist>
+                                    </>
+                                  )}
                                 </div>
 
                                 <div>
                                   <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                    <span>Estado audible: <span style={{ color: '#DC2626' }}>*</span></span>
+                                    <span>Estado audible: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                                   </label>
-                                  <div style={{ display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', border: '1px solid #CBD5E1', minWidth: '150px' }}>
-                                    {['Operando', 'Dañado'].map((opcion) => {
-                                      const isSel = (poste.audibleModuloEstado || 'Operando') === opcion
-                                      return (
-                                        <button
-                                          key={opcion}
-                                          type="button"
-                                          onClick={() => handleActualizarPoste(pIdx, 'audibleModuloEstado', opcion)}
-                                          style={{
-                                            border: 'none',
-                                            borderRadius: '3px',
-                                            padding: '0.3rem 0.4rem',
-                                            fontSize: '0.78rem',
-                                            fontWeight: isSel ? '700' : '500',
-                                            backgroundColor: isSel ? (opcion === 'Operando' ? '#16A34A' : '#DC2626') : 'transparent',
-                                            color: isSel ? '#FFFFFF' : '#475569',
-                                            cursor: 'pointer'
-                                          }}
-                                        >
-                                          {opcion}
-                                        </button>
-                                      )
-                                    })}
-                                  </div>
+                                  {modoVisualizacion ? (
+                                    renderBadgeConsulta(poste.audibleModuloEstado || 'Operando')
+                                  ) : (
+                                    <div style={{ display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', border: '1px solid #CBD5E1', minWidth: '150px' }}>
+                                      {['Operando', 'Dañado'].map((opcion) => {
+                                        const isSel = (poste.audibleModuloEstado || 'Operando') === opcion
+                                        return (
+                                          <button
+                                            key={opcion}
+                                            type="button"
+                                            onClick={() => handleActualizarPoste(pIdx, 'audibleModuloEstado', opcion)}
+                                            style={{
+                                              border: 'none',
+                                              borderRadius: '3px',
+                                              padding: '0.3rem 0.4rem',
+                                              fontSize: '0.78rem',
+                                              fontWeight: isSel ? '700' : '500',
+                                              backgroundColor: isSel ? (opcion === 'Operando' ? '#16A34A' : '#DC2626') : 'transparent',
+                                              color: isSel ? '#FFFFFF' : '#475569',
+                                              cursor: 'pointer'
+                                            }}
+                                          >
+                                            {opcion}
+                                          </button>
+                                        )
+                                      })}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
 
@@ -6438,13 +9120,17 @@ export default function InventarioSemaforos() {
                                 <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
                                   <span>Observaciones del audible:</span>
                                 </label>
-                                <input
-                                  type="text"
-                                  placeholder="Detalles de pulsador, volumen, tono, fallas o cableado..."
-                                  value={poste.audibleObservaciones || ''}
-                                  onChange={(e) => handleActualizarPoste(pIdx, 'audibleObservaciones', e.target.value)}
-                                  style={{ width: '100%', padding: '0.35rem 0.55rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.8rem', boxSizing: 'border-box' }}
-                                />
+                                {modoVisualizacion ? (
+                                  renderObservacionesConsulta(poste.audibleObservaciones)
+                                ) : (
+                                  <input
+                                    type="text"
+                                    placeholder="Detalles de pulsador, volumen, tono, fallas o cableado..."
+                                    value={poste.audibleObservaciones || ''}
+                                    onChange={(e) => handleActualizarPoste(pIdx, 'audibleObservaciones', e.target.value)}
+                                    style={{ width: '100%', padding: '0.35rem 0.55rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.8rem', boxSizing: 'border-box' }}
+                                  />
+                                )}
                               </div>
                             </div>
                           )}
@@ -6466,44 +9152,48 @@ export default function InventarioSemaforos() {
                           </span>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                             <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>¿Instalada en este poste?:</span>
-                            <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
-                              <button
-                                type="button"
-                                onClick={() => handleActualizarPosteMultiple(pIdx, {
-                                  tieneCamara: true,
-                                  camaraModelo: poste.camaraModelo || MODELOS_CAMARA_CATALOGO[0],
-                                  camaraCantidad: poste.camaraCantidad || '1'
-                                })}
-                                style={{
-                                  border: 'none',
-                                  padding: '0.25rem 0.6rem',
-                                  borderRadius: '4px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: poste.tieneCamara ? '700' : '500',
-                                  backgroundColor: poste.tieneCamara ? '#691B31' : 'transparent',
-                                  color: poste.tieneCamara ? '#FFFFFF' : '#475569',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Sí
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleActualizarPoste(pIdx, 'tieneCamara', false)}
-                                style={{
-                                  border: 'none',
-                                  padding: '0.25rem 0.6rem',
-                                  borderRadius: '4px',
-                                  fontSize: '0.78rem',
-                                  fontWeight: !poste.tieneCamara ? '700' : '500',
-                                  backgroundColor: !poste.tieneCamara ? '#691B31' : 'transparent',
-                                  color: !poste.tieneCamara ? '#FFFFFF' : '#475569',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                No
-                              </button>
-                            </div>
+                            {modoVisualizacion ? (
+                              renderBadgeConsulta(poste.tieneCamara ? 'Sí' : 'No')
+                            ) : (
+                              <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleActualizarPosteMultiple(pIdx, {
+                                    tieneCamara: true,
+                                    camaraModelo: poste.camaraModelo || MODELOS_CAMARA_CATALOGO[0],
+                                    camaraCantidad: poste.camaraCantidad || '1'
+                                  })}
+                                  style={{
+                                    border: 'none',
+                                    padding: '0.25rem 0.6rem',
+                                    borderRadius: '4px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: poste.tieneCamara ? '700' : '500',
+                                    backgroundColor: poste.tieneCamara ? '#691B31' : 'transparent',
+                                    color: poste.tieneCamara ? '#FFFFFF' : '#475569',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  Sí
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleActualizarPoste(pIdx, 'tieneCamara', false)}
+                                  style={{
+                                    border: 'none',
+                                    padding: '0.25rem 0.6rem',
+                                    borderRadius: '4px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: !poste.tieneCamara ? '700' : '500',
+                                    backgroundColor: !poste.tieneCamara ? '#691B31' : 'transparent',
+                                    color: !poste.tieneCamara ? '#FFFFFF' : '#475569',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  No
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -6512,33 +9202,41 @@ export default function InventarioSemaforos() {
                             <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem' }}>
                               <div>
                                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                  <span>Modelo de cámara: <span style={{ color: '#DC2626' }}>*</span></span>
+                                  <span>Modelo de cámara: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                                 </label>
-                                <select
-                                  value={poste.camaraModelo || ''}
-                                  onChange={(e) => handleActualizarPoste(pIdx, 'camaraModelo', e.target.value)}
-                                  style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', backgroundColor: 'white', color: '#1E293B', boxSizing: 'border-box' }}
-                                >
-                                  <option value="">-- Seleccionar modelo de cámara --</option>
-                                  {MODELOS_CAMARA_CATALOGO.map((modelo) => (
-                                    <option key={modelo} value={modelo}>{modelo}</option>
-                                  ))}
-                                </select>
+                                {modoVisualizacion ? (
+                                  renderDatoConsulta(poste.camaraModelo, 'Sin modelo de cámara')
+                                ) : (
+                                  <select
+                                    value={poste.camaraModelo || ''}
+                                    onChange={(e) => handleActualizarPoste(pIdx, 'camaraModelo', e.target.value)}
+                                    style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', backgroundColor: 'white', color: '#1E293B', boxSizing: 'border-box' }}
+                                  >
+                                    <option value="">-- Seleccionar modelo de cámara --</option>
+                                    {MODELOS_CAMARA_CATALOGO.map((modelo) => (
+                                      <option key={modelo} value={modelo}>{modelo}</option>
+                                    ))}
+                                  </select>
+                                )}
                               </div>
 
                               <div>
                                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                  <span>Cantidad de equipos: <span style={{ color: '#DC2626' }}>*</span></span>
+                                  <span>Cantidad de equipos: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                                 </label>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  placeholder="ej. 1"
-                                  value={poste.camaraCantidad || ''}
-                                  onChange={(e) => handleActualizarPoste(pIdx, 'camaraCantidad', e.target.value)}
-                                  onWheel={(e) => e.target.blur()}
-                                  style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                                />
+                                {modoVisualizacion ? (
+                                  renderDatoConsulta(`${poste.camaraCantidad || 1} equipo(s)`)
+                                ) : (
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    placeholder="ej. 1"
+                                    value={poste.camaraCantidad || ''}
+                                    onChange={(e) => handleActualizarPoste(pIdx, 'camaraCantidad', e.target.value)}
+                                    onWheel={(e) => e.target.blur()}
+                                    style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                                  />
+                                )}
                               </div>
                             </div>
 
@@ -6546,22 +9244,26 @@ export default function InventarioSemaforos() {
                               <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
                                 <span>Observaciones de la cámara:</span>
                               </label>
-                              <textarea
-                                rows={2}
-                                placeholder="Detalles de cobertura, orientación, cableado o estado físico..."
-                                value={poste.camaraObservaciones || ''}
-                                onChange={(e) => handleActualizarPoste(pIdx, 'camaraObservaciones', e.target.value)}
-                                style={{
-                                  width: '100%',
-                                  padding: '0.45rem 0.65rem',
-                                  border: '1px solid #CBD5E1',
-                                  borderRadius: '6px',
-                                  fontSize: '0.85rem',
-                                  boxSizing: 'border-box',
-                                  resize: 'vertical',
-                                  fontFamily: 'inherit'
-                                }}
-                              />
+                              {modoVisualizacion ? (
+                                renderObservacionesConsulta(poste.camaraObservaciones)
+                              ) : (
+                                <textarea
+                                  rows={2}
+                                  placeholder="Detalles de cobertura, orientación, cableado o estado físico..."
+                                  value={poste.camaraObservaciones || ''}
+                                  onChange={(e) => handleActualizarPoste(pIdx, 'camaraObservaciones', e.target.value)}
+                                  style={{
+                                    width: '100%',
+                                    padding: '0.45rem 0.65rem',
+                                    border: '1px solid #CBD5E1',
+                                    borderRadius: '6px',
+                                    fontSize: '0.85rem',
+                                    boxSizing: 'border-box',
+                                    resize: 'vertical',
+                                    fontFamily: 'inherit'
+                                  }}
+                                />
+                              )}
                             </div>
                           </div>
                         )}
@@ -6572,7 +9274,7 @@ export default function InventarioSemaforos() {
               )}
 
                 {/* Botón inferior: Agregar otro poste */}
-                {(controladorForm.postes || []).length > 0 && (
+                {(controladorForm.postes || []).length > 0 && !modoVisualizacion && (
                   <div style={{ marginTop: '1rem' }}>
                     <button
                       type="button"
@@ -6630,13 +9332,13 @@ export default function InventarioSemaforos() {
                     alignItems: 'center',
                     gap: '0.5rem'
                   }}>
-                    <FaLayerGroup size={15} style={{ color: '#BC955B' }} /> Registros de Piso
+                    <FaLayerGroup size={15} style={{ color: '#BC955B' }} /> Sección 6: Registros de Piso
                   </h4>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
                       Tapas e infraestructura subterránea
                     </span>
-                    {editandoControladorId && (
+                    {editandoControladorId && !modoVisualizacion && (
                       <button
                         type="button"
                         onClick={handleGuardarRegistrosPisoModular}
@@ -6669,50 +9371,75 @@ export default function InventarioSemaforos() {
                   <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
                       <FaLayerGroup size={13} style={{ color: '#691B31' }} />
-                      <span>Cantidad de tapas: <span style={{ color: '#DC2626' }}>*</span></span>
+                      <span>Cantidad de tapas: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                     </label>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="ej. 4"
-                      value={controladorForm.registrosPisoTapas}
-                      onChange={(e) => setControladorForm({ ...controladorForm, registrosPisoTapas: e.target.value })}
-                      onWheel={(e) => e.target.blur()}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        boxSizing: 'border-box',
-                        marginTop: 'auto'
-                      }}
-                    />
+                    {modoVisualizacion ? (
+                      renderDatoConsulta(`${controladorForm.registrosPisoTapas ?? 0} tapas`)
+                    ) : (
+                      <div>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="ej. 4"
+                          value={controladorForm.registrosPisoTapas}
+                          onChange={(e) => handleCambiarRegistrosTapas(e.target.value)}
+                          onWheel={(e) => e.target.blur()}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem 0.75rem',
+                            border: `1px solid ${controladorErrores.registrosPisoTapas ? '#DC2626' : '#CBD5E1'}`,
+                            backgroundColor: controladorErrores.registrosPisoTapas ? '#FEF2F2' : '#FFFFFF',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                            boxSizing: 'border-box',
+                            marginTop: 'auto'
+                          }}
+                        />
+                        {controladorErrores.registrosPisoTapas && (
+                          <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                            <FaExclamationTriangle size={10} /> {controladorErrores.registrosPisoTapas}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Registros dañados */}
                   <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
                       <FaExclamationTriangle size={13} style={{ color: '#DC2626' }} />
-                      <span>Registros dañados: <span style={{ color: '#DC2626' }}>*</span></span>
+                      <span>Registros dañados: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                     </label>
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="ej. 1"
-                      value={controladorForm.registrosPisoDanados}
-                      onChange={(e) => handleCambiarRegistrosDanados(e.target.value)}
-                      onWheel={(e) => e.target.blur()}
-                      style={{
-                        width: '100%',
-                        padding: '0.5rem 0.75rem',
-                        border: '1px solid #CBD5E1',
-                        borderRadius: '6px',
-                        fontSize: '0.85rem',
-                        boxSizing: 'border-box',
-                        marginTop: 'auto'
-                      }}
-                    />
+                    {modoVisualizacion ? (
+                      renderDatoConsulta(`${controladorForm.registrosPisoDanados ?? 0} registros dañados`)
+                    ) : (
+                      <div>
+                        <input
+                          type="number"
+                          min="0"
+                          max={controladorForm.registrosPisoTapas !== '' && !isNaN(parseInt(controladorForm.registrosPisoTapas, 10)) ? parseInt(controladorForm.registrosPisoTapas, 10) : undefined}
+                          placeholder="ej. 1"
+                          value={controladorForm.registrosPisoDanados}
+                          onChange={(e) => handleCambiarRegistrosDanados(e.target.value)}
+                          onWheel={(e) => e.target.blur()}
+                          style={{
+                            width: '100%',
+                            padding: '0.5rem 0.75rem',
+                            border: `1px solid ${controladorErrores.registrosPisoDanados ? '#DC2626' : '#CBD5E1'}`,
+                            backgroundColor: controladorErrores.registrosPisoDanados ? '#FEF2F2' : '#FFFFFF',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                            boxSizing: 'border-box',
+                            marginTop: 'auto'
+                          }}
+                        />
+                        {controladorErrores.registrosPisoDanados && (
+                          <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                            <FaExclamationTriangle size={10} /> {controladorErrores.registrosPisoDanados}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -6761,74 +9488,140 @@ export default function InventarioSemaforos() {
                               gap: '0.35rem'
                             }}
                           >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', fontWeight: '700', color: '#A02142' }}>
-                                <FaExclamationTriangle size={11} style={{ color: '#DC2626' }} /> Registro dañado #{idx + 1}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleObtenerGpsRegistro(idx)}
-                                disabled={capturandoGpsIndex === idx}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.25rem',
-                                  backgroundColor: capturandoGpsIndex === idx ? '#E2E8F0' : '#FEF3C7',
-                                  color: '#92400E',
-                                  border: '1px solid #FCD34D',
-                                  borderRadius: '4px',
-                                  padding: '0.2rem 0.5rem',
-                                  fontSize: '0.72rem',
-                                  fontWeight: '700',
-                                  cursor: capturandoGpsIndex === idx ? 'wait' : 'pointer'
-                                }}
-                                title="Capturar ubicación GPS actual del dispositivo"
-                              >
-                                <FaMapMarkerAlt size={10} />
-                                {capturandoGpsIndex === idx ? 'Obteniendo GPS...' : 'GPS actual'}
-                              </button>
-                            </div>
+                            {(() => {
+                              const coordsReg = extraerCoordenadasValidas(item.coordenadas)
+                              const mapaRegVisible = mapasDanadasVisibles[idx] !== false && Boolean(coordsReg)
 
-                            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                              <input
-                                type="text"
-                                placeholder="ej. 20.123456, -98.765432"
-                                value={item.coordenadas || ''}
-                                onChange={(e) => handleCambiarCoordenada(idx, e.target.value)}
-                                style={{
-                                  flex: 1,
-                                  padding: '0.45rem 0.65rem',
-                                  border: '1px solid #CBD5E1',
-                                  borderRadius: '5px',
-                                  fontSize: '0.82rem',
-                                  backgroundColor: 'white'
-                                }}
-                              />
-                              {item.coordenadas && item.coordenadas.includes(',') && (
-                                <a
-                                  href={`https://www.google.com/maps?q=${encodeURIComponent(item.coordenadas.trim())}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.3rem',
-                                    padding: '0.45rem 0.65rem',
-                                    backgroundColor: '#EFF6FF',
-                                    color: '#1D4ED8',
-                                    border: '1px solid #BFDBFE',
-                                    borderRadius: '5px',
-                                    fontSize: '0.75rem',
-                                    fontWeight: '600',
-                                    textDecoration: 'none'
-                                  }}
-                                  title="Ver en Google Maps"
-                                >
-                                  <FaExternalLinkAlt size={10} />
-                                  <span>Ver mapa</span>
-                                </a>
-                              )}
-                            </div>
+                              return (
+                                <>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem' }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', fontWeight: '700', color: '#A02142' }}>
+                                      <FaExclamationTriangle size={11} style={{ color: '#DC2626' }} /> Registro dañado #{idx + 1}
+                                    </span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                      {coordsReg && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setMapasDanadasVisibles(prev => ({
+                                            ...prev,
+                                            [idx]: mapaRegVisible ? false : true
+                                          }))}
+                                          style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '0.25rem',
+                                            padding: '0.15rem 0.45rem',
+                                            backgroundColor: mapaRegVisible ? '#EFF6FF' : '#F1F5F9',
+                                            color: mapaRegVisible ? '#1D4ED8' : '#475569',
+                                            border: mapaRegVisible ? '1px solid #BFDBFE' : '1px solid #CBD5E1',
+                                            borderRadius: '4px',
+                                            fontSize: '0.72rem',
+                                            fontWeight: '700',
+                                            cursor: 'pointer',
+                                            whiteSpace: 'nowrap',
+                                            pointerEvents: 'auto'
+                                          }}
+                                          title={mapaRegVisible ? "Ocultar mapa interactivo" : "Mostrar mapa interactivo"}
+                                        >
+                                          <FaMap size={10} />
+                                          <span>{mapaRegVisible ? 'Ocultar mapa' : 'Ver mapa'}</span>
+                                        </button>
+                                      )}
+                                      {!modoVisualizacion && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleObtenerGpsRegistro(idx)}
+                                          disabled={capturandoGpsIndex === idx}
+                                          style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '0.25rem',
+                                            backgroundColor: capturandoGpsIndex === idx ? '#E2E8F0' : '#FEF3C7',
+                                            color: '#92400E',
+                                            border: '1px solid #FCD34D',
+                                            borderRadius: '4px',
+                                            padding: '0.2rem 0.5rem',
+                                            fontSize: '0.72rem',
+                                            fontWeight: '700',
+                                            cursor: capturandoGpsIndex === idx ? 'wait' : 'pointer'
+                                          }}
+                                          title="Capturar ubicación GPS actual del dispositivo"
+                                        >
+                                          <FaMapMarkerAlt size={10} />
+                                          {capturandoGpsIndex === idx ? 'Obteniendo GPS...' : 'GPS actual'}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {modoVisualizacion ? (
+                                    renderDatoConsulta(item.coordenadas, 'Sin coordenadas registradas')
+                                  ) : (
+                                    <input
+                                      type="text"
+                                      placeholder="ej. 20.123456, -98.765432"
+                                      value={item.coordenadas || ''}
+                                      onChange={(e) => {
+                                        handleCambiarCoordenada(idx, e.target.value)
+                                        if (extraerCoordenadasValidas(e.target.value)) {
+                                          setMapasDanadasVisibles(prev => ({ ...prev, [idx]: true }))
+                                        }
+                                      }}
+                                      style={{
+                                        width: '100%',
+                                        padding: '0.45rem 0.65rem',
+                                        border: '1px solid #CBD5E1',
+                                        borderRadius: '5px',
+                                        fontSize: '0.82rem',
+                                        backgroundColor: 'white',
+                                        boxSizing: 'border-box'
+                                      }}
+                                    />
+                                  )}
+
+                                  {coordsReg && mapaRegVisible && (
+                                    <div style={{
+                                      marginTop: '0.45rem',
+                                      borderRadius: '6px',
+                                      overflow: 'hidden',
+                                      border: '1px solid #CBD5E1',
+                                      boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+                                      backgroundColor: '#ffffff'
+                                    }}>
+                                      <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        padding: '0.35rem 0.6rem',
+                                        backgroundColor: '#F8FAFC',
+                                        borderBottom: '1px solid #E2E8F0',
+                                        fontSize: '0.73rem',
+                                        fontWeight: '600',
+                                        color: '#475569',
+                                        flexWrap: 'wrap',
+                                        gap: '0.35rem'
+                                      }}>
+                                        <span>GPS: <strong style={{ color: '#1E293B' }}>{coordsReg.lat.toFixed(6)}, {coordsReg.lng.toFixed(6)}</strong></span>
+                                        <a
+                                          href={`https://www.google.com/maps?q=${coordsReg.lat},${coordsReg.lng}`}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          style={{ color: '#2563EB', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.72rem', fontWeight: '600' }}
+                                        >
+                                          <FaExternalLinkAlt size={8} /> Abrir en Google Maps
+                                        </a>
+                                      </div>
+                                      <iframe
+                                        title={`Mapa del registro dañado #${idx + 1}`}
+                                        src={`https://maps.google.com/maps?q=${coordsReg.lat},${coordsReg.lng}&hl=es&z=17&output=embed`}
+                                        style={{ width: '100%', height: '170px', border: 'none', display: 'block' }}
+                                        loading="lazy"
+                                      />
+                                    </div>
+                                  )}
+                                </>
+                              )
+                            })()}
                           </div>
                         ))}
                       </div>
@@ -6837,44 +9630,73 @@ export default function InventarioSemaforos() {
                 )}
               </div>
 
-              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', borderTop: '1px solid #E2E8F0', paddingTop: '1.25rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setModalControladorAbierto(false)}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    padding: '0.6rem 1.2rem',
-                    border: '1px solid #CBD5E1',
-                    borderRadius: '8px',
-                    backgroundColor: 'white',
-                    color: '#6F7271',
-                    cursor: 'pointer',
-                    fontWeight: '600'
-                  }}
-                >
-                  <FaTimes size={13} /> Cancelar
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    padding: '0.6rem 1.2rem',
-                    border: 'none',
-                    borderRadius: '8px',
-                    backgroundColor: '#691B31',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontWeight: '600'
-                  }}
-                >
-                  <FaSave size={13} /> {editandoControladorId ? 'Actualizar' : 'Guardar'}
-                </button>
-              </div>
-            </form>
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end', borderTop: '1px solid #E2E8F0', paddingTop: '1.25rem' }}>
+                  {modoVisualizacion ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModalControladorAbierto(false)
+                        setModoVisualizacion(false)
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.45rem',
+                        padding: '0.65rem 1.4rem',
+                        border: '1px solid #CBD5E1',
+                        borderRadius: '8px',
+                        backgroundColor: '#475569',
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontWeight: '700'
+                      }}
+                    >
+                      <FaTimes size={14} /> Cerrar
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setModalControladorAbierto(false)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          padding: '0.6rem 1.2rem',
+                          border: '1px solid #CBD5E1',
+                          borderRadius: '8px',
+                          backgroundColor: 'white',
+                          color: '#6F7271',
+                          cursor: 'pointer',
+                          fontWeight: '600'
+                        }}
+                      >
+                        <FaTimes size={13} /> Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          padding: '0.6rem 1.2rem',
+                          border: 'none',
+                          borderRadius: '8px',
+                          backgroundColor: '#691B31',
+                          color: 'white',
+                          cursor: 'pointer',
+                          fontWeight: '600'
+                        }}
+                      >
+                        <FaSave size={13} /> {editandoControladorId ? 'Actualizar' : 'Guardar'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
@@ -7277,6 +10099,7 @@ export default function InventarioSemaforos() {
           </div>
         );
       })()}
-    </main>
+
+          </main>
   )
 }

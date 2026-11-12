@@ -999,13 +999,284 @@ async function exportarInventarioMobiliario(mobiliario) {
   return workbook.xlsx.writeBuffer();
 }
 
+async function exportarControladoresSemaforoExcel(controladores, meta = {}) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'SITRAC-H';
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet('Controladores Semafóricos', {
+    views: [{ showGridLines: true }]
+  });
+
+  const TOTAL_COLUMNAS = 13;
+
+  // 1. BANNER INSTITUCIONAL (Filas 1 a 3)
+  sheet.mergeCells('A1:M1');
+  const title1 = sheet.getCell('A1');
+  title1.value = 'SITRAC-H — SISTEMA INTELIGENTE DE TRÁNSITO, RESGUARDO Y AUTOMATIZACIÓN DE CONTROL';
+  title1.font = { name: 'Segoe UI', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+  title1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF691B31' } }; // Guinda
+  title1.alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getRow(1).height = 28;
+
+  sheet.mergeCells('A2:M2');
+  const title2 = sheet.getCell('A2');
+  title2.value = 'INVENTARIO GENERAL DE CONTROLADORES SEMAFÓRICOS INSTALADOS';
+  title2.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF691B31' } };
+  title2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDF8EE' } }; // Crema/Dorado suave
+  title2.alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getRow(2).height = 22;
+
+  sheet.mergeCells('A3:M3');
+  const title3 = sheet.getCell('A3');
+  const fechaMex = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+  const horaMex = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const filtroTexto = (meta.search || meta.modelo)
+    ? `Filtros: ${meta.modelo ? `[Modelo: ${meta.modelo}] ` : ''}${meta.search ? `[Búsqueda: "${meta.search}"]` : ''} | Total: ${controladores.length} controlador(es)`
+    : `Inventario Completo | Total: ${controladores.length} controlador(es) registrados`;
+  title3.value = `Emisión: ${fechaMex} a las ${horaMex} hrs  |  ${filtroTexto}`;
+  title3.font = { name: 'Segoe UI', size: 9, italic: true, color: { argb: 'FF475569' } };
+  title3.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+  title3.alignment = { vertical: 'middle', horizontal: 'center' };
+  sheet.getRow(3).height = 20;
+
+  // Fila 4: Separador visual
+  sheet.getRow(4).height = 8;
+
+  // 2. CONFIGURACIÓN DE COLUMNAS (Fila 5)
+  sheet.getRow(5).height = 32;
+  const columnasDef = [
+    { key: 'num', header: 'No.', width: 6 },
+    { key: 'modelo', header: 'Modelo', width: 16 },
+    { key: 'crucero', header: 'Crucero / Intersección', width: 34 },
+    { key: 'gabinete', header: 'No. Gabinete', width: 16 },
+    { key: 'cabezales', header: 'Cabezales (3L / 4L)', width: 22 },
+    { key: 'leds', header: 'Desglose de LEDs', width: 26 },
+    { key: 'peatonal', header: 'Accesibilidad Peatonal', width: 28 },
+    { key: 'electronica', header: 'Electrónica Interna', width: 30 },
+    { key: 'red', header: 'Red y Conectividad', width: 28 },
+    { key: 'postes', header: 'Postes del Crucero', width: 36 },
+    { key: 'camaras', header: 'Cámaras', width: 20 },
+    { key: 'estadoFisico', header: 'Estado Base y Registros', width: 24 },
+    { key: 'observaciones', header: 'Observaciones', width: 34 }
+  ];
+
+  sheet.columns = columnasDef.map(c => ({ key: c.key, width: c.width }));
+
+  // Re-asignar fila de cabecera en fila 5 manualmente para respetar el banner superior
+  const headerRow = sheet.getRow(5);
+  columnasDef.forEach((col, idx) => {
+    const cell = headerRow.getCell(idx + 1);
+    cell.value = col.header;
+    cell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF691B31' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border = {
+      top: { style: 'medium', color: { argb: 'FF691B31' } },
+      bottom: { style: 'medium', color: { argb: 'FF691B31' } },
+      left: { style: 'thin', color: { argb: 'FF8A2441' } },
+      right: { style: 'thin', color: { argb: 'FF8A2441' } }
+    };
+  });
+
+  // 3. AGREGAR DATOS
+  let totalCabezalesSum = 0;
+  let totalLedsSum = 0;
+
+  for (let i = 0; i < controladores.length; i++) {
+    const ctrl = controladores[i];
+    const rowNum = 6 + i;
+
+    // Normalizar postes con modelo, tipo y coordenadas
+    let postesList = [];
+    if (typeof ctrl.postesDetalle === 'string') {
+      try { postesList = JSON.parse(ctrl.postesDetalle); } catch (e) { postesList = []; }
+    } else if (Array.isArray(ctrl.postesDetalle)) {
+      postesList = ctrl.postesDetalle;
+    }
+
+    const postesStr = postesList.length > 0
+      ? `${postesList.length} poste(s):\n` + postesList.map((p, idx) => {
+          const mod = p.modeloPoste || p.modelo || p.posteModeloTipo || 'S/M';
+          const tipo = p.tipoPoste === 'peatonal' ? 'Peatonal' : (p.tipoPoste === 'mixto' ? 'Vehicular' : (p.tipoPoste || ''));
+          const tipoText = tipo ? ` (${tipo})` : '';
+          const ubic = p.ubicacionPoste || p.coordenadas;
+          const coords = ubic ? ` [${ubic}]` : '';
+          return `• Poste ${idx + 1}: ${mod}${tipoText}${coords}`;
+        }).join('\n')
+      : '0 postes registrados';
+
+    const sem3L = Number(ctrl.semaforos3Luces) || 0;
+    const sem4L = Number(ctrl.semaforos4Luces) || 0;
+    const totalCab = sem3L + sem4L;
+    totalCabezalesSum += totalCab;
+
+    const ledsV = Number(ctrl.totalLedsVerdes) || 0;
+    const ledsR = Number(ctrl.totalLedsRojos) || 0;
+    const ledsA = Number(ctrl.totalLedsAmarillos) || 0;
+    const flechasV = Number(ctrl.totalFlechasVerdes) || 0;
+    const flechasR = Number(ctrl.totalFlechasRojas) || 0;
+    const totalLeds = ledsV + ledsR + ledsA + flechasV + flechasR;
+    totalLedsSum += totalLeds;
+
+    // Cabezales string
+    const cabezalesStr = `3 Luces: ${sem3L}\n4 Luces: ${sem4L}\nTotal: ${totalCab} cabezal(es)`;
+
+    // LEDs string
+    const ledsStr = `Verdes: ${ledsV}${flechasV ? ` (${flechasV} fl.)` : ''}\nRojos: ${ledsR}${flechasR ? ` (${flechasR} fl.)` : ''}\nAmarillos: ${ledsA}\nTotal LEDs: ${totalLeds}`;
+
+    // Peatonal / Accesibilidad
+    const peatPartes = [];
+    if (ctrl.pasoPeatonal) peatPartes.push('• Paso Peatonal: SÍ');
+    if (ctrl.audible) peatPartes.push('• Audible: SÍ');
+    if (ctrl.pantallaLed) peatPartes.push('• Pantalla LED: SÍ');
+    if (ctrl.botonera) peatPartes.push('• Botonera: SÍ');
+    const peatonalStr = peatPartes.length > 0 ? peatPartes.join('\n') : 'Sin dispositivos peatonales';
+
+    // Electrónica interna
+    const elecPartes = [];
+    elecPartes.push(`CPU: ${ctrl.cpu ? 'Sí' : 'No'}`);
+    elecPartes.push(`Relés: ${ctrl.tarjetaRelevadora ? (ctrl.tarjetaRelevadoresModelo ? `Sí (${ctrl.tarjetaRelevadoresModelo})` : 'Sí') : 'No'}`);
+    elecPartes.push(`Fuente: ${ctrl.fuentePoder ? 'Sí' : 'No'}`);
+    if (ctrl.gps) elecPartes.push(`GPS: Sí (${ctrl.gpsModelo || 'Instalado'})`);
+    const electronicaStr = elecPartes.join('\n');
+
+    // Red y Conectividad
+    const redPartes = [];
+    if (ctrl.ipLocal) redPartes.push(`IP Local: ${ctrl.ipLocal}`);
+    if (ctrl.ipSystem) redPartes.push(`IP Sistema: ${ctrl.ipSystem}`);
+    if (ctrl.versionFirmware) redPartes.push(`Firmware: ${ctrl.versionFirmware}`);
+    if (ctrl.switch) redPartes.push(`Switch: ${ctrl.switchFibraMarca || ''} ${ctrl.switchFibraModelo || ''}`.trim() || 'Sí');
+    if (ctrl.fibraOptica) redPartes.push('Fibra Óptica: Sí');
+    const redStr = redPartes.length > 0 ? redPartes.join('\n') : 'Sin configuración de red';
+
+    // Cámaras
+    const camarasStr = ctrl.camaraCantidad
+      ? `${ctrl.camaraCantidad} cámara(s)\nModelo: ${ctrl.camaraModelo || 'Estándar'}`
+      : (ctrl.camaraModelo ? `Cámaras: ${ctrl.camaraModelo}` : 'Ninguna');
+
+    // Estado Base y Registros
+    const estadoPartes = [];
+    const regDanados = Number(ctrl.registrosPisoDanados) || 0;
+    if (regDanados > 0) estadoPartes.push(`⚠️ ${regDanados} REG. DAÑADO(S)`);
+    else estadoPartes.push('Registros: En buen estado');
+    if (ctrl.cimientoCompleto) estadoPartes.push(`Cimiento: ${ctrl.cimientoCompleto}`);
+    if (ctrl.tapaCableado) estadoPartes.push(`Tapa cableado: ${ctrl.tapaCableado}`);
+    const estadoStr = estadoPartes.join('\n');
+
+    // Observaciones
+    const obsStr = ctrl.observacionesExterior || ctrl.posteObservaciones || 'Sin observaciones registradas';
+
+    const row = sheet.getRow(rowNum);
+    row.values = [
+      i + 1,
+      ctrl.modelo || '—',
+      ctrl.crucero?.nombre || (ctrl.cruceroId ? `Crucero #${ctrl.cruceroId}` : 'Sin Asignar'),
+      ctrl.numeroGabinete || '—',
+      cabezalesStr,
+      ledsStr,
+      peatonalStr,
+      electronicaStr,
+      redStr,
+      postesStr,
+      camarasStr,
+      estadoStr,
+      obsStr
+    ];
+
+    // Formateo de celdas de datos
+    const esPar = i % 2 === 0;
+    const bgCol = esPar ? 'FFFFFFFF' : 'FFF9FAFB'; // Alternar blanco y gris sutil
+
+    // Altura dinámica según líneas de contenido para evitar texto cortado
+    const maxLineas = Math.max(
+      postesList.length + 1,
+      elecPartes.length,
+      redPartes.length,
+      estadoPartes.length,
+      3
+    );
+    row.height = Math.max(46, Math.min(130, maxLineas * 15 + 10));
+
+    for (let c = 1; c <= TOTAL_COLUMNAS; c++) {
+      const cell = row.getCell(c);
+      cell.font = { name: 'Segoe UI', size: 9, color: { argb: 'FF1E293B' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgCol } };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+      };
+
+      // Alineaciones según la columna
+      if (c === 1 || c === 4 || c === 11) {
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      } else if (c === 2) {
+        cell.alignment = { vertical: 'middle', horizontal: 'left' };
+        cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF691B31' } };
+      } else if (c === 3) {
+        cell.alignment = { vertical: 'middle', horizontal: 'left' };
+        cell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF0F172A' } };
+      } else if (c === 12 && regDanados > 0) {
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FFDC2626' } }; // Rojo si hay dañados
+      } else {
+        cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+      }
+    }
+  }
+
+  // 4. FILA DE RESUMEN FINAL
+  const finalRowNum = 6 + controladores.length;
+  sheet.mergeCells(`A${finalRowNum}:D${finalRowNum}`);
+  const totalLabelCell = sheet.getCell(`A${finalRowNum}`);
+  totalLabelCell.value = `TOTALES (${controladores.length} CONTROLADORES)`;
+  totalLabelCell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF691B31' } };
+  totalLabelCell.alignment = { vertical: 'middle', horizontal: 'center' };
+  totalLabelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDF8EE' } };
+
+  const totalCabCell = sheet.getCell(`E${finalRowNum}`);
+  totalCabCell.value = `${totalCabezalesSum} Cabezales`;
+  totalCabCell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF691B31' } };
+  totalCabCell.alignment = { vertical: 'middle', horizontal: 'center' };
+  totalCabCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDF8EE' } };
+
+  const totalLedsCell = sheet.getCell(`F${finalRowNum}`);
+  totalLedsCell.value = `${totalLedsSum} LEDs`;
+  totalLedsCell.font = { name: 'Segoe UI', size: 9.5, bold: true, color: { argb: 'FF691B31' } };
+  totalLedsCell.alignment = { vertical: 'middle', horizontal: 'center' };
+  totalLedsCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDF8EE' } };
+
+  sheet.mergeCells(`G${finalRowNum}:M${finalRowNum}`);
+  const summaryEmpty = sheet.getCell(`G${finalRowNum}`);
+  summaryEmpty.value = 'SITRAC-H — Dirección de Control y Dispositivos Viales';
+  summaryEmpty.font = { name: 'Segoe UI', size: 9, italic: true, color: { argb: 'FF64748B' } };
+  summaryEmpty.alignment = { vertical: 'middle', horizontal: 'center' };
+  summaryEmpty.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDF8EE' } };
+
+  sheet.getRow(finalRowNum).height = 28;
+
+  for (let c = 1; c <= TOTAL_COLUMNAS; c++) {
+    sheet.getCell(finalRowNum, c).border = {
+      top: { style: 'medium', color: { argb: 'FF691B31' } },
+      bottom: { style: 'medium', color: { argb: 'FF691B31' } },
+      left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+    };
+  }
+
+  return workbook.xlsx.writeBuffer();
+}
+
 module.exports = {
   exportarReportesOficina,
   exportarReportesInfraestructura,
   exportarReportesSemaforo,
   exportarInventarioExistencias,
   exportarInventarioMobiliario,
-  exportarHerramientasExcel
+  exportarHerramientasExcel,
+  exportarControladoresSemaforoExcel
 };
 
 
