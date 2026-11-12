@@ -15,7 +15,7 @@ import {
   FaSearch,
   FaBoxes,
   FaCheck,
-  FaLightbulb,
+  FaUser,
   FaBoxOpen
 } from 'react-icons/fa'
 import PersonalAutocomplete from '../components/PersonalAutocomplete'
@@ -1564,50 +1564,68 @@ export default function FormOficinas({ usuarioActual }) {
             onClick={(e) => e.stopPropagation()}
             style={{
               backgroundColor: 'white',
-              borderRadius: '16px',
+              borderRadius: '10px',
               maxWidth: '620px',
               width: '100%',
               maxHeight: '85vh',
               display: 'flex',
               flexDirection: 'column',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
               overflow: 'hidden',
-              border: '1px solid #E2E8F0'
+              border: '1px solid #E2E8F0',
+              position: 'relative'
             }}
           >
+            {/* Pleca institucional superior sutil: Guinda 75% / Oro 25% */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '4px',
+                background: 'linear-gradient(90deg, #691B31 0%, #691B31 75%, #BC955B 75%, #BC955B 100%)',
+                zIndex: 10
+              }}
+            />
+
             {/* Cabecera del Modal */}
-            <div style={{
-              padding: '1.25rem 1.5rem',
-              borderBottom: '1px solid #E2E8F0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: '#F8FAFC'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{
-                  backgroundColor: '#691B31',
-                  color: 'white',
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '10px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.95rem'
-                }}>
-                  <FaSearch />
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '800', color: '#1E293B' }}>
-                    Buscar Equipos Asignados
-                  </h3>
-                  <p style={{ margin: 0, fontSize: '0.775rem', color: '#64748B' }}>
-                    {formData.solicitante?.trim()
-                      ? `Equipos a nombre de: ${formData.solicitante}`
-                      : 'Equipos tecnológicos del solicitante'}
+            <div
+              style={{
+                padding: '1.25rem 1.5rem',
+                borderBottom: '1px solid #E2E8F0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: '#FFFFFF'
+              }}
+            >
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '800', color: '#0F172A', letterSpacing: '-0.01em' }}>
+                  Equipos Asignados al Solicitante
+                </h3>
+                {formData.solicitante?.trim() ? (
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.45rem',
+                      marginTop: '0.35rem',
+                      padding: '0.15rem 0.6rem',
+                      backgroundColor: '#F8FAFC',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem'
+                    }}
+                  >
+                    <span style={{ color: '#64748B' }}>Solicitante:</span>
+                    <strong style={{ color: '#691B31', fontWeight: '700' }}>{formData.solicitante}</strong>
+                  </div>
+                ) : (
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.775rem', color: '#64748B' }}>
+                    Consulta de inventario tecnológico por solicitante
                   </p>
-                </div>
+                )}
               </div>
               <button
                 type="button"
@@ -1622,8 +1640,11 @@ export default function FormOficinas({ usuarioActual }) {
                   borderRadius: '6px',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  transition: 'color 0.15s'
                 }}
+                onMouseOver={(e) => (e.currentTarget.style.color = '#334155')}
+                onMouseOut={(e) => (e.currentTarget.style.color = '#94A3B8')}
               >
                 <FaTimes />
               </button>
@@ -1636,14 +1657,14 @@ export default function FormOficinas({ usuarioActual }) {
                   <FaSearch style={{ position: 'absolute', left: '12px', color: '#94A3B8', fontSize: '0.85rem' }} />
                   <input
                     type="text"
-                    placeholder="Filtrar por tipo, marca, modelo, serie o inventario..."
+                    placeholder="Buscar por nombre, modelo, serie o inventario..."
                     value={filtroModalEquipos}
                     onChange={(e) => setFiltroModalEquipos(e.target.value)}
                     style={{
                       width: '100%',
                       padding: '0.6rem 0.85rem 0.6rem 2.25rem',
                       fontSize: '0.85rem',
-                      borderRadius: '8px',
+                      borderRadius: '6px',
                       border: '1px solid #CBD5E1',
                       outline: 'none',
                       backgroundColor: '#F8FAFC'
@@ -1672,35 +1693,58 @@ export default function FormOficinas({ usuarioActual }) {
             )}
 
             {/* Lista de Equipos */}
-            <div style={{
-              padding: '1rem 1.25rem',
-              overflowY: 'auto',
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.65rem'
-            }}>
+            <div
+              style={{
+                padding: '1rem 1.25rem',
+                overflowY: 'auto',
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.65rem'
+              }}
+            >
               {buscandoEquipos ? (
                 <div style={{ padding: '2.5rem', textAlign: 'center', color: '#64748B' }}>
-                  <div className="spinner-border spinner-border-sm text-danger" style={{ width: '24px', height: '24px', borderWidth: '3px', marginBottom: '0.75rem' }} />
+                  <div
+                    className="spinner-border spinner-border-sm text-danger"
+                    style={{ width: '24px', height: '24px', borderWidth: '3px', marginBottom: '0.75rem' }}
+                  />
                   <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>Consultando inventario tecnológico...</div>
                 </div>
               ) : !formData.solicitante?.trim() ? (
-                <div style={{
-                  padding: '2.5rem 1.5rem',
-                  textAlign: 'center',
-                  backgroundColor: '#F8FAFC',
-                  borderRadius: '12px',
-                  border: '1px dashed #CBD5E1'
-                }}>
-                  <div style={{ marginBottom: '0.65rem', color: '#D97706' }}>
-                    <FaLightbulb size={36} />
+                <div
+                  style={{
+                    padding: '2.5rem 1.5rem',
+                    textAlign: 'center',
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: '8px',
+                    border: '1px solid #E2E8F0',
+                    maxWidth: '460px',
+                    margin: '1rem auto'
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: '8px',
+                      backgroundColor: '#F1F5F9',
+                      border: '1px solid #CBD5E1',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#475569',
+                      fontSize: '1.25rem',
+                      marginBottom: '0.85rem'
+                    }}
+                  >
+                    <FaUser />
                   </div>
-                  <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1E293B', marginBottom: '0.35rem' }}>
-                    Seleccione un solicitante en el Paso 1
+                  <div style={{ fontSize: '0.98rem', fontWeight: '700', color: '#0F172A', marginBottom: '0.4rem' }}>
+                    Seleccione al Solicitante en el Formulario
                   </div>
-                  <div style={{ fontSize: '0.825rem', color: '#64748B', maxWidth: '380px', margin: '0 auto 1.25rem auto' }}>
-                    Para desplegar automáticamente los equipos que están a nombre de una persona, elija primero el solicitante en la sección de datos.
+                  <div style={{ fontSize: '0.825rem', color: '#64748B', lineHeight: '1.5', maxWidth: '380px', margin: '0 auto 1.25rem auto' }}>
+                    Para consultar automáticamente los equipos y periféricos asignados, primero debe elegir a la persona en el Paso 1 (Datos del Reporte).
                   </div>
                   <button
                     type="button"
@@ -1709,31 +1753,53 @@ export default function FormOficinas({ usuarioActual }) {
                       backgroundColor: '#691B31',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '8px',
-                      padding: '0.6rem 1.25rem',
+                      borderRadius: '6px',
+                      padding: '0.6rem 1.35rem',
                       fontWeight: '700',
                       fontSize: '0.825rem',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 2px rgba(105, 27, 49, 0.2)',
+                      transition: 'background-color 0.15s'
                     }}
+                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#531526')}
+                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#691B31')}
                   >
-                    Entendido, ir al Paso 1
+                    Entendido, volver al formulario
                   </button>
                 </div>
               ) : opcionesEquipos.length === 0 ? (
-                <div style={{
-                  padding: '2.5rem 1.5rem',
-                  textAlign: 'center',
-                  backgroundColor: '#F8FAFC',
-                  borderRadius: '12px',
-                  border: '1px dashed #CBD5E1'
-                }}>
-                  <div style={{ marginBottom: '0.65rem', color: '#64748B' }}>
-                    <FaBoxOpen size={36} />
+                <div
+                  style={{
+                    padding: '2.5rem 1.5rem',
+                    textAlign: 'center',
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: '8px',
+                    border: '1px solid #E2E8F0',
+                    maxWidth: '460px',
+                    margin: '1rem auto'
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: '8px',
+                      backgroundColor: '#F1F5F9',
+                      border: '1px solid #CBD5E1',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#475569',
+                      fontSize: '1.25rem',
+                      marginBottom: '0.85rem'
+                    }}
+                  >
+                    <FaBoxOpen />
                   </div>
-                  <div style={{ fontSize: '0.95rem', fontWeight: '700', color: '#1E293B', marginBottom: '0.35rem' }}>
+                  <div style={{ fontSize: '0.98rem', fontWeight: '700', color: '#0F172A', marginBottom: '0.4rem' }}>
                     Sin equipos registrados
                   </div>
-                  <div style={{ fontSize: '0.825rem', color: '#64748B', maxWidth: '380px', margin: '0 auto 1.25rem auto' }}>
+                  <div style={{ fontSize: '0.825rem', color: '#64748B', lineHeight: '1.5', maxWidth: '380px', margin: '0 auto 1.25rem auto' }}>
                     No se encontraron equipos o periféricos asignados a <strong>{formData.solicitante}</strong> en el inventario tecnológico. Puede escribir el número de inventario o serie directamente en el formulario.
                   </div>
                   <button
@@ -1743,12 +1809,16 @@ export default function FormOficinas({ usuarioActual }) {
                       backgroundColor: '#691B31',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '8px',
-                      padding: '0.6rem 1.25rem',
+                      borderRadius: '6px',
+                      padding: '0.6rem 1.35rem',
                       fontWeight: '700',
                       fontSize: '0.825rem',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 2px rgba(105, 27, 49, 0.2)',
+                      transition: 'background-color 0.15s'
                     }}
+                    onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#531526')}
+                    onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#691B31')}
                   >
                     Ingresar datos manualmente
                   </button>
@@ -1769,87 +1839,148 @@ export default function FormOficinas({ usuarioActual }) {
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '0.85rem 1rem',
-                        borderRadius: '12px',
+                        borderRadius: '8px',
                         border: estaSeleccionado ? '1.5px solid #10B981' : '1px solid #E2E8F0',
                         backgroundColor: estaSeleccionado ? '#F0FDF4' : 'white',
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
                         gap: '0.75rem',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
                       }}
                       onMouseEnter={(e) => {
                         if (!estaSeleccionado) {
-                          e.currentTarget.style.backgroundColor = '#F8FAFC'
-                          e.currentTarget.style.borderColor = '#CBD5E1'
+                          e.currentTarget.style.backgroundColor = '#FDF8F9'
+                          e.currentTarget.style.borderColor = '#691B31'
+                          const btn = e.currentTarget.querySelector('.btn-elegir-sutil')
+                          if (btn) {
+                            btn.style.backgroundColor = '#691B31'
+                            btn.style.color = '#FFFFFF'
+                            btn.style.borderColor = '#691B31'
+                          }
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (!estaSeleccionado) {
                           e.currentTarget.style.backgroundColor = 'white'
                           e.currentTarget.style.borderColor = '#E2E8F0'
+                          const btn = e.currentTarget.querySelector('.btn-elegir-sutil')
+                          if (btn) {
+                            btn.style.backgroundColor = '#FFFFFF'
+                            btn.style.color = '#475569'
+                            btn.style.borderColor = '#CBD5E1'
+                          }
                         }
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          width: '38px',
-                          height: '38px',
-                          borderRadius: '10px',
-                          backgroundColor: op.esComponente ? '#EEF2FF' : '#FDF2F8',
-                          color: op.esComponente ? '#4F46E5' : '#691B31',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '1.1rem',
-                          flexShrink: 0
-                        }}>
+                        <div
+                          style={{
+                            width: '38px',
+                            height: '38px',
+                            borderRadius: '8px',
+                            backgroundColor: '#F1F5F9',
+                            border: '1px solid #E2E8F0',
+                            color: '#334155',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '1.1rem',
+                            flexShrink: 0
+                          }}
+                        >
                           {getIconoEquipo(op.tipo)}
                         </div>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#1E293B' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.9rem', fontWeight: '700', color: '#0F172A' }}>
                               {op.nombre}
                             </span>
                             {op.esComponente && (
-                              <span style={{
-                                fontSize: '0.675rem',
-                                fontWeight: '700',
-                                backgroundColor: '#EEF2FF',
-                                color: '#4F46E5',
-                                padding: '0.1rem 0.4rem',
-                                borderRadius: '4px'
-                              }}>
-                                Periférico
+                              <span
+                                style={{
+                                  fontSize: '0.65rem',
+                                  fontWeight: '700',
+                                  backgroundColor: '#FEF3C7',
+                                  color: '#92400E',
+                                  border: '1px solid #FCD34D',
+                                  padding: '0.1rem 0.45rem',
+                                  borderRadius: '3px',
+                                  letterSpacing: '0.02em'
+                                }}
+                              >
+                                PERIFÉRICO
                               </span>
                             )}
                           </div>
-                          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem', fontSize: '0.775rem', color: '#64748B', flexWrap: 'wrap' }}>
-                            <span><strong>No. Inv:</strong> {op.numeroInventario || 'Sin inventario'}</span>
-                            <span>•</span>
-                            <span><strong>Serie:</strong> {op.numeroSerie || 'Sin serie'}</span>
+                          <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
+                            <span
+                              style={{
+                                fontSize: '0.725rem',
+                                fontFamily: 'monospace',
+                                color: '#334155',
+                                backgroundColor: '#F8FAFC',
+                                border: '1px solid #E2E8F0',
+                                borderRadius: '3px',
+                                padding: '0.1rem 0.4rem'
+                              }}
+                            >
+                              INV: {op.numeroInventario || 'Sin inventario'}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: '0.725rem',
+                                fontFamily: 'monospace',
+                                color: '#334155',
+                                backgroundColor: '#F8FAFC',
+                                border: '1px solid #E2E8F0',
+                                borderRadius: '3px',
+                                padding: '0.1rem 0.4rem'
+                              }}
+                            >
+                              SERIE: {op.numeroSerie || 'Sin serie'}
+                            </span>
                           </div>
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        style={{
-                          padding: '0.45rem 0.85rem',
-                          backgroundColor: estaSeleccionado ? '#10B981' : '#691B31',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '8px',
-                          fontSize: '0.775rem',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          flexShrink: 0,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.3rem'
-                        }}
-                      >
-                        {estaSeleccionado ? <><FaCheckCircle size={11} /> Seleccionado</> : 'Elegir'}
-                      </button>
+                      {estaSeleccionado ? (
+                        <span
+                          style={{
+                            padding: '0.4rem 0.85rem',
+                            backgroundColor: '#10B981',
+                            color: 'white',
+                            borderRadius: '6px',
+                            fontSize: '0.775rem',
+                            fontWeight: '700',
+                            flexShrink: 0,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.3rem'
+                          }}
+                        >
+                          <FaCheckCircle size={11} /> Seleccionado
+                        </span>
+                      ) : (
+                        <span
+                          className="btn-elegir-sutil"
+                          style={{
+                            padding: '0.4rem 0.85rem',
+                            backgroundColor: '#FFFFFF',
+                            border: '1px solid #CBD5E1',
+                            color: '#475569',
+                            borderRadius: '6px',
+                            fontSize: '0.775rem',
+                            fontWeight: '600',
+                            flexShrink: 0,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          Elegir ›
+                        </span>
+                      )}
                     </div>
                   )
                 })
@@ -1857,30 +1988,37 @@ export default function FormOficinas({ usuarioActual }) {
             </div>
 
             {/* Pie del Modal */}
-            <div style={{
-              padding: '0.85rem 1.25rem',
-              borderTop: '1px solid #E2E8F0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              backgroundColor: '#F8FAFC'
-            }}>
+            <div
+              style={{
+                padding: '0.85rem 1.25rem',
+                borderTop: '1px solid #E2E8F0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: '#F8FAFC'
+              }}
+            >
               <span style={{ fontSize: '0.775rem', color: '#64748B', fontWeight: '600' }}>
-                {opcionesEquipos.length > 0 ? `${equiposFiltradosModal.length} de ${opcionesEquipos.length} equipo(s)` : '0 equipos'}
+                {opcionesEquipos.length > 0
+                  ? `${equiposFiltradosModal.length} de ${opcionesEquipos.length} equipo(s) asignado(s)`
+                  : '0 equipos'}
               </span>
               <button
                 type="button"
                 onClick={() => setModalEquiposAbierto(false)}
                 style={{
-                  padding: '0.5rem 1rem',
+                  padding: '0.5rem 1.1rem',
                   backgroundColor: 'white',
                   border: '1px solid #CBD5E1',
-                  borderRadius: '8px',
+                  borderRadius: '6px',
                   fontSize: '0.825rem',
                   fontWeight: '600',
-                  color: '#475569',
-                  cursor: 'pointer'
+                  color: '#334155',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s'
                 }}
+                onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#F1F5F9')}
+                onMouseOut={(e) => (e.currentTarget.style.backgroundColor = 'white')}
               >
                 Cerrar
               </button>
