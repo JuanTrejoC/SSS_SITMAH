@@ -22,10 +22,19 @@ function errorHandler(err, req, res, next) {
     return res.status(400).json({ ok: false, error: err.message });
   }
 
+  if (err.name === 'PrismaClientValidationError' || (err.message && err.message.includes('invocation in'))) {
+    return res.status(400).json({ ok: false, error: 'Los datos enviados contienen un formato inválido o no soportado.' });
+  }
+
   const status = err.status || 500;
+  const esErrorTecnico = status === 500 || (err.message && (err.message.includes('prisma') || err.message.includes('SQL') || err.message.length > 150));
+  const mensajeFinal = esErrorTecnico
+    ? 'Ocurrió un error en el servidor. Por favor intente más tarde.'
+    : (err.message || 'Error interno del servidor');
+
   res.status(status).json({
     ok: false,
-    error: err.message || 'Error interno del servidor',
+    error: mensajeFinal,
   });
 }
 

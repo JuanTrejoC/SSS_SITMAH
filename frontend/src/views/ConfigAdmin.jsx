@@ -344,8 +344,33 @@ export default function ConfigAdmin() {
         limpiarFormulario()
         cargarItems(catalogoSeleccionado)
       } else {
-        const msgError = json.error || json.message || 'Operación fallida'
-        const esDuplicado = msgError.toLowerCase().includes('correo') || msgError.toLowerCase().includes('email') || msgError.toLowerCase().includes('usuario') || msgError.toLowerCase().includes('login')
+        const rawError = json.error || json.message || 'Operación fallida'
+        let msgError = rawError
+        const esTrazaTecnica = typeof rawError === 'string' && (
+          rawError.includes('prisma') ||
+          rawError.includes('invocation in') ||
+          rawError.includes('Unknown argument') ||
+          rawError.includes('Invalid `') ||
+          rawError.length > 130
+        )
+
+        if (esTrazaTecnica) {
+          if (rawError.toLowerCase().includes('email') || rawError.toLowerCase().includes('correo')) {
+            msgError = 'El correo electrónico ya se encuentra registrado por otro usuario.'
+          } else if (rawError.toLowerCase().includes('username') || rawError.toLowerCase().includes('usuario')) {
+            msgError = 'El nombre de usuario ya está registrado. Elija otro nombre.'
+          } else {
+            msgError = 'Ocurrió un error en el servidor. Verifique los datos e intente nuevamente.'
+          }
+        }
+
+        const esDuplicado = typeof msgError === 'string' && (
+          msgError.toLowerCase().includes('correo') ||
+          msgError.toLowerCase().includes('email') ||
+          msgError.toLowerCase().includes('usuario') ||
+          msgError.toLowerCase().includes('login')
+        )
+
         Swal.fire({
           icon: esDuplicado ? 'warning' : 'error',
           title: esDuplicado ? 'Datos ya registrados' : 'No se pudo guardar',
@@ -407,10 +432,15 @@ export default function ConfigAdmin() {
         })
         const json = await response.json()
         if (response.ok && json.ok) {
-          Swal.fire('Éxito', 'Operación exitosa', 'success')
+          Swal.fire('Éxito', catalogoSeleccionado === 'usuarios' ? 'Usuario eliminado con éxito' : 'Operación exitosa', 'success')
+          if (editandoId === id) {
+            limpiarFormulario()
+          }
           cargarItems(catalogoSeleccionado)
         } else {
-          Swal.fire('Error', json.error || 'No se pudo realizar la acción', 'error')
+          const rawErr = json.error || 'No se pudo realizar la acción'
+          const msgLimpio = typeof rawErr === 'string' && rawErr.length > 120 ? 'No se pudo completar la acción en el servidor' : rawErr
+          Swal.fire('Error', msgLimpio, 'error')
         }
       } catch (err) {
         console.error('Error al dar de baja:', err)
@@ -440,7 +470,9 @@ export default function ConfigAdmin() {
         Swal.fire('Éxito', 'Registro reactivado con éxito', 'success');
         cargarItems(catalogoSeleccionado);
       } else {
-        Swal.fire('Error', json.error || 'No se pudo reactivar', 'error');
+        const rawErr = json.error || 'No se pudo reactivar'
+        const msgLimpio = typeof rawErr === 'string' && rawErr.length > 120 ? 'No se pudo reactivar el registro' : rawErr
+        Swal.fire('Error', msgLimpio, 'error');
       }
     } catch (err) {
       console.error('Error al reactivar:', err);
@@ -570,7 +602,7 @@ export default function ConfigAdmin() {
                 Gestión de {tituloModal}
               </h2>
               <button
-                onClick={() => { setModalAbierto(false); setCatalogoSeleccionado(null) }}
+                onClick={() => { setModalAbierto(false); setCatalogoSeleccionado(null); limpiarFormulario(); }}
                 style={{ border: 'none', backgroundColor: 'transparent', fontSize: '1.2rem', cursor: 'pointer', color: '#6F7271', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 title="Cerrar"
               >

@@ -38,14 +38,14 @@ async function crear(req, res) {
   const usernameNormalizado = username.trim();
 
   const existeEmail = await prisma.usuario.findFirst({
-    where: { email: { equals: emailNormalizado, mode: 'insensitive' } }
+    where: { email: emailNormalizado }
   });
   if (existeEmail) {
     return fail(res, 'El correo electrónico ya se encuentra registrado por otro usuario', 400);
   }
 
   const existeUsername = await prisma.usuario.findFirst({
-    where: { username: { equals: usernameNormalizado, mode: 'insensitive' } }
+    where: { username: usernameNormalizado }
   });
   if (existeUsername) {
     return fail(res, 'El nombre de usuario (login) ya está en uso', 400);
@@ -104,7 +104,7 @@ async function actualizar(req, res) {
     data.email = data.email.trim().toLowerCase();
     const existeEmail = await prisma.usuario.findFirst({
       where: {
-        email: { equals: data.email, mode: 'insensitive' },
+        email: data.email,
         NOT: { id }
       }
     });
@@ -117,7 +117,7 @@ async function actualizar(req, res) {
     data.username = data.username.trim();
     const existeUsername = await prisma.usuario.findFirst({
       where: {
-        username: { equals: data.username, mode: 'insensitive' },
+        username: data.username,
         NOT: { id }
       }
     });

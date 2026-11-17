@@ -178,7 +178,7 @@ async function crearCruceroRapido(req, res) {
 
   // Buscar si ya existe por nombre
   let crucero = await prisma.crucero.findFirst({
-    where: { nombre: { equals: nombre, mode: 'insensitive' } }
+    where: { nombre }
   });
 
   if (!crucero) {
