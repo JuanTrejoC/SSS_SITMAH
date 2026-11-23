@@ -43,6 +43,33 @@ export default function DashboardOficinas() {
     return () => { document.body.style.overflow = '' }
   }, [verDetalle, confirmResuelto.visible])
 
+  // Salir de modales y formularios con la tecla Escape (Esc)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        if (document.querySelector('.swal2-container')) return
+        if (modalAsignacionAbierto) {
+          setModalAsignacionAbierto(false)
+          return
+        }
+        if (modalReemplazoAbierto) {
+          setModalReemplazoAbierto(false)
+          return
+        }
+        if (confirmResuelto.visible) {
+          setConfirmResuelto({ visible: false, reporteId: null, comentario: '', tecnicoAtendio: '', diagnosticSolucion: '', firmaSatisfaccion: null })
+          return
+        }
+        if (verDetalle) {
+          setVerDetalle(null)
+          return
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [verDetalle, confirmResuelto.visible, modalAsignacionAbierto, modalReemplazoAbierto])
+
   const detalleActivoRef = useRef(null)
 
   const recargarDetalle = async (id) => {

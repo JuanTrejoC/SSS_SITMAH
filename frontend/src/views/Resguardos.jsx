@@ -654,6 +654,21 @@ function Resguardos() {
     }
   }, [modalAbierto, form.tipoOpcion]);
 
+  // Salir de modales y formularios con la tecla Escape (Esc)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        if (document.querySelector('.swal2-container')) return;
+        if (modalAbierto) {
+          cerrarModal();
+          return;
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modalAbierto]);
+
   const abrirNuevoResguardo = () => {
     setForm({
       tipoOpcion: 'mobiliario',

@@ -39,6 +39,29 @@ export default function DashboardSemaforos() {
     return () => { document.body.style.overflow = '' }
   }, [verDetalle, confirmResuelto.visible])
 
+  // Salir de modales y formularios con la tecla Escape (Esc)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        if (document.querySelector('.swal2-container')) return
+        if (confirmResuelto.visible) {
+          setConfirmResuelto({ visible: false, reporteId: null, comentario: '' })
+          return
+        }
+        if (mostrarInventario) {
+          setMostrarInventario(false)
+          return
+        }
+        if (verDetalle) {
+          cerrarDetalle()
+          return
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [verDetalle, confirmResuelto.visible, mostrarInventario])
+
   const detalleActivoRef = useRef(null)
 
   const abrirDetalle = (reporte) => {

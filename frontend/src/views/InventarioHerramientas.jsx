@@ -330,6 +330,26 @@ export default function InventarioHerramientas() {
     };
   }, [modalAbierto, imagenModal.abierta]);
 
+  // Salir de modales y formularios con la tecla Escape (Esc)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        if (document.querySelector('.swal2-container')) return;
+        if (imagenModal.abierta) {
+          setImagenModal({ abierta: false, url: '' });
+          return;
+        }
+        if (modalAbierto) {
+          setModalAbierto(false);
+          resetForm();
+          return;
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modalAbierto, imagenModal.abierta]);
+
   // Manejo y compresión de imagen fotográfica
   const comprimirYConvertirImagen = (archivo) => {
     return new Promise((resolve) => {

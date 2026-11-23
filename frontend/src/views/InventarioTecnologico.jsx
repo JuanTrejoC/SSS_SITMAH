@@ -1423,6 +1423,34 @@ export default function InventarioTecnologico() {
     };
   }, [modalAbierto]);
 
+  // Salir de modales y formularios con la tecla Escape (Esc)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        if (document.querySelector('.swal2-container')) return;
+        if (modalFormRefaccionAbierto) {
+          setModalFormRefaccionAbierto(false);
+          return;
+        }
+        if (modalRefaccionesAbierto) {
+          setModalRefaccionesAbierto(false);
+          return;
+        }
+        if (modalWordResguardo?.abierto) {
+          setModalWordResguardo(prev => ({ ...prev, abierto: false }));
+          return;
+        }
+        if (modalAbierto) {
+          setModalAbierto(false);
+          resetForm();
+          return;
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modalAbierto, modalRefaccionesAbierto, modalFormRefaccionAbierto, modalWordResguardo]);
+
   const handleDetalleChange = (campo, valor) => {
     setForm(prev => ({
       ...prev,

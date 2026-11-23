@@ -65,6 +65,20 @@ export default function StockInfraestructura() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // Salir del modal con la tecla Escape (Esc)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        if (document.querySelector('.swal2-container')) return;
+        if (modalAbierto) {
+          setModalAbierto(false);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modalAbierto]);
+
   const resetForm = () => {
     setEditandoId(null);
     setForm({

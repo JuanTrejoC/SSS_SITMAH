@@ -62,6 +62,19 @@ export default function FormOficinas({ usuarioActual }) {
   const [modalEquiposAbierto, setModalEquiposAbierto] = useState(false)
   const [filtroModalEquipos, setFiltroModalEquipos] = useState('')
 
+  // Salir del modal con la tecla Escape (Esc)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        if (modalEquiposAbierto) {
+          setModalEquiposAbierto(false)
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [modalEquiposAbierto])
+
   // Buscar equipos asignados cuando cambia el solicitante
   useEffect(() => {
     const solicitante = (formData.solicitante || '').trim()
@@ -752,7 +765,7 @@ export default function FormOficinas({ usuarioActual }) {
           </div>
           <div>
             <h1 style={{ fontSize: 'clamp(1.25rem, 3vw, 1.75rem)', fontWeight: '800', margin: 0 }}>
-              Reporte de Incidencia Tecnológicas
+              Reportes Tecnológicos
             </h1>
             <p style={{ color: '#E5E7EB', margin: '0.35rem 0 0 0', fontSize: 'clamp(0.85rem, 2vw, 0.95rem)', opacity: 0.9 }}>
               Complete los campos a continuación para solicitar soporte técnico o reporte de mantenimiento tecnológico.

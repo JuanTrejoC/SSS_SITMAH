@@ -352,6 +352,11 @@ const extraerCoordenadasValidas = (input) => {
 
 const generarPosteUid = () => `pst_${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${Math.random().toString(36).substr(2, 5)}`
 
+const limpiarIpFormato = (ip) => {
+  if (!ip) return ''
+  return String(ip).trim().replace(/^(?:v\.?|gw:?)\s*/i, '').replace(/\.+$/, '')
+}
+
 const obtenerConfigColorLed = (color) => {
   const str = String(color || '').trim()
   const lower = str.toLowerCase()
@@ -1311,6 +1316,39 @@ export default function InventarioSemaforos() {
     return () => { document.body.style.overflow = '' }
   }, [modalStockAbierto, modalHistorialAbierto, modalControladorAbierto, grupoSeleccionado])
 
+  // Salir de modales y formularios con la tecla Escape (Esc)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        if (document.querySelector('.swal2-container')) return
+        if (modalControladorAbierto) {
+          setModalControladorAbierto(false)
+          setModoVisualizacion(false)
+          setFormPantallaCompleta(false)
+          return
+        }
+        if (modalStockAbierto) {
+          setModalStockAbierto(false)
+          return
+        }
+        if (modalHistorialAbierto) {
+          setModalHistorialAbierto(false)
+          return
+        }
+        if (modalVerControladorAbierto) {
+          setModalVerControladorAbierto(false)
+          return
+        }
+        if (grupoSeleccionado) {
+          setGrupoSeleccionado(null)
+          return
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [modalControladorAbierto, modalStockAbierto, modalHistorialAbierto, modalVerControladorAbierto, grupoSeleccionado])
+
   // Desactivar cambio de valores por scroll o rueda del mouse en inputs numéricos
   useEffect(() => {
     const handleWheelNumberInput = () => {
@@ -1518,7 +1556,11 @@ export default function InventarioSemaforos() {
     }
 
     // 3. Sección 3: Gabinete, Red y Configuración
-    const esIpValida = (ip) => !ip || ip.trim() === '' || /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ip.trim())
+    const esIpValida = (ip) => {
+      if (!ip || String(ip).trim() === '') return true
+      const limpio = limpiarIpFormato(ip)
+      return /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(limpio)
+    }
     if (controladorForm.ipLocal && !esIpValida(controladorForm.ipLocal)) {
       errores.ipLocal = 'IP Local inválida (ej. 192.168.1.100).'
     }
@@ -1660,8 +1702,8 @@ export default function InventarioSemaforos() {
         const numPostesFinal = json.data?.postesDetalle?.length || (controladorForm.postes || []).length
         Swal.fire({
           title: '¡Sincronizado y Guardado!',
-          text: editandoControladorId 
-            ? `Controlador actualizado correctamente. Hay ${numPostesFinal} poste(s) consolidados en este crucero.` 
+          text: editandoControladorId
+            ? `Controlador actualizado correctamente. Hay ${numPostesFinal} poste(s) consolidados en este crucero.`
             : 'Controlador registrado.',
           icon: 'success',
           confirmButtonColor: '#691B31'
@@ -2374,6 +2416,66 @@ export default function InventarioSemaforos() {
     img.src = src
   })
 
+  const descargarRespaldoProgramacion = async (ctrlId, archivoParam) => {
+    const targetId = ctrlId || editandoControladorId || controladorParaVer?.id
+    if (!targetId) {
+      Swal.fire('Atención', 'No se encontró el identificador del controlador para descargar.', 'warning')
+      return
+    }
+    try {
+      Swal.fire({
+        title: 'Descargando Respaldo...',
+        text: 'Obteniendo archivo de programación del controlador.',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      })
+
+      const res = await fetch(`${API_BASE_URL}/api/inventario/controladores/${targetId}/descargar-programacion`, {
+        headers: { 'Authorization': `Bearer ${user?.token}` }
+      })
+
+      if (!res.ok) {
+        let msg = 'No se pudo descargar el archivo de programación.'
+        try {
+          const jsonErr = await res.json()
+          if (jsonErr && jsonErr.error) msg = jsonErr.error
+        } catch (_) {}
+        throw new Error(msg)
+      }
+
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+
+      let nombreDescarga = 'respaldo_programacion'
+      if (typeof archivoParam === 'string' && archivoParam.trim() !== '') {
+        nombreDescarga = archivoParam.split('/').pop()
+      } else if (archivoParam && archivoParam.name) {
+        nombreDescarga = archivoParam.name
+      }
+
+      a.download = nombreDescarga
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      Swal.close()
+      Swal.fire({
+        icon: 'success',
+        title: 'Descarga completada',
+        text: `Archivo ${nombreDescarga} descargado con éxito.`,
+        timer: 2000,
+        showConfirmButton: false
+      })
+    } catch (err) {
+      console.error('Error al descargar archivo de programación:', err)
+      Swal.close()
+      Swal.fire('Error', err.message || 'No se pudo descargar el archivo de programación.', 'error')
+    }
+  }
+
   const exportarControladoresExcel = async () => {
     try {
       Swal.fire({
@@ -2443,10 +2545,10 @@ export default function InventarioSemaforos() {
           const postesNorm = normalizarPostesDetalle(ctrl.postesDetalle, ctrl)
           const resumenPostes = postesNorm.length > 0
             ? `${postesNorm.length} poste(s): ` + postesNorm.map((p, i) => {
-                const mod = p.modeloPoste || p.modelo || p.posteModeloTipo || 'S/M'
-                const tipo = p.tipoPoste === 'peatonal' ? 'Peatonal' : 'Vehicular'
-                return `[Poste ${i + 1}: ${mod} (${tipo})]`
-              }).join(', ')
+              const mod = p.modeloPoste || p.modelo || p.posteModeloTipo || 'S/M'
+              const tipo = p.tipoPoste === 'peatonal' ? 'Peatonal' : 'Vehicular'
+              return `[Poste ${i + 1}: ${mod} (${tipo})]`
+            }).join(', ')
             : '0 postes'
 
           const sem3L = Number(ctrl.semaforos3Luces) || 0
@@ -2655,10 +2757,10 @@ export default function InventarioSemaforos() {
         const peats = (Array.isArray(p.peatonalesLista) && p.peatonalesLista.length > 0)
           ? p.peatonalesLista
           : ((p.tienePeatonal || p.peatonalModelo) ? [{
-              estado: p.peatonalModuloEstado || 'Operando',
-              tieneAudible: p.tieneAudible,
-              audibleEstado: p.audibleModuloEstado || 'Operando'
-            }] : [])
+            estado: p.peatonalModuloEstado || 'Operando',
+            tieneAudible: p.tieneAudible,
+            audibleEstado: p.audibleModuloEstado || 'Operando'
+          }] : [])
 
         peats.forEach(pt => {
           totalSemPeatonales++
@@ -2701,23 +2803,23 @@ export default function InventarioSemaforos() {
 
       // 1. INSPECCIÓN EXTERIOR, CIMENTACIÓN Y BASE
       const cimientoTexto = ctrl.cimientoCompleto === 'Sí'
-        ? '4 dados completos · Concreto firme'
+        ? '4 dados presentes'
         : (ctrl.cimientoCuantosDados ? `Incompleto (${ctrl.cimientoCuantosDados} dados presentes)` : (ctrl.cimientoCompleto || '—'))
 
       const tapaTexto = ctrl.tapaCableado === 'Sí'
-        ? 'Presente y asegurada'
-        : (ctrl.tapaCableado === 'No' ? 'Faltante / Dañada' : (ctrl.tapaCableado || '—'))
+        ? 'Presente'
+        : (ctrl.tapaCableado === 'No' ? 'No presente' : (ctrl.tapaCableado || '—'))
 
       const tornilleriaTexto = ctrl.tornilleriaBaseCompleta === 'Sí'
-        ? '4 tornillos de anclaje completos'
+        ? '4 tornillos presentes'
         : (ctrl.tornilleriaCuantosTornillos ? `Incompleta (${ctrl.tornilleriaCuantosTornillos} tornillos presentes)` : (ctrl.tornilleriaBaseCompleta || '—'))
 
       const observacionesExteriorTexto = ctrl.observacionesExterior || ctrl.posteObservaciones || 'Sin observaciones registradas'
 
       const seccion1Inspeccion = [
         ['Cimentación de Base', cimientoTexto, 'Tapa de Cableado', tapaTexto],
-        ['Tornillería de Base', tornilleriaTexto, 'Condición General', (ctrl.cimientoCompleto === 'Sí' && ctrl.tornilleriaBaseCompleta === 'Sí') ? 'Firme y en buen estado' : 'Requiere atención'],
-        ['Observaciones Exterior', observacionesExteriorTexto, 'Estado Físico Gabinete', (ctrl.cimientoCompleto === 'Sí' && ctrl.tapaCableado === 'Sí') ? 'Firme y asegurado' : 'Pendiente de revisión']
+        ['Tornillería de Base', tornilleriaTexto, 'Condición General', '—'],
+        ['Observaciones Exterior', observacionesExteriorTexto, 'Estado Físico Gabinete', '—']
       ]
 
       autoTable(doc, {
@@ -2849,65 +2951,65 @@ export default function InventarioSemaforos() {
 
       const postesBody = postesNorm.length > 0
         ? postesNorm.map((p, idx) => {
-            const func = p.tipoPoste === 'peatonal' ? 'Peatonal' : 'Vehicular'
-            const mod = p.modeloPoste || p.modelo || p.posteModeloTipo || '—'
-            const tipoMod = `${func} (${mod})`
+          const func = p.tipoPoste === 'peatonal' ? 'Peatonal' : 'Vehicular'
+          const mod = p.modeloPoste || p.modelo || p.posteModeloTipo || '—'
+          const tipoMod = `${func} (${mod})`
 
-            const equipos = []
-            if (p.tipoPoste !== 'peatonal') {
-              const esPantalla = p.tipoCabezal === 'Pantalla' || p.tipoCabezal === 'Pantalla LED' ||
-                (p.cabezalModelo && p.cabezalModelo.toLowerCase().includes('pantalla')) ||
-                (Number(p.pantallaPiezas) > 0)
+          const equipos = []
+          if (p.tipoPoste !== 'peatonal') {
+            const esPantalla = p.tipoCabezal === 'Pantalla' || p.tipoCabezal === 'Pantalla LED' ||
+              (p.cabezalModelo && p.cabezalModelo.toLowerCase().includes('pantalla')) ||
+              (Number(p.pantallaPiezas) > 0)
 
-              if (esPantalla) {
-                const pzas = (Array.isArray(p.pantallasLista) && p.pantallasLista.length > 0)
-                  ? p.pantallasLista.length
-                  : (Number(p.pantallaPiezas) || 1)
-                const fallas = Array.isArray(p.pantallasLista)
-                  ? p.pantallasLista.filter(x => x.estado === 'No funciona').length
-                  : (p.pantallaEstado === 'No funciona' ? pzas : 0)
-                equipos.push(`${pzas} Pantalla(s) LED${fallas > 0 ? ` (${fallas} no funciona)` : ' (Op.)'}`)
-              } else if ((p.tipoCabezal || 'LED') === 'LED') {
-                const grupos = normalizarCabezalesDetalle(p.cabezalesGrupos)
-                if (grupos.length > 0) {
-                  grupos.forEach((g, gI) => {
-                    const numL = g.leds?.length || g.numLeds || 3
-                    equipos.push(`Cabezal #${gI + 1} [${numL} LEDs] (${p.cabezalModelo || 'LV-1'})`)
-                  })
-                } else {
-                  equipos.push(`Cabezal LED (${p.cabezalModelo || 'LV-1'})`)
-                }
+            if (esPantalla) {
+              const pzas = (Array.isArray(p.pantallasLista) && p.pantallasLista.length > 0)
+                ? p.pantallasLista.length
+                : (Number(p.pantallaPiezas) || 1)
+              const fallas = Array.isArray(p.pantallasLista)
+                ? p.pantallasLista.filter(x => x.estado === 'No funciona').length
+                : (p.pantallaEstado === 'No funciona' ? pzas : 0)
+              equipos.push(`${pzas} Pantalla(s) LED${fallas > 0 ? ` (${fallas} no funciona)` : ' (Op.)'}`)
+            } else if ((p.tipoCabezal || 'LED') === 'LED') {
+              const grupos = normalizarCabezalesDetalle(p.cabezalesGrupos)
+              if (grupos.length > 0) {
+                grupos.forEach((g, gI) => {
+                  const numL = g.leds?.length || g.numLeds || 3
+                  equipos.push(`Cabezal #${gI + 1} [${numL} LEDs] (${p.cabezalModelo || 'LV-1'})`)
+                })
+              } else {
+                equipos.push(`Cabezal LED (${p.cabezalModelo || 'LV-1'})`)
               }
             }
+          }
 
-            // Peatonales
-            if (Array.isArray(p.peatonalesLista) && p.peatonalesLista.length > 0) {
-              p.peatonalesLista.forEach((pt, ptI) => {
-                const est = pt.estado === 'Operando' ? 'Op.' : 'Dañado'
-                const aud = pt.tieneAudible ? ` + Aud (${pt.audibleEstado === 'Operando' ? 'Op.' : 'Dañado'})` : ''
-                equipos.push(`Peat. #${ptI + 1} [${est}]${aud}`)
-              })
-            } else if (p.tienePeatonal || p.peatonalModelo) {
-              const est = p.peatonalModuloEstado === 'Operando' ? 'Op.' : 'Dañado'
-              const aud = p.tieneAudible ? ` + Aud (${p.audibleModuloEstado === 'Operando' ? 'Op.' : 'Dañado'})` : ''
-              equipos.push(`Peatonal [${est}]${aud}`)
-            }
+          // Peatonales
+          if (Array.isArray(p.peatonalesLista) && p.peatonalesLista.length > 0) {
+            p.peatonalesLista.forEach((pt, ptI) => {
+              const est = pt.estado === 'Operando' ? 'Op.' : 'Dañado'
+              const aud = pt.tieneAudible ? ` + Aud (${pt.audibleEstado === 'Operando' ? 'Op.' : 'Dañado'})` : ''
+              equipos.push(`Peat. #${ptI + 1} [${est}]${aud}`)
+            })
+          } else if (p.tienePeatonal || p.peatonalModelo) {
+            const est = p.peatonalModuloEstado === 'Operando' ? 'Op.' : 'Dañado'
+            const aud = p.tieneAudible ? ` + Aud (${p.audibleModuloEstado === 'Operando' ? 'Op.' : 'Dañado'})` : ''
+            equipos.push(`Peatonal [${est}]${aud}`)
+          }
 
-            // Cámaras
-            if (p.tieneCamara || p.camaraCantidad || p.camaraModelo) {
-              const cant = Number(p.camaraCantidad) || 1
-              equipos.push(`${cant} Cámara(s) Peek`)
-            }
+          // Cámaras
+          if (p.tieneCamara || p.camaraCantidad || p.camaraModelo) {
+            const cant = Number(p.camaraCantidad) || 1
+            equipos.push(`${cant} Cámara(s) Peek`)
+          }
 
-            return [
-              `Poste #${idx + 1}`,
-              tipoMod,
-              p.tapaRegistro || p.estadoTapaRegistro || 'Buena',
-              p.ubicacionPoste || p.coordenadas || '—',
-              equipos.length > 0 ? equipos.join(' | ') : '—',
-              p.observaciones || '—'
-            ]
-          })
+          return [
+            `Poste #${idx + 1}`,
+            tipoMod,
+            p.tapaRegistro || p.estadoTapaRegistro || 'Buena',
+            p.ubicacionPoste || p.coordenadas || '—',
+            equipos.length > 0 ? equipos.join(' | ') : '—',
+            p.observaciones || '—'
+          ]
+        })
         : [['Sin postes', '—', '—', '—', 'No se detallaron postes individuales', '—']]
 
       autoTable(doc, {
@@ -5867,640 +5969,1795 @@ export default function InventarioSemaforos() {
 
               <form onSubmit={modoVisualizacion ? (e) => e.preventDefault() : handleGuardarControlador}>
                 <div style={{ pointerEvents: modoVisualizacion ? 'none' : 'auto', userSelect: 'text' }}>
-              {!modoVisualizacion && (
-              <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '1rem' }}>
-                <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                    <FaMicrochip size={13} style={{ color: '#691B31' }} /> Modelo {!modoVisualizacion && <span className="req-star" style={{ color: '#DC2626' }}>*</span>}
-                  </label>
-                  {modoVisualizacion ? (
+                  {!modoVisualizacion && (
+                    <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                          <FaMicrochip size={13} style={{ color: '#691B31' }} /> Modelo {!modoVisualizacion && <span className="req-star" style={{ color: '#DC2626' }}>*</span>}
+                        </label>
+                        {modoVisualizacion ? (
+                          <div style={{
+                            padding: '0.6rem 0.85rem',
+                            backgroundColor: '#FFFFFF',
+                            border: '1px solid #CBD5E1',
+                            borderRadius: '8px',
+                            fontSize: '0.92rem',
+                            fontWeight: '700',
+                            color: '#691B31',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            minHeight: '40px',
+                            boxSizing: 'border-box'
+                          }}>
+                            <FaTrafficLight size={15} style={{ color: '#BC955B' }} />
+                            <span>{controladorForm.modelo || 'Sin modelo asignado'}</span>
+                          </div>
+                        ) : (
+                          <select
+                            value={controladorForm.modelo}
+                            onChange={(e) => {
+                              const nuevoModelo = e.target.value
+                              if (nuevoModelo === 'C-3000') {
+                                setControladorForm(prev => {
+                                  const switchMod = prev.switchFibraModelo && MODELOS_SWITCH_MOXA_CATALOGO.some(m => m.modelo === prev.switchFibraModelo) ? prev.switchFibraModelo : 'Moxa EDS-208 / 308'
+                                  const switchObj = MODELOS_SWITCH_MOXA_CATALOGO.find(m => m.modelo === switchMod)
+                                  return {
+                                    ...prev,
+                                    modelo: 'C-3000',
+                                    // Tarjeta de Conflictos para C-3000 (Solo marca y modelo)
+                                    tarjetaConflictosMarcaModo: 'Peek Traffic',
+                                    tarjetaConflictosMarca: 'Peek Traffic',
+                                    tarjetaConflictosModelo: prev.tarjetaConflictosModelo && MODELOS_TARJETA_CONFLICTOS_PEEK.includes(prev.tarjetaConflictosModelo) ? prev.tarjetaConflictosModelo : 'Model 2010E',
+                                    // Switch de Fibra para C-3000 (Marca, modelo y total de puertos según modelo)
+                                    switchFibraMarcaModo: 'Moxa',
+                                    switchFibraMarca: 'Moxa',
+                                    switchFibraModelo: switchMod,
+                                    switchFibraPuertosTotal: switchObj ? switchObj.puertos : '8',
+                                    switch: true,
+                                    // Relevadores para C-3000 (Solo marca y modelo)
+                                    tarjetaRelevadoresMarcaModo: 'Peek Traffic',
+                                    tarjetaRelevadoresMarca: 'Peek Traffic',
+                                    tarjetaRelevadoresModelo: prev.tarjetaRelevadoresModelo && MODELOS_RELEVADORES_PEEK.includes(prev.tarjetaRelevadoresModelo) ? prev.tarjetaRelevadoresModelo : 'RC-308',
+                                    tarjetaRelevadora: true
+                                  }
+                                })
+                              } else if (nuevoModelo === 'C-5000') {
+                                setControladorForm(prev => ({
+                                  ...prev,
+                                  modelo: 'C-5000',
+                                  // Tarjeta de Conflictos para C-5000 (Solo marca y modelo)
+                                  tarjetaConflictosMarcaModo: 'Oriux (Peek Traffic)',
+                                  tarjetaConflictosMarca: 'Oriux (Peek Traffic)',
+                                  tarjetaConflictosModelo: 'C5000 MMU Integrado',
+                                  // Switch de Fibra para C-5000 (Marca, modelo y total de puertos según modelo)
+                                  switchFibraMarcaModo: 'Oriux',
+                                  switchFibraMarca: 'Oriux',
+                                  switchFibraModelo: 'C5000 ATC CPU Ports',
+                                  switchFibraPuertosTotal: '2',
+                                  switch: true,
+                                  // Relevadores para C-5000 (Solo marca y modelo)
+                                  tarjetaRelevadoresMarcaModo: 'Oriux',
+                                  tarjetaRelevadoresMarca: 'Oriux',
+                                  tarjetaRelevadoresModelo: 'C5000 Card-Based Load Switch',
+                                  tarjetaRelevadora: true
+                                }))
+                              } else {
+                                setControladorForm(prev => ({
+                                  ...prev,
+                                  modelo: nuevoModelo
+                                }))
+                              }
+                            }}
+                            onFocus={(e) => { e.currentTarget.style.borderColor = '#BC955B'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(188,149,91,0.15)' }}
+                            onBlur={(e) => { e.currentTarget.style.borderColor = controladorErrores.modelo ? '#A02142' : '#CBD5E1'; e.currentTarget.style.boxShadow = 'none' }}
+                            style={{
+                              width: '100%', padding: '0.6rem 0.75rem',
+                              border: `1px solid ${controladorErrores.modelo ? '#A02142' : '#CBD5E1'}`,
+                              borderRadius: '8px', fontSize: '0.9rem', fontWeight: '500', color: '#1E293B',
+                              backgroundColor: '#fff', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s',
+                              boxSizing: 'border-box', cursor: 'pointer'
+                            }}
+                          >
+                            <option value="">-- Seleccionar Modelo --</option>
+                            <option value="C-3000">C-3000</option>
+                            <option value="C-5000">C-5000</option>
+                          </select>
+                        )}
+                        {controladorErrores.modelo && <span style={{ fontSize: '0.75rem', color: '#A02142' }}>{controladorErrores.modelo}</span>}
+                      </div>
+
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.35rem' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: '700', color: '#334155' }}>
+                            <FaMapMarkerAlt size={13} style={{ color: '#691B31' }} /> Crucero {!modoVisualizacion && <span className="req-star" style={{ color: '#DC2626' }}>*</span>}
+                          </label>
+                          {!modoVisualizacion && (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                              <button
+                                type="button"
+                                onClick={handleCrearNuevoCruceroRapido}
+                                title="Registrar un nuevo crucero si no aparece en la lista"
+                                style={{
+                                  background: '#F1F5F9',
+                                  border: '1px solid #CBD5E1',
+                                  color: '#691B31',
+                                  fontSize: '0.72rem',
+                                  fontWeight: '700',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                  padding: '0.15rem 0.5rem',
+                                  borderRadius: '4px'
+                                }}
+                                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#E2E8F0'}
+                                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#F1F5F9'}
+                              >
+                                <FaPlus size={9} style={{ color: '#BC955B' }} /> Nuevo crucero
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {modoVisualizacion ? (
+                          <div style={{
+                            padding: '0.6rem 0.85rem',
+                            backgroundColor: '#FFFFFF',
+                            border: '1px solid #CBD5E1',
+                            borderRadius: '8px',
+                            fontSize: '0.92rem',
+                            fontWeight: '700',
+                            color: '#1E293B',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            minHeight: '40px',
+                            boxSizing: 'border-box'
+                          }}>
+                            <FaMapMarkerAlt size={14} style={{ color: '#691B31' }} />
+                            <span>{listaCruceros.find(c => String(c.id) === String(controladorForm.cruceroId))?.nombre || controladorParaVer?.crucero?.nombre || controladorParaVer?.cruceroNombre || 'Sin crucero especificado'}</span>
+                          </div>
+                        ) : (
+                          <select
+                            value={controladorForm.cruceroId}
+                            onChange={(e) => setControladorForm({ ...controladorForm, cruceroId: e.target.value })}
+                            onFocus={() => cargarCatalogos()}
+                            style={{
+                              width: '100%', padding: '0.6rem', border: `1px solid ${controladorErrores.cruceroId ? '#A02142' : '#CBD5E1'}`,
+                              borderRadius: '8px', fontSize: '0.9rem'
+                            }}
+                          >
+                            <option value="">-- Seleccionar Crucero --</option>
+                            {listaCruceros.map((c) => (
+                              <option key={c.id} value={c.id}>{c.nombre}</option>
+                            ))}
+                          </select>
+                        )}
+                        {controladorErrores.cruceroId && <span style={{ fontSize: '0.75rem', color: '#A02142' }}>{controladorErrores.cruceroId}</span>}
+                      </div>
+                    </div>
+                  )}
+
+                  {!editandoControladorId && !modoVisualizacion && (
                     <div style={{
-                      padding: '0.6rem 0.85rem',
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #CBD5E1',
-                      borderRadius: '8px',
-                      fontSize: '0.92rem',
-                      fontWeight: '700',
-                      color: '#691B31',
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      marginBottom: '1rem'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={handleIniciarLevantamiento}
+                        disabled={guardandoIniciando}
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          border: '1.5px solid #691B31',
+                          color: '#691B31',
+                          borderRadius: '6px',
+                          padding: '0.35rem 0.8rem',
+                          fontSize: '0.8rem',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                          transition: 'all 0.15s'
+                        }}
+                        onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#FCFBF9'; }}
+                        onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
+                        title="Guarda la ubicación inicial del crucero para habilitar la captura simultánea"
+                      >
+                        {guardandoIniciando ? <FaSyncAlt className="fa-spin" size={11} /> : <FaSave size={11} />}
+                        <span>{guardandoIniciando ? 'Guardando...' : 'Iniciar Crucero'}</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* SECCIÓN 1: INSPECCIÓN EXTERIOR, CIMENTACIÓN Y BASE */}
+                  <div style={{
+                    marginBottom: '1.5rem',
+                    backgroundColor: '#F8FAFC',
+                    padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
+                    borderRadius: '10px',
+                    border: '1px solid #E2E8F0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.5rem',
-                      minHeight: '40px',
-                      boxSizing: 'border-box'
+                      justifyContent: 'space-between',
+                      borderBottom: '1px solid #E2E8F0',
+                      paddingBottom: '0.5rem',
+                      marginBottom: '0.2rem',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem'
                     }}>
-                      <FaTrafficLight size={15} style={{ color: '#BC955B' }} />
-                      <span>{controladorForm.modelo || 'Sin modelo asignado'}</span>
-                    </div>
-                  ) : (
-                    <select
-                      value={controladorForm.modelo}
-                      onChange={(e) => {
-                        const nuevoModelo = e.target.value
-                        if (nuevoModelo === 'C-3000') {
-                          setControladorForm(prev => {
-                            const switchMod = prev.switchFibraModelo && MODELOS_SWITCH_MOXA_CATALOGO.some(m => m.modelo === prev.switchFibraModelo) ? prev.switchFibraModelo : 'Moxa EDS-208 / 308'
-                            const switchObj = MODELOS_SWITCH_MOXA_CATALOGO.find(m => m.modelo === switchMod)
-                            return {
-                              ...prev,
-                              modelo: 'C-3000',
-                              // Tarjeta de Conflictos para C-3000 (Solo marca y modelo)
-                              tarjetaConflictosMarcaModo: 'Peek Traffic',
-                              tarjetaConflictosMarca: 'Peek Traffic',
-                              tarjetaConflictosModelo: prev.tarjetaConflictosModelo && MODELOS_TARJETA_CONFLICTOS_PEEK.includes(prev.tarjetaConflictosModelo) ? prev.tarjetaConflictosModelo : 'Model 2010E',
-                              // Switch de Fibra para C-3000 (Marca, modelo y total de puertos según modelo)
-                              switchFibraMarcaModo: 'Moxa',
-                              switchFibraMarca: 'Moxa',
-                              switchFibraModelo: switchMod,
-                              switchFibraPuertosTotal: switchObj ? switchObj.puertos : '8',
-                              switch: true,
-                              // Relevadores para C-3000 (Solo marca y modelo)
-                              tarjetaRelevadoresMarcaModo: 'Peek Traffic',
-                              tarjetaRelevadoresMarca: 'Peek Traffic',
-                              tarjetaRelevadoresModelo: prev.tarjetaRelevadoresModelo && MODELOS_RELEVADORES_PEEK.includes(prev.tarjetaRelevadoresModelo) ? prev.tarjetaRelevadoresModelo : 'RC-308',
-                              tarjetaRelevadora: true
-                            }
-                          })
-                        } else if (nuevoModelo === 'C-5000') {
-                          setControladorForm(prev => ({
-                            ...prev,
-                            modelo: 'C-5000',
-                            // Tarjeta de Conflictos para C-5000 (Solo marca y modelo)
-                            tarjetaConflictosMarcaModo: 'Oriux (Peek Traffic)',
-                            tarjetaConflictosMarca: 'Oriux (Peek Traffic)',
-                            tarjetaConflictosModelo: 'C5000 MMU Integrado',
-                            // Switch de Fibra para C-5000 (Marca, modelo y total de puertos según modelo)
-                            switchFibraMarcaModo: 'Oriux',
-                            switchFibraMarca: 'Oriux',
-                            switchFibraModelo: 'C5000 ATC CPU Ports',
-                            switchFibraPuertosTotal: '2',
-                            switch: true,
-                            // Relevadores para C-5000 (Solo marca y modelo)
-                            tarjetaRelevadoresMarcaModo: 'Oriux',
-                            tarjetaRelevadoresMarca: 'Oriux',
-                            tarjetaRelevadoresModelo: 'C5000 Card-Based Load Switch',
-                            tarjetaRelevadora: true
-                          }))
-                        } else {
-                          setControladorForm(prev => ({
-                            ...prev,
-                            modelo: nuevoModelo
-                          }))
-                        }
-                      }}
-                      onFocus={(e) => { e.currentTarget.style.borderColor = '#BC955B'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(188,149,91,0.15)' }}
-                      onBlur={(e) => { e.currentTarget.style.borderColor = controladorErrores.modelo ? '#A02142' : '#CBD5E1'; e.currentTarget.style.boxShadow = 'none' }}
-                      style={{
-                        width: '100%', padding: '0.6rem 0.75rem',
-                        border: `1px solid ${controladorErrores.modelo ? '#A02142' : '#CBD5E1'}`,
-                        borderRadius: '8px', fontSize: '0.9rem', fontWeight: '500', color: '#1E293B',
-                        backgroundColor: '#fff', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s',
-                        boxSizing: 'border-box', cursor: 'pointer'
-                      }}
-                    >
-                      <option value="">-- Seleccionar Modelo --</option>
-                      <option value="C-3000">C-3000</option>
-                      <option value="C-5000">C-5000</option>
-                    </select>
-                  )}
-                  {controladorErrores.modelo && <span style={{ fontSize: '0.75rem', color: '#A02142' }}>{controladorErrores.modelo}</span>}
-                </div>
-
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.35rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: '700', color: '#334155' }}>
-                      <FaMapMarkerAlt size={13} style={{ color: '#691B31' }} /> Crucero {!modoVisualizacion && <span className="req-star" style={{ color: '#DC2626' }}>*</span>}
-                    </label>
-                    {!modoVisualizacion && (
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                      <div>
+                        <h4 style={{
+                          margin: 0,
+                          fontSize: '0.92rem',
+                          fontWeight: '800',
+                          color: '#691B31',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.45rem'
+                        }}>
+                          <FaBuilding size={14} style={{ color: '#BC955B' }} /> Sección 1: Inspección Exterior, Cimentación y Base
+                        </h4>
+                        <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
+                          Revisión física del poste / crucero
+                        </span>
+                      </div>
+                      {editandoControladorId && !modoVisualizacion && (
                         <button
                           type="button"
-                          onClick={handleCrearNuevoCruceroRapido}
-                          title="Registrar un nuevo crucero si no aparece en la lista"
+                          onClick={handleGuardarGabineteModular}
+                          disabled={guardandoModularSeccion === 'gabinete'}
                           style={{
-                            background: '#F1F5F9',
-                            border: '1px solid #CBD5E1',
+                            backgroundColor: '#FFFFFF',
+                            border: '1.5px solid #691B31',
                             color: '#691B31',
-                            fontSize: '0.72rem',
+                            borderRadius: '6px',
+                            padding: '0.3rem 0.7rem',
+                            fontSize: '0.78rem',
                             fontWeight: '700',
                             cursor: 'pointer',
                             display: 'inline-flex',
                             alignItems: 'center',
-                            gap: '0.25rem',
-                            padding: '0.15rem 0.5rem',
-                            borderRadius: '4px'
+                            gap: '0.35rem',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
                           }}
-                          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#E2E8F0'}
-                          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#F1F5F9'}
+                          title="Guarda los datos del gabinete en el servidor sin afectar los postes"
                         >
-                          <FaPlus size={9} style={{ color: '#BC955B' }} /> Nuevo crucero
+                          {guardandoModularSeccion === 'gabinete' ? <FaSyncAlt className="fa-spin" size={11} /> : <FaSave size={11} />}
+                          <span>{guardandoModularSeccion === 'gabinete' ? 'Guardando...' : 'Guardar solo Gabinete'}</span>
                         </button>
-                      </div>
-                    )}
-                  </div>
-                  {modoVisualizacion ? (
-                    <div style={{
-                      padding: '0.6rem 0.85rem',
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #CBD5E1',
-                      borderRadius: '8px',
-                      fontSize: '0.92rem',
-                      fontWeight: '700',
-                      color: '#1E293B',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      minHeight: '40px',
-                      boxSizing: 'border-box'
-                    }}>
-                      <FaMapMarkerAlt size={14} style={{ color: '#691B31' }} />
-                      <span>{listaCruceros.find(c => String(c.id) === String(controladorForm.cruceroId))?.nombre || controladorParaVer?.crucero?.nombre || controladorParaVer?.cruceroNombre || 'Sin crucero especificado'}</span>
+                      )}
                     </div>
-                  ) : (
-                    <select
-                      value={controladorForm.cruceroId}
-                      onChange={(e) => setControladorForm({ ...controladorForm, cruceroId: e.target.value })}
-                      onFocus={() => cargarCatalogos()}
-                      style={{
-                        width: '100%', padding: '0.6rem', border: `1px solid ${controladorErrores.cruceroId ? '#A02142' : '#CBD5E1'}`,
-                        borderRadius: '8px', fontSize: '0.9rem'
-                      }}
-                    >
-                      <option value="">-- Seleccionar Crucero --</option>
-                      {listaCruceros.map((c) => (
-                        <option key={c.id} value={c.id}>{c.nombre}</option>
-                      ))}
-                    </select>
-                  )}
-                  {controladorErrores.cruceroId && <span style={{ fontSize: '0.75rem', color: '#A02142' }}>{controladorErrores.cruceroId}</span>}
-                </div>
-              </div>
-              )}
 
-              {!editandoControladorId && !modoVisualizacion && (
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  marginBottom: '1rem'
-                }}>
-                  <button
-                    type="button"
-                    onClick={handleIniciarLevantamiento}
-                    disabled={guardandoIniciando}
-                    style={{
-                      backgroundColor: '#FFFFFF',
-                      border: '1.5px solid #691B31',
-                      color: '#691B31',
-                      borderRadius: '6px',
-                      padding: '0.35rem 0.8rem',
-                      fontSize: '0.8rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                      transition: 'all 0.15s'
-                    }}
-                    onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#FCFBF9'; }}
-                    onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
-                    title="Guarda la ubicación inicial del crucero para habilitar la captura simultánea"
-                  >
-                    {guardandoIniciando ? <FaSyncAlt className="fa-spin" size={11} /> : <FaSave size={11} />}
-                    <span>{guardandoIniciando ? 'Guardando...' : 'Iniciar Crucero'}</span>
-                  </button>
-                </div>
-              )}
+                    <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', alignItems: 'start' }}>
+                      {/* Pregunta 1: Cimiento 4 dados */}
+                      <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
+                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
+                          <FaCube size={13} style={{ color: '#691B31', marginTop: '2px', flexShrink: 0 }} />
+                          <span>{modoVisualizacion ? 'Cimentación de Base' : 'Cimiento: ¿4 dados completos y en buen estado?'} <span style={{ color: '#DC2626' }}>*</span></span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', marginTop: '0.35rem', minHeight: '32px' }}>
+                          {modoVisualizacion ? (
+                            renderBadgeConsulta(
+                              controladorForm.cimientoCompleto,
+                              controladorForm.cimientoCompleto === 'Sí'
+                                ? '4 dados presentes'
+                                : (controladorForm.cimientoCuantosDados ? `Incompleto (${controladorForm.cimientoCuantosDados} dados presentes)` : 'Incompleto')
+                            )
+                          ) : (
+                            ['Sí', 'No'].map((opcion) => (
+                              <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.cimientoCompleto === opcion ? '700' : '500', color: '#1E293B' }}>
+                                <input
+                                  type="radio"
+                                  name="cimientoCompleto"
+                                  value={opcion}
+                                  checked={controladorForm.cimientoCompleto === opcion}
+                                  onChange={(e) => {
+                                    const val = e.target.value
+                                    setControladorForm({
+                                      ...controladorForm,
+                                      cimientoCompleto: val,
+                                      cimientoCuantosDados: val === 'Sí' ? '' : controladorForm.cimientoCuantosDados
+                                    })
+                                  }}
+                                  style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                />
+                                {opcion}
+                              </label>
+                            ))
+                          )}
+                        </div>
 
-              {/* SECCIÓN 1: INSPECCIÓN EXTERIOR, CIMENTACIÓN Y BASE */}
-              <div style={{
-                marginBottom: '1.5rem',
-                backgroundColor: '#F8FAFC',
-                padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
-                borderRadius: '10px',
-                border: '1px solid #E2E8F0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1rem',
-                boxSizing: 'border-box'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  borderBottom: '1px solid #E2E8F0',
-                  paddingBottom: '0.5rem',
-                  marginBottom: '0.2rem',
-                  flexWrap: 'wrap',
-                  gap: '0.5rem'
-                }}>
-                  <div>
-                    <h4 style={{
-                      margin: 0,
-                      fontSize: '0.92rem',
-                      fontWeight: '800',
-                      color: '#691B31',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.45rem'
-                    }}>
-                      <FaBuilding size={14} style={{ color: '#BC955B' }} /> Sección 1: Inspección Exterior, Cimentación y Base
-                    </h4>
-                    <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
-                      Revisión física del poste / crucero
-                    </span>
-                  </div>
-                  {editandoControladorId && !modoVisualizacion && (
-                    <button
-                      type="button"
-                      onClick={handleGuardarGabineteModular}
-                      disabled={guardandoModularSeccion === 'gabinete'}
-                      style={{
-                        backgroundColor: '#FFFFFF',
-                        border: '1.5px solid #691B31',
-                        color: '#691B31',
-                        borderRadius: '6px',
-                        padding: '0.3rem 0.7rem',
-                        fontSize: '0.78rem',
-                        fontWeight: '700',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
-                      }}
-                      title="Guarda los datos del gabinete en el servidor sin afectar los postes"
-                    >
-                      {guardandoModularSeccion === 'gabinete' ? <FaSyncAlt className="fa-spin" size={11} /> : <FaSave size={11} />}
-                      <span>{guardandoModularSeccion === 'gabinete' ? 'Guardando...' : 'Guardar solo Gabinete'}</span>
-                    </button>
-                  )}
-                </div>
-
-                <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', alignItems: 'start' }}>
-                  {/* Pregunta 1: Cimiento 4 dados */}
-                  <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
-                      <FaCube size={13} style={{ color: '#691B31', marginTop: '2px', flexShrink: 0 }} />
-                      <span>{modoVisualizacion ? 'Cimentación de Base' : 'Cimiento: ¿4 dados completos y en buen estado?'} <span style={{ color: '#DC2626' }}>*</span></span>
-                    </label>
-                    <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', marginTop: '0.35rem', minHeight: '32px' }}>
-                      {modoVisualizacion ? (
-                        renderBadgeConsulta(
-                          controladorForm.cimientoCompleto,
-                          controladorForm.cimientoCompleto === 'Sí'
-                            ? '4 dados completos · Concreto firme'
-                            : (controladorForm.cimientoCuantosDados ? `Incompleto (${controladorForm.cimientoCuantosDados} dados presentes)` : 'Incompleto')
-                        )
-                      ) : (
-                        ['Sí', 'No'].map((opcion) => (
-                          <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.cimientoCompleto === opcion ? '700' : '500', color: '#1E293B' }}>
+                        {/* Subcampo condicional: solo si respondió No y no está en modo visualización */}
+                        {!modoVisualizacion && controladorForm.cimientoCompleto === 'No' && (
+                          <div style={{ marginTop: '0.65rem', paddingTop: '0.65rem', borderTop: '1px dashed #CBD5E1' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#1E293B', marginBottom: '0.35rem' }}>
+                              <FaCube size={11} style={{ color: '#691B31' }} /> <span>¿Cuántos dados tiene? <span style={{ color: '#DC2626' }}>*</span></span>
+                            </label>
                             <input
-                              type="radio"
-                              name="cimientoCompleto"
-                              value={opcion}
-                              checked={controladorForm.cimientoCompleto === opcion}
+                              type="text"
+                              placeholder="ej. 1, 2 o 3"
+                              value={controladorForm.cimientoCuantosDados}
                               onChange={(e) => {
                                 const val = e.target.value
-                                setControladorForm({
-                                  ...controladorForm,
-                                  cimientoCompleto: val,
-                                  cimientoCuantosDados: val === 'Sí' ? '' : controladorForm.cimientoCuantosDados
-                                })
+                                setControladorForm(prev => ({ ...prev, cimientoCuantosDados: val }))
+                                const num = parseInt(val, 10)
+                                if (val.trim() && (!isNaN(num) && (num > 3 || num < 0))) {
+                                  setControladorErrores(prev => ({
+                                    ...prev,
+                                    cimientoCuantosDados: 'Máximo 3 dados (0 a 3).'
+                                  }))
+                                } else if (controladorErrores.cimientoCuantosDados) {
+                                  setControladorErrores(prev => ({ ...prev, cimientoCuantosDados: undefined }))
+                                }
                               }}
-                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                              autoFocus
+                              style={{
+                                width: '100%',
+                                padding: '0.45rem 0.65rem',
+                                border: `1px solid ${controladorErrores.cimientoCuantosDados ? '#DC2626' : '#CBD5E1'}`,
+                                borderRadius: '6px',
+                                fontSize: '0.85rem',
+                                backgroundColor: controladorErrores.cimientoCuantosDados ? '#FEF2F2' : '#FFFFFF',
+                                boxSizing: 'border-box',
+                                outline: 'none',
+                                transition: 'border-color 0.2s, background-color 0.2s'
+                              }}
                             />
-                            {opcion}
-                          </label>
-                        ))
-                      )}
-                    </div>
-
-                    {/* Subcampo condicional: solo si respondió No y no está en modo visualización */}
-                    {!modoVisualizacion && controladorForm.cimientoCompleto === 'No' && (
-                      <div style={{ marginTop: '0.65rem', paddingTop: '0.65rem', borderTop: '1px dashed #CBD5E1' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#1E293B', marginBottom: '0.35rem' }}>
-                          <FaCube size={11} style={{ color: '#691B31' }} /> <span>¿Cuántos dados tiene? <span style={{ color: '#DC2626' }}>*</span></span>
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="ej. 1, 2 o 3"
-                          value={controladorForm.cimientoCuantosDados}
-                          onChange={(e) => {
-                            const val = e.target.value
-                            setControladorForm(prev => ({ ...prev, cimientoCuantosDados: val }))
-                            const num = parseInt(val, 10)
-                            if (val.trim() && (!isNaN(num) && (num > 3 || num < 0))) {
-                              setControladorErrores(prev => ({
-                                ...prev,
-                                cimientoCuantosDados: 'Máximo 3 dados (0 a 3).'
-                              }))
-                            } else if (controladorErrores.cimientoCuantosDados) {
-                              setControladorErrores(prev => ({ ...prev, cimientoCuantosDados: undefined }))
-                            }
-                          }}
-                          autoFocus
-                          style={{
-                            width: '100%',
-                            padding: '0.45rem 0.65rem',
-                            border: `1px solid ${controladorErrores.cimientoCuantosDados ? '#DC2626' : '#CBD5E1'}`,
-                            borderRadius: '6px',
-                            fontSize: '0.85rem',
-                            backgroundColor: controladorErrores.cimientoCuantosDados ? '#FEF2F2' : '#FFFFFF',
-                            boxSizing: 'border-box',
-                            outline: 'none',
-                            transition: 'border-color 0.2s, background-color 0.2s'
-                          }}
-                        />
-                        {controladorErrores.cimientoCuantosDados && (
-                          <span style={{ fontSize: '0.75rem', color: '#DC2626', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: '600' }}>
-                            <FaExclamationTriangle size={10} /> {controladorErrores.cimientoCuantosDados}
-                          </span>
+                            {controladorErrores.cimientoCuantosDados && (
+                              <span style={{ fontSize: '0.75rem', color: '#DC2626', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: '600' }}>
+                                <FaExclamationTriangle size={10} /> {controladorErrores.cimientoCuantosDados}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
 
-                  {/* Pregunta 3: Tapa de cableado */}
-                  <div style={{
-                    backgroundColor: 'white',
-                    padding: '0.85rem',
-                    borderRadius: '8px',
-                    border: '1px solid #E2E8F0',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignSelf: 'start'
-                  }}>
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                      <FaCheckSquare size={13} style={{ color: '#691B31', marginTop: '2px', flexShrink: 0 }} />
-                      <span>{modoVisualizacion ? 'Tapa de Cableado' : 'Tapa de cableado: ¿Presente y en buen estado?'} <span style={{ color: '#DC2626' }}>*</span></span>
-                    </label>
-                    <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', marginTop: '0.35rem', minHeight: '32px' }}>
-                      {modoVisualizacion ? (
-                        renderBadgeConsulta(
-                          controladorForm.tapaCableado,
-                          controladorForm.tapaCableado === 'Sí' ? 'Presente y asegurada' : 'Faltante / Dañada'
-                        )
-                      ) : (
-                        ['Sí', 'No'].map((opcion) => (
-                          <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.tapaCableado === opcion ? '700' : '500', color: '#1E293B' }}>
-                            <input
-                              type="radio"
-                              name="tapaCableado"
-                              value={opcion}
-                              checked={controladorForm.tapaCableado === opcion}
-                              onChange={(e) => setControladorForm({ ...controladorForm, tapaCableado: e.target.value })}
-                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                            />
-                            {opcion}
-                          </label>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Pregunta 4: Tornillería base */}
-                  <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
-                      <FaWrench size={13} style={{ color: '#691B31', marginTop: '2px', flexShrink: 0 }} />
-                      <span>{modoVisualizacion ? 'Tornillería de Base' : 'Tornillería: ¿4 tornillos de base completos?'} <span style={{ color: '#DC2626' }}>*</span></span>
-                    </label>
-                    <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', marginTop: '0.35rem', minHeight: '32px' }}>
-                      {modoVisualizacion ? (
-                        renderBadgeConsulta(
-                          controladorForm.tornilleriaBaseCompleta,
-                          controladorForm.tornilleriaBaseCompleta === 'Sí'
-                            ? '4 tornillos de anclaje completos'
-                            : (controladorForm.tornilleriaCuantosTornillos ? `Incompleta (${controladorForm.tornilleriaCuantosTornillos} tornillos presentes)` : 'Incompleta')
-                        )
-                      ) : (
-                        ['Sí', 'No'].map((opcion) => (
-                          <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.tornilleriaBaseCompleta === opcion ? '700' : '500', color: '#1E293B' }}>
-                            <input
-                              type="radio"
-                              name="tornilleriaBaseCompleta"
-                              value={opcion}
-                              checked={controladorForm.tornilleriaBaseCompleta === opcion}
-                              onChange={(e) => {
-                                const val = e.target.value
-                                setControladorForm({
-                                  ...controladorForm,
-                                  tornilleriaBaseCompleta: val,
-                                  tornilleriaCuantosTornillos: val === 'Sí' ? '' : controladorForm.tornilleriaCuantosTornillos
-                                })
-                              }}
-                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                            />
-                            {opcion}
-                          </label>
-                        ))
-                      )}
-                    </div>
-
-                    {/* Subcampo condicional: solo si respondió No y no está en modo visualización */}
-                    {!modoVisualizacion && controladorForm.tornilleriaBaseCompleta === 'No' && (
-                      <div style={{ marginTop: '0.65rem', paddingTop: '0.65rem', borderTop: '1px dashed #CBD5E1' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#1E293B', marginBottom: '0.35rem' }}>
-                          <FaWrench size={11} style={{ color: '#691B31' }} /> <span>¿Cuántos tornillos tiene? <span style={{ color: '#DC2626' }}>*</span></span>
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="ej. 1, 2 o 3"
-                          value={controladorForm.tornilleriaCuantosTornillos}
-                          onChange={(e) => {
-                            const val = e.target.value
-                            setControladorForm(prev => ({ ...prev, tornilleriaCuantosTornillos: val }))
-                            const num = parseInt(val, 10)
-                            if (val.trim() && (!isNaN(num) && (num > 3 || num < 0))) {
-                              setControladorErrores(prev => ({
-                                ...prev,
-                                tornilleriaCuantosTornillos: 'Máximo 3 tornillos (0 a 3).'
-                              }))
-                            } else if (controladorErrores.tornilleriaCuantosTornillos) {
-                              setControladorErrores(prev => ({ ...prev, tornilleriaCuantosTornillos: undefined }))
-                            }
-                          }}
-                          autoFocus
-                          style={{
-                            width: '100%',
-                            padding: '0.45rem 0.65rem',
-                            border: `1px solid ${controladorErrores.tornilleriaCuantosTornillos ? '#DC2626' : '#CBD5E1'}`,
-                            borderRadius: '6px',
-                            fontSize: '0.85rem',
-                            backgroundColor: controladorErrores.tornilleriaCuantosTornillos ? '#FEF2F2' : '#FFFFFF',
-                            boxSizing: 'border-box',
-                            outline: 'none',
-                            transition: 'border-color 0.2s, background-color 0.2s'
-                          }}
-                        />
-                        {controladorErrores.tornilleriaCuantosTornillos && (
-                          <span style={{ fontSize: '0.75rem', color: '#DC2626', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: '600' }}>
-                            <FaExclamationTriangle size={10} /> {controladorErrores.tornilleriaCuantosTornillos}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Pregunta 6: Observaciones exterior */}
-                  <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
-                      <FaListUl size={13} style={{ color: '#691B31', flexShrink: 0 }} />
-                      <span>Observaciones exterior</span>
-                    </label>
-                    {modoVisualizacion ? (
-                      renderObservacionesConsulta(controladorForm.observacionesExterior)
-                    ) : (
-                      <textarea
-                        rows={3}
-                        placeholder="Detalles de pintura, golpes, corrosión o estado general..."
-                        value={controladorForm.observacionesExterior}
-                        onChange={(e) => setControladorForm({ ...controladorForm, observacionesExterior: e.target.value })}
-                        style={{
-                          width: '100%',
-                          padding: '0.5rem 0.75rem',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '6px',
-                          fontSize: '0.85rem',
-                          boxSizing: 'border-box',
-                          resize: 'vertical',
-                          fontFamily: 'inherit',
-                          marginTop: '0.35rem'
-                        }}
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* SECCIÓN 2: ELECTRÓNICA INTERNA — MÓDULO GPS */}
-              <div style={{
-                marginBottom: '1.5rem',
-                backgroundColor: '#F8FAFC',
-                padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
-                borderRadius: '10px',
-                border: '1px solid #E2E8F0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1rem',
-                boxSizing: 'border-box'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  borderBottom: '1px solid #E2E8F0',
-                  paddingBottom: '0.5rem',
-                  marginBottom: '0.2rem'
-                }}>
-                  <h4 style={{
-                    margin: 0,
-                    fontSize: '0.92rem',
-                    fontWeight: '800',
-                    color: '#691B31',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.45rem'
-                  }}>
-                    <FaMapMarkerAlt size={14} style={{ color: '#BC955B' }} /> Sección 2: Electrónica Interna — Módulo GPS
-                  </h4>
-                  <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
-                    Sincronización y comunicación
-                  </span>
-                </div>
-
-                {/* Pregunta Principal: GPS Receptor Satelital RC-308 / Sincronizador ATC-3000 */}
-                <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.5rem' }}>
-                    <FaMapMarkerAlt size={13} style={{ color: '#691B31' }} />
-                    <span>{modoVisualizacion ? 'Módulo Receptor GPS' : 'GPS:'} <span style={{ color: '#DC2626' }}>*</span></span>
-                  </label>
-                  {modoVisualizacion ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.2rem', minHeight: '26px' }}>
-                      {controladorForm.gpsModelo ? (
-                        <>
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2563EB', display: 'inline-block', flexShrink: 0 }}></span>
-                          <span style={{ color: '#0F172A', fontSize: '0.9rem', fontWeight: '600' }}>
-                            {controladorForm.gpsModelo}
-                          </span>
-                        </>
-                      ) : (
-                        <span style={{ color: '#94A3B8', fontSize: '0.85rem', fontStyle: 'italic', fontWeight: '400' }}>Sin GPS registrado</span>
-                      )}
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', gap: '1.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                      <label style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.45rem',
-                        cursor: 'pointer',
-                        fontSize: '0.88rem',
-                        fontWeight: (controladorForm.gpsModelo === 'Receptor Satelital GPS RC-308' || controladorForm.gpsModelo === 'Modelo A') ? '700' : '500',
-                        color: '#1E293B'
-                      }}>
-                        <input
-                          type="radio"
-                          name="gpsModelo"
-                          value="Receptor Satelital GPS RC-308"
-                          checked={controladorForm.gpsModelo === 'Receptor Satelital GPS RC-308' || controladorForm.gpsModelo === 'Modelo A'}
-                          onChange={() => setControladorForm({ ...controladorForm, gpsModelo: 'Receptor Satelital GPS RC-308', gps: true })}
-                          style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                        />
-                        Receptor Satelital GPS RC-308
-                      </label>
-
-                      <label style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.45rem',
-                        cursor: 'pointer',
-                        fontSize: '0.88rem',
-                        fontWeight: (controladorForm.gpsModelo === 'Sincronizador Satelital Integrado ATC-3000' || controladorForm.gpsModelo === 'Modelo B') ? '700' : '500',
-                        color: '#1E293B'
-                      }}>
-                        <input
-                          type="radio"
-                          name="gpsModelo"
-                          value="Sincronizador Satelital Integrado ATC-3000"
-                          checked={controladorForm.gpsModelo === 'Sincronizador Satelital Integrado ATC-3000' || controladorForm.gpsModelo === 'Modelo B'}
-                          onChange={() => setControladorForm({ ...controladorForm, gpsModelo: 'Sincronizador Satelital Integrado ATC-3000', gpsComponenteFisico: '', gps: true })}
-                          style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                        />
-                        Sincronizador Satelital Integrado ATC-3000
-                      </label>
-                    </div>
-                  )}
-                </div>
-
-                {/* Subcampos condicionales según modelo GPS */}
-                {controladorForm.gpsModelo && (
-                  <div className={(controladorForm.gpsModelo === 'Receptor Satelital GPS RC-308' || controladorForm.gpsModelo === 'Modelo A') ? "form-responsive-grid grid-2" : ""} style={{ gap: '0.85rem 1rem' }}>
-                    {/* Componente Físico: SOLO se muestra si es Receptor Satelital GPS RC-308 */}
-                    {(controladorForm.gpsModelo === 'Receptor Satelital GPS RC-308' || controladorForm.gpsModelo === 'Modelo A') && (
+                      {/* Pregunta 3: Tapa de cableado */}
                       <div style={{
                         backgroundColor: 'white',
                         padding: '0.85rem',
                         borderRadius: '8px',
                         border: '1px solid #E2E8F0',
                         display: 'flex',
-                        flexDirection: 'column'
+                        flexDirection: 'column',
+                        alignSelf: 'start'
                       }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.5rem' }}>
-                          <FaMicrochip size={13} style={{ color: '#691B31' }} />
-                          <span>Componente físico: <span style={{ color: '#DC2626' }}>*</span></span>
+                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                          <FaCheckSquare size={13} style={{ color: '#691B31', marginTop: '2px', flexShrink: 0 }} />
+                          <span>{modoVisualizacion ? 'Tapa de Cableado' : 'Tapa de cableado: ¿Presente y en buen estado?'} <span style={{ color: '#DC2626' }}>*</span></span>
                         </label>
-                        {modoVisualizacion ? (
-                          renderBadgeConsulta(controladorForm.gpsComponenteFisico)
-                        ) : (
-                          <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                            {['Operativo', 'Dañado'].map((opcion) => (
-                              <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.gpsComponenteFisico === opcion ? '700' : '500', color: '#1E293B' }}>
+                        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', marginTop: '0.35rem', minHeight: '32px' }}>
+                          {modoVisualizacion ? (
+                            renderBadgeConsulta(
+                              controladorForm.tapaCableado,
+                              controladorForm.tapaCableado === 'Sí' ? 'Presente' : 'No presente'
+                            )
+                          ) : (
+                            ['Sí', 'No'].map((opcion) => (
+                              <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.tapaCableado === opcion ? '700' : '500', color: '#1E293B' }}>
                                 <input
                                   type="radio"
-                                  name="gpsComponenteFisico"
+                                  name="tapaCableado"
                                   value={opcion}
-                                  checked={controladorForm.gpsComponenteFisico === opcion}
-                                  onChange={(e) => setControladorForm({ ...controladorForm, gpsComponenteFisico: e.target.value })}
+                                  checked={controladorForm.tapaCableado === opcion}
+                                  onChange={(e) => setControladorForm({ ...controladorForm, tapaCableado: e.target.value })}
+                                  style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                />
+                                {opcion}
+                              </label>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Pregunta 4: Tornillería base */}
+                      <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
+                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
+                          <FaWrench size={13} style={{ color: '#691B31', marginTop: '2px', flexShrink: 0 }} />
+                          <span>{modoVisualizacion ? 'Tornillería de Base' : 'Tornillería: ¿4 tornillos de base completos?'} <span style={{ color: '#DC2626' }}>*</span></span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', marginTop: '0.35rem', minHeight: '32px' }}>
+                          {modoVisualizacion ? (
+                            renderBadgeConsulta(
+                              controladorForm.tornilleriaBaseCompleta,
+                              controladorForm.tornilleriaBaseCompleta === 'Sí'
+                                ? '4 tornillos presentes'
+                                : (controladorForm.tornilleriaCuantosTornillos ? `Incompleta (${controladorForm.tornilleriaCuantosTornillos} tornillos presentes)` : 'Incompleta')
+                            )
+                          ) : (
+                            ['Sí', 'No'].map((opcion) => (
+                              <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.tornilleriaBaseCompleta === opcion ? '700' : '500', color: '#1E293B' }}>
+                                <input
+                                  type="radio"
+                                  name="tornilleriaBaseCompleta"
+                                  value={opcion}
+                                  checked={controladorForm.tornilleriaBaseCompleta === opcion}
+                                  onChange={(e) => {
+                                    const val = e.target.value
+                                    setControladorForm({
+                                      ...controladorForm,
+                                      tornilleriaBaseCompleta: val,
+                                      tornilleriaCuantosTornillos: val === 'Sí' ? '' : controladorForm.tornilleriaCuantosTornillos
+                                    })
+                                  }}
+                                  style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                />
+                                {opcion}
+                              </label>
+                            ))
+                          )}
+                        </div>
+
+                        {/* Subcampo condicional: solo si respondió No y no está en modo visualización */}
+                        {!modoVisualizacion && controladorForm.tornilleriaBaseCompleta === 'No' && (
+                          <div style={{ marginTop: '0.65rem', paddingTop: '0.65rem', borderTop: '1px dashed #CBD5E1' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#1E293B', marginBottom: '0.35rem' }}>
+                              <FaWrench size={11} style={{ color: '#691B31' }} /> <span>¿Cuántos tornillos tiene? <span style={{ color: '#DC2626' }}>*</span></span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="ej. 1, 2 o 3"
+                              value={controladorForm.tornilleriaCuantosTornillos}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setControladorForm(prev => ({ ...prev, tornilleriaCuantosTornillos: val }))
+                                const num = parseInt(val, 10)
+                                if (val.trim() && (!isNaN(num) && (num > 3 || num < 0))) {
+                                  setControladorErrores(prev => ({
+                                    ...prev,
+                                    tornilleriaCuantosTornillos: 'Máximo 3 tornillos (0 a 3).'
+                                  }))
+                                } else if (controladorErrores.tornilleriaCuantosTornillos) {
+                                  setControladorErrores(prev => ({ ...prev, tornilleriaCuantosTornillos: undefined }))
+                                }
+                              }}
+                              autoFocus
+                              style={{
+                                width: '100%',
+                                padding: '0.45rem 0.65rem',
+                                border: `1px solid ${controladorErrores.tornilleriaCuantosTornillos ? '#DC2626' : '#CBD5E1'}`,
+                                borderRadius: '6px',
+                                fontSize: '0.85rem',
+                                backgroundColor: controladorErrores.tornilleriaCuantosTornillos ? '#FEF2F2' : '#FFFFFF',
+                                boxSizing: 'border-box',
+                                outline: 'none',
+                                transition: 'border-color 0.2s, background-color 0.2s'
+                              }}
+                            />
+                            {controladorErrores.tornilleriaCuantosTornillos && (
+                              <span style={{ fontSize: '0.75rem', color: '#DC2626', marginTop: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: '600' }}>
+                                <FaExclamationTriangle size={10} /> {controladorErrores.tornilleriaCuantosTornillos}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Pregunta 6: Observaciones exterior */}
+                      <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
+                          <FaListUl size={13} style={{ color: '#691B31', flexShrink: 0 }} />
+                          <span>Observaciones exterior</span>
+                        </label>
+                        {modoVisualizacion ? (
+                          renderObservacionesConsulta(controladorForm.observacionesExterior)
+                        ) : (
+                          <textarea
+                            rows={3}
+                            placeholder="Detalles de pintura, golpes, corrosión o estado general..."
+                            value={controladorForm.observacionesExterior}
+                            onChange={(e) => setControladorForm({ ...controladorForm, observacionesExterior: e.target.value })}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem 0.75rem',
+                              border: '1px solid #CBD5E1',
+                              borderRadius: '6px',
+                              fontSize: '0.85rem',
+                              boxSizing: 'border-box',
+                              resize: 'vertical',
+                              fontFamily: 'inherit',
+                              marginTop: '0.35rem'
+                            }}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECCIÓN 2: ELECTRÓNICA INTERNA — MÓDULO GPS */}
+                  <div style={{
+                    marginBottom: '1.5rem',
+                    backgroundColor: '#F8FAFC',
+                    padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
+                    borderRadius: '10px',
+                    border: '1px solid #E2E8F0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderBottom: '1px solid #E2E8F0',
+                      paddingBottom: '0.5rem',
+                      marginBottom: '0.2rem'
+                    }}>
+                      <h4 style={{
+                        margin: 0,
+                        fontSize: '0.92rem',
+                        fontWeight: '800',
+                        color: '#691B31',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.45rem'
+                      }}>
+                        <FaMapMarkerAlt size={14} style={{ color: '#BC955B' }} /> Sección 2: Electrónica Interna — Módulo GPS
+                      </h4>
+                      <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
+                        Sincronización y comunicación
+                      </span>
+                    </div>
+
+                    {/* Pregunta Principal: GPS Receptor Satelital RC-308 / Sincronizador ATC-3000 */}
+                    <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.5rem' }}>
+                        <FaMapMarkerAlt size={13} style={{ color: '#691B31' }} />
+                        <span>{modoVisualizacion ? 'Módulo Receptor GPS' : 'GPS:'} <span style={{ color: '#DC2626' }}>*</span></span>
+                      </label>
+                      {modoVisualizacion ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginTop: '0.2rem', minHeight: '26px' }}>
+                          {controladorForm.gpsModelo ? (
+                            <>
+                              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2563EB', display: 'inline-block', flexShrink: 0 }}></span>
+                              <span style={{ color: '#0F172A', fontSize: '0.9rem', fontWeight: '600' }}>
+                                {controladorForm.gpsModelo}
+                              </span>
+                            </>
+                          ) : (
+                            <span style={{ color: '#94A3B8', fontSize: '0.85rem', fontStyle: 'italic', fontWeight: '400' }}>Sin GPS registrado</span>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '1.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <label style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.45rem',
+                            cursor: 'pointer',
+                            fontSize: '0.88rem',
+                            fontWeight: (controladorForm.gpsModelo === 'Receptor Satelital GPS RC-308' || controladorForm.gpsModelo === 'Modelo A') ? '700' : '500',
+                            color: '#1E293B'
+                          }}>
+                            <input
+                              type="radio"
+                              name="gpsModelo"
+                              value="Receptor Satelital GPS RC-308"
+                              checked={controladorForm.gpsModelo === 'Receptor Satelital GPS RC-308' || controladorForm.gpsModelo === 'Modelo A'}
+                              onChange={() => setControladorForm({ ...controladorForm, gpsModelo: 'Receptor Satelital GPS RC-308', gps: true })}
+                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            Receptor Satelital GPS RC-308
+                          </label>
+
+                          <label style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.45rem',
+                            cursor: 'pointer',
+                            fontSize: '0.88rem',
+                            fontWeight: (controladorForm.gpsModelo === 'Sincronizador Satelital Integrado ATC-3000' || controladorForm.gpsModelo === 'Modelo B') ? '700' : '500',
+                            color: '#1E293B'
+                          }}>
+                            <input
+                              type="radio"
+                              name="gpsModelo"
+                              value="Sincronizador Satelital Integrado ATC-3000"
+                              checked={controladorForm.gpsModelo === 'Sincronizador Satelital Integrado ATC-3000' || controladorForm.gpsModelo === 'Modelo B'}
+                              onChange={() => setControladorForm({ ...controladorForm, gpsModelo: 'Sincronizador Satelital Integrado ATC-3000', gpsComponenteFisico: '', gps: true })}
+                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                            />
+                            Sincronizador Satelital Integrado ATC-3000
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Subcampos condicionales según modelo GPS */}
+                    {controladorForm.gpsModelo && (
+                      <div className={(controladorForm.gpsModelo === 'Receptor Satelital GPS RC-308' || controladorForm.gpsModelo === 'Modelo A') ? "form-responsive-grid grid-2" : ""} style={{ gap: '0.85rem 1rem' }}>
+                        {/* Componente Físico: SOLO se muestra si es Receptor Satelital GPS RC-308 */}
+                        {(controladorForm.gpsModelo === 'Receptor Satelital GPS RC-308' || controladorForm.gpsModelo === 'Modelo A') && (
+                          <div style={{
+                            backgroundColor: 'white',
+                            padding: '0.85rem',
+                            borderRadius: '8px',
+                            border: '1px solid #E2E8F0',
+                            display: 'flex',
+                            flexDirection: 'column'
+                          }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.5rem' }}>
+                              <FaMicrochip size={13} style={{ color: '#691B31' }} />
+                              <span>Componente físico: <span style={{ color: '#DC2626' }}>*</span></span>
+                            </label>
+                            {modoVisualizacion ? (
+                              renderBadgeConsulta(controladorForm.gpsComponenteFisico)
+                            ) : (
+                              <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                                {['Operativo', 'Dañado'].map((opcion) => (
+                                  <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.gpsComponenteFisico === opcion ? '700' : '500', color: '#1E293B' }}>
+                                    <input
+                                      type="radio"
+                                      name="gpsComponenteFisico"
+                                      value={opcion}
+                                      checked={controladorForm.gpsComponenteFisico === opcion}
+                                      onChange={(e) => setControladorForm({ ...controladorForm, gpsComponenteFisico: e.target.value })}
+                                      style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                    />
+                                    {opcion}
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Antena Exterior: Se muestra en ambos modelos */}
+                        <div style={{
+                          backgroundColor: 'white',
+                          padding: '0.85rem',
+                          borderRadius: '8px',
+                          border: '1px solid #E2E8F0',
+                          display: 'flex',
+                          flexDirection: 'column'
+                        }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.5rem' }}>
+                            <FaBroadcastTower size={13} style={{ color: '#691B31' }} />
+                            <span>Antena exterior: <span style={{ color: '#DC2626' }}>*</span></span>
+                          </label>
+                          {modoVisualizacion ? (
+                            renderBadgeConsulta(controladorForm.gpsAntenaExterior)
+                          ) : (
+                            <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                              {['Instalada', 'Dañada'].map((opcion) => (
+                                <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.gpsAntenaExterior === opcion ? '700' : '500', color: '#1E293B' }}>
+                                  <input
+                                    type="radio"
+                                    name="gpsAntenaExterior"
+                                    value={opcion}
+                                    checked={controladorForm.gpsAntenaExterior === opcion}
+                                    onChange={(e) => setControladorForm({ ...controladorForm, gpsAntenaExterior: e.target.value })}
+                                    style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                  />
+                                  {opcion}
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* SECCIÓN 3: ELECTRÓNICA INTERNA (CPU) — RED Y CONFIGURACIÓN */}
+                  <div style={{
+                    marginBottom: '1.5rem',
+                    backgroundColor: '#F8FAFC',
+                    padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
+                    borderRadius: '10px',
+                    border: '1px solid #E2E8F0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderBottom: '1px solid #E2E8F0',
+                      paddingBottom: '0.5rem',
+                      marginBottom: '0.2rem'
+                    }}>
+                      <h4 style={{
+                        margin: 0,
+                        fontSize: '0.92rem',
+                        fontWeight: '800',
+                        color: '#691B31',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.45rem'
+                      }}>
+                        <FaNetworkWired size={14} style={{ color: '#BC955B' }} /> Sección 3: Gabinete, Red y Configuración
+                      </h4>
+                      <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
+                        Parámetros de CPU y conectividad
+                      </span>
+                    </div>
+
+                    <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem' }}>
+                      {/* Número de Gabinete */}
+                      <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
+                          <FaHdd size={13} style={{ color: '#691B31' }} />
+                          <span>Número de Gabinete (#): {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                        </label>
+                        {modoVisualizacion ? (
+                          renderDatoConsulta(controladorForm.numeroGabinete)
+                        ) : (
+                          <input
+                            type="text"
+                            placeholder="ej. GAB-01"
+                            value={controladorForm.numeroGabinete}
+                            onChange={(e) => setControladorForm({ ...controladorForm, numeroGabinete: e.target.value })}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem 0.75rem',
+                              border: '1px solid #CBD5E1',
+                              borderRadius: '6px',
+                              fontSize: '0.85rem',
+                              boxSizing: 'border-box',
+                              marginTop: 'auto'
+                            }}
+                          />
+                        )}
+                      </div>
+
+                      {/* Versión de Firmware */}
+                      <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
+                          <FaMicrochip size={13} style={{ color: '#691B31' }} />
+                          <span>Versión de Firmware: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                        </label>
+                        {modoVisualizacion ? (
+                          renderDatoConsulta(controladorForm.versionFirmware)
+                        ) : (
+                          <input
+                            type="text"
+                            placeholder="ej. v2.4.1"
+                            value={controladorForm.versionFirmware}
+                            onChange={(e) => setControladorForm({ ...controladorForm, versionFirmware: e.target.value })}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem 0.75rem',
+                              border: '1px solid #CBD5E1',
+                              borderRadius: '6px',
+                              fontSize: '0.85rem',
+                              boxSizing: 'border-box',
+                              marginTop: 'auto'
+                            }}
+                          />
+                        )}
+                      </div>
+
+                      {/* IP Local */}
+                      <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
+                          <FaNetworkWired size={13} style={{ color: '#691B31' }} />
+                          <span>IP Local: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                        </label>
+                        {modoVisualizacion ? (
+                          renderDatoConsulta(controladorForm.ipLocal, 'Sin registrar', true)
+                        ) : (
+                          <div>
+                            <input
+                              type="text"
+                              placeholder="ej. 192.168.1.100"
+                              value={controladorForm.ipLocal}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setControladorForm(prev => ({ ...prev, ipLocal: val }))
+                                if (controladorErrores.ipLocal) {
+                                  setControladorErrores(prev => ({ ...prev, ipLocal: undefined }))
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem 0.75rem',
+                                border: `1px solid ${controladorErrores.ipLocal ? '#DC2626' : '#CBD5E1'}`,
+                                backgroundColor: controladorErrores.ipLocal ? '#FEF2F2' : '#FFFFFF',
+                                borderRadius: '6px',
+                                fontSize: '0.85rem',
+                                boxSizing: 'border-box',
+                                marginTop: 'auto'
+                              }}
+                            />
+                            {controladorErrores.ipLocal && (
+                              <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                                <FaExclamationTriangle size={10} /> {controladorErrores.ipLocal}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* IP System */}
+                      <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
+                          <FaNetworkWired size={13} style={{ color: '#691B31' }} />
+                          <span>IP System: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                        </label>
+                        {modoVisualizacion ? (
+                          renderDatoConsulta(controladorForm.ipSystem, 'Sin registrar', true)
+                        ) : (
+                          <div>
+                            <input
+                              type="text"
+                              placeholder="ej. 10.0.0.1"
+                              value={controladorForm.ipSystem}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setControladorForm(prev => ({ ...prev, ipSystem: val }))
+                                if (controladorErrores.ipSystem) {
+                                  setControladorErrores(prev => ({ ...prev, ipSystem: undefined }))
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem 0.75rem',
+                                border: `1px solid ${controladorErrores.ipSystem ? '#DC2626' : '#CBD5E1'}`,
+                                backgroundColor: controladorErrores.ipSystem ? '#FEF2F2' : '#FFFFFF',
+                                borderRadius: '6px',
+                                fontSize: '0.85rem',
+                                boxSizing: 'border-box',
+                                marginTop: 'auto'
+                              }}
+                            />
+                            {controladorErrores.ipSystem && (
+                              <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                                <FaExclamationTriangle size={10} /> {controladorErrores.ipSystem}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Máscara de Red */}
+                      <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
+                          <FaNetworkWired size={13} style={{ color: '#691B31' }} />
+                          <span>Máscara de Red: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                        </label>
+                        {modoVisualizacion ? (
+                          renderDatoConsulta(controladorForm.mascaraRed, 'Sin registrar', true)
+                        ) : (
+                          <div>
+                            <input
+                              type="text"
+                              placeholder="ej. 255.255.255.0"
+                              value={controladorForm.mascaraRed}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setControladorForm(prev => ({ ...prev, mascaraRed: val }))
+                                if (controladorErrores.mascaraRed) {
+                                  setControladorErrores(prev => ({ ...prev, mascaraRed: undefined }))
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem 0.75rem',
+                                border: `1px solid ${controladorErrores.mascaraRed ? '#DC2626' : '#CBD5E1'}`,
+                                backgroundColor: controladorErrores.mascaraRed ? '#FEF2F2' : '#FFFFFF',
+                                borderRadius: '6px',
+                                fontSize: '0.85rem',
+                                boxSizing: 'border-box',
+                                marginTop: 'auto'
+                              }}
+                            />
+                            {controladorErrores.mascaraRed && (
+                              <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                                <FaExclamationTriangle size={10} /> {controladorErrores.mascaraRed}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Gateway */}
+                      <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
+                          <FaNetworkWired size={13} style={{ color: '#691B31' }} />
+                          <span>Gateway: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                        </label>
+                        {modoVisualizacion ? (
+                          renderDatoConsulta(controladorForm.gateway, 'Sin registrar', true)
+                        ) : (
+                          <div>
+                            <input
+                              type="text"
+                              placeholder="ej. 192.168.1.1"
+                              value={controladorForm.gateway}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setControladorForm(prev => ({ ...prev, gateway: val }))
+                                if (controladorErrores.gateway) {
+                                  setControladorErrores(prev => ({ ...prev, gateway: undefined }))
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem 0.75rem',
+                                border: `1px solid ${controladorErrores.gateway ? '#DC2626' : '#CBD5E1'}`,
+                                backgroundColor: controladorErrores.gateway ? '#FEF2F2' : '#FFFFFF',
+                                borderRadius: '6px',
+                                fontSize: '0.85rem',
+                                boxSizing: 'border-box',
+                                marginTop: 'auto'
+                              }}
+                            />
+                            {controladorErrores.gateway && (
+                              <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                                <FaExclamationTriangle size={10} /> {controladorErrores.gateway}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Ciclo completo */}
+                      <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
+                          <FaHistory size={13} style={{ color: '#691B31' }} />
+                          <span>Ciclo completo: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                        </label>
+                        {modoVisualizacion ? (
+                          renderDatoConsulta(controladorForm.cicloCompleto)
+                        ) : (
+                          <div>
+                            <input
+                              type="text"
+                              placeholder="ej. 90 segundos"
+                              value={controladorForm.cicloCompleto}
+                              onChange={(e) => {
+                                const val = e.target.value
+                                setControladorForm(prev => ({ ...prev, cicloCompleto: val }))
+                                if (controladorErrores.cicloCompleto) {
+                                  setControladorErrores(prev => ({ ...prev, cicloCompleto: undefined }))
+                                }
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem 0.75rem',
+                                border: `1px solid ${controladorErrores.cicloCompleto ? '#DC2626' : '#CBD5E1'}`,
+                                backgroundColor: controladorErrores.cicloCompleto ? '#FEF2F2' : '#FFFFFF',
+                                borderRadius: '6px',
+                                fontSize: '0.85rem',
+                                boxSizing: 'border-box',
+                                marginTop: 'auto'
+                              }}
+                            />
+                            {controladorErrores.cicloCompleto && (
+                              <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                                <FaExclamationTriangle size={10} /> {controladorErrores.cicloCompleto}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Respaldo de programación descargado (USB) */}
+                      <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
+                          <FaUpload size={13} style={{ color: '#691B31' }} />
+                          <span>Respaldo de programación descargado (USB / .zip): {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                        </label>
+
+                        {modoVisualizacion ? (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.45rem 0.75rem', backgroundColor: '#F8FAFC', borderRadius: '6px', border: '1px solid #E2E8F0', marginTop: 'auto', minHeight: '38px', pointerEvents: 'auto' }}>
+                            {(archivoProgramacion || controladorParaVer?.archivoProgramacion || controladorForm.respaldoProgramacionUsb) ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', justifyContent: 'space-between', pointerEvents: 'auto' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                  <FaFileArchive size={16} color="#059669" />
+                                  <span style={{ fontSize: '0.82rem', color: '#065F46', fontWeight: '700' }}>
+                                    {(() => {
+                                      const target = archivoProgramacion || controladorParaVer?.archivoProgramacion || controladorForm.respaldoProgramacionUsb
+                                      if (typeof target === 'string') return target.split('/').pop()
+                                      if (target && target.name) return target.name
+                                      return 'archivo_programacion.zip'
+                                    })()}
+                                  </span>
+                                </div>
+                                {(editandoControladorId || controladorParaVer?.id) && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      const idDestino = editandoControladorId || controladorParaVer?.id
+                                      const archivoDestino = archivoProgramacion || controladorParaVer?.archivoProgramacion || controladorForm.respaldoProgramacionUsb
+                                      descargarRespaldoProgramacion(idDestino, archivoDestino)
+                                    }}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: '#E0F2FE', border: '1px solid #BAE6FD', color: '#0369A1', borderRadius: '4px', padding: '0.25rem 0.6rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: '700', pointerEvents: 'auto', zIndex: 10 }}
+                                  >
+                                    <FaDownload size={11} /> Descargar
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ color: '#94A3B8', fontSize: '0.82rem', fontStyle: 'italic', fontWeight: '500' }}>
+                                Sin respaldo cargado
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <div
+                              title="Haz clic o arrastra un archivo de respaldo (.zip, .cfg, .bin, .dat, .rar)"
+                              onClick={() => archivoProgramacionInputRef.current?.click()}
+                              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                              onDrop={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                  const file = e.dataTransfer.files[0]
+                                  setArchivoProgramacion(file)
+                                  setControladorForm(prev => ({ ...prev, respaldoProgramacionUsb: file.name }))
+                                }
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.5rem',
+                                minHeight: '38px',
+                                border: archivoProgramacion ? '1px solid #10B981' : '1px dashed #CBD5E1',
+                                borderRadius: '6px',
+                                backgroundColor: archivoProgramacion ? '#F0FDF4' : '#F8FAFC',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                padding: '0.35rem 0.75rem',
+                                boxSizing: 'border-box',
+                                marginTop: 'auto'
+                              }}
+                              onMouseOver={(e) => { if (!archivoProgramacion) e.currentTarget.style.borderColor = '#BC955B' }}
+                              onMouseOut={(e) => { if (!archivoProgramacion) e.currentTarget.style.borderColor = '#CBD5E1' }}
+                            >
+                              {archivoProgramacion ? (
+                                <>
+                                  {String(typeof archivoProgramacion === 'string' ? archivoProgramacion : archivoProgramacion.name).toLowerCase().endsWith('.zip') ? (
+                                    <FaFileArchive size={18} color="#059669" />
+                                  ) : (
+                                    <FaUpload size={18} color="#10B981" />
+                                  )}
+                                  <span style={{ fontSize: '0.82rem', color: '#065F46', fontWeight: '600', maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {typeof archivoProgramacion === 'string' ? archivoProgramacion.split('/').pop() : archivoProgramacion.name}
+                                  </span>
+                                  {archivoProgramacion instanceof File && (
+                                    <span style={{ fontSize: '0.72rem', color: '#047857', fontWeight: '500' }}>
+                                      ({archivoProgramacion.size > 1024 * 1024 ? `${(archivoProgramacion.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(archivoProgramacion.size / 1024)} KB`})
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  <FaUpload size={18} color="#BC955B" />
+                                  <span style={{ fontSize: '0.8rem', color: '#64748B' }}>Subir archivo (.zip, .cfg, .bin, .dat)</span>
+                                </>
+                              )}
+                              <input
+                                ref={archivoProgramacionInputRef}
+                                type="file"
+                                accept=".zip,.rar,.7z,.cfg,.bin,.dat,.txt,.tar,.gz,application/zip,application/x-zip-compressed,multipart/x-zip"
+                                style={{ display: 'none' }}
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    const file = e.target.files[0]
+                                    setArchivoProgramacion(file)
+                                    setControladorForm(prev => ({ ...prev, respaldoProgramacionUsb: file.name }))
+                                  }
+                                }}
+                              />
+                            </div>
+
+                            {archivoProgramacion && (
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.35rem' }}>
+                                {typeof archivoProgramacion === 'string' && editandoControladorId && (
+                                  <button
+                                    type="button"
+                                    onClick={() => descargarRespaldoProgramacion(editandoControladorId, archivoProgramacion)}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: 'none', border: 'none', color: '#0284C7', fontSize: '0.75rem', cursor: 'pointer', fontWeight: '600', pointerEvents: 'auto' }}
+                                  >
+                                    <FaDownload size={11} /> Descargar
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setArchivoProgramacion(null)
+                                    setControladorForm(prev => ({ ...prev, respaldoProgramacionUsb: '' }))
+                                    if (archivoProgramacionInputRef.current) archivoProgramacionInputRef.current.value = ''
+                                  }}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: 'none', border: 'none', color: '#EF4444', fontSize: '0.75rem', cursor: 'pointer', fontWeight: '600' }}
+                                >
+                                  <FaTimes size={11} /> Quitar
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+
+                      {/* Tarjeta de Conflictos */}
+                      <div style={{
+                        gridColumn: '1 / -1',
+                        backgroundColor: 'white',
+                        padding: '0.9rem',
+                        borderRadius: '8px',
+                        border: '1px solid #E2E8F0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.75rem'
+                      }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#691B31', textTransform: 'uppercase', letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <FaExclamationTriangle size={13} style={{ color: '#BC955B' }} /> Tarjeta de Conflictos
+                        </span>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
+                          {/* 1. Marca */}
+                          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                              <FaExclamationTriangle size={12} style={{ color: '#691B31' }} />
+                              <span>Marca: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                            </label>
+                            {modoVisualizacion ? (
+                              renderDatoConsulta(controladorForm.tarjetaConflictosMarca || (controladorForm.modelo === 'C-5000' ? 'Oriux (Peek Traffic)' : 'Peek Traffic'))
+                            ) : (
+                              <>
+                                <select
+                                  value={controladorForm.tarjetaConflictosMarcaModo || (controladorForm.modelo === 'C-5000' ? 'Oriux (Peek Traffic)' : 'Peek Traffic')}
+                                  onChange={(e) => {
+                                    const val = e.target.value
+                                    if (val === 'Peek Traffic') {
+                                      setControladorForm(prev => ({
+                                        ...prev,
+                                        tarjetaConflictosMarcaModo: 'Peek Traffic',
+                                        tarjetaConflictosMarca: 'Peek Traffic',
+                                        tarjetaConflictosModelo: prev.tarjetaConflictosModelo && MODELOS_TARJETA_CONFLICTOS_PEEK.includes(prev.tarjetaConflictosModelo) ? prev.tarjetaConflictosModelo : 'Model 2010E'
+                                      }))
+                                    } else if (val === 'Oriux (Peek Traffic)') {
+                                      setControladorForm(prev => ({
+                                        ...prev,
+                                        tarjetaConflictosMarcaModo: 'Oriux (Peek Traffic)',
+                                        tarjetaConflictosMarca: 'Oriux (Peek Traffic)',
+                                        tarjetaConflictosModelo: 'C5000 MMU Integrado'
+                                      }))
+                                    } else if (val === 'Otro') {
+                                      setControladorForm(prev => ({
+                                        ...prev,
+                                        tarjetaConflictosMarcaModo: 'Otro',
+                                        tarjetaConflictosMarca: prev.tarjetaConflictosMarca && prev.tarjetaConflictosMarca !== 'Peek Traffic' && prev.tarjetaConflictosMarca !== 'Oriux (Peek Traffic)' ? prev.tarjetaConflictosMarca : '',
+                                        tarjetaConflictosModelo: ''
+                                      }))
+                                    }
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '0.5rem 0.65rem',
+                                    border: '1px solid #CBD5E1',
+                                    borderRadius: '6px',
+                                    fontSize: '0.85rem',
+                                    boxSizing: 'border-box',
+                                    backgroundColor: 'white',
+                                    color: '#1E293B',
+                                    cursor: 'pointer',
+                                    marginTop: 'auto'
+                                  }}
+                                >
+                                  {controladorForm.modelo === 'C-5000' || controladorForm.tarjetaConflictosMarcaModo === 'Oriux (Peek Traffic)' ? (
+                                    <option value="Oriux (Peek Traffic)">Oriux (Peek Traffic)</option>
+                                  ) : (
+                                    <option value="Peek Traffic">Peek Traffic</option>
+                                  )}
+                                  <option value="Otro">Otro (especificar)</option>
+                                </select>
+                                {controladorForm.tarjetaConflictosMarcaModo === 'Otro' && (
+                                  <input
+                                    type="text"
+                                    placeholder="Especificar otra marca..."
+                                    value={controladorForm.tarjetaConflictosMarca || ''}
+                                    onChange={(e) => setControladorForm({ ...controladorForm, tarjetaConflictosMarca: e.target.value })}
+                                    style={{
+                                      width: '100%',
+                                      padding: '0.45rem 0.65rem',
+                                      border: '1px solid #CBD5E1',
+                                      borderRadius: '6px',
+                                      fontSize: '0.82rem',
+                                      boxSizing: 'border-box',
+                                      marginTop: '0.4rem'
+                                    }}
+                                  />
+                                )}
+                              </>
+                            )}
+                          </div>
+
+                          {/* 2. Modelo */}
+                          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                              <FaExclamationTriangle size={12} style={{ color: '#691B31' }} />
+                              <span>Modelo: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                            </label>
+                            {modoVisualizacion ? (
+                              renderDatoConsulta(controladorForm.tarjetaConflictosModelo, 'Sin modelo especificado')
+                            ) : controladorForm.tarjetaConflictosMarcaModo === 'Otro' ? (
+                              <input
+                                type="text"
+                                placeholder="Especificar modelo de tarjeta..."
+                                value={controladorForm.tarjetaConflictosModelo || ''}
+                                onChange={(e) => setControladorForm({ ...controladorForm, tarjetaConflictosModelo: e.target.value })}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem 0.65rem',
+                                  border: '1px solid #CBD5E1',
+                                  borderRadius: '6px',
+                                  fontSize: '0.85rem',
+                                  boxSizing: 'border-box',
+                                  marginTop: 'auto'
+                                }}
+                              />
+                            ) : (
+                              <select
+                                value={controladorForm.tarjetaConflictosModelo || ''}
+                                onChange={(e) => setControladorForm({ ...controladorForm, tarjetaConflictosModelo: e.target.value })}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem 0.65rem',
+                                  border: '1px solid #CBD5E1',
+                                  borderRadius: '6px',
+                                  fontSize: '0.85rem',
+                                  boxSizing: 'border-box',
+                                  backgroundColor: 'white',
+                                  color: '#1E293B',
+                                  cursor: 'pointer',
+                                  marginTop: 'auto'
+                                }}
+                              >
+                                <option value="">-- Seleccionar modelo --</option>
+                                {(controladorForm.modelo === 'C-5000' || controladorForm.tarjetaConflictosMarcaModo === 'Oriux (Peek Traffic)'
+                                  ? MODELOS_TARJETA_CONFLICTOS_C5000
+                                  : MODELOS_TARJETA_CONFLICTOS_PEEK
+                                ).map((modelo) => (
+                                  <option key={modelo} value={modelo}>{modelo}</option>
+                                ))}
+                                {controladorForm.tarjetaConflictosModelo &&
+                                  !MODELOS_TARJETA_CONFLICTOS_PEEK.includes(controladorForm.tarjetaConflictosModelo) &&
+                                  !MODELOS_TARJETA_CONFLICTOS_C5000.includes(controladorForm.tarjetaConflictosModelo) && (
+                                    <option value={controladorForm.tarjetaConflictosModelo}>{controladorForm.tarjetaConflictosModelo}</option>
+                                  )}
+                              </select>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Estado de operación */}
+                        <div style={{ paddingTop: '0.4rem', borderTop: '1px solid #F1F5F9' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                            <FaExclamationTriangle size={12} style={{ color: '#691B31' }} />
+                            <span>Estado de operación: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                          </label>
+                          {modoVisualizacion ? (
+                            renderBadgeConsulta(controladorForm.tarjetaConflictosEstado)
+                          ) : (
+                            <div style={{ display: 'flex', gap: '1.75rem', alignItems: 'center' }}>
+                              {['Correcto', 'Falla'].map((opcion) => (
+                                <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.tarjetaConflictosEstado === opcion ? '700' : '500', color: '#1E293B' }}>
+                                  <input
+                                    type="radio"
+                                    name="tarjetaConflictosEstado"
+                                    value={opcion}
+                                    checked={controladorForm.tarjetaConflictosEstado === opcion}
+                                    onChange={(e) => setControladorForm({ ...controladorForm, tarjetaConflictosEstado: e.target.value })}
+                                    style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                  />
+                                  {opcion}
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Tarjetas de Relevadores */}
+                      <div style={{
+                        gridColumn: '1 / -1',
+                        backgroundColor: 'white',
+                        padding: '0.9rem',
+                        borderRadius: '8px',
+                        border: '1px solid #E2E8F0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.75rem'
+                      }}>
+                        <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#691B31', textTransform: 'uppercase', letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <FaCreditCard size={13} style={{ color: '#BC955B' }} /> Tarjetas de Relevadores
+                        </span>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
+                          {/* 1. Marca */}
+                          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                              <FaCreditCard size={12} style={{ color: '#691B31' }} />
+                              <span>Marca: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                            </label>
+                            {modoVisualizacion ? (
+                              renderDatoConsulta(controladorForm.tarjetaRelevadoresMarca || (controladorForm.modelo === 'C-5000' ? 'Oriux' : 'Peek Traffic'))
+                            ) : (
+                              <>
+                                <select
+                                  value={controladorForm.tarjetaRelevadoresMarcaModo || (controladorForm.modelo === 'C-5000' ? 'Oriux' : 'Peek Traffic')}
+                                  onChange={(e) => {
+                                    const val = e.target.value
+                                    if (val === 'Peek Traffic') {
+                                      setControladorForm(prev => ({
+                                        ...prev,
+                                        tarjetaRelevadoresMarcaModo: 'Peek Traffic',
+                                        tarjetaRelevadoresMarca: 'Peek Traffic',
+                                        tarjetaRelevadoresModelo: MODELOS_RELEVADORES_PEEK.includes(prev.tarjetaRelevadoresModelo) ? prev.tarjetaRelevadoresModelo : 'RC-308',
+                                        tarjetaRelevadora: true
+                                      }))
+                                    } else if (val === 'SEMEX') {
+                                      setControladorForm(prev => ({
+                                        ...prev,
+                                        tarjetaRelevadoresMarcaModo: 'SEMEX',
+                                        tarjetaRelevadoresMarca: 'SEMEX',
+                                        tarjetaRelevadoresModelo: MODELOS_RELEVADORES_SEMEX.includes(prev.tarjetaRelevadoresModelo) ? prev.tarjetaRelevadoresModelo : 'SEMEX SG-16',
+                                        tarjetaRelevadora: true
+                                      }))
+                                    } else if (val === 'Oriux') {
+                                      setControladorForm(prev => ({
+                                        ...prev,
+                                        tarjetaRelevadoresMarcaModo: 'Oriux',
+                                        tarjetaRelevadoresMarca: 'Oriux',
+                                        tarjetaRelevadoresModelo: 'C5000 Card-Based Load Switch',
+                                        tarjetaRelevadora: true
+                                      }))
+                                    } else if (val === 'Otro') {
+                                      setControladorForm(prev => ({
+                                        ...prev,
+                                        tarjetaRelevadoresMarcaModo: 'Otro',
+                                        tarjetaRelevadoresMarca: (prev.tarjetaRelevadoresMarca && !['Peek Traffic', 'SEMEX', 'Oriux'].includes(prev.tarjetaRelevadoresMarca)) ? prev.tarjetaRelevadoresMarca : '',
+                                        tarjetaRelevadoresModelo: '',
+                                        tarjetaRelevadora: true
+                                      }))
+                                    }
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '0.5rem 0.65rem',
+                                    border: '1px solid #CBD5E1',
+                                    borderRadius: '6px',
+                                    fontSize: '0.85rem',
+                                    boxSizing: 'border-box',
+                                    backgroundColor: 'white',
+                                    color: '#1E293B',
+                                    cursor: 'pointer',
+                                    marginTop: 'auto'
+                                  }}
+                                >
+                                  <option value="Peek Traffic">Peek Traffic</option>
+                                  <option value="SEMEX">SEMEX</option>
+                                  <option value="Oriux">Oriux</option>
+                                  <option value="Otro">Otro (especificar)</option>
+                                </select>
+                                {controladorForm.tarjetaRelevadoresMarcaModo === 'Otro' && (
+                                  <input
+                                    type="text"
+                                    placeholder="Especificar otra marca..."
+                                    value={controladorForm.tarjetaRelevadoresMarca || ''}
+                                    onChange={(e) => setControladorForm(prev => ({ ...prev, tarjetaRelevadoresMarca: e.target.value, tarjetaRelevadora: true }))}
+                                    style={{
+                                      width: '100%',
+                                      padding: '0.45rem 0.65rem',
+                                      border: '1px solid #CBD5E1',
+                                      borderRadius: '6px',
+                                      fontSize: '0.82rem',
+                                      boxSizing: 'border-box',
+                                      marginTop: '0.4rem'
+                                    }}
+                                  />
+                                )}
+                              </>
+                            )}
+                          </div>
+
+                          {/* 2. Modelo */}
+                          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                              <FaCreditCard size={12} style={{ color: '#691B31' }} />
+                              <span>Modelo: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                            </label>
+                            {modoVisualizacion ? (
+                              renderDatoConsulta(controladorForm.tarjetaRelevadoresModelo, 'Sin modelo especificado')
+                            ) : controladorForm.tarjetaRelevadoresMarcaModo === 'Otro' ? (
+                              <input
+                                type="text"
+                                placeholder="Especificar modelo de relevador..."
+                                value={controladorForm.tarjetaRelevadoresModelo || ''}
+                                onChange={(e) => setControladorForm(prev => ({ ...prev, tarjetaRelevadoresModelo: e.target.value, tarjetaRelevadora: true }))}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem 0.65rem',
+                                  border: '1px solid #CBD5E1',
+                                  borderRadius: '6px',
+                                  fontSize: '0.85rem',
+                                  boxSizing: 'border-box',
+                                  marginTop: 'auto'
+                                }}
+                              />
+                            ) : (
+                              <select
+                                value={controladorForm.tarjetaRelevadoresModelo || ''}
+                                onChange={(e) => setControladorForm(prev => ({ ...prev, tarjetaRelevadoresModelo: e.target.value, tarjetaRelevadora: true }))}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem 0.65rem',
+                                  border: '1px solid #CBD5E1',
+                                  borderRadius: '6px',
+                                  fontSize: '0.85rem',
+                                  boxSizing: 'border-box',
+                                  backgroundColor: 'white',
+                                  color: '#1E293B',
+                                  cursor: 'pointer',
+                                  marginTop: 'auto'
+                                }}
+                              >
+                                <option value="">-- Seleccionar modelo --</option>
+                                {(controladorForm.tarjetaRelevadoresMarcaModo === 'Peek Traffic'
+                                  ? MODELOS_RELEVADORES_PEEK
+                                  : (controladorForm.modelo === 'C-5000' || controladorForm.tarjetaRelevadoresMarcaModo === 'Oriux')
+                                    ? MODELOS_RELEVADORES_C5000
+                                    : MODELOS_RELEVADORES_SEMEX
+                                ).map((modelo) => (
+                                  <option key={modelo} value={modelo}>{modelo}</option>
+                                ))}
+                                {controladorForm.tarjetaRelevadoresModelo &&
+                                  !MODELOS_RELEVADORES_PEEK.includes(controladorForm.tarjetaRelevadoresModelo) &&
+                                  !MODELOS_RELEVADORES_SEMEX.includes(controladorForm.tarjetaRelevadoresModelo) &&
+                                  !MODELOS_RELEVADORES_C5000.includes(controladorForm.tarjetaRelevadoresModelo) && (
+                                    <option value={controladorForm.tarjetaRelevadoresModelo}>{controladorForm.tarjetaRelevadoresModelo}</option>
+                                  )}
+                              </select>
+                            )}
+                          </div>
+
+                          {/* 3. Cantidad instalada */}
+                          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                              <FaBoxes size={12} style={{ color: '#691B31' }} />
+                              <span>Cantidad instalada: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                            </label>
+                            {modoVisualizacion ? (
+                              renderDatoConsulta(controladorForm.tarjetaRelevadoresCantidad, 'Sin registrar')
+                            ) : (
+                              <div>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  placeholder="ej. 8 o 16 piezas"
+                                  value={controladorForm.tarjetaRelevadoresCantidad || ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value
+                                    setControladorForm(prev => ({ ...prev, tarjetaRelevadoresCantidad: val, tarjetaRelevadora: true }))
+                                    if (controladorErrores.tarjetaRelevadoresCantidad) {
+                                      setControladorErrores(prev => ({ ...prev, tarjetaRelevadoresCantidad: undefined }))
+                                    }
+                                  }}
+                                  onWheel={(e) => e.target.blur()}
+                                  style={{
+                                    width: '100%',
+                                    padding: '0.5rem 0.65rem',
+                                    border: `1px solid ${controladorErrores.tarjetaRelevadoresCantidad ? '#DC2626' : '#CBD5E1'}`,
+                                    backgroundColor: controladorErrores.tarjetaRelevadoresCantidad ? '#FEF2F2' : '#FFFFFF',
+                                    borderRadius: '6px',
+                                    fontSize: '0.85rem',
+                                    boxSizing: 'border-box',
+                                    marginTop: 'auto'
+                                  }}
+                                />
+                                {controladorErrores.tarjetaRelevadoresCantidad && (
+                                  <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                                    <FaExclamationTriangle size={10} /> {controladorErrores.tarjetaRelevadoresCantidad}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SECCIÓN C: RED, CONECTIVIDAD Y ENERGÍA */}
+                  <div style={{
+                    marginBottom: '1.5rem',
+                    backgroundColor: '#F8FAFC',
+                    padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
+                    borderRadius: '10px',
+                    border: '1px solid #E2E8F0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderBottom: '1px solid #E2E8F0',
+                      paddingBottom: '0.5rem',
+                      marginBottom: '0.2rem'
+                    }}>
+                      <h4 style={{
+                        margin: 0,
+                        fontSize: '0.92rem',
+                        fontWeight: '800',
+                        color: '#691B31',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.45rem'
+                      }}>
+                        <FaProjectDiagram size={14} style={{ color: '#BC955B' }} /> Sección 4: Red, Conectividad y Energía
+                      </h4>
+                      <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
+                        Switch de fibra, conexiones y alimentación
+                      </span>
+                    </div>
+
+                    {/* 1. Switch de Fibra */}
+                    <div style={{ backgroundColor: 'white', padding: '0.9rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#691B31', textTransform: 'uppercase', letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <FaProjectDiagram size={13} style={{ color: '#BC955B' }} /> Switch de Fibra
+                      </span>
+
+                      {/* Fila 1 y 2: Marca, Modelo, Total de puertos y Puertos en uso */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
+                        {/* 1. Marca */}
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                            <FaProjectDiagram size={12} style={{ color: '#691B31' }} />
+                            <span>Marca: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                          </label>
+                          {modoVisualizacion ? (
+                            renderDatoConsulta(controladorForm.switchFibraMarca || (controladorForm.modelo === 'C-5000' ? 'Oriux' : 'Moxa'))
+                          ) : (
+                            <>
+                              <select
+                                value={controladorForm.switchFibraMarcaModo || (controladorForm.modelo === 'C-5000' ? 'Oriux' : 'Moxa')}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  if (val === 'Moxa') {
+                                    setControladorForm(prev => {
+                                      const switchMod = prev.switchFibraModelo && MODELOS_SWITCH_MOXA_CATALOGO.some(m => m.modelo === prev.switchFibraModelo) ? prev.switchFibraModelo : 'Moxa EDS-208 / 308'
+                                      const switchObj = MODELOS_SWITCH_MOXA_CATALOGO.find(m => m.modelo === switchMod)
+                                      const newTotal = switchObj ? parseInt(switchObj.puertos, 10) : 8
+                                      const prevUso = parseInt(prev.switchFibraPuertosUso, 10)
+                                      const nuevoUso = (!isNaN(prevUso) && prevUso > newTotal) ? String(newTotal) : prev.switchFibraPuertosUso
+                                      return {
+                                        ...prev,
+                                        switchFibraMarcaModo: 'Moxa',
+                                        switchFibraMarca: 'Moxa',
+                                        switchFibraModelo: switchMod,
+                                        switchFibraPuertosTotal: switchObj ? switchObj.puertos : '8',
+                                        switchFibraPuertosUso: nuevoUso,
+                                        switch: true
+                                      }
+                                    })
+                                    setControladorErrores(prev => ({ ...prev, switchFibraPuertosTotal: undefined, switchFibraPuertosUso: undefined }))
+                                  } else if (val === 'Oriux') {
+                                    setControladorForm(prev => {
+                                      const newTotal = 2
+                                      const prevUso = parseInt(prev.switchFibraPuertosUso, 10)
+                                      const nuevoUso = (!isNaN(prevUso) && prevUso > newTotal) ? String(newTotal) : prev.switchFibraPuertosUso
+                                      return {
+                                        ...prev,
+                                        switchFibraMarcaModo: 'Oriux',
+                                        switchFibraMarca: 'Oriux',
+                                        switchFibraModelo: 'C5000 ATC CPU Ports',
+                                        switchFibraPuertosTotal: '2',
+                                        switchFibraPuertosUso: nuevoUso,
+                                        switch: true
+                                      }
+                                    })
+                                    setControladorErrores(prev => ({ ...prev, switchFibraPuertosTotal: undefined, switchFibraPuertosUso: undefined }))
+                                  } else if (val === 'Otro') {
+                                    setControladorForm(prev => ({
+                                      ...prev,
+                                      switchFibraMarcaModo: 'Otro',
+                                      switchFibraMarca: (prev.switchFibraMarca && prev.switchFibraMarca !== 'Moxa' && prev.switchFibraMarca !== 'Oriux') ? prev.switchFibraMarca : '',
+                                      switchFibraModelo: '',
+                                      switchFibraPuertosTotal: '',
+                                      switch: true
+                                    }))
+                                    setControladorErrores(prev => ({ ...prev, switchFibraPuertosTotal: undefined, switchFibraPuertosUso: undefined }))
+                                  }
+                                }}
+                                style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', backgroundColor: 'white', color: '#1E293B', cursor: 'pointer', marginTop: 'auto' }}
+                              >
+                                {controladorForm.modelo === 'C-5000' || controladorForm.switchFibraMarcaModo === 'Oriux' ? (
+                                  <option value="Oriux">Oriux</option>
+                                ) : (
+                                  <option value="Moxa">Moxa</option>
+                                )}
+                                <option value="Otro">Otro (especificar)</option>
+                              </select>
+                              {controladorForm.switchFibraMarcaModo === 'Otro' && (
+                                <input
+                                  type="text"
+                                  placeholder="Especificar marca (ej. Cisco, RuggedCom)..."
+                                  value={controladorForm.switchFibraMarca || ''}
+                                  onChange={(e) => setControladorForm({ ...controladorForm, switchFibraMarca: e.target.value, switch: true })}
+                                  style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.82rem', boxSizing: 'border-box', marginTop: '0.4rem' }}
+                                />
+                              )}
+                            </>
+                          )}
+                        </div>
+
+                        {/* 2. Modelo */}
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                            <FaHdd size={12} style={{ color: '#691B31' }} />
+                            <span>Modelo: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                          </label>
+                          {modoVisualizacion ? (
+                            renderDatoConsulta(controladorForm.switchFibraModelo, 'Sin modelo especificado')
+                          ) : controladorForm.switchFibraMarcaModo === 'Otro' ? (
+                            <input
+                              type="text"
+                              placeholder="Especificar modelo de switch..."
+                              value={controladorForm.switchFibraModelo || ''}
+                              onChange={(e) => setControladorForm({ ...controladorForm, switchFibraModelo: e.target.value, switch: true })}
+                              style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', marginTop: 'auto' }}
+                            />
+                          ) : (
+                            <select
+                              value={controladorForm.switchFibraModelo || ''}
+                              onChange={(e) => {
+                                const mod = e.target.value
+                                const catalogo = (controladorForm.modelo === 'C-5000' || controladorForm.switchFibraMarcaModo === 'Oriux')
+                                  ? MODELOS_SWITCH_ORIUX_CATALOGO
+                                  : MODELOS_SWITCH_MOXA_CATALOGO
+                                const found = catalogo.find(m => m.modelo === mod)
+                                const newTotal = found ? parseInt(found.puertos, 10) : undefined
+                                setControladorForm(prev => {
+                                  const prevUso = parseInt(prev.switchFibraPuertosUso, 10)
+                                  let nuevoUso = prev.switchFibraPuertosUso
+                                  if (newTotal !== undefined && !isNaN(prevUso) && prevUso > newTotal) {
+                                    nuevoUso = String(newTotal)
+                                  }
+                                  return {
+                                    ...prev,
+                                    switchFibraModelo: mod,
+                                    switchFibraPuertosTotal: found ? found.puertos : prev.switchFibraPuertosTotal,
+                                    switchFibraPuertosUso: nuevoUso,
+                                    switch: true
+                                  }
+                                })
+                                setControladorErrores(prev => ({ ...prev, switchFibraPuertosTotal: undefined, switchFibraPuertosUso: undefined }))
+                              }}
+                              style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', backgroundColor: 'white', color: '#1E293B', cursor: 'pointer', marginTop: 'auto' }}
+                            >
+                              <option value="">-- Seleccionar modelo --</option>
+                              {(controladorForm.modelo === 'C-5000' || controladorForm.switchFibraMarcaModo === 'Oriux'
+                                ? MODELOS_SWITCH_ORIUX_CATALOGO
+                                : MODELOS_SWITCH_MOXA_CATALOGO
+                              ).map((item) => (
+                                <option key={item.modelo} value={item.modelo}>{item.modelo}</option>
+                              ))}
+                              {controladorForm.switchFibraModelo &&
+                                !MODELOS_SWITCH_MOXA_CATALOGO.some(m => m.modelo === controladorForm.switchFibraModelo) &&
+                                !MODELOS_SWITCH_ORIUX_CATALOGO.some(m => m.modelo === controladorForm.switchFibraModelo) && (
+                                  <option value={controladorForm.switchFibraModelo}>{controladorForm.switchFibraModelo}</option>
+                                )}
+                            </select>
+                          )}
+                        </div>
+
+                        {/* 3. Total de puertos */}
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                            <FaNetworkWired size={12} style={{ color: '#691B31' }} />
+                            <span>Total de puertos: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                          </label>
+                          {modoVisualizacion ? (
+                            renderDatoConsulta(controladorForm.switchFibraPuertosTotal ? `${controladorForm.switchFibraPuertosTotal} puertos` : '', 'Sin registrar')
+                          ) : (
+                            <div>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="ej. 2, 8 o 10 puertos"
+                                value={controladorForm.switchFibraPuertosTotal || ''}
+                                onChange={(e) => handleCambiarSwitchPuertosTotal(e.target.value)}
+                                onWheel={(e) => e.target.blur()}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem 0.65rem',
+                                  border: `1px solid ${controladorErrores.switchFibraPuertosTotal ? '#DC2626' : '#CBD5E1'}`,
+                                  backgroundColor: controladorErrores.switchFibraPuertosTotal ? '#FEF2F2' : '#FFFFFF',
+                                  borderRadius: '6px',
+                                  fontSize: '0.85rem',
+                                  boxSizing: 'border-box',
+                                  marginTop: 'auto'
+                                }}
+                              />
+                              {controladorErrores.switchFibraPuertosTotal && (
+                                <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                                  <FaExclamationTriangle size={10} /> {controladorErrores.switchFibraPuertosTotal}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 4. Puertos en uso */}
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                            <FaNetworkWired size={12} style={{ color: '#691B31' }} />
+                            <span>Puertos en uso: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                          </label>
+                          {modoVisualizacion ? (
+                            renderDatoConsulta(controladorForm.switchFibraPuertosUso ? `${controladorForm.switchFibraPuertosUso} puertos` : '', 'Sin registrar')
+                          ) : (
+                            <div>
+                              <input
+                                type="number"
+                                min="0"
+                                max={controladorForm.switchFibraPuertosTotal !== '' && !isNaN(parseInt(controladorForm.switchFibraPuertosTotal, 10)) ? parseInt(controladorForm.switchFibraPuertosTotal, 10) : undefined}
+                                placeholder="ej. 4 puertos"
+                                value={controladorForm.switchFibraPuertosUso || ''}
+                                onChange={(e) => handleCambiarSwitchPuertosUso(e.target.value)}
+                                onWheel={(e) => e.target.blur()}
+                                style={{
+                                  width: '100%',
+                                  padding: '0.5rem 0.65rem',
+                                  border: `1px solid ${controladorErrores.switchFibraPuertosUso ? '#DC2626' : '#CBD5E1'}`,
+                                  backgroundColor: controladorErrores.switchFibraPuertosUso ? '#FEF2F2' : '#FFFFFF',
+                                  borderRadius: '6px',
+                                  fontSize: '0.85rem',
+                                  boxSizing: 'border-box',
+                                  marginTop: 'auto'
+                                }}
+                              />
+                              {controladorErrores.switchFibraPuertosUso && (
+                                <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                                  <FaExclamationTriangle size={10} /> {controladorErrores.switchFibraPuertosUso}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Fila 2: Fuentes de poder del switch */}
+                      <div style={{ paddingTop: '0.5rem', borderTop: '1px solid #F1F5F9' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                          <FaPowerOff size={12} style={{ color: '#691B31' }} />
+                          <span>Fuentes de poder del switch: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                        </label>
+                        {modoVisualizacion ? (
+                          renderBadgeConsulta(controladorForm.switchFibraFuentePoder)
+                        ) : (
+                          <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                            {['Operativa', 'Sin operar'].map((opcion) => (
+                              <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.switchFibraFuentePoder === opcion ? '700' : '500', color: '#1E293B' }}>
+                                <input
+                                  type="radio"
+                                  name="switchFibraFuentePoder"
+                                  value={opcion}
+                                  checked={controladorForm.switchFibraFuentePoder === opcion}
+                                  onChange={(e) => setControladorForm({ ...controladorForm, switchFibraFuentePoder: e.target.value, switch: true })}
                                   style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
                                 />
                                 {opcion}
@@ -6509,1478 +7766,612 @@ export default function InventarioSemaforos() {
                           </div>
                         )}
                       </div>
-                    )}
-
-                    {/* Antena Exterior: Se muestra en ambos modelos */}
-                    <div style={{
-                      backgroundColor: 'white',
-                      padding: '0.85rem',
-                      borderRadius: '8px',
-                      border: '1px solid #E2E8F0',
-                      display: 'flex',
-                      flexDirection: 'column'
-                    }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.5rem' }}>
-                        <FaBroadcastTower size={13} style={{ color: '#691B31' }} />
-                        <span>Antena exterior: <span style={{ color: '#DC2626' }}>*</span></span>
-                      </label>
-                      {modoVisualizacion ? (
-                        renderBadgeConsulta(controladorForm.gpsAntenaExterior)
-                      ) : (
-                        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                          {['Instalada', 'Dañada'].map((opcion) => (
-                            <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.88rem', fontWeight: controladorForm.gpsAntenaExterior === opcion ? '700' : '500', color: '#1E293B' }}>
-                              <input
-                                type="radio"
-                                name="gpsAntenaExterior"
-                                value={opcion}
-                                checked={controladorForm.gpsAntenaExterior === opcion}
-                                onChange={(e) => setControladorForm({ ...controladorForm, gpsAntenaExterior: e.target.value })}
-                                style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                              />
-                              {opcion}
-                            </label>
-                          ))}
-                        </div>
-                      )}
                     </div>
-                  </div>
-                )}
-              </div>
 
-              {/* SECCIÓN 3: ELECTRÓNICA INTERNA (CPU) — RED Y CONFIGURACIÓN */}
-              <div style={{
-                marginBottom: '1.5rem',
-                backgroundColor: '#F8FAFC',
-                padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
-                borderRadius: '10px',
-                border: '1px solid #E2E8F0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1rem',
-                boxSizing: 'border-box'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  borderBottom: '1px solid #E2E8F0',
-                  paddingBottom: '0.5rem',
-                  marginBottom: '0.2rem'
-                }}>
-                  <h4 style={{
-                    margin: 0,
-                    fontSize: '0.92rem',
-                    fontWeight: '800',
-                    color: '#691B31',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.45rem'
-                  }}>
-                    <FaNetworkWired size={14} style={{ color: '#BC955B' }} /> Sección 3: Gabinete, Red y Configuración
-                  </h4>
-                  <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
-                    Parámetros de CPU y conectividad
-                  </span>
-                </div>
+                    {/* 2. Receptor de Fibra */}
+                    <div style={{ backgroundColor: 'white', padding: '0.9rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#691B31', textTransform: 'uppercase', letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <FaProjectDiagram size={13} style={{ color: '#BC955B' }} /> Receptor de Fibra
+                      </span>
 
-                <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem' }}>
-                  {/* Número de Gabinete */}
-                  <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
-                      <FaHdd size={13} style={{ color: '#691B31' }} />
-                      <span>Número de Gabinete (#): {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                    </label>
-                    {modoVisualizacion ? (
-                      renderDatoConsulta(controladorForm.numeroGabinete)
-                    ) : (
-                      <input
-                        type="text"
-                        placeholder="ej. GAB-01"
-                        value={controladorForm.numeroGabinete}
-                        onChange={(e) => setControladorForm({ ...controladorForm, numeroGabinete: e.target.value })}
-                        style={{
-                          width: '100%',
-                          padding: '0.5rem 0.75rem',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '6px',
-                          fontSize: '0.85rem',
-                          boxSizing: 'border-box',
-                          marginTop: 'auto'
-                        }}
-                      />
-                    )}
-                  </div>
-
-                  {/* Versión de Firmware */}
-                  <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
-                      <FaMicrochip size={13} style={{ color: '#691B31' }} />
-                      <span>Versión de Firmware: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                    </label>
-                    {modoVisualizacion ? (
-                      renderDatoConsulta(controladorForm.versionFirmware)
-                    ) : (
-                      <input
-                        type="text"
-                        placeholder="ej. v2.4.1"
-                        value={controladorForm.versionFirmware}
-                        onChange={(e) => setControladorForm({ ...controladorForm, versionFirmware: e.target.value })}
-                        style={{
-                          width: '100%',
-                          padding: '0.5rem 0.75rem',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '6px',
-                          fontSize: '0.85rem',
-                          boxSizing: 'border-box',
-                          marginTop: 'auto'
-                        }}
-                      />
-                    )}
-                  </div>
-
-                  {/* IP Local */}
-                  <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
-                      <FaNetworkWired size={13} style={{ color: '#691B31' }} />
-                      <span>IP Local: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                    </label>
-                    {modoVisualizacion ? (
-                      renderDatoConsulta(controladorForm.ipLocal, 'Sin registrar', true)
-                    ) : (
-                      <div>
-                        <input
-                          type="text"
-                          placeholder="ej. 192.168.1.100"
-                          value={controladorForm.ipLocal}
-                          onChange={(e) => {
-                            const val = e.target.value
-                            setControladorForm(prev => ({ ...prev, ipLocal: val }))
-                            if (controladorErrores.ipLocal) {
-                              setControladorErrores(prev => ({ ...prev, ipLocal: undefined }))
-                            }
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem 0.75rem',
-                            border: `1px solid ${controladorErrores.ipLocal ? '#DC2626' : '#CBD5E1'}`,
-                            backgroundColor: controladorErrores.ipLocal ? '#FEF2F2' : '#FFFFFF',
-                            borderRadius: '6px',
-                            fontSize: '0.85rem',
-                            boxSizing: 'border-box',
-                            marginTop: 'auto'
-                          }}
-                        />
-                        {controladorErrores.ipLocal && (
-                          <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
-                            <FaExclamationTriangle size={10} /> {controladorErrores.ipLocal}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* IP System */}
-                  <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
-                      <FaNetworkWired size={13} style={{ color: '#691B31' }} />
-                      <span>IP System: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                    </label>
-                    {modoVisualizacion ? (
-                      renderDatoConsulta(controladorForm.ipSystem, 'Sin registrar', true)
-                    ) : (
-                      <div>
-                        <input
-                          type="text"
-                          placeholder="ej. 10.0.0.1"
-                          value={controladorForm.ipSystem}
-                          onChange={(e) => {
-                            const val = e.target.value
-                            setControladorForm(prev => ({ ...prev, ipSystem: val }))
-                            if (controladorErrores.ipSystem) {
-                              setControladorErrores(prev => ({ ...prev, ipSystem: undefined }))
-                            }
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem 0.75rem',
-                            border: `1px solid ${controladorErrores.ipSystem ? '#DC2626' : '#CBD5E1'}`,
-                            backgroundColor: controladorErrores.ipSystem ? '#FEF2F2' : '#FFFFFF',
-                            borderRadius: '6px',
-                            fontSize: '0.85rem',
-                            boxSizing: 'border-box',
-                            marginTop: 'auto'
-                          }}
-                        />
-                        {controladorErrores.ipSystem && (
-                          <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
-                            <FaExclamationTriangle size={10} /> {controladorErrores.ipSystem}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Máscara de Red */}
-                  <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
-                      <FaNetworkWired size={13} style={{ color: '#691B31' }} />
-                      <span>Máscara de Red: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                    </label>
-                    {modoVisualizacion ? (
-                      renderDatoConsulta(controladorForm.mascaraRed, 'Sin registrar', true)
-                    ) : (
-                      <div>
-                        <input
-                          type="text"
-                          placeholder="ej. 255.255.255.0"
-                          value={controladorForm.mascaraRed}
-                          onChange={(e) => {
-                            const val = e.target.value
-                            setControladorForm(prev => ({ ...prev, mascaraRed: val }))
-                            if (controladorErrores.mascaraRed) {
-                              setControladorErrores(prev => ({ ...prev, mascaraRed: undefined }))
-                            }
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem 0.75rem',
-                            border: `1px solid ${controladorErrores.mascaraRed ? '#DC2626' : '#CBD5E1'}`,
-                            backgroundColor: controladorErrores.mascaraRed ? '#FEF2F2' : '#FFFFFF',
-                            borderRadius: '6px',
-                            fontSize: '0.85rem',
-                            boxSizing: 'border-box',
-                            marginTop: 'auto'
-                          }}
-                        />
-                        {controladorErrores.mascaraRed && (
-                          <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
-                            <FaExclamationTriangle size={10} /> {controladorErrores.mascaraRed}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Gateway */}
-                  <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
-                      <FaNetworkWired size={13} style={{ color: '#691B31' }} />
-                      <span>Gateway: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                    </label>
-                    {modoVisualizacion ? (
-                      renderDatoConsulta(controladorForm.gateway, 'Sin registrar', true)
-                    ) : (
-                      <div>
-                        <input
-                          type="text"
-                          placeholder="ej. 192.168.1.1"
-                          value={controladorForm.gateway}
-                          onChange={(e) => {
-                            const val = e.target.value
-                            setControladorForm(prev => ({ ...prev, gateway: val }))
-                            if (controladorErrores.gateway) {
-                              setControladorErrores(prev => ({ ...prev, gateway: undefined }))
-                            }
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem 0.75rem',
-                            border: `1px solid ${controladorErrores.gateway ? '#DC2626' : '#CBD5E1'}`,
-                            backgroundColor: controladorErrores.gateway ? '#FEF2F2' : '#FFFFFF',
-                            borderRadius: '6px',
-                            fontSize: '0.85rem',
-                            boxSizing: 'border-box',
-                            marginTop: 'auto'
-                          }}
-                        />
-                        {controladorErrores.gateway && (
-                          <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
-                            <FaExclamationTriangle size={10} /> {controladorErrores.gateway}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Ciclo completo */}
-                  <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
-                      <FaHistory size={13} style={{ color: '#691B31' }} />
-                      <span>Ciclo completo: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                    </label>
-                    {modoVisualizacion ? (
-                      renderDatoConsulta(controladorForm.cicloCompleto)
-                    ) : (
-                      <div>
-                        <input
-                          type="text"
-                          placeholder="ej. 90 segundos"
-                          value={controladorForm.cicloCompleto}
-                          onChange={(e) => {
-                            const val = e.target.value
-                            setControladorForm(prev => ({ ...prev, cicloCompleto: val }))
-                            if (controladorErrores.cicloCompleto) {
-                              setControladorErrores(prev => ({ ...prev, cicloCompleto: undefined }))
-                            }
-                          }}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem 0.75rem',
-                            border: `1px solid ${controladorErrores.cicloCompleto ? '#DC2626' : '#CBD5E1'}`,
-                            backgroundColor: controladorErrores.cicloCompleto ? '#FEF2F2' : '#FFFFFF',
-                            borderRadius: '6px',
-                            fontSize: '0.85rem',
-                            boxSizing: 'border-box',
-                            marginTop: 'auto'
-                          }}
-                        />
-                        {controladorErrores.cicloCompleto && (
-                          <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
-                            <FaExclamationTriangle size={10} /> {controladorErrores.cicloCompleto}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Respaldo de programación descargado (USB) */}
-                  <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
-                      <FaUpload size={13} style={{ color: '#691B31' }} />
-                      <span>Respaldo de programación descargado (USB / .zip): {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                    </label>
-
-                    {modoVisualizacion ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.45rem 0.75rem', backgroundColor: '#F8FAFC', borderRadius: '6px', border: '1px solid #E2E8F0', marginTop: 'auto', minHeight: '38px' }}>
-                        {archivoProgramacion ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', justifyContent: 'space-between' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <FaFileArchive size={16} color="#059669" />
-                              <span style={{ fontSize: '0.82rem', color: '#065F46', fontWeight: '700' }}>
-                                {typeof archivoProgramacion === 'string' ? archivoProgramacion.split('/').pop() : archivoProgramacion.name}
-                              </span>
-                            </div>
-                            {typeof archivoProgramacion === 'string' && editandoControladorId && (
-                              <button
-                                type="button"
-                                onClick={() => window.open(`${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/descargar-programacion`, '_blank')}
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: '#E0F2FE', border: '1px solid #BAE6FD', color: '#0369A1', borderRadius: '4px', padding: '0.2rem 0.5rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: '700' }}
-                              >
-                                <FaDownload size={11} /> Descargar
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <span style={{ color: '#94A3B8', fontSize: '0.82rem', fontStyle: 'italic', fontWeight: '500' }}>
-                            Sin respaldo cargado
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        <div
-                          title="Haz clic o arrastra un archivo de respaldo (.zip, .cfg, .bin, .dat, .rar)"
-                          onClick={() => archivoProgramacionInputRef.current?.click()}
-                          onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                          onDrop={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                              const file = e.dataTransfer.files[0]
-                              setArchivoProgramacion(file)
-                              setControladorForm(prev => ({ ...prev, respaldoProgramacionUsb: file.name }))
-                            }
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            minHeight: '38px',
-                            border: archivoProgramacion ? '1px solid #10B981' : '1px dashed #CBD5E1',
-                            borderRadius: '6px',
-                            backgroundColor: archivoProgramacion ? '#F0FDF4' : '#F8FAFC',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                            padding: '0.35rem 0.75rem',
-                            boxSizing: 'border-box',
-                            marginTop: 'auto'
-                          }}
-                          onMouseOver={(e) => { if (!archivoProgramacion) e.currentTarget.style.borderColor = '#BC955B' }}
-                          onMouseOut={(e) => { if (!archivoProgramacion) e.currentTarget.style.borderColor = '#CBD5E1' }}
-                        >
-                          {archivoProgramacion ? (
-                            <>
-                              {String(typeof archivoProgramacion === 'string' ? archivoProgramacion : archivoProgramacion.name).toLowerCase().endsWith('.zip') ? (
-                                <FaFileArchive size={18} color="#059669" />
-                              ) : (
-                                <FaUpload size={18} color="#10B981" />
-                              )}
-                              <span style={{ fontSize: '0.82rem', color: '#065F46', fontWeight: '600', maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {typeof archivoProgramacion === 'string' ? archivoProgramacion.split('/').pop() : archivoProgramacion.name}
-                              </span>
-                              {archivoProgramacion instanceof File && (
-                                <span style={{ fontSize: '0.72rem', color: '#047857', fontWeight: '500' }}>
-                                  ({archivoProgramacion.size > 1024 * 1024 ? `${(archivoProgramacion.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.round(archivoProgramacion.size / 1024)} KB`})
-                                </span>
-                              )}
-                            </>
+                      <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1.25rem' }}>
+                        {/* Dispositivo receptor */}
+                        <div>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                            <FaHdd size={12} style={{ color: '#691B31' }} />
+                            <span>Dispositivo receptor: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                          </label>
+                          {modoVisualizacion ? (
+                            renderBadgeConsulta(controladorForm.receptorFibraDispositivo)
                           ) : (
-                            <>
-                              <FaUpload size={18} color="#BC955B" />
-                              <span style={{ fontSize: '0.8rem', color: '#64748B' }}>Subir archivo (.zip, .cfg, .bin, .dat)</span>
-                            </>
+                            <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '34px' }}>
+                              {['Presente', 'No tiene'].map((opcion) => (
+                                <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.receptorFibraDispositivo === opcion ? '700' : '500', color: '#1E293B' }}>
+                                  <input
+                                    type="radio"
+                                    name="receptorFibraDispositivo"
+                                    value={opcion}
+                                    checked={controladorForm.receptorFibraDispositivo === opcion}
+                                    onChange={(e) => setControladorForm({ ...controladorForm, receptorFibraDispositivo: e.target.value, fibraOptica: opcion === 'Presente' })}
+                                    style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                  />
+                                  {opcion}
+                                </label>
+                              ))}
+                            </div>
                           )}
-                          <input
-                            ref={archivoProgramacionInputRef}
-                            type="file"
-                            accept=".zip,.rar,.7z,.cfg,.bin,.dat,.txt,.tar,.gz,application/zip,application/x-zip-compressed,multipart/x-zip"
-                            style={{ display: 'none' }}
-                            onChange={(e) => {
-                              if (e.target.files && e.target.files[0]) {
-                                const file = e.target.files[0]
-                                setArchivoProgramacion(file)
-                                setControladorForm(prev => ({ ...prev, respaldoProgramacionUsb: file.name }))
-                              }
-                            }}
-                          />
                         </div>
 
-                        {archivoProgramacion && (
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.35rem' }}>
-                            {typeof archivoProgramacion === 'string' && editandoControladorId && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  window.open(`${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/descargar-programacion`, '_blank')
-                                }}
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: 'none', border: 'none', color: '#0284C7', fontSize: '0.75rem', cursor: 'pointer', fontWeight: '600', pointerEvents: 'auto' }}
-                              >
-                                <FaDownload size={11} /> Descargar
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setArchivoProgramacion(null)
-                                setControladorForm(prev => ({ ...prev, respaldoProgramacionUsb: '' }))
-                                if (archivoProgramacionInputRef.current) archivoProgramacionInputRef.current.value = ''
-                              }}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', background: 'none', border: 'none', color: '#EF4444', fontSize: '0.75rem', cursor: 'pointer', fontWeight: '600' }}
-                            >
-                              <FaTimes size={11} /> Quitar
-                            </button>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {/* Tarjeta de Conflictos */}
-                  <div style={{
-                    gridColumn: '1 / -1',
-                    backgroundColor: 'white',
-                    padding: '0.9rem',
-                    borderRadius: '8px',
-                    border: '1px solid #E2E8F0',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.75rem'
-                  }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#691B31', textTransform: 'uppercase', letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <FaExclamationTriangle size={13} style={{ color: '#BC955B' }} /> Tarjeta de Conflictos
-                    </span>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
-                      {/* 1. Marca */}
-                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                          <FaExclamationTriangle size={12} style={{ color: '#691B31' }} />
-                          <span>Marca: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                        </label>
-                        {modoVisualizacion ? (
-                          renderDatoConsulta(controladorForm.tarjetaConflictosMarca || (controladorForm.modelo === 'C-5000' ? 'Oriux (Peek Traffic)' : 'Peek Traffic'))
-                        ) : (
-                          <>
-                            <select
-                              value={controladorForm.tarjetaConflictosMarcaModo || (controladorForm.modelo === 'C-5000' ? 'Oriux (Peek Traffic)' : 'Peek Traffic')}
-                              onChange={(e) => {
-                                const val = e.target.value
-                                if (val === 'Peek Traffic') {
-                                  setControladorForm(prev => ({
-                                    ...prev,
-                                    tarjetaConflictosMarcaModo: 'Peek Traffic',
-                                    tarjetaConflictosMarca: 'Peek Traffic',
-                                    tarjetaConflictosModelo: prev.tarjetaConflictosModelo && MODELOS_TARJETA_CONFLICTOS_PEEK.includes(prev.tarjetaConflictosModelo) ? prev.tarjetaConflictosModelo : 'Model 2010E'
-                                  }))
-                                } else if (val === 'Oriux (Peek Traffic)') {
-                                  setControladorForm(prev => ({
-                                    ...prev,
-                                    tarjetaConflictosMarcaModo: 'Oriux (Peek Traffic)',
-                                    tarjetaConflictosMarca: 'Oriux (Peek Traffic)',
-                                    tarjetaConflictosModelo: 'C5000 MMU Integrado'
-                                  }))
-                                } else if (val === 'Otro') {
-                                  setControladorForm(prev => ({
-                                    ...prev,
-                                    tarjetaConflictosMarcaModo: 'Otro',
-                                    tarjetaConflictosMarca: prev.tarjetaConflictosMarca && prev.tarjetaConflictosMarca !== 'Peek Traffic' && prev.tarjetaConflictosMarca !== 'Oriux (Peek Traffic)' ? prev.tarjetaConflictosMarca : '',
-                                    tarjetaConflictosModelo: ''
-                                  }))
-                                }
-                              }}
-                              style={{
-                                width: '100%',
-                                padding: '0.5rem 0.65rem',
-                                border: '1px solid #CBD5E1',
-                                borderRadius: '6px',
-                                fontSize: '0.85rem',
-                                boxSizing: 'border-box',
-                                backgroundColor: 'white',
-                                color: '#1E293B',
-                                cursor: 'pointer',
-                                marginTop: 'auto'
-                              }}
-                            >
-                              {controladorForm.modelo === 'C-5000' || controladorForm.tarjetaConflictosMarcaModo === 'Oriux (Peek Traffic)' ? (
-                                <option value="Oriux (Peek Traffic)">Oriux (Peek Traffic)</option>
-                              ) : (
-                                <option value="Peek Traffic">Peek Traffic</option>
-                              )}
-                              <option value="Otro">Otro (especificar)</option>
-                            </select>
-                            {controladorForm.tarjetaConflictosMarcaModo === 'Otro' && (
-                              <input
-                                type="text"
-                                placeholder="Especificar otra marca..."
-                                value={controladorForm.tarjetaConflictosMarca || ''}
-                                onChange={(e) => setControladorForm({ ...controladorForm, tarjetaConflictosMarca: e.target.value })}
-                                style={{
-                                  width: '100%',
-                                  padding: '0.45rem 0.65rem',
-                                  border: '1px solid #CBD5E1',
-                                  borderRadius: '6px',
-                                  fontSize: '0.82rem',
-                                  boxSizing: 'border-box',
-                                  marginTop: '0.4rem'
-                                }}
-                              />
-                            )}
-                          </>
-                        )}
-                      </div>
-
-                      {/* 2. Modelo */}
-                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                          <FaExclamationTriangle size={12} style={{ color: '#691B31' }} />
-                          <span>Modelo: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                        </label>
-                        {modoVisualizacion ? (
-                          renderDatoConsulta(controladorForm.tarjetaConflictosModelo, 'Sin modelo especificado')
-                        ) : controladorForm.tarjetaConflictosMarcaModo === 'Otro' ? (
-                          <input
-                            type="text"
-                            placeholder="Especificar modelo de tarjeta..."
-                            value={controladorForm.tarjetaConflictosModelo || ''}
-                            onChange={(e) => setControladorForm({ ...controladorForm, tarjetaConflictosModelo: e.target.value })}
-                            style={{
-                              width: '100%',
-                              padding: '0.5rem 0.65rem',
-                              border: '1px solid #CBD5E1',
-                              borderRadius: '6px',
-                              fontSize: '0.85rem',
-                              boxSizing: 'border-box',
-                              marginTop: 'auto'
-                            }}
-                          />
-                        ) : (
-                          <select
-                            value={controladorForm.tarjetaConflictosModelo || ''}
-                            onChange={(e) => setControladorForm({ ...controladorForm, tarjetaConflictosModelo: e.target.value })}
-                            style={{
-                              width: '100%',
-                              padding: '0.5rem 0.65rem',
-                              border: '1px solid #CBD5E1',
-                              borderRadius: '6px',
-                              fontSize: '0.85rem',
-                              boxSizing: 'border-box',
-                              backgroundColor: 'white',
-                              color: '#1E293B',
-                              cursor: 'pointer',
-                              marginTop: 'auto'
-                            }}
-                          >
-                            <option value="">-- Seleccionar modelo --</option>
-                            {(controladorForm.modelo === 'C-5000' || controladorForm.tarjetaConflictosMarcaModo === 'Oriux (Peek Traffic)'
-                              ? MODELOS_TARJETA_CONFLICTOS_C5000
-                              : MODELOS_TARJETA_CONFLICTOS_PEEK
-                            ).map((modelo) => (
-                              <option key={modelo} value={modelo}>{modelo}</option>
-                            ))}
-                            {controladorForm.tarjetaConflictosModelo &&
-                              !MODELOS_TARJETA_CONFLICTOS_PEEK.includes(controladorForm.tarjetaConflictosModelo) &&
-                              !MODELOS_TARJETA_CONFLICTOS_C5000.includes(controladorForm.tarjetaConflictosModelo) && (
-                                <option value={controladorForm.tarjetaConflictosModelo}>{controladorForm.tarjetaConflictosModelo}</option>
-                              )}
-                          </select>
-                        )}
+                        {/* Cable de fibra óptica */}
+                        <div>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                            <FaProjectDiagram size={12} style={{ color: '#691B31' }} />
+                            <span>Cable de fibra óptica: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                          </label>
+                          {modoVisualizacion ? (
+                            renderBadgeConsulta(controladorForm.receptorFibraCable)
+                          ) : (
+                            <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '34px' }}>
+                              {['Conectado', 'Desconectado', 'No tiene'].map((opcion) => (
+                                <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.receptorFibraCable === opcion ? '700' : '500', color: '#1E293B' }}>
+                                  <input
+                                    type="radio"
+                                    name="receptorFibraCable"
+                                    value={opcion}
+                                    checked={controladorForm.receptorFibraCable === opcion}
+                                    onChange={(e) => setControladorForm({ ...controladorForm, receptorFibraCable: e.target.value })}
+                                    style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                  />
+                                  {opcion}
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Estado de operación */}
-                    <div style={{ paddingTop: '0.4rem', borderTop: '1px solid #F1F5F9' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                        <FaExclamationTriangle size={12} style={{ color: '#691B31' }} />
-                        <span>Estado de operación: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                      </label>
-                      {modoVisualizacion ? (
-                        renderBadgeConsulta(controladorForm.tarjetaConflictosEstado)
-                      ) : (
-                        <div style={{ display: 'flex', gap: '1.75rem', alignItems: 'center' }}>
-                          {['Correcto', 'Falla'].map((opcion) => (
-                            <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.tarjetaConflictosEstado === opcion ? '700' : '500', color: '#1E293B' }}>
-                              <input
-                                type="radio"
-                                name="tarjetaConflictosEstado"
-                                value={opcion}
-                                checked={controladorForm.tarjetaConflictosEstado === opcion}
-                                onChange={(e) => setControladorForm({ ...controladorForm, tarjetaConflictosEstado: e.target.value })}
-                                style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                              />
-                              {opcion}
-                            </label>
-                          ))}
+                    {/* 3 & 4: Conexiones a la tarjeta madre & Alimentación Eléctrica / Fuente de poder */}
+                    <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem' }}>
+                      {/* Conexiones a la tarjeta madre */}
+                      <div style={{ backgroundColor: 'white', padding: '0.9rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.35rem' }}>
+                        <div>
+                          <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#691B31', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <FaMicrochip size={13} style={{ color: '#BC955B' }} /> Conexiones a la tarjeta madre
+                          </span>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                            <FaMicrochip size={12} style={{ color: '#691B31' }} />
+                            <span>Total de conexiones ocupadas: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                          </label>
                         </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Tarjetas de Relevadores */}
-                  <div style={{
-                    gridColumn: '1 / -1',
-                    backgroundColor: 'white',
-                    padding: '0.9rem',
-                    borderRadius: '8px',
-                    border: '1px solid #E2E8F0',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.75rem'
-                  }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#691B31', textTransform: 'uppercase', letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <FaCreditCard size={13} style={{ color: '#BC955B' }} /> Tarjetas de Relevadores
-                    </span>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
-                      {/* 1. Marca */}
-                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                          <FaCreditCard size={12} style={{ color: '#691B31' }} />
-                          <span>Marca: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                        </label>
                         {modoVisualizacion ? (
-                          renderDatoConsulta(controladorForm.tarjetaRelevadoresMarca || (controladorForm.modelo === 'C-5000' ? 'Oriux' : 'Peek Traffic'))
+                          renderDatoConsulta(controladorForm.conexionesTarjetaMadre, 'Sin registrar')
                         ) : (
-                          <>
-                            <select
-                              value={controladorForm.tarjetaRelevadoresMarcaModo || (controladorForm.modelo === 'C-5000' ? 'Oriux' : 'Peek Traffic')}
-                              onChange={(e) => {
-                                const val = e.target.value
-                                if (val === 'Peek Traffic') {
-                                  setControladorForm(prev => ({
-                                    ...prev,
-                                    tarjetaRelevadoresMarcaModo: 'Peek Traffic',
-                                    tarjetaRelevadoresMarca: 'Peek Traffic',
-                                    tarjetaRelevadoresModelo: MODELOS_RELEVADORES_PEEK.includes(prev.tarjetaRelevadoresModelo) ? prev.tarjetaRelevadoresModelo : 'RC-308',
-                                    tarjetaRelevadora: true
-                                  }))
-                                } else if (val === 'SEMEX') {
-                                  setControladorForm(prev => ({
-                                    ...prev,
-                                    tarjetaRelevadoresMarcaModo: 'SEMEX',
-                                    tarjetaRelevadoresMarca: 'SEMEX',
-                                    tarjetaRelevadoresModelo: MODELOS_RELEVADORES_SEMEX.includes(prev.tarjetaRelevadoresModelo) ? prev.tarjetaRelevadoresModelo : 'SEMEX SG-16',
-                                    tarjetaRelevadora: true
-                                  }))
-                                } else if (val === 'Oriux') {
-                                  setControladorForm(prev => ({
-                                    ...prev,
-                                    tarjetaRelevadoresMarcaModo: 'Oriux',
-                                    tarjetaRelevadoresMarca: 'Oriux',
-                                    tarjetaRelevadoresModelo: 'C5000 Card-Based Load Switch',
-                                    tarjetaRelevadora: true
-                                  }))
-                                } else if (val === 'Otro') {
-                                  setControladorForm(prev => ({
-                                    ...prev,
-                                    tarjetaRelevadoresMarcaModo: 'Otro',
-                                    tarjetaRelevadoresMarca: (prev.tarjetaRelevadoresMarca && !['Peek Traffic', 'SEMEX', 'Oriux'].includes(prev.tarjetaRelevadoresMarca)) ? prev.tarjetaRelevadoresMarca : '',
-                                    tarjetaRelevadoresModelo: '',
-                                    tarjetaRelevadora: true
-                                  }))
-                                }
-                              }}
-                              style={{
-                                width: '100%',
-                                padding: '0.5rem 0.65rem',
-                                border: '1px solid #CBD5E1',
-                                borderRadius: '6px',
-                                fontSize: '0.85rem',
-                                boxSizing: 'border-box',
-                                backgroundColor: 'white',
-                                color: '#1E293B',
-                                cursor: 'pointer',
-                                marginTop: 'auto'
-                              }}
-                            >
-                              <option value="Peek Traffic">Peek Traffic</option>
-                              <option value="SEMEX">SEMEX</option>
-                              <option value="Oriux">Oriux</option>
-                              <option value="Otro">Otro (especificar)</option>
-                            </select>
-                            {controladorForm.tarjetaRelevadoresMarcaModo === 'Otro' && (
-                              <input
-                                type="text"
-                                placeholder="Especificar otra marca..."
-                                value={controladorForm.tarjetaRelevadoresMarca || ''}
-                                onChange={(e) => setControladorForm(prev => ({ ...prev, tarjetaRelevadoresMarca: e.target.value, tarjetaRelevadora: true }))}
-                                style={{
-                                  width: '100%',
-                                  padding: '0.45rem 0.65rem',
-                                  border: '1px solid #CBD5E1',
-                                  borderRadius: '6px',
-                                  fontSize: '0.82rem',
-                                  boxSizing: 'border-box',
-                                  marginTop: '0.4rem'
-                                }}
-                              />
-                            )}
-                          </>
-                        )}
-                      </div>
-
-                      {/* 2. Modelo */}
-                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                          <FaCreditCard size={12} style={{ color: '#691B31' }} />
-                          <span>Modelo: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                        </label>
-                        {modoVisualizacion ? (
-                          renderDatoConsulta(controladorForm.tarjetaRelevadoresModelo, 'Sin modelo especificado')
-                        ) : controladorForm.tarjetaRelevadoresMarcaModo === 'Otro' ? (
                           <input
                             type="text"
-                            placeholder="Especificar modelo de relevador..."
-                            value={controladorForm.tarjetaRelevadoresModelo || ''}
-                            onChange={(e) => setControladorForm(prev => ({ ...prev, tarjetaRelevadoresModelo: e.target.value, tarjetaRelevadora: true }))}
-                            style={{
-                              width: '100%',
-                              padding: '0.5rem 0.65rem',
-                              border: '1px solid #CBD5E1',
-                              borderRadius: '6px',
-                              fontSize: '0.85rem',
-                              boxSizing: 'border-box',
-                              marginTop: 'auto'
-                            }}
+                            placeholder="ej. 12 conexiones"
+                            value={controladorForm.conexionesTarjetaMadre}
+                            onChange={(e) => setControladorForm({ ...controladorForm, conexionesTarjetaMadre: e.target.value })}
+                            style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', marginTop: 'auto' }}
                           />
-                        ) : (
-                          <select
-                            value={controladorForm.tarjetaRelevadoresModelo || ''}
-                            onChange={(e) => setControladorForm(prev => ({ ...prev, tarjetaRelevadoresModelo: e.target.value, tarjetaRelevadora: true }))}
-                            style={{
-                              width: '100%',
-                              padding: '0.5rem 0.65rem',
-                              border: '1px solid #CBD5E1',
-                              borderRadius: '6px',
-                              fontSize: '0.85rem',
-                              boxSizing: 'border-box',
-                              backgroundColor: 'white',
-                              color: '#1E293B',
-                              cursor: 'pointer',
-                              marginTop: 'auto'
-                            }}
-                          >
-                            <option value="">-- Seleccionar modelo --</option>
-                            {(controladorForm.tarjetaRelevadoresMarcaModo === 'Peek Traffic'
-                              ? MODELOS_RELEVADORES_PEEK
-                              : (controladorForm.modelo === 'C-5000' || controladorForm.tarjetaRelevadoresMarcaModo === 'Oriux')
-                                ? MODELOS_RELEVADORES_C5000
-                                : MODELOS_RELEVADORES_SEMEX
-                            ).map((modelo) => (
-                              <option key={modelo} value={modelo}>{modelo}</option>
-                            ))}
-                            {controladorForm.tarjetaRelevadoresModelo &&
-                              !MODELOS_RELEVADORES_PEEK.includes(controladorForm.tarjetaRelevadoresModelo) &&
-                              !MODELOS_RELEVADORES_SEMEX.includes(controladorForm.tarjetaRelevadoresModelo) &&
-                              !MODELOS_RELEVADORES_C5000.includes(controladorForm.tarjetaRelevadoresModelo) && (
-                                <option value={controladorForm.tarjetaRelevadoresModelo}>{controladorForm.tarjetaRelevadoresModelo}</option>
-                              )}
-                          </select>
                         )}
                       </div>
 
-                      {/* 3. Cantidad instalada */}
-                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                          <FaBoxes size={12} style={{ color: '#691B31' }} />
-                          <span>Cantidad instalada: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                        </label>
+                      {/* Alimentación Eléctrica / Fuente de poder */}
+                      <div style={{ backgroundColor: 'white', padding: '0.9rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.35rem' }}>
+                        <div>
+                          <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#691B31', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <FaPowerOff size={13} style={{ color: '#BC955B' }} /> Alimentación Eléctrica / Fuente
+                          </span>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                            <FaPowerOff size={12} style={{ color: '#691B31' }} />
+                            <span>Supresor de picos: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                          </label>
+                        </div>
                         {modoVisualizacion ? (
-                          renderDatoConsulta(controladorForm.tarjetaRelevadoresCantidad, 'Sin registrar')
+                          renderBadgeConsulta(controladorForm.fuentePoderSupresorPicos)
                         ) : (
-                          <div>
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder="ej. 8 o 16 piezas"
-                              value={controladorForm.tarjetaRelevadoresCantidad || ''}
-                              onChange={(e) => {
-                                const val = e.target.value
-                                setControladorForm(prev => ({ ...prev, tarjetaRelevadoresCantidad: val, tarjetaRelevadora: true }))
-                                if (controladorErrores.tarjetaRelevadoresCantidad) {
-                                  setControladorErrores(prev => ({ ...prev, tarjetaRelevadoresCantidad: undefined }))
-                                }
-                              }}
-                              onWheel={(e) => e.target.blur()}
-                              style={{
-                                width: '100%',
-                                padding: '0.5rem 0.65rem',
-                                border: `1px solid ${controladorErrores.tarjetaRelevadoresCantidad ? '#DC2626' : '#CBD5E1'}`,
-                                backgroundColor: controladorErrores.tarjetaRelevadoresCantidad ? '#FEF2F2' : '#FFFFFF',
-                                borderRadius: '6px',
-                                fontSize: '0.85rem',
-                                boxSizing: 'border-box',
-                                marginTop: 'auto'
-                              }}
-                            />
-                            {controladorErrores.tarjetaRelevadoresCantidad && (
-                              <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
-                                <FaExclamationTriangle size={10} /> {controladorErrores.tarjetaRelevadoresCantidad}
-                              </span>
-                            )}
+                          <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '38px', marginTop: 'auto' }}>
+                            {['Operando', 'Dañado'].map((opcion) => (
+                              <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.fuentePoderSupresorPicos === opcion ? '700' : '500', color: '#1E293B' }}>
+                                <input
+                                  type="radio"
+                                  name="fuentePoderSupresorPicos"
+                                  value={opcion}
+                                  checked={controladorForm.fuentePoderSupresorPicos === opcion}
+                                  onChange={(e) => setControladorForm({ ...controladorForm, fuentePoderSupresorPicos: e.target.value, fuentePoder: true })}
+                                  style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                />
+                                {opcion}
+                              </label>
+                            ))}
                           </div>
                         )}
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* SECCIÓN C: RED, CONECTIVIDAD Y ENERGÍA */}
-              <div style={{
-                marginBottom: '1.5rem',
-                backgroundColor: '#F8FAFC',
-                padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
-                borderRadius: '10px',
-                border: '1px solid #E2E8F0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '1rem',
-                boxSizing: 'border-box'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  borderBottom: '1px solid #E2E8F0',
-                  paddingBottom: '0.5rem',
-                  marginBottom: '0.2rem'
-                }}>
-                  <h4 style={{
-                    margin: 0,
-                    fontSize: '0.92rem',
-                    fontWeight: '800',
-                    color: '#691B31',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.45rem'
+                  {/* SECCIÓN D: POSTES Y EQUIPAMIENTO VINCULADO */}
+                  <div style={{
+                    marginBottom: '1.5rem',
+                    backgroundColor: '#fcfbf9',
+                    padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
+                    borderRadius: '10px',
+                    border: '1px solid #DDC9A3',
+                    boxSizing: 'border-box'
                   }}>
-                    <FaProjectDiagram size={14} style={{ color: '#BC955B' }} /> Sección 4: Red, Conectividad y Energía
-                  </h4>
-                  <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
-                    Switch de fibra, conexiones y alimentación
-                  </span>
-                </div>
-
-                {/* 1. Switch de Fibra */}
-                <div style={{ backgroundColor: 'white', padding: '0.9rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#691B31', textTransform: 'uppercase', letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <FaProjectDiagram size={13} style={{ color: '#BC955B' }} /> Switch de Fibra
-                  </span>
-
-                  {/* Fila 1 y 2: Marca, Modelo, Total de puertos y Puertos en uso */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
-                    {/* 1. Marca */}
-                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                        <FaProjectDiagram size={12} style={{ color: '#691B31' }} />
-                        <span>Marca: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                      </label>
-                      {modoVisualizacion ? (
-                        renderDatoConsulta(controladorForm.switchFibraMarca || (controladorForm.modelo === 'C-5000' ? 'Oriux' : 'Moxa'))
-                      ) : (
-                        <>
-                          <select
-                            value={controladorForm.switchFibraMarcaModo || (controladorForm.modelo === 'C-5000' ? 'Oriux' : 'Moxa')}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              if (val === 'Moxa') {
-                                setControladorForm(prev => {
-                                  const switchMod = prev.switchFibraModelo && MODELOS_SWITCH_MOXA_CATALOGO.some(m => m.modelo === prev.switchFibraModelo) ? prev.switchFibraModelo : 'Moxa EDS-208 / 308'
-                                  const switchObj = MODELOS_SWITCH_MOXA_CATALOGO.find(m => m.modelo === switchMod)
-                                  const newTotal = switchObj ? parseInt(switchObj.puertos, 10) : 8
-                                  const prevUso = parseInt(prev.switchFibraPuertosUso, 10)
-                                  const nuevoUso = (!isNaN(prevUso) && prevUso > newTotal) ? String(newTotal) : prev.switchFibraPuertosUso
-                                  return {
-                                    ...prev,
-                                    switchFibraMarcaModo: 'Moxa',
-                                    switchFibraMarca: 'Moxa',
-                                    switchFibraModelo: switchMod,
-                                    switchFibraPuertosTotal: switchObj ? switchObj.puertos : '8',
-                                    switchFibraPuertosUso: nuevoUso,
-                                    switch: true
-                                  }
-                                })
-                                setControladorErrores(prev => ({ ...prev, switchFibraPuertosTotal: undefined, switchFibraPuertosUso: undefined }))
-                              } else if (val === 'Oriux') {
-                                setControladorForm(prev => {
-                                  const newTotal = 2
-                                  const prevUso = parseInt(prev.switchFibraPuertosUso, 10)
-                                  const nuevoUso = (!isNaN(prevUso) && prevUso > newTotal) ? String(newTotal) : prev.switchFibraPuertosUso
-                                  return {
-                                    ...prev,
-                                    switchFibraMarcaModo: 'Oriux',
-                                    switchFibraMarca: 'Oriux',
-                                    switchFibraModelo: 'C5000 ATC CPU Ports',
-                                    switchFibraPuertosTotal: '2',
-                                    switchFibraPuertosUso: nuevoUso,
-                                    switch: true
-                                  }
-                                })
-                                setControladorErrores(prev => ({ ...prev, switchFibraPuertosTotal: undefined, switchFibraPuertosUso: undefined }))
-                              } else if (val === 'Otro') {
-                                setControladorForm(prev => ({
-                                  ...prev,
-                                  switchFibraMarcaModo: 'Otro',
-                                  switchFibraMarca: (prev.switchFibraMarca && prev.switchFibraMarca !== 'Moxa' && prev.switchFibraMarca !== 'Oriux') ? prev.switchFibraMarca : '',
-                                  switchFibraModelo: '',
-                                  switchFibraPuertosTotal: '',
-                                  switch: true
-                                }))
-                                setControladorErrores(prev => ({ ...prev, switchFibraPuertosTotal: undefined, switchFibraPuertosUso: undefined }))
-                              }
-                            }}
-                            style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', backgroundColor: 'white', color: '#1E293B', cursor: 'pointer', marginTop: 'auto' }}
-                          >
-                            {controladorForm.modelo === 'C-5000' || controladorForm.switchFibraMarcaModo === 'Oriux' ? (
-                              <option value="Oriux">Oriux</option>
-                            ) : (
-                              <option value="Moxa">Moxa</option>
-                            )}
-                            <option value="Otro">Otro (especificar)</option>
-                          </select>
-                          {controladorForm.switchFibraMarcaModo === 'Otro' && (
-                            <input
-                              type="text"
-                              placeholder="Especificar marca (ej. Cisco, RuggedCom)..."
-                              value={controladorForm.switchFibraMarca || ''}
-                              onChange={(e) => setControladorForm({ ...controladorForm, switchFibraMarca: e.target.value, switch: true })}
-                              style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.82rem', boxSizing: 'border-box', marginTop: '0.4rem' }}
-                            />
-                          )}
-                        </>
-                      )}
-                    </div>
-
-                    {/* 2. Modelo */}
-                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                        <FaHdd size={12} style={{ color: '#691B31' }} />
-                        <span>Modelo: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                      </label>
-                      {modoVisualizacion ? (
-                        renderDatoConsulta(controladorForm.switchFibraModelo, 'Sin modelo especificado')
-                      ) : controladorForm.switchFibraMarcaModo === 'Otro' ? (
-                        <input
-                          type="text"
-                          placeholder="Especificar modelo de switch..."
-                          value={controladorForm.switchFibraModelo || ''}
-                          onChange={(e) => setControladorForm({ ...controladorForm, switchFibraModelo: e.target.value, switch: true })}
-                          style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', marginTop: 'auto' }}
-                        />
-                      ) : (
-                        <select
-                          value={controladorForm.switchFibraModelo || ''}
-                          onChange={(e) => {
-                            const mod = e.target.value
-                            const catalogo = (controladorForm.modelo === 'C-5000' || controladorForm.switchFibraMarcaModo === 'Oriux')
-                              ? MODELOS_SWITCH_ORIUX_CATALOGO
-                              : MODELOS_SWITCH_MOXA_CATALOGO
-                            const found = catalogo.find(m => m.modelo === mod)
-                            const newTotal = found ? parseInt(found.puertos, 10) : undefined
-                            setControladorForm(prev => {
-                              const prevUso = parseInt(prev.switchFibraPuertosUso, 10)
-                              let nuevoUso = prev.switchFibraPuertosUso
-                              if (newTotal !== undefined && !isNaN(prevUso) && prevUso > newTotal) {
-                                nuevoUso = String(newTotal)
-                              }
-                              return {
-                                ...prev,
-                                switchFibraModelo: mod,
-                                switchFibraPuertosTotal: found ? found.puertos : prev.switchFibraPuertosTotal,
-                                switchFibraPuertosUso: nuevoUso,
-                                switch: true
-                              }
-                            })
-                            setControladorErrores(prev => ({ ...prev, switchFibraPuertosTotal: undefined, switchFibraPuertosUso: undefined }))
-                          }}
-                          style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', backgroundColor: 'white', color: '#1E293B', cursor: 'pointer', marginTop: 'auto' }}
-                        >
-                          <option value="">-- Seleccionar modelo --</option>
-                          {(controladorForm.modelo === 'C-5000' || controladorForm.switchFibraMarcaModo === 'Oriux'
-                            ? MODELOS_SWITCH_ORIUX_CATALOGO
-                            : MODELOS_SWITCH_MOXA_CATALOGO
-                          ).map((item) => (
-                            <option key={item.modelo} value={item.modelo}>{item.modelo}</option>
-                          ))}
-                          {controladorForm.switchFibraModelo &&
-                            !MODELOS_SWITCH_MOXA_CATALOGO.some(m => m.modelo === controladorForm.switchFibraModelo) &&
-                            !MODELOS_SWITCH_ORIUX_CATALOGO.some(m => m.modelo === controladorForm.switchFibraModelo) && (
-                              <option value={controladorForm.switchFibraModelo}>{controladorForm.switchFibraModelo}</option>
-                            )}
-                        </select>
-                      )}
-                    </div>
-
-                    {/* 3. Total de puertos */}
-                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                        <FaNetworkWired size={12} style={{ color: '#691B31' }} />
-                        <span>Total de puertos: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                      </label>
-                      {modoVisualizacion ? (
-                        renderDatoConsulta(controladorForm.switchFibraPuertosTotal ? `${controladorForm.switchFibraPuertosTotal} puertos` : '', 'Sin registrar')
-                      ) : (
-                        <div>
-                          <input
-                            type="number"
-                            min="0"
-                            placeholder="ej. 2, 8 o 10 puertos"
-                            value={controladorForm.switchFibraPuertosTotal || ''}
-                            onChange={(e) => handleCambiarSwitchPuertosTotal(e.target.value)}
-                            onWheel={(e) => e.target.blur()}
-                            style={{
-                              width: '100%',
-                              padding: '0.5rem 0.65rem',
-                              border: `1px solid ${controladorErrores.switchFibraPuertosTotal ? '#DC2626' : '#CBD5E1'}`,
-                              backgroundColor: controladorErrores.switchFibraPuertosTotal ? '#FEF2F2' : '#FFFFFF',
-                              borderRadius: '6px',
-                              fontSize: '0.85rem',
-                              boxSizing: 'border-box',
-                              marginTop: 'auto'
-                            }}
-                          />
-                          {controladorErrores.switchFibraPuertosTotal && (
-                            <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
-                              <FaExclamationTriangle size={10} /> {controladorErrores.switchFibraPuertosTotal}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 4. Puertos en uso */}
-                    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                        <FaNetworkWired size={12} style={{ color: '#691B31' }} />
-                        <span>Puertos en uso: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                      </label>
-                      {modoVisualizacion ? (
-                        renderDatoConsulta(controladorForm.switchFibraPuertosUso ? `${controladorForm.switchFibraPuertosUso} puertos` : '', 'Sin registrar')
-                      ) : (
-                        <div>
-                          <input
-                            type="number"
-                            min="0"
-                            max={controladorForm.switchFibraPuertosTotal !== '' && !isNaN(parseInt(controladorForm.switchFibraPuertosTotal, 10)) ? parseInt(controladorForm.switchFibraPuertosTotal, 10) : undefined}
-                            placeholder="ej. 4 puertos"
-                            value={controladorForm.switchFibraPuertosUso || ''}
-                            onChange={(e) => handleCambiarSwitchPuertosUso(e.target.value)}
-                            onWheel={(e) => e.target.blur()}
-                            style={{
-                              width: '100%',
-                              padding: '0.5rem 0.65rem',
-                              border: `1px solid ${controladorErrores.switchFibraPuertosUso ? '#DC2626' : '#CBD5E1'}`,
-                              backgroundColor: controladorErrores.switchFibraPuertosUso ? '#FEF2F2' : '#FFFFFF',
-                              borderRadius: '6px',
-                              fontSize: '0.85rem',
-                              boxSizing: 'border-box',
-                              marginTop: 'auto'
-                            }}
-                          />
-                          {controladorErrores.switchFibraPuertosUso && (
-                            <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
-                              <FaExclamationTriangle size={10} /> {controladorErrores.switchFibraPuertosUso}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Fila 2: Fuentes de poder del switch */}
-                  <div style={{ paddingTop: '0.5rem', borderTop: '1px solid #F1F5F9' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                      <FaPowerOff size={12} style={{ color: '#691B31' }} />
-                      <span>Fuentes de poder del switch: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                    </label>
-                    {modoVisualizacion ? (
-                      renderBadgeConsulta(controladorForm.switchFibraFuentePoder)
-                    ) : (
-                      <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                        {['Operativa', 'Sin operar'].map((opcion) => (
-                          <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.switchFibraFuentePoder === opcion ? '700' : '500', color: '#1E293B' }}>
-                            <input
-                              type="radio"
-                              name="switchFibraFuentePoder"
-                              value={opcion}
-                              checked={controladorForm.switchFibraFuentePoder === opcion}
-                              onChange={(e) => setControladorForm({ ...controladorForm, switchFibraFuentePoder: e.target.value, switch: true })}
-                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                            />
-                            {opcion}
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 2. Receptor de Fibra */}
-                <div style={{ backgroundColor: 'white', padding: '0.9rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#691B31', textTransform: 'uppercase', letterSpacing: '0.3px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <FaProjectDiagram size={13} style={{ color: '#BC955B' }} /> Receptor de Fibra
-                  </span>
-
-                  <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1.25rem' }}>
-                    {/* Dispositivo receptor */}
-                    <div>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                        <FaHdd size={12} style={{ color: '#691B31' }} />
-                        <span>Dispositivo receptor: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                      </label>
-                      {modoVisualizacion ? (
-                        renderBadgeConsulta(controladorForm.receptorFibraDispositivo)
-                      ) : (
-                        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '34px' }}>
-                          {['Presente', 'No tiene'].map((opcion) => (
-                            <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.receptorFibraDispositivo === opcion ? '700' : '500', color: '#1E293B' }}>
-                              <input
-                                type="radio"
-                                name="receptorFibraDispositivo"
-                                value={opcion}
-                                checked={controladorForm.receptorFibraDispositivo === opcion}
-                                onChange={(e) => setControladorForm({ ...controladorForm, receptorFibraDispositivo: e.target.value, fibraOptica: opcion === 'Presente' })}
-                                style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                              />
-                              {opcion}
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Cable de fibra óptica */}
-                    <div>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                        <FaProjectDiagram size={12} style={{ color: '#691B31' }} />
-                        <span>Cable de fibra óptica: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                      </label>
-                      {modoVisualizacion ? (
-                        renderBadgeConsulta(controladorForm.receptorFibraCable)
-                      ) : (
-                        <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '34px' }}>
-                          {['Conectado', 'Desconectado', 'No tiene'].map((opcion) => (
-                            <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.receptorFibraCable === opcion ? '700' : '500', color: '#1E293B' }}>
-                              <input
-                                type="radio"
-                                name="receptorFibraCable"
-                                value={opcion}
-                                checked={controladorForm.receptorFibraCable === opcion}
-                                onChange={(e) => setControladorForm({ ...controladorForm, receptorFibraCable: e.target.value })}
-                                style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                              />
-                              {opcion}
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3 & 4: Conexiones a la tarjeta madre & Alimentación Eléctrica / Fuente de poder */}
-                <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem' }}>
-                  {/* Conexiones a la tarjeta madre */}
-                  <div style={{ backgroundColor: 'white', padding: '0.9rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.35rem' }}>
-                    <div>
-                      <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#691B31', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <FaMicrochip size={13} style={{ color: '#BC955B' }} /> Conexiones a la tarjeta madre
-                      </span>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                        <FaMicrochip size={12} style={{ color: '#691B31' }} />
-                        <span>Total de conexiones ocupadas: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                      </label>
-                    </div>
-                    {modoVisualizacion ? (
-                      renderDatoConsulta(controladorForm.conexionesTarjetaMadre, 'Sin registrar')
-                    ) : (
-                      <input
-                        type="text"
-                        placeholder="ej. 12 conexiones"
-                        value={controladorForm.conexionesTarjetaMadre}
-                        onChange={(e) => setControladorForm({ ...controladorForm, conexionesTarjetaMadre: e.target.value })}
-                        style={{ width: '100%', padding: '0.5rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', marginTop: 'auto' }}
-                      />
-                    )}
-                  </div>
-
-                  {/* Alimentación Eléctrica / Fuente de poder */}
-                  <div style={{ backgroundColor: 'white', padding: '0.9rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.35rem' }}>
-                    <div>
-                      <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#691B31', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <FaPowerOff size={13} style={{ color: '#BC955B' }} /> Alimentación Eléctrica / Fuente
-                      </span>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                        <FaPowerOff size={12} style={{ color: '#691B31' }} />
-                        <span>Supresor de picos: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                      </label>
-                    </div>
-                    {modoVisualizacion ? (
-                      renderBadgeConsulta(controladorForm.fuentePoderSupresorPicos)
-                    ) : (
-                      <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '38px', marginTop: 'auto' }}>
-                        {['Operando', 'Dañado'].map((opcion) => (
-                          <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.fuentePoderSupresorPicos === opcion ? '700' : '500', color: '#1E293B' }}>
-                            <input
-                              type="radio"
-                              name="fuentePoderSupresorPicos"
-                              value={opcion}
-                              checked={controladorForm.fuentePoderSupresorPicos === opcion}
-                              onChange={(e) => setControladorForm({ ...controladorForm, fuentePoderSupresorPicos: e.target.value, fuentePoder: true })}
-                              style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                            />
-                            {opcion}
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* SECCIÓN D: POSTES Y EQUIPAMIENTO VINCULADO */}
-              <div style={{
-                marginBottom: '1.5rem',
-                backgroundColor: '#fcfbf9',
-                padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
-                borderRadius: '10px',
-                border: '1px solid #DDC9A3',
-                boxSizing: 'border-box'
-              }}>
-                {/* Header General de Postes */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  borderBottom: '1px solid #E2E8F0',
-                  paddingBottom: '0.6rem',
-                  marginBottom: '1rem',
-                  flexWrap: 'wrap',
-                  gap: '0.5rem'
-                }}>
-                  <div>
-                    <h4 style={{
-                      margin: 0,
-                      fontSize: '0.92rem',
-                      fontWeight: '800',
-                      color: '#691B31',
+                    {/* Header General de Postes */}
+                    <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.45rem'
+                      justifyContent: 'space-between',
+                      borderBottom: '1px solid #E2E8F0',
+                      paddingBottom: '0.6rem',
+                      marginBottom: '1rem',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem'
                     }}>
-                      <FaSign size={14} style={{ color: '#BC955B' }} /> Sección 5: Postes y Equipamiento del Crucero
-                    </h4>
-                    <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '500' }}>
-                      Detalle de postes, cabezales vehiculares, paso peatonal y detección
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <FaBoxes size={11} style={{ color: '#691B31' }} />
-                      {(controladorForm.postes || []).length} poste{((controladorForm.postes || []).length !== 1) ? 's' : ''} en crucero
-                    </span>
-                    {!modoVisualizacion && (
-                      <button
-                        type="button"
-                        onClick={handleAgregarPoste}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          backgroundColor: '#FFFFFF',
-                          border: '1px solid #CBD5E1',
-                          borderRadius: '6px',
-                          padding: '0.35rem 0.75rem',
-                          fontSize: '0.8rem',
-                          fontWeight: '700',
+                      <div>
+                        <h4 style={{
+                          margin: 0,
+                          fontSize: '0.92rem',
+                          fontWeight: '800',
                           color: '#691B31',
-                          cursor: 'pointer',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                          transition: 'all 0.15s'
-                        }}
-                        onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#F8FAFC'; e.currentTarget.style.borderColor = '#691B31'; }}
-                        onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.borderColor = '#CBD5E1'; }}
-                      >
-                        <FaPlus size={10} style={{ color: '#BC955B' }} /> Agregar poste
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Listado de Postes */}
-                {(controladorForm.postes || []).length === 0 && modoVisualizacion && (
-                  <div style={{ padding: '1.25rem', textAlign: 'center', color: '#94A3B8', fontStyle: 'italic', fontSize: '0.85rem', backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px dashed #CBD5E1' }}>
-                    No hay postes registrados en la infraestructura de este controlador.
-                  </div>
-                )}
-                {(controladorForm.postes || []).length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.85rem' }}>
-                    {(controladorForm.postes || []).map((poste, pIdx) => (
-                      <div
-                        key={poste.uid || poste.id || pIdx}
-                      style={{
-                        backgroundColor: '#FFFFFF',
-                        borderRadius: '8px',
-                        border: '1px solid #E2E8F0',
-                        padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                        boxSizing: 'border-box'
-                      }}
-                    >
-                      {/* Encabezado del poste */}
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        paddingBottom: '0.65rem',
-                        borderBottom: '1px solid #F1F5F9',
-                        marginBottom: '0.85rem'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <span style={{
-                            backgroundColor: '#691B31',
-                            color: '#FFFFFF',
-                            fontSize: '0.75rem',
-                            fontWeight: '800',
-                            padding: '0.2rem 0.55rem',
-                            borderRadius: '4px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.3rem'
-                          }}>
-                            <FaSign size={10} style={{ color: '#BC955B' }} /> Poste #{pIdx + 1}
-                          </span>
-                          <span style={{
-                            backgroundColor: poste.tipoPoste === 'peatonal' ? '#E0F2FE' : '#F1F5F9',
-                            color: poste.tipoPoste === 'peatonal' ? '#0369A1' : '#475569',
-                            fontSize: '0.72rem',
-                            fontWeight: '700',
-                            padding: '0.15rem 0.45rem',
-                            borderRadius: '4px',
-                            border: poste.tipoPoste === 'peatonal' ? '1px solid #BAE6FD' : '1px solid #CBD5E1',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.3rem'
-                          }}>
-                            {poste.tipoPoste === 'peatonal' ? <FaWalking size={10} /> : <FaTrafficLight size={10} />}
-                            {poste.tipoPoste === 'peatonal' ? 'Peatonal' : 'Vehicular / Mixto'}
-                          </span>
-                          <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#1E293B' }}>
-                            {normalizarNombreModeloPoste(poste.modeloPoste) || 'Sin modelo asignado'}
-                          </span>
-                          {poste.ubicacionPoste && (
-                            <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>
-                              • {poste.ubicacionPoste}
-                            </span>
-                          )}
-                        </div>
-
-                        {!modoVisualizacion && (
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.65rem' }}>
-                            <button
-                              type="button"
-                              onClick={() => handleEliminarPosteModular(pIdx)}
-                              disabled={guardandoModularSeccion === `poste-del-${pIdx}`}
-                              title="Eliminar este poste"
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.3rem',
-                                background: 'none',
-                                border: 'none',
-                                color: '#DC2626',
-                                fontSize: '0.78rem',
-                                fontWeight: '600',
-                                cursor: 'pointer',
-                                padding: '0.2rem 0.4rem',
-                                borderRadius: '4px'
-                              }}
-                              onMouseOver={(e) => e.currentTarget.style.textDecoration = 'underline'}
-                              onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}
-                            >
-                              <FaTrashAlt size={11} /> {guardandoModularSeccion === `poste-del-${pIdx}` ? 'Borrando...' : 'Eliminar este poste'}
-                            </button>
-                          </div>
-                        )}
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.45rem'
+                        }}>
+                          <FaSign size={14} style={{ color: '#BC955B' }} /> Sección 5: Postes y Equipamiento del Crucero
+                        </h4>
+                        <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '500' }}>
+                          Detalle de postes, cabezales vehiculares, paso peatonal y detección
+                        </span>
                       </div>
 
-                      {/* Datos del Poste */}
-                      {(() => {
-                        const coordsPoste = extraerCoordenadasValidas(poste.ubicacionPoste)
-                        const mapaVisible = mapasPostesVisibles[pIdx] !== false && Boolean(coordsPoste)
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <FaBoxes size={11} style={{ color: '#691B31' }} />
+                          {(controladorForm.postes || []).length} poste{((controladorForm.postes || []).length !== 1) ? 's' : ''} en crucero
+                        </span>
+                        {!modoVisualizacion && (
+                          <button
+                            type="button"
+                            onClick={handleAgregarPoste}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              backgroundColor: '#FFFFFF',
+                              border: '1px solid #CBD5E1',
+                              borderRadius: '6px',
+                              padding: '0.35rem 0.75rem',
+                              fontSize: '0.8rem',
+                              fontWeight: '700',
+                              color: '#691B31',
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                              transition: 'all 0.15s'
+                            }}
+                            onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#F8FAFC'; e.currentTarget.style.borderColor = '#691B31'; }}
+                            onMouseOut={(e) => { e.currentTarget.style.backgroundColor = '#FFFFFF'; e.currentTarget.style.borderColor = '#CBD5E1'; }}
+                          >
+                            <FaPlus size={10} style={{ color: '#BC955B' }} /> Agregar poste
+                          </button>
+                        )}
+                      </div>
+                    </div>
 
-                        return (
-                          <>
-                            <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: coordsPoste && mapaVisible ? '0.65rem' : '0.85rem' }}>
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                  <span>Tipo / Función de poste: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                                </label>
-                                {modoVisualizacion ? (
-                                  <div style={{ display: 'flex', alignItems: 'center', minHeight: '34px' }}>
-                                    <span style={{
+                    {/* Listado de Postes */}
+                    {(controladorForm.postes || []).length === 0 && modoVisualizacion && (
+                      <div style={{ padding: '1.25rem', textAlign: 'center', color: '#94A3B8', fontStyle: 'italic', fontSize: '0.85rem', backgroundColor: '#FFFFFF', borderRadius: '8px', border: '1px dashed #CBD5E1' }}>
+                        No hay postes registrados en la infraestructura de este controlador.
+                      </div>
+                    )}
+                    {(controladorForm.postes || []).length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.85rem' }}>
+                        {(controladorForm.postes || []).map((poste, pIdx) => (
+                          <div
+                            key={poste.uid || poste.id || pIdx}
+                            style={{
+                              backgroundColor: '#FFFFFF',
+                              borderRadius: '8px',
+                              border: '1px solid #E2E8F0',
+                              padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                              boxSizing: 'border-box'
+                            }}
+                          >
+                            {/* Encabezado del poste */}
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              paddingBottom: '0.65rem',
+                              borderBottom: '1px solid #F1F5F9',
+                              marginBottom: '0.85rem'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <span style={{
+                                  backgroundColor: '#691B31',
+                                  color: '#FFFFFF',
+                                  fontSize: '0.75rem',
+                                  fontWeight: '800',
+                                  padding: '0.2rem 0.55rem',
+                                  borderRadius: '4px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem'
+                                }}>
+                                  <FaSign size={10} style={{ color: '#BC955B' }} /> Poste #{pIdx + 1}
+                                </span>
+                                <span style={{
+                                  backgroundColor: poste.tipoPoste === 'peatonal' ? '#E0F2FE' : '#F1F5F9',
+                                  color: poste.tipoPoste === 'peatonal' ? '#0369A1' : '#475569',
+                                  fontSize: '0.72rem',
+                                  fontWeight: '700',
+                                  padding: '0.15rem 0.45rem',
+                                  borderRadius: '4px',
+                                  border: poste.tipoPoste === 'peatonal' ? '1px solid #BAE6FD' : '1px solid #CBD5E1',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem'
+                                }}>
+                                  {poste.tipoPoste === 'peatonal' ? <FaWalking size={10} /> : <FaTrafficLight size={10} />}
+                                  {poste.tipoPoste === 'peatonal' ? 'Peatonal' : 'Vehicular / Mixto'}
+                                </span>
+                                <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#1E293B' }}>
+                                  {normalizarNombreModeloPoste(poste.modeloPoste) || 'Sin modelo asignado'}
+                                </span>
+                                {poste.ubicacionPoste && (
+                                  <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>
+                                    • {poste.ubicacionPoste}
+                                  </span>
+                                )}
+                              </div>
+
+                              {!modoVisualizacion && (
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.65rem' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEliminarPosteModular(pIdx)}
+                                    disabled={guardandoModularSeccion === `poste-del-${pIdx}`}
+                                    title="Eliminar este poste"
+                                    style={{
                                       display: 'inline-flex',
                                       alignItems: 'center',
-                                      gap: '0.4rem',
-                                      padding: '0.35rem 0.8rem',
+                                      gap: '0.3rem',
+                                      background: 'none',
+                                      border: 'none',
+                                      color: '#DC2626',
+                                      fontSize: '0.78rem',
+                                      fontWeight: '600',
+                                      cursor: 'pointer',
+                                      padding: '0.2rem 0.4rem',
+                                      borderRadius: '4px'
+                                    }}
+                                    onMouseOver={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                                    onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}
+                                  >
+                                    <FaTrashAlt size={11} /> {guardandoModularSeccion === `poste-del-${pIdx}` ? 'Borrando...' : 'Eliminar este poste'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Datos del Poste */}
+                            {(() => {
+                              const coordsPoste = extraerCoordenadasValidas(poste.ubicacionPoste)
+                              const mapaVisible = mapasPostesVisibles[pIdx] !== false && Boolean(coordsPoste)
+
+                              return (
+                                <>
+                                  <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: coordsPoste && mapaVisible ? '0.65rem' : '0.85rem' }}>
+                                    <div>
+                                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                                        <span>Tipo / Función de poste: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                      </label>
+                                      {modoVisualizacion ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', minHeight: '34px' }}>
+                                          <span style={{
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '0.4rem',
+                                            padding: '0.35rem 0.8rem',
+                                            borderRadius: '6px',
+                                            fontSize: '0.85rem',
+                                            fontWeight: '700',
+                                            backgroundColor: (poste.tipoPoste || 'mixto') === 'peatonal' ? '#EFF6FF' : '#FDF2F8',
+                                            color: (poste.tipoPoste || 'mixto') === 'peatonal' ? '#1D4ED8' : '#691B31',
+                                            border: (poste.tipoPoste || 'mixto') === 'peatonal' ? '1px solid #BFDBFE' : '1px solid #FBCFE8'
+                                          }}>
+                                            {(poste.tipoPoste || 'mixto') === 'peatonal' ? <FaWalking size={12} /> : <FaTrafficLight size={12} />}
+                                            {(poste.tipoPoste || 'mixto') === 'peatonal' ? 'Peatonal' : 'Vehicular / Mixto'}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <div style={{
+                                          display: 'grid',
+                                          gridTemplateColumns: '1fr 1fr',
+                                          gap: '3px',
+                                          backgroundColor: '#F1F5F9',
+                                          padding: '3px',
+                                          borderRadius: '6px',
+                                          border: '1px solid #CBD5E1',
+                                          boxSizing: 'border-box'
+                                        }}>
+                                          {[
+                                            { val: 'mixto', label: 'Vehicular / Mixto', icon: <FaTrafficLight size={11} /> },
+                                            { val: 'peatonal', label: 'Peatonal', icon: <FaWalking size={11} /> }
+                                          ].map(({ val, label, icon }) => {
+                                            const isSel = (poste.tipoPoste || 'mixto') === val
+                                            return (
+                                              <button
+                                                key={val}
+                                                type="button"
+                                                onClick={() => {
+                                                  if (val === 'peatonal') {
+                                                    handleActualizarPosteMultiple(pIdx, {
+                                                      tipoPoste: 'peatonal',
+                                                      modeloPoste: (!poste.modeloPoste || poste.modeloPoste === 'PCC-1' || normalizarNombreModeloPoste(poste.modeloPoste) === 'MP-01') ? 'MP-01' : normalizarNombreModeloPoste(poste.modeloPoste),
+                                                      tienePeatonal: true,
+                                                      tipoCabezal: 'Ninguno',
+                                                      pantallaPiezas: '',
+                                                      cabezalesGrupos: [],
+                                                      peatonalModelo: poste.peatonalModelo || MODELOS_PEATONAL_CATALOGO[0],
+                                                      peatonalModuloEstado: poste.peatonalModuloEstado || 'Operando',
+                                                      peatonalesLista: (poste.peatonalesLista && poste.peatonalesLista.length > 0) ? poste.peatonalesLista : [crearPeatonalInicial(1)]
+                                                    })
+                                                  } else {
+                                                    handleActualizarPosteMultiple(pIdx, {
+                                                      tipoPoste: 'mixto',
+                                                      modeloPoste: (normalizarNombreModeloPoste(poste.modeloPoste) === 'MP-01') ? 'PCC-1' : (poste.modeloPoste || 'PCC-1'),
+                                                      tipoCabezal: 'LED',
+                                                      cabezalesGrupos: (poste.cabezalesGrupos && poste.cabezalesGrupos.length > 0) ? poste.cabezalesGrupos : [
+                                                        {
+                                                          id: 1,
+                                                          numLeds: 4,
+                                                          leds: [
+                                                            { numero: 1, color: 'Rojo', estado: 'Funciona' },
+                                                            { numero: 2, color: 'Amarillo', estado: 'Funciona' },
+                                                            { numero: 3, color: 'Verde', estado: 'Funciona' },
+                                                            { numero: 4, color: 'Flecha Verde', estado: 'Funciona' }
+                                                          ]
+                                                        }
+                                                      ]
+                                                    })
+                                                  }
+                                                }}
+                                                style={{
+                                                  border: 'none',
+                                                  borderRadius: '4px',
+                                                  padding: '0.45rem 0.5rem',
+                                                  fontSize: '0.78rem',
+                                                  fontWeight: isSel ? '700' : '500',
+                                                  backgroundColor: isSel ? '#691B31' : 'transparent',
+                                                  color: isSel ? '#FFFFFF' : '#475569',
+                                                  cursor: 'pointer',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  gap: '0.35rem',
+                                                  boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                                  transition: 'all 0.15s',
+                                                  whiteSpace: 'nowrap'
+                                                }}
+                                              >
+                                                {icon}
+                                                <span>{label}</span>
+                                              </button>
+                                            )
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.35rem' }}>
+                                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', margin: 0 }}>
+                                          <span>Coordenadas del poste:</span>
+                                        </label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                          {coordsPoste && (
+                                            <button
+                                              type="button"
+                                              onClick={() => setMapasPostesVisibles(prev => ({
+                                                ...prev,
+                                                [pIdx]: mapaVisible ? false : true
+                                              }))}
+                                              style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '0.25rem',
+                                                padding: '0.15rem 0.45rem',
+                                                backgroundColor: mapaVisible ? '#EFF6FF' : '#F1F5F9',
+                                                color: mapaVisible ? '#1D4ED8' : '#475569',
+                                                border: mapaVisible ? '1px solid #BFDBFE' : '1px solid #CBD5E1',
+                                                borderRadius: '4px',
+                                                fontSize: '0.72rem',
+                                                fontWeight: '700',
+                                                cursor: 'pointer',
+                                                whiteSpace: 'nowrap',
+                                                transition: 'all 0.15s',
+                                                pointerEvents: 'auto'
+                                              }}
+                                              title={mapaVisible ? 'Ocultar mapa interactivo' : 'Mostrar mapa interactivo'}
+                                            >
+                                              <FaMap size={10} />
+                                              <span>{mapaVisible ? 'Ocultar mapa' : 'Ver mapa'}</span>
+                                            </button>
+                                          )}
+                                          {!modoVisualizacion && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleObtenerGpsPoste(pIdx)}
+                                              disabled={capturandoGpsPosteIndex === pIdx}
+                                              style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '0.25rem',
+                                                backgroundColor: capturandoGpsPosteIndex === pIdx ? '#E2E8F0' : '#FEF3C7',
+                                                color: '#92400E',
+                                                border: '1px solid #FCD34D',
+                                                borderRadius: '4px',
+                                                padding: '0.15rem 0.45rem',
+                                                fontSize: '0.72rem',
+                                                fontWeight: '700',
+                                                cursor: capturandoGpsPosteIndex === pIdx ? 'wait' : 'pointer'
+                                              }}
+                                              title="Capturar ubicación GPS actual del poste"
+                                            >
+                                              <FaMapMarkerAlt size={10} />
+                                              {capturandoGpsPosteIndex === pIdx ? 'Obteniendo GPS...' : 'GPS actual'}
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                      {modoVisualizacion ? (
+                                        renderDatoConsulta(poste.ubicacionPoste, 'Sin coordenadas registradas')
+                                      ) : (
+                                        <>
+                                          <input
+                                            type="text"
+                                            list={`sugerencias-ubicacion-postes-${pIdx}`}
+                                            placeholder="ej. 20.123456, -98.765432"
+                                            value={poste.ubicacionPoste || ''}
+                                            onChange={(e) => {
+                                              handleActualizarPoste(pIdx, 'ubicacionPoste', e.target.value)
+                                              if (extraerCoordenadasValidas(e.target.value)) {
+                                                setMapasPostesVisibles(prev => ({ ...prev, [pIdx]: true }))
+                                              }
+                                            }}
+                                            style={{
+                                              width: '100%',
+                                              padding: '0.45rem 0.65rem',
+                                              border: '1px solid #CBD5E1',
+                                              borderRadius: '6px',
+                                              fontSize: '0.85rem',
+                                              boxSizing: 'border-box'
+                                            }}
+                                          />
+                                          <datalist id={`sugerencias-ubicacion-postes-${pIdx}`}>
+                                            <option value="Camellón Central (Isleta)" />
+                                            <option value="Banqueta Poniente" />
+                                            <option value="Banqueta Oriente" />
+                                            <option value="Banqueta Norte" />
+                                            <option value="Banqueta Sur" />
+                                            <option value="Esquina Norponiente" />
+                                            <option value="Esquina Surponiente" />
+                                            <option value="Esquina Nororiente" />
+                                            <option value="Esquina Suroriente" />
+                                          </datalist>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* MAPA DEL POSTE A TODO LO ANCHO DE LA TARJETA */}
+                                  {coordsPoste && mapaVisible && (
+                                    <div style={{
+                                      marginBottom: '0.85rem',
+                                      borderRadius: '8px',
+                                      overflow: 'hidden',
+                                      border: '1px solid #CBD5E1',
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                                      backgroundColor: '#ffffff',
+                                      pointerEvents: 'auto'
+                                    }}>
+                                      <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        padding: '0.35rem 0.65rem',
+                                        backgroundColor: '#F8FAFC',
+                                        borderBottom: '1px solid #E2E8F0',
+                                        fontSize: '0.74rem',
+                                        color: '#475569'
+                                      }}>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                                          <FaMapMarkerAlt size={11} style={{ color: '#DC2626' }} />
+                                          <span>Ubicación GPS del poste #{pIdx + 1}: <strong style={{ color: '#1E293B' }}>{coordsPoste.lat.toFixed(6)}, {coordsPoste.lng.toFixed(6)}</strong></span>
+                                        </span>
+                                        <a
+                                          href={`https://www.google.com/maps?q=${coordsPoste.lat},${coordsPoste.lng}`}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          style={{
+                                            color: '#2563EB',
+                                            textDecoration: 'none',
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '0.25rem',
+                                            fontSize: '0.72rem',
+                                            fontWeight: '600'
+                                          }}
+                                          title="Abrir en Google Maps externo"
+                                        >
+                                          <FaExternalLinkAlt size={9} /> Abrir en Google Maps
+                                        </a>
+                                      </div>
+                                      <iframe
+                                        title={`Mapa del poste #${pIdx + 1}`}
+                                        src={`https://maps.google.com/maps?q=${coordsPoste.lat},${coordsPoste.lng}&hl=es&z=17&output=embed`}
+                                        style={{
+                                          width: '100%',
+                                          height: '210px',
+                                          border: 'none',
+                                          display: 'block'
+                                        }}
+                                        loading="lazy"
+                                      />
+                                    </div>
+                                  )}
+                                </>
+                              )
+                            })()}
+
+                            <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '0.85rem' }}>
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                                  <span>Modelo de poste: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                </label>
+                                {modoVisualizacion ? (
+                                  renderDatoConsulta(normalizarNombreModeloPoste(poste.modeloPoste) || 'Sin modelo')
+                                ) : (
+                                  <select
+                                    value={normalizarNombreModeloPoste(poste.modeloPoste)}
+                                    onChange={(e) => handleActualizarPoste(pIdx, 'modeloPoste', e.target.value)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '0.45rem 0.65rem',
+                                      border: '1px solid #CBD5E1',
                                       borderRadius: '6px',
                                       fontSize: '0.85rem',
-                                      fontWeight: '700',
-                                      backgroundColor: (poste.tipoPoste || 'mixto') === 'peatonal' ? '#EFF6FF' : '#FDF2F8',
-                                      color: (poste.tipoPoste || 'mixto') === 'peatonal' ? '#1D4ED8' : '#691B31',
-                                      border: (poste.tipoPoste || 'mixto') === 'peatonal' ? '1px solid #BFDBFE' : '1px solid #FBCFE8'
-                                    }}>
-                                      {(poste.tipoPoste || 'mixto') === 'peatonal' ? <FaWalking size={12} /> : <FaTrafficLight size={12} />}
-                                      {(poste.tipoPoste || 'mixto') === 'peatonal' ? 'Peatonal' : 'Vehicular / Mixto'}
-                                    </span>
-                                  </div>
+                                      backgroundColor: 'white',
+                                      color: '#1E293B',
+                                      boxSizing: 'border-box'
+                                    }}
+                                  >
+                                    <option value="">-- Seleccionar modelo de poste --</option>
+                                    {MODELOS_POSTES_CATALOGO.map((modelo) => (
+                                      <option key={modelo} value={modelo}>{modelo}</option>
+                                    ))}
+                                    {poste.modeloPoste && !MODELOS_POSTES_CATALOGO.includes(normalizarNombreModeloPoste(poste.modeloPoste)) && (
+                                      <option value={poste.modeloPoste}>{poste.modeloPoste}</option>
+                                    )}
+                                  </select>
+                                )}
+                              </div>
+
+                              <div>
+                                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                                  <span>Estado de tapa de registro: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                </label>
+                                {modoVisualizacion ? (
+                                  renderBadgeConsulta(poste.tapaRegistro || 'Buena')
                                 ) : (
                                   <div style={{
                                     display: 'grid',
-                                    gridTemplateColumns: '1fr 1fr',
+                                    gridTemplateColumns: 'repeat(4, 1fr)',
                                     gap: '3px',
                                     backgroundColor: '#F1F5F9',
                                     padding: '3px',
@@ -7988,1228 +8379,806 @@ export default function InventarioSemaforos() {
                                     border: '1px solid #CBD5E1',
                                     boxSizing: 'border-box'
                                   }}>
-                                    {[
-                                      { val: 'mixto', label: 'Vehicular / Mixto', icon: <FaTrafficLight size={11} /> },
-                                      { val: 'peatonal', label: 'Peatonal', icon: <FaWalking size={11} /> }
-                                    ].map(({ val, label, icon }) => {
-                                      const isSel = (poste.tipoPoste || 'mixto') === val
+                                    {['Buena', 'Dañada', 'Faltante', 'No aplica'].map((opcion) => {
+                                      const isSel = (poste.tapaRegistro || 'Buena') === opcion
                                       return (
                                         <button
-                                          key={val}
+                                          key={opcion}
                                           type="button"
-                                          onClick={() => {
-                                            if (val === 'peatonal') {
-                                              handleActualizarPosteMultiple(pIdx, {
-                                                tipoPoste: 'peatonal',
-                                                modeloPoste: (!poste.modeloPoste || poste.modeloPoste === 'PCC-1' || normalizarNombreModeloPoste(poste.modeloPoste) === 'MP-01') ? 'MP-01' : normalizarNombreModeloPoste(poste.modeloPoste),
-                                                tienePeatonal: true,
-                                                tipoCabezal: 'Ninguno',
-                                                pantallaPiezas: '',
-                                                cabezalesGrupos: [],
-                                                peatonalModelo: poste.peatonalModelo || MODELOS_PEATONAL_CATALOGO[0],
-                                                peatonalModuloEstado: poste.peatonalModuloEstado || 'Operando',
-                                                peatonalesLista: (poste.peatonalesLista && poste.peatonalesLista.length > 0) ? poste.peatonalesLista : [crearPeatonalInicial(1)]
-                                              })
-                                            } else {
-                                              handleActualizarPosteMultiple(pIdx, {
-                                                tipoPoste: 'mixto',
-                                                modeloPoste: (normalizarNombreModeloPoste(poste.modeloPoste) === 'MP-01') ? 'PCC-1' : (poste.modeloPoste || 'PCC-1'),
-                                                tipoCabezal: 'LED',
-                                                cabezalesGrupos: (poste.cabezalesGrupos && poste.cabezalesGrupos.length > 0) ? poste.cabezalesGrupos : [
-                                                  {
-                                                    id: 1,
-                                                    numLeds: 4,
-                                                    leds: [
-                                                      { numero: 1, color: 'Rojo', estado: 'Funciona' },
-                                                      { numero: 2, color: 'Amarillo', estado: 'Funciona' },
-                                                      { numero: 3, color: 'Verde', estado: 'Funciona' },
-                                                      { numero: 4, color: 'Flecha Verde', estado: 'Funciona' }
-                                                    ]
-                                                  }
-                                                ]
-                                              })
-                                            }
-                                          }}
+                                          onClick={() => handleActualizarPoste(pIdx, 'tapaRegistro', opcion)}
                                           style={{
                                             border: 'none',
                                             borderRadius: '4px',
-                                            padding: '0.45rem 0.5rem',
+                                            padding: '0.45rem 0.2rem',
                                             fontSize: '0.78rem',
                                             fontWeight: isSel ? '700' : '500',
                                             backgroundColor: isSel ? '#691B31' : 'transparent',
                                             color: isSel ? '#FFFFFF' : '#475569',
                                             cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            gap: '0.35rem',
-                                            boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
                                             transition: 'all 0.15s',
-                                            whiteSpace: 'nowrap'
+                                            whiteSpace: 'nowrap',
+                                            boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                            textAlign: 'center'
                                           }}
                                         >
-                                          {icon}
-                                          <span>{label}</span>
+                                          {opcion}
                                         </button>
                                       )
                                     })}
                                   </div>
                                 )}
                               </div>
-
-                              <div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.35rem' }}>
-                                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', margin: 0 }}>
-                                    <span>Coordenadas del poste:</span>
-                                  </label>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                    {coordsPoste && (
-                                      <button
-                                        type="button"
-                                        onClick={() => setMapasPostesVisibles(prev => ({
-                                          ...prev,
-                                          [pIdx]: mapaVisible ? false : true
-                                        }))}
-                                        style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '0.25rem',
-                                          padding: '0.15rem 0.45rem',
-                                          backgroundColor: mapaVisible ? '#EFF6FF' : '#F1F5F9',
-                                          color: mapaVisible ? '#1D4ED8' : '#475569',
-                                          border: mapaVisible ? '1px solid #BFDBFE' : '1px solid #CBD5E1',
-                                          borderRadius: '4px',
-                                          fontSize: '0.72rem',
-                                          fontWeight: '700',
-                                          cursor: 'pointer',
-                                          whiteSpace: 'nowrap',
-                                          transition: 'all 0.15s',
-                                          pointerEvents: 'auto'
-                                        }}
-                                        title={mapaVisible ? 'Ocultar mapa interactivo' : 'Mostrar mapa interactivo'}
-                                      >
-                                        <FaMap size={10} />
-                                        <span>{mapaVisible ? 'Ocultar mapa' : 'Ver mapa'}</span>
-                                      </button>
-                                    )}
-                                    {!modoVisualizacion && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleObtenerGpsPoste(pIdx)}
-                                        disabled={capturandoGpsPosteIndex === pIdx}
-                                        style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '0.25rem',
-                                          backgroundColor: capturandoGpsPosteIndex === pIdx ? '#E2E8F0' : '#FEF3C7',
-                                          color: '#92400E',
-                                          border: '1px solid #FCD34D',
-                                          borderRadius: '4px',
-                                          padding: '0.15rem 0.45rem',
-                                          fontSize: '0.72rem',
-                                          fontWeight: '700',
-                                          cursor: capturandoGpsPosteIndex === pIdx ? 'wait' : 'pointer'
-                                        }}
-                                        title="Capturar ubicación GPS actual del poste"
-                                      >
-                                        <FaMapMarkerAlt size={10} />
-                                        {capturandoGpsPosteIndex === pIdx ? 'Obteniendo GPS...' : 'GPS actual'}
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                                {modoVisualizacion ? (
-                                  renderDatoConsulta(poste.ubicacionPoste, 'Sin coordenadas registradas')
-                                ) : (
-                                  <>
-                                    <input
-                                      type="text"
-                                      list={`sugerencias-ubicacion-postes-${pIdx}`}
-                                      placeholder="ej. 20.123456, -98.765432"
-                                      value={poste.ubicacionPoste || ''}
-                                      onChange={(e) => {
-                                        handleActualizarPoste(pIdx, 'ubicacionPoste', e.target.value)
-                                        if (extraerCoordenadasValidas(e.target.value)) {
-                                          setMapasPostesVisibles(prev => ({ ...prev, [pIdx]: true }))
-                                        }
-                                      }}
-                                      style={{
-                                        width: '100%',
-                                        padding: '0.45rem 0.65rem',
-                                        border: '1px solid #CBD5E1',
-                                        borderRadius: '6px',
-                                        fontSize: '0.85rem',
-                                        boxSizing: 'border-box'
-                                      }}
-                                    />
-                                    <datalist id={`sugerencias-ubicacion-postes-${pIdx}`}>
-                                      <option value="Camellón Central (Isleta)" />
-                                      <option value="Banqueta Poniente" />
-                                      <option value="Banqueta Oriente" />
-                                      <option value="Banqueta Norte" />
-                                      <option value="Banqueta Sur" />
-                                      <option value="Esquina Norponiente" />
-                                      <option value="Esquina Surponiente" />
-                                      <option value="Esquina Nororiente" />
-                                      <option value="Esquina Suroriente" />
-                                    </datalist>
-                                  </>
-                                )}
-                              </div>
                             </div>
 
-                            {/* MAPA DEL POSTE A TODO LO ANCHO DE LA TARJETA */}
-                            {coordsPoste && mapaVisible && (
-                              <div style={{
-                                marginBottom: '0.85rem',
-                                borderRadius: '8px',
-                                overflow: 'hidden',
-                                border: '1px solid #CBD5E1',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                                backgroundColor: '#ffffff',
-                                pointerEvents: 'auto'
-                              }}>
-                                <div style={{
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  padding: '0.35rem 0.65rem',
-                                  backgroundColor: '#F8FAFC',
-                                  borderBottom: '1px solid #E2E8F0',
-                                  fontSize: '0.74rem',
-                                  color: '#475569'
-                                }}>
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                                    <FaMapMarkerAlt size={11} style={{ color: '#DC2626' }} />
-                                    <span>Ubicación GPS del poste #{pIdx + 1}: <strong style={{ color: '#1E293B' }}>{coordsPoste.lat.toFixed(6)}, {coordsPoste.lng.toFixed(6)}</strong></span>
-                                  </span>
-                                  <a
-                                    href={`https://www.google.com/maps?q=${coordsPoste.lat},${coordsPoste.lng}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    style={{
-                                      color: '#2563EB',
-                                      textDecoration: 'none',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: '0.25rem',
-                                      fontSize: '0.72rem',
-                                      fontWeight: '600'
-                                    }}
-                                    title="Abrir en Google Maps externo"
-                                  >
-                                    <FaExternalLinkAlt size={9} /> Abrir en Google Maps
-                                  </a>
-                                </div>
-                                <iframe
-                                  title={`Mapa del poste #${pIdx + 1}`}
-                                  src={`https://maps.google.com/maps?q=${coordsPoste.lat},${coordsPoste.lng}&hl=es&z=17&output=embed`}
-                                  style={{
-                                    width: '100%',
-                                    height: '210px',
-                                    border: 'none',
-                                    display: 'block'
-                                  }}
-                                  loading="lazy"
-                                />
-                              </div>
-                            )}
-                          </>
-                        )
-                      })()}
-
-                      <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '0.85rem' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                            <span>Modelo de poste: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                          </label>
-                          {modoVisualizacion ? (
-                            renderDatoConsulta(normalizarNombreModeloPoste(poste.modeloPoste) || 'Sin modelo')
-                          ) : (
-                            <select
-                              value={normalizarNombreModeloPoste(poste.modeloPoste)}
-                              onChange={(e) => handleActualizarPoste(pIdx, 'modeloPoste', e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '0.45rem 0.65rem',
-                                border: '1px solid #CBD5E1',
-                                borderRadius: '6px',
-                                fontSize: '0.85rem',
-                                backgroundColor: 'white',
-                                color: '#1E293B',
-                                boxSizing: 'border-box'
-                              }}
-                            >
-                              <option value="">-- Seleccionar modelo de poste --</option>
-                              {MODELOS_POSTES_CATALOGO.map((modelo) => (
-                                <option key={modelo} value={modelo}>{modelo}</option>
-                              ))}
-                              {poste.modeloPoste && !MODELOS_POSTES_CATALOGO.includes(normalizarNombreModeloPoste(poste.modeloPoste)) && (
-                                <option value={poste.modeloPoste}>{poste.modeloPoste}</option>
-                              )}
-                            </select>
-                          )}
-                        </div>
-
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                            <span>Estado de tapa de registro: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                          </label>
-                          {modoVisualizacion ? (
-                            renderBadgeConsulta(poste.tapaRegistro || 'Buena')
-                          ) : (
-                            <div style={{
-                              display: 'grid',
-                              gridTemplateColumns: 'repeat(4, 1fr)',
-                              gap: '3px',
-                              backgroundColor: '#F1F5F9',
-                              padding: '3px',
-                              borderRadius: '6px',
-                              border: '1px solid #CBD5E1',
-                              boxSizing: 'border-box'
-                            }}>
-                              {['Buena', 'Dañada', 'Faltante', 'No aplica'].map((opcion) => {
-                                const isSel = (poste.tapaRegistro || 'Buena') === opcion
-                                return (
-                                  <button
-                                    key={opcion}
-                                    type="button"
-                                    onClick={() => handleActualizarPoste(pIdx, 'tapaRegistro', opcion)}
-                                    style={{
-                                      border: 'none',
-                                      borderRadius: '4px',
-                                      padding: '0.45rem 0.2rem',
-                                      fontSize: '0.78rem',
-                                      fontWeight: isSel ? '700' : '500',
-                                      backgroundColor: isSel ? '#691B31' : 'transparent',
-                                      color: isSel ? '#FFFFFF' : '#475569',
-                                      cursor: 'pointer',
-                                      transition: 'all 0.15s',
-                                      whiteSpace: 'nowrap',
-                                      boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                      textAlign: 'center'
-                                    }}
-                                  >
-                                    {opcion}
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div style={{ marginBottom: '1.25rem' }}>
-                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                          <span>Observaciones del poste:</span>
-                        </label>
-                        {modoVisualizacion ? (
-                          renderObservacionesConsulta(poste.observaciones, 'Sin observaciones registradas')
-                        ) : (
-                          <input
-                            type="text"
-                            placeholder="Detalles de golpes, corrosión, cableado expuesto o estado general..."
-                            value={poste.observaciones || ''}
-                            onChange={(e) => handleActualizarPoste(pIdx, 'observaciones', e.target.value)}
-                            style={{
-                              width: '100%',
-                              padding: '0.45rem 0.65rem',
-                              border: '1px solid #CBD5E1',
-                              borderRadius: '6px',
-                              fontSize: '0.85rem',
-                              boxSizing: 'border-box'
-                            }}
-                          />
-                        )}
-                      </div>
-
-                      {/* Cabezales Vehiculares (Solo si no es exclusivo peatonal) */}
-                      {poste.tipoPoste !== 'peatonal' && (
-                        <div style={{
-                          border: '1px solid #E2E8F0',
-                          backgroundColor: '#FFFFFF',
-                          borderRadius: '8px',
-                          padding: '1rem',
-                          marginTop: '1rem',
-                          marginBottom: '1.25rem',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
-                            <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                              <FaTrafficLight size={13} style={{ color: '#BC955B' }} /> Cabezales Vehiculares
-                            </span>
-                            <span style={{ fontSize: '0.74rem', color: '#64748B' }}>Tipo y desglose de luces</span>
-                          </div>
-
-                          <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '0.85rem' }}>
-                            <div>
+                            <div style={{ marginBottom: '1.25rem' }}>
                               <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                <span>Tipo de cabezal: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                <span>Observaciones del poste:</span>
                               </label>
                               {modoVisualizacion ? (
-                                <div style={{ display: 'flex', alignItems: 'center', minHeight: '34px' }}>
-                                  <span style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.35rem',
-                                    padding: '0.3rem 0.75rem',
-                                    borderRadius: '6px',
-                                    fontSize: '0.85rem',
-                                    fontWeight: '700',
-                                    backgroundColor: (poste.tipoCabezal || 'LED') === 'Pantalla' ? '#EFF6FF' : '#F1F5F9',
-                                    color: (poste.tipoCabezal || 'LED') === 'Pantalla' ? '#1D4ED8' : '#334155',
-                                    border: (poste.tipoCabezal || 'LED') === 'Pantalla' ? '1px solid #BFDBFE' : '1px solid #CBD5E1'
-                                  }}>
-                                    {(poste.tipoCabezal || 'LED') === 'Pantalla' ? <FaDesktop size={12} /> : <FaTrafficLight size={12} />}
-                                    {(poste.tipoCabezal || 'LED') === 'Pantalla' ? 'Pantalla LED' : 'LED'}
-                                  </span>
-                                </div>
+                                renderObservacionesConsulta(poste.observaciones, 'Sin observaciones registradas')
                               ) : (
-                                <div style={{
-                                  display: 'grid',
-                                  gridTemplateColumns: '1fr 1fr',
-                                  gap: '3px',
-                                  backgroundColor: '#F1F5F9',
-                                  padding: '3px',
-                                  borderRadius: '6px',
-                                  border: '1px solid #CBD5E1',
-                                  boxSizing: 'border-box'
-                                }}>
-                                  {[
-                                    { val: 'LED', label: 'LED', icon: <FaTrafficLight size={11} /> },
-                                    { val: 'Pantalla', label: 'Pantalla LED', icon: <FaDesktop size={11} /> }
-                                  ].map(({ val, label, icon }) => {
-                                    const isSel = (poste.tipoCabezal || 'LED') === val
-                                    return (
-                                      <button
-                                        key={val}
-                                        type="button"
-                                        onClick={() => {
-                                          const nuevoTipo = val
-                                          const piezasVal = nuevoTipo === 'Pantalla' ? (poste.pantallaPiezas || '1') : ''
-                                          const cantNum = parseInt(piezasVal, 10) || 0
-                                          const pantallasInit = cantNum > 0
-                                            ? Array.from({ length: cantNum }, (_, i) => ({ numero: i + 1, estado: 'Funciona' }))
-                                            : []
-                                          handleActualizarPosteMultiple(pIdx, {
-                                            tipoCabezal: nuevoTipo,
-                                            cabezalModelo: nuevoTipo === 'Pantalla' ? 'Semáforo de pantalla LED' : (poste.cabezalModelo === 'Semáforo de pantalla LED' ? 'LV-1' : (poste.cabezalModelo || 'LV-1')),
-                                            pantallaPiezas: piezasVal,
-                                            pantallasLista: nuevoTipo === 'Pantalla' ? (poste.pantallasLista?.length ? poste.pantallasLista : pantallasInit) : [],
-                                            pantallaEstado: 'Funciona'
-                                          })
-                                        }}
-                                        style={{
-                                          border: 'none',
-                                          borderRadius: '4px',
-                                          padding: '0.45rem 0.5rem',
-                                          fontSize: '0.78rem',
-                                          fontWeight: isSel ? '700' : '500',
-                                          backgroundColor: isSel ? '#691B31' : 'transparent',
-                                          color: isSel ? '#FFFFFF' : '#475569',
-                                          cursor: 'pointer',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          gap: '0.35rem',
-                                          boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                          transition: 'all 0.15s',
-                                          whiteSpace: 'nowrap'
-                                        }}
-                                      >
-                                        {icon}
-                                        <span>{label}</span>
-                                      </button>
-                                    )
-                                  })}
-                                </div>
-                              )}
-                            </div>
-
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                <span>Modelo de cabezal: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                              </label>
-                              {modoVisualizacion ? (
-                                renderDatoConsulta(poste.cabezalModelo, 'Sin modelo especificado')
-                              ) : (
-                                <select
-                                  value={poste.cabezalModelo || ''}
-                                  onChange={(e) => handleActualizarPoste(pIdx, 'cabezalModelo', e.target.value)}
+                                <input
+                                  type="text"
+                                  placeholder="Detalles de golpes, corrosión, cableado expuesto o estado general..."
+                                  value={poste.observaciones || ''}
+                                  onChange={(e) => handleActualizarPoste(pIdx, 'observaciones', e.target.value)}
                                   style={{
                                     width: '100%',
                                     padding: '0.45rem 0.65rem',
                                     border: '1px solid #CBD5E1',
                                     borderRadius: '6px',
                                     fontSize: '0.85rem',
-                                    backgroundColor: 'white',
-                                    color: '#1E293B',
                                     boxSizing: 'border-box'
                                   }}
-                                >
-                                  <option value="">-- Seleccionar modelo de cabezal --</option>
-                                  {MODELOS_CABEZAL_CATALOGO.map((modelo) => (
-                                    <option key={modelo} value={modelo}>{modelo}</option>
-                                  ))}
-                                  {poste.cabezalModelo && !MODELOS_CABEZAL_CATALOGO.includes(poste.cabezalModelo) && (
-                                    <option value={poste.cabezalModelo}>{poste.cabezalModelo}</option>
-                                  )}
-                                </select>
+                                />
                               )}
                             </div>
-                          </div>
 
-                          {/* Pantalla LED */}
-                          {poste.tipoCabezal === 'Pantalla' && (() => {
-                            const cantPiezas = Number(poste.pantallaPiezas) || 0
-                            const piezasList = (Array.isArray(poste.pantallasLista) && poste.pantallasLista.length > 0)
-                              ? poste.pantallasLista
-                              : (cantPiezas > 0
-                                ? Array.from({ length: cantPiezas }, (_, i) => ({ numero: i + 1, estado: poste.pantallaEstado || 'Funciona' }))
-                                : [])
-
-                            return (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '0.85rem' }}>
-                                <div>
-                                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                    <span>Cantidad de piezas: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                                  </label>
-                                  {modoVisualizacion ? (
-                                    renderDatoConsulta(`${poste.pantallaPiezas || 0} piezas`)
-                                  ) : (
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      placeholder="ej. 1, 2, 3..."
-                                      value={poste.pantallaPiezas === 0 || poste.pantallaPiezas === '0' ? '' : (poste.pantallaPiezas ?? '')}
-                                      onChange={(e) => handleCambiarPantallaPiezasEnPoste(pIdx, e.target.value)}
-                                      style={{ width: '100%', maxWidth: '240px', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                                    />
-                                  )}
+                            {/* Cabezales Vehiculares (Solo si no es exclusivo peatonal) */}
+                            {poste.tipoPoste !== 'peatonal' && (
+                              <div style={{
+                                border: '1px solid #E2E8F0',
+                                backgroundColor: '#FFFFFF',
+                                borderRadius: '8px',
+                                padding: '1rem',
+                                marginTop: '1rem',
+                                marginBottom: '1.25rem',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                  <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                    <FaTrafficLight size={13} style={{ color: '#BC955B' }} /> Cabezales Vehiculares
+                                  </span>
+                                  <span style={{ fontSize: '0.74rem', color: '#64748B' }}>Tipo y desglose de luces</span>
                                 </div>
 
-                                {piezasList.length > 0 ? (
+                                <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '0.85rem' }}>
                                   <div>
-                                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.5rem' }}>
-                                      <span>Estado de operación de cada pieza: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                                      <span>Tipo de cabezal: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                                     </label>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))', gap: '0.5rem' }}>
-                                      {piezasList.map((pieza) => (
-                                        <div
-                                          key={`p-${pIdx}-pieza-${pieza.numero}`}
-                                          style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            backgroundColor: '#FFFFFF',
-                                            padding: '0.45rem 0.75rem',
-                                            borderRadius: '6px',
-                                            border: '1px solid #CBD5E1',
-                                            gap: '0.5rem'
-                                          }}
-                                        >
-                                          <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                            <FaDesktop size={11} style={{ color: '#691B31' }} />
-                                            Pieza #{pieza.numero}
-                                          </span>
-                                          {modoVisualizacion ? (
-                                            <span style={{
-                                              display: 'inline-flex',
-                                              alignItems: 'center',
-                                              gap: '0.35rem',
-                                              fontSize: '0.78rem',
-                                              fontWeight: '700',
-                                              padding: '0.2rem 0.55rem',
-                                              borderRadius: '5px',
-                                              backgroundColor: (pieza.estado || 'Funciona') === 'Funciona' ? '#DCFCE7' : '#FEE2E2',
-                                              color: (pieza.estado || 'Funciona') === 'Funciona' ? '#15803D' : '#B91C1C',
-                                              border: (pieza.estado || 'Funciona') === 'Funciona' ? '1px solid #86EFAC' : '1px solid #FCA5A5'
-                                            }}>
-                                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: (pieza.estado || 'Funciona') === 'Funciona' ? '#16A34A' : '#DC2626' }} />
-                                              {(pieza.estado || 'Funciona') === 'Funciona' ? 'Funciona' : 'No funciona'}
-                                            </span>
-                                          ) : (
-                                            <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center' }}>
-                                              {['Funciona', 'No funciona'].map((estado) => (
-                                                <label
-                                                  key={estado}
-                                                  style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '0.25rem',
-                                                    cursor: 'pointer',
-                                                    fontSize: '0.8rem',
-                                                    fontWeight: (pieza.estado || 'Funciona') === estado ? '700' : '500',
-                                                    color: (pieza.estado || 'Funciona') === estado ? (estado === 'Funciona' ? '#16A34A' : '#DC2626') : '#64748B'
-                                                  }}
-                                                >
-                                                  <input
-                                                    type="radio"
-                                                    name={`poste-${pIdx}-pieza-${pieza.numero}-estado`}
-                                                    value={estado}
-                                                    checked={(pieza.estado || 'Funciona') === estado}
-                                                    onChange={() => handleCambiarEstadoPiezaPantalla(pIdx, pieza.numero, estado)}
-                                                    style={{ accentColor: '#691B31', width: '13px', height: '13px', cursor: 'pointer' }}
-                                                  />
-                                                  <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', backgroundColor: estado === 'Funciona' ? '#16A34A' : '#DC2626' }} />
-                                                  {estado}
-                                                </label>
-                                              ))}
-                                            </div>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div style={{ fontSize: '0.78rem', color: '#64748B', fontStyle: 'italic' }}>
-                                    Ingrese la cantidad de piezas para definir el estado de operación de cada una.
-                                  </div>
-                                )}
-                              </div>
-                            )
-                          })()}
-
-                          {/* Desglose LED */}
-                          {(poste.tipoCabezal || 'LED') === 'LED' && (() => {
-                            const cabezalesGrupos = normalizarCabezalesDetalle(poste.cabezalesGrupos)
-                            return (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                  <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                    Desglose de Cabezales LED:
-                                  </span>
-                                  {!modoVisualizacion && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleAgregarGrupoCabezalEnPoste(pIdx)}
-                                      style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '0.3rem',
-                                        backgroundColor: '#FFFFFF',
-                                        border: '1px solid #CBD5E1',
-                                        borderRadius: '5px',
-                                        padding: '0.25rem 0.6rem',
-                                        fontSize: '0.75rem',
-                                        fontWeight: '700',
-                                        color: '#691B31',
-                                        cursor: 'pointer'
-                                      }}
-                                    >
-                                      <FaPlus size={10} style={{ color: '#BC955B' }} /> + Otro cabezal
-                                    </button>
-                                  )}
-                                </div>
-
-                                {cabezalesGrupos.map((grupo, gIdx) => {
-                                  const numLeds = grupo.numLeds !== undefined ? Number(grupo.numLeds) : 4
-                                  const leds = (grupo.leds || []).slice(0, numLeds)
-
-                                  return (
-                                    <div
-                                      key={grupo.id || gIdx}
-                                      style={{
-                                        backgroundColor: '#F8FAFC',
-                                        padding: '0.75rem 0.85rem',
-                                        borderRadius: '8px',
-                                        border: '1px solid #E2E8F0'
-                                      }}
-                                    >
-                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
-                                        <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                          <FaTrafficLight size={11} style={{ color: '#691B31' }} />
-                                          Cabezal {cabezalesGrupos.length > 1 ? `#${gIdx + 1}` : ''}
-                                        </span>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                                          {modoVisualizacion ? (
-                                            <span style={{
-                                              fontSize: '0.78rem',
-                                              fontWeight: '700',
-                                              color: '#334155',
-                                              backgroundColor: '#E2E8F0',
-                                              padding: '0.2rem 0.55rem',
-                                              borderRadius: '5px'
-                                            }}>
-                                              {numLeds} LEDs
-                                            </span>
-                                          ) : (
-                                            <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                              <span>LEDs:</span>
-                                              <input
-                                                type="number"
-                                                min="0"
-                                                max="12"
-                                                value={numLeds || ''}
-                                                onChange={(e) => handleCambiarNumLedsEnPoste(pIdx, gIdx, e.target.value)}
-                                                onWheel={(e) => e.target.blur()}
-                                                style={{ width: '45px', padding: '0.2rem 0.35rem', border: '1px solid #CBD5E1', borderRadius: '4px', fontSize: '0.8rem', textAlign: 'center', fontWeight: '700' }}
-                                              />
-                                            </label>
-                                          )}
-                                          {cabezalesGrupos.length > 1 && !modoVisualizacion && (
-                                            <button
-                                              type="button"
-                                              onClick={() => handleEliminarGrupoCabezalEnPoste(pIdx, gIdx)}
-                                              style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', padding: '0.1rem', display: 'flex', alignItems: 'center' }}
-                                              title="Eliminar cabezal"
-                                            >
-                                              <FaTrashAlt size={11} />
-                                            </button>
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      {numLeds > 0 && (
-                                        <div className="cabezal-leds-grid">
-                                          {leds.map((led, idx) => {
-                                            const colorActual = obtenerConfigColorLed(led.color)
-                                            const isFunciona = (led.estado || 'Funciona') === 'Funciona'
-
-                                            if (modoVisualizacion) {
-                                              return (
-                                                <div
-                                                  key={`p-${pIdx}-g-${gIdx}-led-${led.numero || idx + 1}`}
-                                                  style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'space-between',
-                                                    backgroundColor: '#FFFFFF',
-                                                    padding: '0.35rem 0.5rem',
-                                                    borderRadius: '7px',
-                                                    border: '1px solid #E2E8F0',
-                                                    gap: '0.35rem',
-                                                    boxSizing: 'border-box',
-                                                    minWidth: 0
-                                                  }}
-                                                >
-                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
-                                                    <span
-                                                      style={{
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        width: '22px',
-                                                        height: '22px',
-                                                        minWidth: '22px',
-                                                        minHeight: '22px',
-                                                        borderRadius: '50%',
-                                                        border: `2px solid ${colorActual.color}`,
-                                                        backgroundColor: '#FFFFFF',
-                                                        flexShrink: 0
-                                                      }}
-                                                      title={`Color: ${colorActual.label}`}
-                                                    >
-                                                      <span
-                                                        style={{
-                                                          width: '13px',
-                                                          height: '13px',
-                                                          borderRadius: '50%',
-                                                          backgroundColor: colorActual.color
-                                                        }}
-                                                      />
-                                                    </span>
-                                                    <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#1E293B', minWidth: '18px', flexShrink: 0 }}>
-                                                      L{led.numero || idx + 1}
-                                                    </span>
-                                                    <div
-                                                      style={{
-                                                        display: 'inline-flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'space-between',
-                                                        width: '104px',
-                                                        padding: '0.2rem 0.35rem',
-                                                        border: '1px solid #CBD5E1',
-                                                        borderLeft: `4px solid ${colorActual.color}`,
-                                                        borderRadius: '6px',
-                                                        fontSize: '0.78rem',
-                                                        fontWeight: '600',
-                                                        backgroundColor: '#FFFFFF',
-                                                        color: '#1E293B',
-                                                        boxSizing: 'border-box'
-                                                      }}
-                                                    >
-                                                      <span>{colorActual.label}</span>
-                                                      <span style={{ fontSize: '0.6rem', color: '#64748B' }}>▼</span>
-                                                    </div>
-                                                  </div>
-                                                  <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexShrink: 0, marginLeft: 'auto', pointerEvents: 'none' }}>
-                                                    {['Funciona', 'No funciona'].map((estado) => {
-                                                      const isChecked = (led.estado || 'Funciona') === estado
-                                                      const esFunc = estado === 'Funciona'
-                                                      return (
-                                                        <label
-                                                          key={estado}
-                                                          style={{
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            gap: '0.2rem',
-                                                            cursor: 'default',
-                                                            fontSize: '0.74rem',
-                                                            whiteSpace: 'nowrap',
-                                                            fontWeight: isChecked ? '700' : '500',
-                                                            color: isChecked ? (esFunc ? '#16A34A' : '#DC2626') : '#64748B'
-                                                          }}
-                                                        >
-                                                          <input
-                                                            type="radio"
-                                                            name={`view-p-${pIdx}-g-${gIdx}-led-${idx}-estado`}
-                                                            value={estado}
-                                                            checked={isChecked}
-                                                            disabled
-                                                            readOnly
-                                                            style={{ accentColor: '#691B31', width: '13px', height: '13px', cursor: 'default', margin: 0 }}
-                                                          />
-                                                          <span
-                                                            style={{
-                                                              display: 'inline-block',
-                                                              width: '5px',
-                                                              height: '5px',
-                                                              borderRadius: '50%',
-                                                              backgroundColor: esFunc ? '#16A34A' : '#DC2626',
-                                                              flexShrink: 0
-                                                            }}
-                                                          />
-                                                          {estado}
-                                                        </label>
-                                                      )
-                                                    })}
-                                                  </div>
-                                                </div>
-                                              )
-                                            }
-
-                                            return (
-                                              <div
-                                                key={`p-${pIdx}-g-${gIdx}-led-${led.numero || idx + 1}`}
-                                                style={{
-                                                  display: 'flex',
-                                                  alignItems: 'center',
-                                                  justifyContent: 'space-between',
-                                                  backgroundColor: '#FFFFFF',
-                                                  padding: '0.35rem 0.5rem',
-                                                  borderRadius: '7px',
-                                                  border: '1px solid #E2E8F0',
-                                                  gap: '0.35rem',
-                                                  boxSizing: 'border-box',
-                                                  minWidth: 0
-                                                }}
-                                              >
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
-                                                  <span
-                                                    style={{
-                                                      display: 'inline-flex',
-                                                      alignItems: 'center',
-                                                      justifyContent: 'center',
-                                                      width: '22px',
-                                                      height: '22px',
-                                                      minWidth: '22px',
-                                                      minHeight: '22px',
-                                                      borderRadius: '50%',
-                                                      border: `2px solid ${colorActual.color}`,
-                                                      backgroundColor: '#FFFFFF',
-                                                      flexShrink: 0
-                                                    }}
-                                                    title={`Color: ${colorActual.label}`}
-                                                  >
-                                                    <span
-                                                      style={{
-                                                        width: '13px',
-                                                        height: '13px',
-                                                        borderRadius: '50%',
-                                                        backgroundColor: colorActual.color
-                                                      }}
-                                                    />
-                                                  </span>
-                                                  <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#1E293B', minWidth: '18px', flexShrink: 0 }}>
-                                                    L{led.numero || idx + 1}
-                                                  </span>
-                                                  <select
-                                                    value={led.color || 'Rojo'}
-                                                    onChange={(e) => handleCambiarLedEnPoste(pIdx, gIdx, idx, 'color', e.target.value)}
-                                                    style={{
-                                                      width: '104px',
-                                                      padding: '0.2rem 0.35rem',
-                                                      border: '1px solid #CBD5E1',
-                                                      borderLeft: `4px solid ${colorActual.color}`,
-                                                      borderRadius: '6px',
-                                                      fontSize: '0.78rem',
-                                                      fontWeight: '600',
-                                                      backgroundColor: '#FFFFFF',
-                                                      color: '#1E293B',
-                                                      cursor: 'pointer'
-                                                    }}
-                                                  >
-                                                    {OPCIONES_COLORES_LED.map(c => (
-                                                      <option key={c.valor} value={c.valor}>{c.label}</option>
-                                                    ))}
-                                                  </select>
-                                                </div>
-                                                <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
-                                                  {['Funciona', 'No funciona'].map((estado) => {
-                                                    const isChecked = (led.estado || 'Funciona') === estado
-                                                    const esFunc = estado === 'Funciona'
-                                                    return (
-                                                      <label
-                                                        key={estado}
-                                                        style={{
-                                                          display: 'inline-flex',
-                                                          alignItems: 'center',
-                                                          gap: '0.2rem',
-                                                          cursor: 'pointer',
-                                                          fontSize: '0.74rem',
-                                                          whiteSpace: 'nowrap',
-                                                          fontWeight: isChecked ? '700' : '500',
-                                                          color: isChecked ? (esFunc ? '#16A34A' : '#DC2626') : '#64748B'
-                                                        }}
-                                                      >
-                                                        <input
-                                                          type="radio"
-                                                          name={`p-${pIdx}-g-${gIdx}-led-${idx}-estado`}
-                                                          value={estado}
-                                                          checked={isChecked}
-                                                          onChange={() => handleCambiarLedEnPoste(pIdx, gIdx, idx, 'estado', estado)}
-                                                          style={{ accentColor: '#691B31', width: '13px', height: '13px', cursor: 'pointer', margin: 0 }}
-                                                        />
-                                                        <span
-                                                          style={{
-                                                            display: 'inline-block',
-                                                            width: '5px',
-                                                            height: '5px',
-                                                            borderRadius: '50%',
-                                                            backgroundColor: esFunc ? '#16A34A' : '#DC2626',
-                                                            flexShrink: 0
-                                                          }}
-                                                        />
-                                                        {estado}
-                                                      </label>
-                                                    )
-                                                  })}
-                                                </div>
-                                              </div>
-                                            )
-                                           })}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            )
-                          })()}
-                        </div>
-                      )}
-
-                      {/* Semáforo Peatonal */}
-                      <div style={{
-                        border: '1px solid #E2E8F0',
-                        backgroundColor: '#FFFFFF',
-                        borderRadius: '8px',
-                        padding: '1rem',
-                        marginTop: '1rem',
-                        marginBottom: '1.25rem',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                              <FaWalking size={14} style={{ color: '#BC955B' }} /> Semáforo Peatonal
-                            </span>
-                            {poste.tienePeatonal ? (() => {
-                              const lista = poste.peatonalesLista || []
-                              const conCabezal = lista.filter(pt => pt.modelo && !pt.modelo.toLowerCase().includes('sin cabezal')).length
-                              const conAudible = lista.filter(pt => pt.tieneAudible).length
-                              if (conCabezal === 0 && conAudible > 0) {
-                                return (
-                                  <span style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.72rem', fontWeight: '700', padding: '0.15rem 0.45rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                                    <FaVolumeUp size={10} /> Solo audible ({conAudible})
-                                  </span>
-                                )
-                              }
-                              return (
-                                <span style={{ backgroundColor: '#F1F5F9', color: '#475569', fontSize: '0.72rem', fontWeight: '700', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
-                                  {conCabezal} {conCabezal === 1 ? 'semáforo' : 'semáforos'}
-                                  {conAudible > 0 && ` • ${conAudible} con audible`}
-                                </span>
-                              )
-                            })() : (
-                              <span style={{ backgroundColor: '#F1F5F9', color: '#94A3B8', fontSize: '0.72rem', fontWeight: '600', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
-                                No instalado
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>¿Instalado en este poste?:</span>
-                            {modoVisualizacion ? (
-                              renderBadgeConsulta(poste.tienePeatonal ? 'Sí' : 'No')
-                            ) : (
-                              <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleActualizarPosteMultiple(pIdx, {
-                                    tienePeatonal: true,
-                                    peatonalModelo: poste.peatonalModelo || MODELOS_PEATONAL_CATALOGO[0],
-                                    peatonalModuloEstado: poste.peatonalModuloEstado || 'Operando'
-                                  })}
-                                  style={{
-                                    border: 'none',
-                                    padding: '0.25rem 0.6rem',
-                                    borderRadius: '4px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: poste.tienePeatonal ? '700' : '500',
-                                    backgroundColor: poste.tienePeatonal ? '#691B31' : 'transparent',
-                                    color: poste.tienePeatonal ? '#FFFFFF' : '#475569',
-                                    cursor: 'pointer'
-                                  }}
-                                >
-                                  Sí
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleActualizarPosteMultiple(pIdx, { tienePeatonal: false })}
-                                  style={{
-                                    border: 'none',
-                                    padding: '0.25rem 0.6rem',
-                                    borderRadius: '4px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: !poste.tienePeatonal ? '700' : '500',
-                                    backgroundColor: !poste.tienePeatonal ? '#691B31' : 'transparent',
-                                    color: !poste.tienePeatonal ? '#FFFFFF' : '#475569',
-                                    cursor: 'pointer'
-                                  }}
-                                >
-                                  No
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {poste.tienePeatonal && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                            {(poste.peatonalesLista || [crearPeatonalInicial(1)]).map((pt, ptIdx) => (
-                              <div
-                                key={pt.id || ptIdx}
-                                style={{
-                                  backgroundColor: '#F8FAFC',
-                                  border: '1px solid #E2E8F0',
-                                  borderRadius: '6px',
-                                  padding: '0.65rem 0.8rem'
-                                }}
-                              >
-                                {(poste.peatonalesLista || []).length > 1 && (
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
-                                    <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                      <FaWalking size={11} style={{ color: '#691B31' }} />
-                                      Semáforo Peatonal #{ptIdx + 1}
-                                    </span>
-                                    {!modoVisualizacion && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleEliminarPeatonalEnPoste(pIdx, ptIdx)}
-                                        style={{
-                                          background: 'none',
-                                          border: 'none',
-                                          color: '#DC2626',
-                                          fontSize: '0.75rem',
-                                          fontWeight: '700',
-                                          cursor: 'pointer',
+                                    {modoVisualizacion ? (
+                                      <div style={{ display: 'flex', alignItems: 'center', minHeight: '34px' }}>
+                                        <span style={{
                                           display: 'inline-flex',
                                           alignItems: 'center',
-                                          gap: '0.25rem',
-                                          padding: '0.15rem 0.35rem'
-                                        }}
-                                        title="Quitar este semáforo peatonal"
-                                      >
-                                        <FaTrashAlt size={10} /> Quitar
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-
-                                <div className="form-responsive-grid grid-2" style={{ gap: '0.65rem 0.85rem', marginBottom: '0.5rem' }}>
-                                  <div>
-                                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                      <span>Modelo peatonal: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                                    </label>
-                                    {modoVisualizacion ? (
-                                      renderDatoConsulta(pt.modelo || 'Sin modelo')
+                                          gap: '0.35rem',
+                                          padding: '0.3rem 0.75rem',
+                                          borderRadius: '6px',
+                                          fontSize: '0.85rem',
+                                          fontWeight: '700',
+                                          backgroundColor: (poste.tipoCabezal || 'LED') === 'Pantalla' ? '#EFF6FF' : '#F1F5F9',
+                                          color: (poste.tipoCabezal || 'LED') === 'Pantalla' ? '#1D4ED8' : '#334155',
+                                          border: (poste.tipoCabezal || 'LED') === 'Pantalla' ? '1px solid #BFDBFE' : '1px solid #CBD5E1'
+                                        }}>
+                                          {(poste.tipoCabezal || 'LED') === 'Pantalla' ? <FaDesktop size={12} /> : <FaTrafficLight size={12} />}
+                                          {(poste.tipoCabezal || 'LED') === 'Pantalla' ? 'Pantalla LED' : 'LED'}
+                                        </span>
+                                      </div>
                                     ) : (
-                                      <select
-                                        value={pt.modelo || ''}
-                                        onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'modelo', e.target.value)}
-                                        style={{ width: '100%', padding: '0.4rem 0.6rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.82rem', backgroundColor: 'white', color: '#1E293B', boxSizing: 'border-box' }}
-                                      >
-                                        <option value="">-- Modelo peatonal --</option>
-                                        {MODELOS_PEATONAL_CATALOGO.map((modelo) => (
-                                          <option key={modelo} value={modelo}>{modelo}</option>
-                                        ))}
-                                      </select>
-                                    )}
-                                  </div>
-
-                                  <div>
-                                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                      <span>{pt.modelo && pt.modelo.toLowerCase().includes('sin cabezal') ? 'Estado del equipo / soporte:' : 'Estado del módulo:'} {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                                    </label>
-                                    {modoVisualizacion ? (
-                                      renderBadgeConsulta(pt.estado || 'Operando')
-                                    ) : (
-                                      <div style={{ display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', border: '1px solid #CBD5E1', minWidth: '160px' }}>
-                                        {['Operando', 'Dañado'].map((opcion) => {
-                                          const isSel = (pt.estado || 'Operando') === opcion
+                                      <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr 1fr',
+                                        gap: '3px',
+                                        backgroundColor: '#F1F5F9',
+                                        padding: '3px',
+                                        borderRadius: '6px',
+                                        border: '1px solid #CBD5E1',
+                                        boxSizing: 'border-box'
+                                      }}>
+                                        {[
+                                          { val: 'LED', label: 'LED', icon: <FaTrafficLight size={11} /> },
+                                          { val: 'Pantalla', label: 'Pantalla LED', icon: <FaDesktop size={11} /> }
+                                        ].map(({ val, label, icon }) => {
+                                          const isSel = (poste.tipoCabezal || 'LED') === val
                                           return (
                                             <button
-                                              key={opcion}
+                                              key={val}
                                               type="button"
-                                              onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'estado', opcion)}
+                                              onClick={() => {
+                                                const nuevoTipo = val
+                                                const piezasVal = nuevoTipo === 'Pantalla' ? (poste.pantallaPiezas || '1') : ''
+                                                const cantNum = parseInt(piezasVal, 10) || 0
+                                                const pantallasInit = cantNum > 0
+                                                  ? Array.from({ length: cantNum }, (_, i) => ({ numero: i + 1, estado: 'Funciona' }))
+                                                  : []
+                                                handleActualizarPosteMultiple(pIdx, {
+                                                  tipoCabezal: nuevoTipo,
+                                                  cabezalModelo: nuevoTipo === 'Pantalla' ? 'Semáforo de pantalla LED' : (poste.cabezalModelo === 'Semáforo de pantalla LED' ? 'LV-1' : (poste.cabezalModelo || 'LV-1')),
+                                                  pantallaPiezas: piezasVal,
+                                                  pantallasLista: nuevoTipo === 'Pantalla' ? (poste.pantallasLista?.length ? poste.pantallasLista : pantallasInit) : [],
+                                                  pantallaEstado: 'Funciona'
+                                                })
+                                              }}
                                               style={{
                                                 border: 'none',
-                                                borderRadius: '3px',
-                                                padding: '0.3rem 0.4rem',
+                                                borderRadius: '4px',
+                                                padding: '0.45rem 0.5rem',
                                                 fontSize: '0.78rem',
                                                 fontWeight: isSel ? '700' : '500',
-                                                backgroundColor: isSel ? (opcion === 'Operando' ? '#16A34A' : '#DC2626') : 'transparent',
+                                                backgroundColor: isSel ? '#691B31' : 'transparent',
                                                 color: isSel ? '#FFFFFF' : '#475569',
-                                                cursor: 'pointer'
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '0.35rem',
+                                                boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                                transition: 'all 0.15s',
+                                                whiteSpace: 'nowrap'
                                               }}
                                             >
-                                              {opcion}
+                                              {icon}
+                                              <span>{label}</span>
                                             </button>
                                           )
                                         })}
                                       </div>
                                     )}
                                   </div>
-                                </div>
 
-                                <div>
-                                  <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
-                                    <span>Observaciones de este semáforo peatonal:</span>
-                                  </label>
-                                  {modoVisualizacion ? (
-                                    renderObservacionesConsulta(pt.observaciones, 'Sin observaciones registradas')
-                                  ) : (
-                                    <input
-                                      type="text"
-                                      placeholder="Detalles sobre mica, leds apagados, soporte, orientación..."
-                                      value={pt.observaciones || ''}
-                                      onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'observaciones', e.target.value)}
-                                      style={{ width: '100%', padding: '0.35rem 0.55rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.8rem', boxSizing: 'border-box' }}
-                                    />
-                                  )}
-                                </div>
-
-                                {/* Dispositivo Audible integrado para este semáforo peatonal */}
-                                <div style={{
-                                  marginTop: '0.65rem',
-                                  paddingTop: '0.6rem',
-                                  borderTop: '1px dashed #E2E8F0',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: '0.45rem'
-                                }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
-                                    <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                      <FaVolumeUp size={11} style={{ color: '#691B31' }} /> ¿Tiene dispositivo audible?:
-                                    </span>
+                                  <div>
+                                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                                      <span>Modelo de cabezal: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                    </label>
                                     {modoVisualizacion ? (
-                                      renderBadgeConsulta(pt.tieneAudible ? 'Sí' : 'No')
+                                      renderDatoConsulta(poste.cabezalModelo, 'Sin modelo especificado')
                                     ) : (
-                                      <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'tieneAudible', true)}
-                                          style={{
-                                            border: 'none',
-                                            padding: '0.2rem 0.5rem',
-                                            borderRadius: '3px',
-                                            fontSize: '0.75rem',
-                                            fontWeight: pt.tieneAudible ? '700' : '500',
-                                            backgroundColor: pt.tieneAudible ? '#691B31' : 'transparent',
-                                            color: pt.tieneAudible ? '#FFFFFF' : '#475569',
-                                            cursor: 'pointer'
-                                          }}
-                                        >
-                                          Sí
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'tieneAudible', false)}
-                                          style={{
-                                            border: 'none',
-                                            padding: '0.2rem 0.5rem',
-                                            borderRadius: '3px',
-                                            fontSize: '0.75rem',
-                                            fontWeight: !pt.tieneAudible ? '700' : '500',
-                                            backgroundColor: !pt.tieneAudible ? '#691B31' : 'transparent',
-                                            color: !pt.tieneAudible ? '#FFFFFF' : '#475569',
-                                            cursor: 'pointer'
-                                          }}
-                                        >
-                                          No
-                                        </button>
-                                      </div>
+                                      <select
+                                        value={poste.cabezalModelo || ''}
+                                        onChange={(e) => handleActualizarPoste(pIdx, 'cabezalModelo', e.target.value)}
+                                        style={{
+                                          width: '100%',
+                                          padding: '0.45rem 0.65rem',
+                                          border: '1px solid #CBD5E1',
+                                          borderRadius: '6px',
+                                          fontSize: '0.85rem',
+                                          backgroundColor: 'white',
+                                          color: '#1E293B',
+                                          boxSizing: 'border-box'
+                                        }}
+                                      >
+                                        <option value="">-- Seleccionar modelo de cabezal --</option>
+                                        {MODELOS_CABEZAL_CATALOGO.map((modelo) => (
+                                          <option key={modelo} value={modelo}>{modelo}</option>
+                                        ))}
+                                        {poste.cabezalModelo && !MODELOS_CABEZAL_CATALOGO.includes(poste.cabezalModelo) && (
+                                          <option value={poste.cabezalModelo}>{poste.cabezalModelo}</option>
+                                        )}
+                                      </select>
                                     )}
                                   </div>
+                                </div>
 
-                                  {pt.tieneAudible && (
-                                    <div style={{
-                                      backgroundColor: '#FFFFFF',
-                                      border: '1px solid #CBD5E1',
-                                      borderRadius: '6px',
-                                      padding: '0.65rem 0.8rem',
-                                      display: 'flex',
-                                      flexDirection: 'column',
-                                      gap: '0.55rem',
-                                      marginTop: '0.35rem'
-                                    }}>
-                                      <div className="form-responsive-grid grid-2" style={{ gap: '0.65rem 0.85rem' }}>
+                                {/* Pantalla LED */}
+                                {poste.tipoCabezal === 'Pantalla' && (() => {
+                                  const cantPiezas = Number(poste.pantallaPiezas) || 0
+                                  const piezasList = (Array.isArray(poste.pantallasLista) && poste.pantallasLista.length > 0)
+                                    ? poste.pantallasLista
+                                    : (cantPiezas > 0
+                                      ? Array.from({ length: cantPiezas }, (_, i) => ({ numero: i + 1, estado: poste.pantallaEstado || 'Funciona' }))
+                                      : [])
+
+                                  return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '0.85rem' }}>
+                                      <div>
+                                        <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                                          <span>Cantidad de piezas: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                        </label>
+                                        {modoVisualizacion ? (
+                                          renderDatoConsulta(`${poste.pantallaPiezas || 0} piezas`)
+                                        ) : (
+                                          <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            placeholder="ej. 1, 2, 3..."
+                                            value={poste.pantallaPiezas === 0 || poste.pantallaPiezas === '0' ? '' : (poste.pantallaPiezas ?? '')}
+                                            onChange={(e) => handleCambiarPantallaPiezasEnPoste(pIdx, e.target.value)}
+                                            style={{ width: '100%', maxWidth: '240px', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                                          />
+                                        )}
+                                      </div>
+
+                                      {piezasList.length > 0 ? (
                                         <div>
-                                          <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                            <span>Modelo audible: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                          <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.5rem' }}>
+                                            <span>Estado de operación de cada pieza: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                          </label>
+                                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 250px), 1fr))', gap: '0.5rem' }}>
+                                            {piezasList.map((pieza) => (
+                                              <div
+                                                key={`p-${pIdx}-pieza-${pieza.numero}`}
+                                                style={{
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'space-between',
+                                                  backgroundColor: '#FFFFFF',
+                                                  padding: '0.45rem 0.75rem',
+                                                  borderRadius: '6px',
+                                                  border: '1px solid #CBD5E1',
+                                                  gap: '0.5rem'
+                                                }}
+                                              >
+                                                <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                                  <FaDesktop size={11} style={{ color: '#691B31' }} />
+                                                  Pieza #{pieza.numero}
+                                                </span>
+                                                {modoVisualizacion ? (
+                                                  <span style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.35rem',
+                                                    fontSize: '0.78rem',
+                                                    fontWeight: '700',
+                                                    padding: '0.2rem 0.55rem',
+                                                    borderRadius: '5px',
+                                                    backgroundColor: (pieza.estado || 'Funciona') === 'Funciona' ? '#DCFCE7' : '#FEE2E2',
+                                                    color: (pieza.estado || 'Funciona') === 'Funciona' ? '#15803D' : '#B91C1C',
+                                                    border: (pieza.estado || 'Funciona') === 'Funciona' ? '1px solid #86EFAC' : '1px solid #FCA5A5'
+                                                  }}>
+                                                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: (pieza.estado || 'Funciona') === 'Funciona' ? '#16A34A' : '#DC2626' }} />
+                                                    {(pieza.estado || 'Funciona') === 'Funciona' ? 'Funciona' : 'No funciona'}
+                                                  </span>
+                                                ) : (
+                                                  <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center' }}>
+                                                    {['Funciona', 'No funciona'].map((estado) => (
+                                                      <label
+                                                        key={estado}
+                                                        style={{
+                                                          display: 'inline-flex',
+                                                          alignItems: 'center',
+                                                          gap: '0.25rem',
+                                                          cursor: 'pointer',
+                                                          fontSize: '0.8rem',
+                                                          fontWeight: (pieza.estado || 'Funciona') === estado ? '700' : '500',
+                                                          color: (pieza.estado || 'Funciona') === estado ? (estado === 'Funciona' ? '#16A34A' : '#DC2626') : '#64748B'
+                                                        }}
+                                                      >
+                                                        <input
+                                                          type="radio"
+                                                          name={`poste-${pIdx}-pieza-${pieza.numero}-estado`}
+                                                          value={estado}
+                                                          checked={(pieza.estado || 'Funciona') === estado}
+                                                          onChange={() => handleCambiarEstadoPiezaPantalla(pIdx, pieza.numero, estado)}
+                                                          style={{ accentColor: '#691B31', width: '13px', height: '13px', cursor: 'pointer' }}
+                                                        />
+                                                        <span style={{ display: 'inline-block', width: '7px', height: '7px', borderRadius: '50%', backgroundColor: estado === 'Funciona' ? '#16A34A' : '#DC2626' }} />
+                                                        {estado}
+                                                      </label>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <div style={{ fontSize: '0.78rem', color: '#64748B', fontStyle: 'italic' }}>
+                                          Ingrese la cantidad de piezas para definir el estado de operación de cada una.
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })()}
+
+                                {/* Desglose LED */}
+                                {(poste.tipoCabezal || 'LED') === 'LED' && (() => {
+                                  const cabezalesGrupos = normalizarCabezalesDetalle(poste.cabezalesGrupos)
+                                  return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                          Desglose de Cabezales LED:
+                                        </span>
+                                        {!modoVisualizacion && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleAgregarGrupoCabezalEnPoste(pIdx)}
+                                            style={{
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '0.3rem',
+                                              backgroundColor: '#FFFFFF',
+                                              border: '1px solid #CBD5E1',
+                                              borderRadius: '5px',
+                                              padding: '0.25rem 0.6rem',
+                                              fontSize: '0.75rem',
+                                              fontWeight: '700',
+                                              color: '#691B31',
+                                              cursor: 'pointer'
+                                            }}
+                                          >
+                                            <FaPlus size={10} style={{ color: '#BC955B' }} /> + Otro cabezal
+                                          </button>
+                                        )}
+                                      </div>
+
+                                      {cabezalesGrupos.map((grupo, gIdx) => {
+                                        const numLeds = grupo.numLeds !== undefined ? Number(grupo.numLeds) : 4
+                                        const leds = (grupo.leds || []).slice(0, numLeds)
+
+                                        return (
+                                          <div
+                                            key={grupo.id || gIdx}
+                                            style={{
+                                              backgroundColor: '#F8FAFC',
+                                              padding: '0.75rem 0.85rem',
+                                              borderRadius: '8px',
+                                              border: '1px solid #E2E8F0'
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+                                              <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                                <FaTrafficLight size={11} style={{ color: '#691B31' }} />
+                                                Cabezal {cabezalesGrupos.length > 1 ? `#${gIdx + 1}` : ''}
+                                              </span>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                                                {modoVisualizacion ? (
+                                                  <span style={{
+                                                    fontSize: '0.78rem',
+                                                    fontWeight: '700',
+                                                    color: '#334155',
+                                                    backgroundColor: '#E2E8F0',
+                                                    padding: '0.2rem 0.55rem',
+                                                    borderRadius: '5px'
+                                                  }}>
+                                                    {numLeds} LEDs
+                                                  </span>
+                                                ) : (
+                                                  <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                                    <span>LEDs:</span>
+                                                    <input
+                                                      type="number"
+                                                      min="0"
+                                                      max="12"
+                                                      value={numLeds || ''}
+                                                      onChange={(e) => handleCambiarNumLedsEnPoste(pIdx, gIdx, e.target.value)}
+                                                      onWheel={(e) => e.target.blur()}
+                                                      style={{ width: '45px', padding: '0.2rem 0.35rem', border: '1px solid #CBD5E1', borderRadius: '4px', fontSize: '0.8rem', textAlign: 'center', fontWeight: '700' }}
+                                                    />
+                                                  </label>
+                                                )}
+                                                {cabezalesGrupos.length > 1 && !modoVisualizacion && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => handleEliminarGrupoCabezalEnPoste(pIdx, gIdx)}
+                                                    style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer', padding: '0.1rem', display: 'flex', alignItems: 'center' }}
+                                                    title="Eliminar cabezal"
+                                                  >
+                                                    <FaTrashAlt size={11} />
+                                                  </button>
+                                                )}
+                                              </div>
+                                            </div>
+
+                                            {numLeds > 0 && (
+                                              <div className="cabezal-leds-grid">
+                                                {leds.map((led, idx) => {
+                                                  const colorActual = obtenerConfigColorLed(led.color)
+                                                  const isFunciona = (led.estado || 'Funciona') === 'Funciona'
+
+                                                  if (modoVisualizacion) {
+                                                    return (
+                                                      <div
+                                                        key={`p-${pIdx}-g-${gIdx}-led-${led.numero || idx + 1}`}
+                                                        style={{
+                                                          display: 'flex',
+                                                          alignItems: 'center',
+                                                          justifyContent: 'space-between',
+                                                          backgroundColor: '#FFFFFF',
+                                                          padding: '0.35rem 0.5rem',
+                                                          borderRadius: '7px',
+                                                          border: '1px solid #E2E8F0',
+                                                          gap: '0.35rem',
+                                                          boxSizing: 'border-box',
+                                                          minWidth: 0
+                                                        }}
+                                                      >
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+                                                          <span
+                                                            style={{
+                                                              display: 'inline-flex',
+                                                              alignItems: 'center',
+                                                              justifyContent: 'center',
+                                                              width: '22px',
+                                                              height: '22px',
+                                                              minWidth: '22px',
+                                                              minHeight: '22px',
+                                                              borderRadius: '50%',
+                                                              border: `2px solid ${colorActual.color}`,
+                                                              backgroundColor: '#FFFFFF',
+                                                              flexShrink: 0
+                                                            }}
+                                                            title={`Color: ${colorActual.label}`}
+                                                          >
+                                                            <span
+                                                              style={{
+                                                                width: '13px',
+                                                                height: '13px',
+                                                                borderRadius: '50%',
+                                                                backgroundColor: colorActual.color
+                                                              }}
+                                                            />
+                                                          </span>
+                                                          <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#1E293B', minWidth: '18px', flexShrink: 0 }}>
+                                                            L{led.numero || idx + 1}
+                                                          </span>
+                                                          <div
+                                                            style={{
+                                                              display: 'inline-flex',
+                                                              alignItems: 'center',
+                                                              justifyContent: 'space-between',
+                                                              width: '104px',
+                                                              padding: '0.2rem 0.35rem',
+                                                              border: '1px solid #CBD5E1',
+                                                              borderLeft: `4px solid ${colorActual.color}`,
+                                                              borderRadius: '6px',
+                                                              fontSize: '0.78rem',
+                                                              fontWeight: '600',
+                                                              backgroundColor: '#FFFFFF',
+                                                              color: '#1E293B',
+                                                              boxSizing: 'border-box'
+                                                            }}
+                                                          >
+                                                            <span>{colorActual.label}</span>
+                                                            <span style={{ fontSize: '0.6rem', color: '#64748B' }}>▼</span>
+                                                          </div>
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexShrink: 0, marginLeft: 'auto', pointerEvents: 'none' }}>
+                                                          {['Funciona', 'No funciona'].map((estado) => {
+                                                            const isChecked = (led.estado || 'Funciona') === estado
+                                                            const esFunc = estado === 'Funciona'
+                                                            return (
+                                                              <label
+                                                                key={estado}
+                                                                style={{
+                                                                  display: 'inline-flex',
+                                                                  alignItems: 'center',
+                                                                  gap: '0.2rem',
+                                                                  cursor: 'default',
+                                                                  fontSize: '0.74rem',
+                                                                  whiteSpace: 'nowrap',
+                                                                  fontWeight: isChecked ? '700' : '500',
+                                                                  color: isChecked ? (esFunc ? '#16A34A' : '#DC2626') : '#64748B'
+                                                                }}
+                                                              >
+                                                                <input
+                                                                  type="radio"
+                                                                  name={`view-p-${pIdx}-g-${gIdx}-led-${idx}-estado`}
+                                                                  value={estado}
+                                                                  checked={isChecked}
+                                                                  disabled
+                                                                  readOnly
+                                                                  style={{ accentColor: '#691B31', width: '13px', height: '13px', cursor: 'default', margin: 0 }}
+                                                                />
+                                                                <span
+                                                                  style={{
+                                                                    display: 'inline-block',
+                                                                    width: '5px',
+                                                                    height: '5px',
+                                                                    borderRadius: '50%',
+                                                                    backgroundColor: esFunc ? '#16A34A' : '#DC2626',
+                                                                    flexShrink: 0
+                                                                  }}
+                                                                />
+                                                                {estado}
+                                                              </label>
+                                                            )
+                                                          })}
+                                                        </div>
+                                                      </div>
+                                                    )
+                                                  }
+
+                                                  return (
+                                                    <div
+                                                      key={`p-${pIdx}-g-${gIdx}-led-${led.numero || idx + 1}`}
+                                                      style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        backgroundColor: '#FFFFFF',
+                                                        padding: '0.35rem 0.5rem',
+                                                        borderRadius: '7px',
+                                                        border: '1px solid #E2E8F0',
+                                                        gap: '0.35rem',
+                                                        boxSizing: 'border-box',
+                                                        minWidth: 0
+                                                      }}
+                                                    >
+                                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
+                                                        <span
+                                                          style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            width: '22px',
+                                                            height: '22px',
+                                                            minWidth: '22px',
+                                                            minHeight: '22px',
+                                                            borderRadius: '50%',
+                                                            border: `2px solid ${colorActual.color}`,
+                                                            backgroundColor: '#FFFFFF',
+                                                            flexShrink: 0
+                                                          }}
+                                                          title={`Color: ${colorActual.label}`}
+                                                        >
+                                                          <span
+                                                            style={{
+                                                              width: '13px',
+                                                              height: '13px',
+                                                              borderRadius: '50%',
+                                                              backgroundColor: colorActual.color
+                                                            }}
+                                                          />
+                                                        </span>
+                                                        <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#1E293B', minWidth: '18px', flexShrink: 0 }}>
+                                                          L{led.numero || idx + 1}
+                                                        </span>
+                                                        <select
+                                                          value={led.color || 'Rojo'}
+                                                          onChange={(e) => handleCambiarLedEnPoste(pIdx, gIdx, idx, 'color', e.target.value)}
+                                                          style={{
+                                                            width: '104px',
+                                                            padding: '0.2rem 0.35rem',
+                                                            border: '1px solid #CBD5E1',
+                                                            borderLeft: `4px solid ${colorActual.color}`,
+                                                            borderRadius: '6px',
+                                                            fontSize: '0.78rem',
+                                                            fontWeight: '600',
+                                                            backgroundColor: '#FFFFFF',
+                                                            color: '#1E293B',
+                                                            cursor: 'pointer'
+                                                          }}
+                                                        >
+                                                          {OPCIONES_COLORES_LED.map(c => (
+                                                            <option key={c.valor} value={c.valor}>{c.label}</option>
+                                                          ))}
+                                                        </select>
+                                                      </div>
+                                                      <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
+                                                        {['Funciona', 'No funciona'].map((estado) => {
+                                                          const isChecked = (led.estado || 'Funciona') === estado
+                                                          const esFunc = estado === 'Funciona'
+                                                          return (
+                                                            <label
+                                                              key={estado}
+                                                              style={{
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                gap: '0.2rem',
+                                                                cursor: 'pointer',
+                                                                fontSize: '0.74rem',
+                                                                whiteSpace: 'nowrap',
+                                                                fontWeight: isChecked ? '700' : '500',
+                                                                color: isChecked ? (esFunc ? '#16A34A' : '#DC2626') : '#64748B'
+                                                              }}
+                                                            >
+                                                              <input
+                                                                type="radio"
+                                                                name={`p-${pIdx}-g-${gIdx}-led-${idx}-estado`}
+                                                                value={estado}
+                                                                checked={isChecked}
+                                                                onChange={() => handleCambiarLedEnPoste(pIdx, gIdx, idx, 'estado', estado)}
+                                                                style={{ accentColor: '#691B31', width: '13px', height: '13px', cursor: 'pointer', margin: 0 }}
+                                                              />
+                                                              <span
+                                                                style={{
+                                                                  display: 'inline-block',
+                                                                  width: '5px',
+                                                                  height: '5px',
+                                                                  borderRadius: '50%',
+                                                                  backgroundColor: esFunc ? '#16A34A' : '#DC2626',
+                                                                  flexShrink: 0
+                                                                }}
+                                                              />
+                                                              {estado}
+                                                            </label>
+                                                          )
+                                                        })}
+                                                      </div>
+                                                    </div>
+                                                  )
+                                                })}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  )
+                                })()}
+                              </div>
+                            )}
+
+                            {/* Semáforo Peatonal */}
+                            <div style={{
+                              border: '1px solid #E2E8F0',
+                              backgroundColor: '#FFFFFF',
+                              borderRadius: '8px',
+                              padding: '1rem',
+                              marginTop: '1rem',
+                              marginBottom: '1.25rem',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                    <FaWalking size={14} style={{ color: '#BC955B' }} /> Semáforo Peatonal
+                                  </span>
+                                  {poste.tienePeatonal ? (() => {
+                                    const lista = poste.peatonalesLista || []
+                                    const conCabezal = lista.filter(pt => pt.modelo && !pt.modelo.toLowerCase().includes('sin cabezal')).length
+                                    const conAudible = lista.filter(pt => pt.tieneAudible).length
+                                    if (conCabezal === 0 && conAudible > 0) {
+                                      return (
+                                        <span style={{ backgroundColor: '#FEF3C7', color: '#92400E', fontSize: '0.72rem', fontWeight: '700', padding: '0.15rem 0.45rem', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                          <FaVolumeUp size={10} /> Solo audible ({conAudible})
+                                        </span>
+                                      )
+                                    }
+                                    return (
+                                      <span style={{ backgroundColor: '#F1F5F9', color: '#475569', fontSize: '0.72rem', fontWeight: '700', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
+                                        {conCabezal} {conCabezal === 1 ? 'semáforo' : 'semáforos'}
+                                        {conAudible > 0 && ` • ${conAudible} con audible`}
+                                      </span>
+                                    )
+                                  })() : (
+                                    <span style={{ backgroundColor: '#F1F5F9', color: '#94A3B8', fontSize: '0.72rem', fontWeight: '600', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>
+                                      No instalado
+                                    </span>
+                                  )}
+                                </div>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>¿Instalado en este poste?:</span>
+                                  {modoVisualizacion ? (
+                                    renderBadgeConsulta(poste.tienePeatonal ? 'Sí' : 'No')
+                                  ) : (
+                                    <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleActualizarPosteMultiple(pIdx, {
+                                          tienePeatonal: true,
+                                          peatonalModelo: poste.peatonalModelo || MODELOS_PEATONAL_CATALOGO[0],
+                                          peatonalModuloEstado: poste.peatonalModuloEstado || 'Operando'
+                                        })}
+                                        style={{
+                                          border: 'none',
+                                          padding: '0.25rem 0.6rem',
+                                          borderRadius: '4px',
+                                          fontSize: '0.78rem',
+                                          fontWeight: poste.tienePeatonal ? '700' : '500',
+                                          backgroundColor: poste.tienePeatonal ? '#691B31' : 'transparent',
+                                          color: poste.tienePeatonal ? '#FFFFFF' : '#475569',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        Sí
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleActualizarPosteMultiple(pIdx, { tienePeatonal: false })}
+                                        style={{
+                                          border: 'none',
+                                          padding: '0.25rem 0.6rem',
+                                          borderRadius: '4px',
+                                          fontSize: '0.78rem',
+                                          fontWeight: !poste.tienePeatonal ? '700' : '500',
+                                          backgroundColor: !poste.tienePeatonal ? '#691B31' : 'transparent',
+                                          color: !poste.tienePeatonal ? '#FFFFFF' : '#475569',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        No
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {poste.tienePeatonal && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                  {(poste.peatonalesLista || [crearPeatonalInicial(1)]).map((pt, ptIdx) => (
+                                    <div
+                                      key={pt.id || ptIdx}
+                                      style={{
+                                        backgroundColor: '#F8FAFC',
+                                        border: '1px solid #E2E8F0',
+                                        borderRadius: '6px',
+                                        padding: '0.65rem 0.8rem'
+                                      }}
+                                    >
+                                      {(poste.peatonalesLista || []).length > 1 && (
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                          <span style={{ fontSize: '0.8rem', fontWeight: '800', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                            <FaWalking size={11} style={{ color: '#691B31' }} />
+                                            Semáforo Peatonal #{ptIdx + 1}
+                                          </span>
+                                          {!modoVisualizacion && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleEliminarPeatonalEnPoste(pIdx, ptIdx)}
+                                              style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                color: '#DC2626',
+                                                fontSize: '0.75rem',
+                                                fontWeight: '700',
+                                                cursor: 'pointer',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '0.25rem',
+                                                padding: '0.15rem 0.35rem'
+                                              }}
+                                              title="Quitar este semáforo peatonal"
+                                            >
+                                              <FaTrashAlt size={10} /> Quitar
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      <div className="form-responsive-grid grid-2" style={{ gap: '0.65rem 0.85rem', marginBottom: '0.5rem' }}>
+                                        <div>
+                                          <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
+                                            <span>Modelo peatonal: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                                           </label>
                                           {modoVisualizacion ? (
-                                            renderDatoConsulta(pt.audibleModelo, 'Sin modelo')
+                                            renderDatoConsulta(pt.modelo || 'Sin modelo')
                                           ) : (
-                                            <>
-                                              <input
-                                                type="text"
-                                                list={`sugerencias-audible-${pIdx}-${ptIdx}`}
-                                                placeholder="ej. Novax DS-100 Audible"
-                                                value={pt.audibleModelo || ''}
-                                                onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'audibleModelo', e.target.value)}
-                                                style={{ width: '100%', padding: '0.35rem 0.55rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.8rem', boxSizing: 'border-box' }}
-                                              />
-                                              <datalist id={`sugerencias-audible-${pIdx}-${ptIdx}`}>
-                                                <option value="Novax DS-100 Audible" />
-                                                <option value="Novax Audible Peatonal" />
-                                                <option value="Dispositivo Audible Genérico" />
-                                              </datalist>
-                                            </>
+                                            <select
+                                              value={pt.modelo || ''}
+                                              onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'modelo', e.target.value)}
+                                              style={{ width: '100%', padding: '0.4rem 0.6rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.82rem', backgroundColor: 'white', color: '#1E293B', boxSizing: 'border-box' }}
+                                            >
+                                              <option value="">-- Modelo peatonal --</option>
+                                              {MODELOS_PEATONAL_CATALOGO.map((modelo) => (
+                                                <option key={modelo} value={modelo}>{modelo}</option>
+                                              ))}
+                                            </select>
                                           )}
                                         </div>
 
                                         <div>
-                                          <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                            <span>Estado audible: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                          <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
+                                            <span>{pt.modelo && pt.modelo.toLowerCase().includes('sin cabezal') ? 'Estado del equipo / soporte:' : 'Estado del módulo:'} {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                                           </label>
                                           {modoVisualizacion ? (
-                                            renderBadgeConsulta(pt.audibleEstado || 'Operando')
+                                            renderBadgeConsulta(pt.estado || 'Operando')
                                           ) : (
-                                            <div style={{ display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', border: '1px solid #CBD5E1', minWidth: '150px' }}>
+                                            <div style={{ display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', border: '1px solid #CBD5E1', minWidth: '160px' }}>
                                               {['Operando', 'Dañado'].map((opcion) => {
-                                                const isSel = (pt.audibleEstado || 'Operando') === opcion
+                                                const isSel = (pt.estado || 'Operando') === opcion
                                                 return (
                                                   <button
                                                     key={opcion}
                                                     type="button"
-                                                    onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'audibleEstado', opcion)}
+                                                    onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'estado', opcion)}
                                                     style={{
                                                       border: 'none',
                                                       borderRadius: '3px',
-                                                      padding: '0.25rem 0.35rem',
-                                                      fontSize: '0.75rem',
+                                                      padding: '0.3rem 0.4rem',
+                                                      fontSize: '0.78rem',
                                                       fontWeight: isSel ? '700' : '500',
                                                       backgroundColor: isSel ? (opcion === 'Operando' ? '#16A34A' : '#DC2626') : 'transparent',
                                                       color: isSel ? '#FFFFFF' : '#475569',
@@ -9226,702 +9195,844 @@ export default function InventarioSemaforos() {
                                       </div>
 
                                       <div>
-                                        <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#475569', marginBottom: '0.2rem' }}>
-                                          <span>Observaciones del audible:</span>
+                                        <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
+                                          <span>Observaciones de este semáforo peatonal:</span>
                                         </label>
                                         {modoVisualizacion ? (
-                                          renderObservacionesConsulta(pt.audibleObservaciones, 'Sin observaciones registradas')
+                                          renderObservacionesConsulta(pt.observaciones, 'Sin observaciones registradas')
                                         ) : (
                                           <input
                                             type="text"
-                                            placeholder="Observaciones sobre volumen, pulsador, cableado o fallas..."
-                                            value={pt.audibleObservaciones || ''}
-                                            onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'audibleObservaciones', e.target.value)}
-                                            style={{ width: '100%', padding: '0.3rem 0.5rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.78rem', boxSizing: 'border-box' }}
+                                            placeholder="Detalles sobre mica, leds apagados, soporte, orientación..."
+                                            value={pt.observaciones || ''}
+                                            onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'observaciones', e.target.value)}
+                                            style={{ width: '100%', padding: '0.35rem 0.55rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.8rem', boxSizing: 'border-box' }}
                                           />
                                         )}
                                       </div>
+
+                                      {/* Dispositivo Audible integrado para este semáforo peatonal */}
+                                      <div style={{
+                                        marginTop: '0.65rem',
+                                        paddingTop: '0.6rem',
+                                        borderTop: '1px dashed #E2E8F0',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '0.45rem'
+                                      }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
+                                          <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                            <FaVolumeUp size={11} style={{ color: '#691B31' }} /> ¿Tiene dispositivo audible?:
+                                          </span>
+                                          {modoVisualizacion ? (
+                                            renderBadgeConsulta(pt.tieneAudible ? 'Sí' : 'No')
+                                          ) : (
+                                            <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'tieneAudible', true)}
+                                                style={{
+                                                  border: 'none',
+                                                  padding: '0.2rem 0.5rem',
+                                                  borderRadius: '3px',
+                                                  fontSize: '0.75rem',
+                                                  fontWeight: pt.tieneAudible ? '700' : '500',
+                                                  backgroundColor: pt.tieneAudible ? '#691B31' : 'transparent',
+                                                  color: pt.tieneAudible ? '#FFFFFF' : '#475569',
+                                                  cursor: 'pointer'
+                                                }}
+                                              >
+                                                Sí
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'tieneAudible', false)}
+                                                style={{
+                                                  border: 'none',
+                                                  padding: '0.2rem 0.5rem',
+                                                  borderRadius: '3px',
+                                                  fontSize: '0.75rem',
+                                                  fontWeight: !pt.tieneAudible ? '700' : '500',
+                                                  backgroundColor: !pt.tieneAudible ? '#691B31' : 'transparent',
+                                                  color: !pt.tieneAudible ? '#FFFFFF' : '#475569',
+                                                  cursor: 'pointer'
+                                                }}
+                                              >
+                                                No
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {pt.tieneAudible && (
+                                          <div style={{
+                                            backgroundColor: '#FFFFFF',
+                                            border: '1px solid #CBD5E1',
+                                            borderRadius: '6px',
+                                            padding: '0.65rem 0.8rem',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '0.55rem',
+                                            marginTop: '0.35rem'
+                                          }}>
+                                            <div className="form-responsive-grid grid-2" style={{ gap: '0.65rem 0.85rem' }}>
+                                              <div>
+                                                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
+                                                  <span>Modelo audible: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                                </label>
+                                                {modoVisualizacion ? (
+                                                  renderDatoConsulta(pt.audibleModelo, 'Sin modelo')
+                                                ) : (
+                                                  <>
+                                                    <input
+                                                      type="text"
+                                                      list={`sugerencias-audible-${pIdx}-${ptIdx}`}
+                                                      placeholder="ej. Novax DS-100 Audible"
+                                                      value={pt.audibleModelo || ''}
+                                                      onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'audibleModelo', e.target.value)}
+                                                      style={{ width: '100%', padding: '0.35rem 0.55rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.8rem', boxSizing: 'border-box' }}
+                                                    />
+                                                    <datalist id={`sugerencias-audible-${pIdx}-${ptIdx}`}>
+                                                      <option value="Novax DS-100 Audible" />
+                                                      <option value="Novax Audible Peatonal" />
+                                                      <option value="Dispositivo Audible Genérico" />
+                                                    </datalist>
+                                                  </>
+                                                )}
+                                              </div>
+
+                                              <div>
+                                                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
+                                                  <span>Estado audible: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                                </label>
+                                                {modoVisualizacion ? (
+                                                  renderBadgeConsulta(pt.audibleEstado || 'Operando')
+                                                ) : (
+                                                  <div style={{ display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', border: '1px solid #CBD5E1', minWidth: '150px' }}>
+                                                    {['Operando', 'Dañado'].map((opcion) => {
+                                                      const isSel = (pt.audibleEstado || 'Operando') === opcion
+                                                      return (
+                                                        <button
+                                                          key={opcion}
+                                                          type="button"
+                                                          onClick={() => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'audibleEstado', opcion)}
+                                                          style={{
+                                                            border: 'none',
+                                                            borderRadius: '3px',
+                                                            padding: '0.25rem 0.35rem',
+                                                            fontSize: '0.75rem',
+                                                            fontWeight: isSel ? '700' : '500',
+                                                            backgroundColor: isSel ? (opcion === 'Operando' ? '#16A34A' : '#DC2626') : 'transparent',
+                                                            color: isSel ? '#FFFFFF' : '#475569',
+                                                            cursor: 'pointer'
+                                                          }}
+                                                        >
+                                                          {opcion}
+                                                        </button>
+                                                      )
+                                                    })}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+
+                                            <div>
+                                              <label style={{ display: 'block', fontSize: '0.74rem', fontWeight: '700', color: '#475569', marginBottom: '0.2rem' }}>
+                                                <span>Observaciones del audible:</span>
+                                              </label>
+                                              {modoVisualizacion ? (
+                                                renderObservacionesConsulta(pt.audibleObservaciones, 'Sin observaciones registradas')
+                                              ) : (
+                                                <input
+                                                  type="text"
+                                                  placeholder="Observaciones sobre volumen, pulsador, cableado o fallas..."
+                                                  value={pt.audibleObservaciones || ''}
+                                                  onChange={(e) => handleActualizarPeatonalEnPoste(pIdx, ptIdx, 'audibleObservaciones', e.target.value)}
+                                                  style={{ width: '100%', padding: '0.3rem 0.5rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.78rem', boxSizing: 'border-box' }}
+                                                />
+                                              )}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
+                                  ))}
+           
+                                  {!modoVisualizacion && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAgregarPeatonalEnPoste(pIdx)}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.4rem',
+                                        backgroundColor: '#FFFFFF',
+                                        border: '1px dashed #691B31',
+                                        color: '#691B31',
+                                        fontSize: '0.8rem',
+                                        fontWeight: '700',
+                                        padding: '0.4rem 0.75rem',
+                                        borderRadius: '5px',
+                                        cursor: 'pointer',
+                                        width: 'fit-content',
+                                        alignSelf: 'flex-start'
+                                      }}
+                                    >
+                                      <FaPlus size={10} style={{ color: '#BC955B' }} /> + Agregar otro semáforo peatonal en este poste
+                                    </button>
                                   )}
-                                </div>
-                              </div>
-                            ))}
-
-                            {!modoVisualizacion && (
-                              <button
-                                type="button"
-                                onClick={() => handleAgregarPeatonalEnPoste(pIdx)}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.4rem',
-                                  backgroundColor: '#FFFFFF',
-                                  border: '1px dashed #691B31',
-                                  color: '#691B31',
-                                  fontSize: '0.8rem',
-                                  fontWeight: '700',
-                                  padding: '0.4rem 0.75rem',
-                                  borderRadius: '5px',
-                                  cursor: 'pointer',
-                                  width: 'fit-content',
-                                  alignSelf: 'flex-start'
-                                }}
-                              >
-                                <FaPlus size={10} style={{ color: '#BC955B' }} /> + Agregar otro semáforo peatonal en este poste
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Dispositivo Audible (solo para postes vehiculares/mixtos sin semáforo peatonal) */}
-                      {poste.tipoPoste !== 'peatonal' && !poste.tienePeatonal && (
-                        <div style={{
-                          border: '1px solid #E2E8F0',
-                          backgroundColor: '#FFFFFF',
-                          borderRadius: '8px',
-                          padding: '1rem',
-                          marginTop: '1rem',
-                          marginBottom: '1.25rem',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                              <FaVolumeUp size={14} style={{ color: '#BC955B' }} /> Dispositivo Audible
-                            </span>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-                              <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>¿Instalado en este poste?:</span>
-                              {modoVisualizacion ? (
-                                renderBadgeConsulta(poste.tieneAudible ? 'Sí' : 'No')
-                              ) : (
-                                <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleActualizarPosteMultiple(pIdx, {
-                                      tieneAudible: true,
-                                      audibleModelo: poste.audibleModelo || 'Novax DS-100 Audible',
-                                      audibleModuloEstado: poste.audibleModuloEstado || 'Operando'
-                                    })}
-                                    style={{
-                                      border: 'none',
-                                      padding: '0.25rem 0.6rem',
-                                      borderRadius: '4px',
-                                      fontSize: '0.78rem',
-                                      fontWeight: poste.tieneAudible ? '700' : '500',
-                                      backgroundColor: poste.tieneAudible ? '#691B31' : 'transparent',
-                                      color: poste.tieneAudible ? '#FFFFFF' : '#475569',
-                                      cursor: 'pointer'
-                                    }}
-                                  >
-                                    Sí
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleActualizarPosteMultiple(pIdx, {
-                                      tieneAudible: false
-                                    })}
-                                    style={{
-                                      border: 'none',
-                                      padding: '0.25rem 0.6rem',
-                                      borderRadius: '4px',
-                                      fontSize: '0.78rem',
-                                      fontWeight: !poste.tieneAudible ? '700' : '500',
-                                      backgroundColor: !poste.tieneAudible ? '#691B31' : 'transparent',
-                                      color: !poste.tieneAudible ? '#FFFFFF' : '#475569',
-                                      cursor: 'pointer'
-                                    }}
-                                  >
-                                    No
-                                  </button>
                                 </div>
                               )}
                             </div>
-                          </div>
 
-                          {poste.tieneAudible && (
-                            <div style={{
-                              backgroundColor: '#F8FAFC',
-                              border: '1px solid #E2E8F0',
-                              borderRadius: '6px',
-                              padding: '0.75rem 0.85rem',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '0.55rem'
-                            }}>
-                              <div className="form-responsive-grid grid-2" style={{ gap: '0.65rem 0.85rem' }}>
-                                <div>
-                                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                    <span>Modelo audible: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                                  </label>
-                                  {modoVisualizacion ? (
-                                    renderDatoConsulta(poste.audibleModelo, 'Sin modelo especificado')
-                                  ) : (
-                                    <>
-                                      <input
-                                        type="text"
-                                        list={`sugerencias-audible-${pIdx}`}
-                                        placeholder="ej. Novax DS-100 Audible"
-                                        value={poste.audibleModelo || ''}
-                                        onChange={(e) => handleActualizarPoste(pIdx, 'audibleModelo', e.target.value)}
-                                        style={{ width: '100%', padding: '0.4rem 0.6rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.82rem', boxSizing: 'border-box' }}
-                                      />
-                                      <datalist id={`sugerencias-audible-${pIdx}`}>
-                                        <option value="Novax DS-100 Audible" />
-                                        <option value="Novax Audible Peatonal" />
-                                        <option value="Dispositivo Audible Genérico" />
-                                      </datalist>
-                                    </>
-                                  )}
+                            {/* Dispositivo Audible (solo para postes vehiculares/mixtos sin semáforo peatonal) */}
+                            {poste.tipoPoste !== 'peatonal' && !poste.tienePeatonal && (
+                              <div style={{
+                                border: '1px solid #E2E8F0',
+                                backgroundColor: '#FFFFFF',
+                                borderRadius: '8px',
+                                padding: '1rem',
+                                marginTop: '1rem',
+                                marginBottom: '1.25rem',
+                                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                  <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                    <FaVolumeUp size={14} style={{ color: '#BC955B' }} /> Dispositivo Audible
+                                  </span>
+                                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>¿Instalado en este poste?:</span>
+                                    {modoVisualizacion ? (
+                                      renderBadgeConsulta(poste.tieneAudible ? 'Sí' : 'No')
+                                    ) : (
+                                      <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleActualizarPosteMultiple(pIdx, {
+                                            tieneAudible: true,
+                                            audibleModelo: poste.audibleModelo || 'Novax DS-100 Audible',
+                                            audibleModuloEstado: poste.audibleModuloEstado || 'Operando'
+                                          })}
+                                          style={{
+                                            border: 'none',
+                                            padding: '0.25rem 0.6rem',
+                                            borderRadius: '4px',
+                                            fontSize: '0.78rem',
+                                            fontWeight: poste.tieneAudible ? '700' : '500',
+                                            backgroundColor: poste.tieneAudible ? '#691B31' : 'transparent',
+                                            color: poste.tieneAudible ? '#FFFFFF' : '#475569',
+                                            cursor: 'pointer'
+                                          }}
+                                        >
+                                          Sí
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleActualizarPosteMultiple(pIdx, {
+                                            tieneAudible: false
+                                          })}
+                                          style={{
+                                            border: 'none',
+                                            padding: '0.25rem 0.6rem',
+                                            borderRadius: '4px',
+                                            fontSize: '0.78rem',
+                                            fontWeight: !poste.tieneAudible ? '700' : '500',
+                                            backgroundColor: !poste.tieneAudible ? '#691B31' : 'transparent',
+                                            color: !poste.tieneAudible ? '#FFFFFF' : '#475569',
+                                            cursor: 'pointer'
+                                          }}
+                                        >
+                                          No
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
 
-                                <div>
-                                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
-                                    <span>Estado audible: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                                  </label>
-                                  {modoVisualizacion ? (
-                                    renderBadgeConsulta(poste.audibleModuloEstado || 'Operando')
-                                  ) : (
-                                    <div style={{ display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', border: '1px solid #CBD5E1', minWidth: '150px' }}>
-                                      {['Operando', 'Dañado'].map((opcion) => {
-                                        const isSel = (poste.audibleModuloEstado || 'Operando') === opcion
-                                        return (
-                                          <button
-                                            key={opcion}
-                                            type="button"
-                                            onClick={() => handleActualizarPoste(pIdx, 'audibleModuloEstado', opcion)}
-                                            style={{
-                                              border: 'none',
-                                              borderRadius: '3px',
-                                              padding: '0.3rem 0.4rem',
-                                              fontSize: '0.78rem',
-                                              fontWeight: isSel ? '700' : '500',
-                                              backgroundColor: isSel ? (opcion === 'Operando' ? '#16A34A' : '#DC2626') : 'transparent',
-                                              color: isSel ? '#FFFFFF' : '#475569',
-                                              cursor: 'pointer'
-                                            }}
-                                          >
-                                            {opcion}
-                                          </button>
-                                        )
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
-                                  <span>Observaciones del audible:</span>
-                                </label>
-                                {modoVisualizacion ? (
-                                  renderObservacionesConsulta(poste.audibleObservaciones)
-                                ) : (
-                                  <input
-                                    type="text"
-                                    placeholder="Detalles de pulsador, volumen, tono, fallas o cableado..."
-                                    value={poste.audibleObservaciones || ''}
-                                    onChange={(e) => handleActualizarPoste(pIdx, 'audibleObservaciones', e.target.value)}
-                                    style={{ width: '100%', padding: '0.35rem 0.55rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.8rem', boxSizing: 'border-box' }}
-                                  />
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Cámaras Videodetectoras */}
-                      <div style={{
-                        border: '1px solid #E2E8F0',
-                        backgroundColor: '#FFFFFF',
-                        borderRadius: '8px',
-                        padding: '1rem',
-                        marginTop: '1rem',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                          <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                            <FaVideo size={14} style={{ color: '#BC955B' }} /> Cámaras Videodetectoras
-                          </span>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>¿Instalada en este poste?:</span>
-                            {modoVisualizacion ? (
-                              renderBadgeConsulta(poste.tieneCamara ? 'Sí' : 'No')
-                            ) : (
-                              <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleActualizarPosteMultiple(pIdx, {
-                                    tieneCamara: true,
-                                    camaraModelo: poste.camaraModelo || MODELOS_CAMARA_CATALOGO[0],
-                                    camaraCantidad: poste.camaraCantidad || '1'
-                                  })}
-                                  style={{
-                                    border: 'none',
-                                    padding: '0.25rem 0.6rem',
-                                    borderRadius: '4px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: poste.tieneCamara ? '700' : '500',
-                                    backgroundColor: poste.tieneCamara ? '#691B31' : 'transparent',
-                                    color: poste.tieneCamara ? '#FFFFFF' : '#475569',
-                                    cursor: 'pointer'
-                                  }}
-                                >
-                                  Sí
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleActualizarPoste(pIdx, 'tieneCamara', false)}
-                                  style={{
-                                    border: 'none',
-                                    padding: '0.25rem 0.6rem',
-                                    borderRadius: '4px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: !poste.tieneCamara ? '700' : '500',
-                                    backgroundColor: !poste.tieneCamara ? '#691B31' : 'transparent',
-                                    color: !poste.tieneCamara ? '#FFFFFF' : '#475569',
-                                    cursor: 'pointer'
-                                  }}
-                                >
-                                  No
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {poste.tieneCamara && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                            <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem' }}>
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                  <span>Modelo de cámara: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                                </label>
-                                {modoVisualizacion ? (
-                                  renderDatoConsulta(poste.camaraModelo, 'Sin modelo de cámara')
-                                ) : (
-                                  <select
-                                    value={poste.camaraModelo || ''}
-                                    onChange={(e) => handleActualizarPoste(pIdx, 'camaraModelo', e.target.value)}
-                                    style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', backgroundColor: 'white', color: '#1E293B', boxSizing: 'border-box' }}
-                                  >
-                                    <option value="">-- Seleccionar modelo de cámara --</option>
-                                    {MODELOS_CAMARA_CATALOGO.map((modelo) => (
-                                      <option key={modelo} value={modelo}>{modelo}</option>
-                                    ))}
-                                  </select>
-                                )}
-                              </div>
-
-                              <div>
-                                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                  <span>Cantidad de equipos: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                                </label>
-                                {modoVisualizacion ? (
-                                  renderDatoConsulta(`${poste.camaraCantidad || 1} equipo(s)`)
-                                ) : (
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    placeholder="ej. 1"
-                                    value={poste.camaraCantidad || ''}
-                                    onChange={(e) => handleActualizarPoste(pIdx, 'camaraCantidad', e.target.value)}
-                                    onWheel={(e) => e.target.blur()}
-                                    style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                                  />
-                                )}
-                              </div>
-                            </div>
-
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                <span>Observaciones de la cámara:</span>
-                              </label>
-                              {modoVisualizacion ? (
-                                renderObservacionesConsulta(poste.camaraObservaciones)
-                              ) : (
-                                <textarea
-                                  rows={2}
-                                  placeholder="Detalles de cobertura, orientación, cableado o estado físico..."
-                                  value={poste.camaraObservaciones || ''}
-                                  onChange={(e) => handleActualizarPoste(pIdx, 'camaraObservaciones', e.target.value)}
-                                  style={{
-                                    width: '100%',
-                                    padding: '0.45rem 0.65rem',
-                                    border: '1px solid #CBD5E1',
+                                {poste.tieneAudible && (
+                                  <div style={{
+                                    backgroundColor: '#F8FAFC',
+                                    border: '1px solid #E2E8F0',
                                     borderRadius: '6px',
-                                    fontSize: '0.85rem',
-                                    boxSizing: 'border-box',
-                                    resize: 'vertical',
-                                    fontFamily: 'inherit'
-                                  }}
-                                />
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                                    padding: '0.75rem 0.85rem',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '0.55rem'
+                                  }}>
+                                    <div className="form-responsive-grid grid-2" style={{ gap: '0.65rem 0.85rem' }}>
+                                      <div>
+                                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
+                                          <span>Modelo audible: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                        </label>
+                                        {modoVisualizacion ? (
+                                          renderDatoConsulta(poste.audibleModelo, 'Sin modelo especificado')
+                                        ) : (
+                                          <>
+                                            <input
+                                              type="text"
+                                              list={`sugerencias-audible-${pIdx}`}
+                                              placeholder="ej. Novax DS-100 Audible"
+                                              value={poste.audibleModelo || ''}
+                                              onChange={(e) => handleActualizarPoste(pIdx, 'audibleModelo', e.target.value)}
+                                              style={{ width: '100%', padding: '0.4rem 0.6rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.82rem', boxSizing: 'border-box' }}
+                                            />
+                                            <datalist id={`sugerencias-audible-${pIdx}`}>
+                                              <option value="Novax DS-100 Audible" />
+                                              <option value="Novax Audible Peatonal" />
+                                              <option value="Dispositivo Audible Genérico" />
+                                            </datalist>
+                                          </>
+                                        )}
+                                      </div>
 
-                {/* Botón inferior: Agregar otro poste */}
-                {(controladorForm.postes || []).length > 0 && !modoVisualizacion && (
-                  <div style={{ marginTop: '1rem' }}>
-                    <button
-                      type="button"
-                      onClick={handleAgregarPoste}
-                      style={{
-                        width: '100%',
-                        padding: '0.65rem 1rem',
-                        backgroundColor: '#FFFFFF',
-                        border: '1.5px dashed #CBD5E1',
-                        borderRadius: '8px',
-                        color: '#691B31',
-                        fontSize: '0.85rem',
-                        fontWeight: '700',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.4rem',
-                        transition: 'all 0.15s'
-                      }}
-                      onMouseOver={(e) => { e.currentTarget.style.borderColor = '#691B31'; e.currentTarget.style.backgroundColor = '#FCFBF9'; }}
-                      onMouseOut={(e) => { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
-                    >
-                      <FaPlus size={11} style={{ color: '#BC955B' }} /> Agregar otro poste al crucero
-                    </button>
-                  </div>
-                )}
-              </div>
+                                      <div>
+                                        <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.25rem' }}>
+                                          <span>Estado audible: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                        </label>
+                                        {modoVisualizacion ? (
+                                          renderBadgeConsulta(poste.audibleModuloEstado || 'Operando')
+                                        ) : (
+                                          <div style={{ display: 'inline-grid', gridTemplateColumns: '1fr 1fr', gap: '2px', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', border: '1px solid #CBD5E1', minWidth: '150px' }}>
+                                            {['Operando', 'Dañado'].map((opcion) => {
+                                              const isSel = (poste.audibleModuloEstado || 'Operando') === opcion
+                                              return (
+                                                <button
+                                                  key={opcion}
+                                                  type="button"
+                                                  onClick={() => handleActualizarPoste(pIdx, 'audibleModuloEstado', opcion)}
+                                                  style={{
+                                                    border: 'none',
+                                                    borderRadius: '3px',
+                                                    padding: '0.3rem 0.4rem',
+                                                    fontSize: '0.78rem',
+                                                    fontWeight: isSel ? '700' : '500',
+                                                    backgroundColor: isSel ? (opcion === 'Operando' ? '#16A34A' : '#DC2626') : 'transparent',
+                                                    color: isSel ? '#FFFFFF' : '#475569',
+                                                    cursor: 'pointer'
+                                                  }}
+                                                >
+                                                  {opcion}
+                                                </button>
+                                              )
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
 
-              {/* REGISTROS DE PISO */}
-              <div style={{
-                marginBottom: '1.5rem',
-                backgroundColor: '#fcfbf9',
-                padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
-                borderRadius: '10px',
-                border: '1px solid #DDC9A3',
-                boxSizing: 'border-box'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '1rem',
-                  borderBottom: '1px solid #E2E8F0',
-                  paddingBottom: '0.65rem',
-                  flexWrap: 'wrap',
-                  gap: '0.5rem'
-                }}>
-                  <h4 style={{
-                    fontSize: '0.95rem',
-                    fontWeight: '800',
-                    color: '#691B31',
-                    margin: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}>
-                    <FaLayerGroup size={15} style={{ color: '#BC955B' }} /> Sección 6: Registros de Piso
-                  </h4>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
-                      Tapas e infraestructura subterránea
-                    </span>
-                    {editandoControladorId && !modoVisualizacion && (
-                      <button
-                        type="button"
-                        onClick={handleGuardarRegistrosPisoModular}
-                        disabled={guardandoModularSeccion === 'registros'}
-                        style={{
-                          backgroundColor: '#FFFFFF',
-                          border: '1.5px solid #691B31',
-                          color: '#691B31',
-                          borderRadius: '6px',
-                          padding: '0.3rem 0.7rem',
-                          fontSize: '0.78rem',
-                          fontWeight: '700',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
-                        }}
-                        title="Guarda los datos de registros y tapas en el servidor sin afectar los postes ni el gabinete"
-                      >
-                        {guardandoModularSeccion === 'registros' ? <FaSyncAlt className="fa-spin" size={11} /> : <FaSave size={11} />}
-                        <span>{guardandoModularSeccion === 'registros' ? 'Guardando...' : 'Guardar solo Registros'}</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem' }}>
-                  {/* Cantidad de tapas */}
-                  <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
-                      <FaLayerGroup size={13} style={{ color: '#691B31' }} />
-                      <span>Cantidad de tapas: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                    </label>
-                    {modoVisualizacion ? (
-                      renderDatoConsulta(`${controladorForm.registrosPisoTapas ?? 0} tapas`)
-                    ) : (
-                      <div>
-                        <input
-                          type="number"
-                          min="0"
-                          placeholder="ej. 4"
-                          value={controladorForm.registrosPisoTapas}
-                          onChange={(e) => handleCambiarRegistrosTapas(e.target.value)}
-                          onWheel={(e) => e.target.blur()}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem 0.75rem',
-                            border: `1px solid ${controladorErrores.registrosPisoTapas ? '#DC2626' : '#CBD5E1'}`,
-                            backgroundColor: controladorErrores.registrosPisoTapas ? '#FEF2F2' : '#FFFFFF',
-                            borderRadius: '6px',
-                            fontSize: '0.85rem',
-                            boxSizing: 'border-box',
-                            marginTop: 'auto'
-                          }}
-                        />
-                        {controladorErrores.registrosPisoTapas && (
-                          <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
-                            <FaExclamationTriangle size={10} /> {controladorErrores.registrosPisoTapas}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Registros dañados */}
-                  <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
-                      <FaExclamationTriangle size={13} style={{ color: '#DC2626' }} />
-                      <span>Registros dañados: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                    </label>
-                    {modoVisualizacion ? (
-                      renderDatoConsulta(`${controladorForm.registrosPisoDanados ?? 0} registros dañados`)
-                    ) : (
-                      <div>
-                        <input
-                          type="number"
-                          min="0"
-                          max={controladorForm.registrosPisoTapas !== '' && !isNaN(parseInt(controladorForm.registrosPisoTapas, 10)) ? parseInt(controladorForm.registrosPisoTapas, 10) : undefined}
-                          placeholder="ej. 1"
-                          value={controladorForm.registrosPisoDanados}
-                          onChange={(e) => handleCambiarRegistrosDanados(e.target.value)}
-                          onWheel={(e) => e.target.blur()}
-                          style={{
-                            width: '100%',
-                            padding: '0.5rem 0.75rem',
-                            border: `1px solid ${controladorErrores.registrosPisoDanados ? '#DC2626' : '#CBD5E1'}`,
-                            backgroundColor: controladorErrores.registrosPisoDanados ? '#FEF2F2' : '#FFFFFF',
-                            borderRadius: '6px',
-                            fontSize: '0.85rem',
-                            boxSizing: 'border-box',
-                            marginTop: 'auto'
-                          }}
-                        />
-                        {controladorErrores.registrosPisoDanados && (
-                          <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
-                            <FaExclamationTriangle size={10} /> {controladorErrores.registrosPisoDanados}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* APARTADO DINÁMICO DE COORDENADAS (Solo si hay registros dañados) */}
-                {Number(controladorForm.registrosPisoDanados) > 0 && (
-                  <div style={{ marginTop: '1rem' }}>
-                    <div style={{
-                      backgroundColor: '#FFFFFF',
-                      border: '1px solid #FCD34D',
-                      borderRadius: '8px',
-                      padding: '0.85rem 1rem'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginBottom: '0.75rem',
-                        borderBottom: '1px dashed #E2E8F0',
-                        paddingBottom: '0.5rem',
-                        flexWrap: 'wrap',
-                        gap: '0.5rem'
-                      }}>
-                        <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#92400E', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                          <FaMapMarkerAlt style={{ color: '#D97706' }} /> Coordenadas de los {controladorForm.registrosPisoDanados} registro(s) dañado(s):
-                        </span>
-                        <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
-                          Latitud, Longitud (ej. 20.123456, -98.765432)
-                        </span>
-                      </div>
-
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: Number(controladorForm.registrosPisoDanados) > 1 ? 'repeat(auto-fit, minmax(280px, 1fr))' : '1fr',
-                        gap: '0.75rem'
-                      }}>
-                        {(controladorForm.registrosPisoCoordenadas || []).map((item, idx) => (
-                          <div
-                            key={`registro-coord-${idx}`}
-                            style={{
-                              backgroundColor: '#F8FAFC',
-                              border: '1px solid #E2E8F0',
-                              borderRadius: '6px',
-                              padding: '0.65rem 0.75rem',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '0.35rem'
-                            }}
-                          >
-                            {(() => {
-                              const coordsReg = extraerCoordenadasValidas(item.coordenadas)
-                              const mapaRegVisible = mapasDanadasVisibles[idx] !== false && Boolean(coordsReg)
-
-                              return (
-                                <>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem' }}>
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', fontWeight: '700', color: '#A02142' }}>
-                                      <FaExclamationTriangle size={11} style={{ color: '#DC2626' }} /> Registro dañado #{idx + 1}
-                                    </span>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                      {coordsReg && (
-                                        <button
-                                          type="button"
-                                          onClick={() => setMapasDanadasVisibles(prev => ({
-                                            ...prev,
-                                            [idx]: mapaRegVisible ? false : true
-                                          }))}
-                                          style={{
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '0.25rem',
-                                            padding: '0.15rem 0.45rem',
-                                            backgroundColor: mapaRegVisible ? '#EFF6FF' : '#F1F5F9',
-                                            color: mapaRegVisible ? '#1D4ED8' : '#475569',
-                                            border: mapaRegVisible ? '1px solid #BFDBFE' : '1px solid #CBD5E1',
-                                            borderRadius: '4px',
-                                            fontSize: '0.72rem',
-                                            fontWeight: '700',
-                                            cursor: 'pointer',
-                                            whiteSpace: 'nowrap',
-                                            pointerEvents: 'auto'
-                                          }}
-                                          title={mapaRegVisible ? "Ocultar mapa interactivo" : "Mostrar mapa interactivo"}
-                                        >
-                                          <FaMap size={10} />
-                                          <span>{mapaRegVisible ? 'Ocultar mapa' : 'Ver mapa'}</span>
-                                        </button>
+                                    <div>
+                                      <label style={{ display: 'block', fontSize: '0.76rem', fontWeight: '700', color: '#475569', marginBottom: '0.25rem' }}>
+                                        <span>Observaciones del audible:</span>
+                                      </label>
+                                      {modoVisualizacion ? (
+                                        renderObservacionesConsulta(poste.audibleObservaciones)
+                                      ) : (
+                                        <input
+                                          type="text"
+                                          placeholder="Detalles de pulsador, volumen, tono, fallas o cableado..."
+                                          value={poste.audibleObservaciones || ''}
+                                          onChange={(e) => handleActualizarPoste(pIdx, 'audibleObservaciones', e.target.value)}
+                                          style={{ width: '100%', padding: '0.35rem 0.55rem', border: '1px solid #CBD5E1', borderRadius: '5px', fontSize: '0.8rem', boxSizing: 'border-box' }}
+                                        />
                                       )}
-                                      {!modoVisualizacion && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleObtenerGpsRegistro(idx)}
-                                          disabled={capturandoGpsIndex === idx}
-                                          style={{
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '0.25rem',
-                                            backgroundColor: capturandoGpsIndex === idx ? '#E2E8F0' : '#FEF3C7',
-                                            color: '#92400E',
-                                            border: '1px solid #FCD34D',
-                                            borderRadius: '4px',
-                                            padding: '0.2rem 0.5rem',
-                                            fontSize: '0.72rem',
-                                            fontWeight: '700',
-                                            cursor: capturandoGpsIndex === idx ? 'wait' : 'pointer'
-                                          }}
-                                          title="Capturar ubicación GPS actual del dispositivo"
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Cámaras Videodetectoras */}
+                            <div style={{
+                              border: '1px solid #E2E8F0',
+                              backgroundColor: '#FFFFFF',
+                              borderRadius: '8px',
+                              padding: '1rem',
+                              marginTop: '1rem',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.85rem', borderBottom: '1px solid #F1F5F9', paddingBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#691B31', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                  <FaVideo size={14} style={{ color: '#BC955B' }} /> Cámaras Videodetectoras
+                                </span>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>¿Instalada en este poste?:</span>
+                                  {modoVisualizacion ? (
+                                    renderBadgeConsulta(poste.tieneCamara ? 'Sí' : 'No')
+                                  ) : (
+                                    <div style={{ display: 'inline-flex', backgroundColor: '#F1F5F9', padding: '2px', borderRadius: '5px', gap: '2px', border: '1px solid #CBD5E1' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleActualizarPosteMultiple(pIdx, {
+                                          tieneCamara: true,
+                                          camaraModelo: poste.camaraModelo || MODELOS_CAMARA_CATALOGO[0],
+                                          camaraCantidad: poste.camaraCantidad || '1'
+                                        })}
+                                        style={{
+                                          border: 'none',
+                                          padding: '0.25rem 0.6rem',
+                                          borderRadius: '4px',
+                                          fontSize: '0.78rem',
+                                          fontWeight: poste.tieneCamara ? '700' : '500',
+                                          backgroundColor: poste.tieneCamara ? '#691B31' : 'transparent',
+                                          color: poste.tieneCamara ? '#FFFFFF' : '#475569',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        Sí
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleActualizarPoste(pIdx, 'tieneCamara', false)}
+                                        style={{
+                                          border: 'none',
+                                          padding: '0.25rem 0.6rem',
+                                          borderRadius: '4px',
+                                          fontSize: '0.78rem',
+                                          fontWeight: !poste.tieneCamara ? '700' : '500',
+                                          backgroundColor: !poste.tieneCamara ? '#691B31' : 'transparent',
+                                          color: !poste.tieneCamara ? '#FFFFFF' : '#475569',
+                                          cursor: 'pointer'
+                                        }}
+                                      >
+                                        No
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {poste.tieneCamara && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                  <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem' }}>
+                                    <div>
+                                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                                        <span>Modelo de cámara: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                      </label>
+                                      {modoVisualizacion ? (
+                                        renderDatoConsulta(poste.camaraModelo, 'Sin modelo de cámara')
+                                      ) : (
+                                        <select
+                                          value={poste.camaraModelo || ''}
+                                          onChange={(e) => handleActualizarPoste(pIdx, 'camaraModelo', e.target.value)}
+                                          style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', backgroundColor: 'white', color: '#1E293B', boxSizing: 'border-box' }}
                                         >
-                                          <FaMapMarkerAlt size={10} />
-                                          {capturandoGpsIndex === idx ? 'Obteniendo GPS...' : 'GPS actual'}
-                                        </button>
+                                          <option value="">-- Seleccionar modelo de cámara --</option>
+                                          {MODELOS_CAMARA_CATALOGO.map((modelo) => (
+                                            <option key={modelo} value={modelo}>{modelo}</option>
+                                          ))}
+                                        </select>
+                                      )}
+                                    </div>
+
+                                    <div>
+                                      <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                                        <span>Cantidad de equipos: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                      </label>
+                                      {modoVisualizacion ? (
+                                        renderDatoConsulta(`${poste.camaraCantidad || 1} equipo(s)`)
+                                      ) : (
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          placeholder="ej. 1"
+                                          value={poste.camaraCantidad || ''}
+                                          onChange={(e) => handleActualizarPoste(pIdx, 'camaraCantidad', e.target.value)}
+                                          onWheel={(e) => e.target.blur()}
+                                          style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                                        />
                                       )}
                                     </div>
                                   </div>
 
-                                  {modoVisualizacion ? (
-                                    renderDatoConsulta(item.coordenadas, 'Sin coordenadas registradas')
-                                  ) : (
-                                    <input
-                                      type="text"
-                                      placeholder="ej. 20.123456, -98.765432"
-                                      value={item.coordenadas || ''}
-                                      onChange={(e) => {
-                                        handleCambiarCoordenada(idx, e.target.value)
-                                        if (extraerCoordenadasValidas(e.target.value)) {
-                                          setMapasDanadasVisibles(prev => ({ ...prev, [idx]: true }))
-                                        }
-                                      }}
-                                      style={{
-                                        width: '100%',
-                                        padding: '0.45rem 0.65rem',
-                                        border: '1px solid #CBD5E1',
-                                        borderRadius: '5px',
-                                        fontSize: '0.82rem',
-                                        backgroundColor: 'white',
-                                        boxSizing: 'border-box'
-                                      }}
-                                    />
-                                  )}
-
-                                  {coordsReg && mapaRegVisible && (
-                                    <div style={{
-                                      marginTop: '0.45rem',
-                                      borderRadius: '6px',
-                                      overflow: 'hidden',
-                                      border: '1px solid #CBD5E1',
-                                      boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
-                                      backgroundColor: '#ffffff'
-                                    }}>
-                                      <div style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        padding: '0.35rem 0.6rem',
-                                        backgroundColor: '#F8FAFC',
-                                        borderBottom: '1px solid #E2E8F0',
-                                        fontSize: '0.73rem',
-                                        fontWeight: '600',
-                                        color: '#475569',
-                                        flexWrap: 'wrap',
-                                        gap: '0.35rem'
-                                      }}>
-                                        <span>GPS: <strong style={{ color: '#1E293B' }}>{coordsReg.lat.toFixed(6)}, {coordsReg.lng.toFixed(6)}</strong></span>
-                                        <a
-                                          href={`https://www.google.com/maps?q=${coordsReg.lat},${coordsReg.lng}`}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          style={{ color: '#2563EB', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.72rem', fontWeight: '600' }}
-                                        >
-                                          <FaExternalLinkAlt size={8} /> Abrir en Google Maps
-                                        </a>
-                                      </div>
-                                      <iframe
-                                        title={`Mapa del registro dañado #${idx + 1}`}
-                                        src={`https://maps.google.com/maps?q=${coordsReg.lat},${coordsReg.lng}&hl=es&z=17&output=embed`}
-                                        style={{ width: '100%', height: '170px', border: 'none', display: 'block' }}
-                                        loading="lazy"
+                                  <div>
+                                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                                      <span>Observaciones de la cámara:</span>
+                                    </label>
+                                    {modoVisualizacion ? (
+                                      renderObservacionesConsulta(poste.camaraObservaciones)
+                                    ) : (
+                                      <textarea
+                                        rows={2}
+                                        placeholder="Detalles de cobertura, orientación, cableado o estado físico..."
+                                        value={poste.camaraObservaciones || ''}
+                                        onChange={(e) => handleActualizarPoste(pIdx, 'camaraObservaciones', e.target.value)}
+                                        style={{
+                                          width: '100%',
+                                          padding: '0.45rem 0.65rem',
+                                          border: '1px solid #CBD5E1',
+                                          borderRadius: '6px',
+                                          fontSize: '0.85rem',
+                                          boxSizing: 'border-box',
+                                          resize: 'vertical',
+                                          fontFamily: 'inherit'
+                                        }}
                                       />
-                                    </div>
-                                  )}
-                                </>
-                              )
-                            })()}
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
-                    </div>
+                    )}
+
+                    {/* Botón inferior: Agregar otro poste */}
+                    {(controladorForm.postes || []).length > 0 && !modoVisualizacion && (
+                      <div style={{ marginTop: '1rem' }}>
+                        <button
+                          type="button"
+                          onClick={handleAgregarPoste}
+                          style={{
+                            width: '100%',
+                            padding: '0.65rem 1rem',
+                            backgroundColor: '#FFFFFF',
+                            border: '1.5px dashed #CBD5E1',
+                            borderRadius: '8px',
+                            color: '#691B31',
+                            fontSize: '0.85rem',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.4rem',
+                            transition: 'all 0.15s'
+                          }}
+                          onMouseOver={(e) => { e.currentTarget.style.borderColor = '#691B31'; e.currentTarget.style.backgroundColor = '#FCFBF9'; }}
+                          onMouseOut={(e) => { e.currentTarget.style.borderColor = '#CBD5E1'; e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
+                        >
+                          <FaPlus size={11} style={{ color: '#BC955B' }} /> Agregar otro poste al crucero
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+
+                  {/* REGISTROS DE PISO */}
+                  <div style={{
+                    marginBottom: '1.5rem',
+                    backgroundColor: '#fcfbf9',
+                    padding: 'clamp(0.65rem, 2.5vw, 1.15rem)',
+                    borderRadius: '10px',
+                    border: '1px solid #DDC9A3',
+                    boxSizing: 'border-box'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: '1rem',
+                      borderBottom: '1px solid #E2E8F0',
+                      paddingBottom: '0.65rem',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem'
+                    }}>
+                      <h4 style={{
+                        fontSize: '0.95rem',
+                        fontWeight: '800',
+                        color: '#691B31',
+                        margin: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}>
+                        <FaLayerGroup size={15} style={{ color: '#BC955B' }} /> Sección 6: Registros de Piso
+                      </h4>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
+                          Tapas e infraestructura subterránea
+                        </span>
+                        {editandoControladorId && !modoVisualizacion && (
+                          <button
+                            type="button"
+                            onClick={handleGuardarRegistrosPisoModular}
+                            disabled={guardandoModularSeccion === 'registros'}
+                            style={{
+                              backgroundColor: '#FFFFFF',
+                              border: '1.5px solid #691B31',
+                              color: '#691B31',
+                              borderRadius: '6px',
+                              padding: '0.3rem 0.7rem',
+                              fontSize: '0.78rem',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                            }}
+                            title="Guarda los datos de registros y tapas en el servidor sin afectar los postes ni el gabinete"
+                          >
+                            {guardandoModularSeccion === 'registros' ? <FaSyncAlt className="fa-spin" size={11} /> : <FaSave size={11} />}
+                            <span>{guardandoModularSeccion === 'registros' ? 'Guardando...' : 'Guardar solo Registros'}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem' }}>
+                      {/* Cantidad de tapas */}
+                      <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
+                          <FaLayerGroup size={13} style={{ color: '#691B31' }} />
+                          <span>Cantidad de tapas: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                        </label>
+                        {modoVisualizacion ? (
+                          renderDatoConsulta(`${controladorForm.registrosPisoTapas ?? 0} tapas`)
+                        ) : (
+                          <div>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="ej. 4"
+                              value={controladorForm.registrosPisoTapas}
+                              onChange={(e) => handleCambiarRegistrosTapas(e.target.value)}
+                              onWheel={(e) => e.target.blur()}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem 0.75rem',
+                                border: `1px solid ${controladorErrores.registrosPisoTapas ? '#DC2626' : '#CBD5E1'}`,
+                                backgroundColor: controladorErrores.registrosPisoTapas ? '#FEF2F2' : '#FFFFFF',
+                                borderRadius: '6px',
+                                fontSize: '0.85rem',
+                                boxSizing: 'border-box',
+                                marginTop: 'auto'
+                              }}
+                            />
+                            {controladorErrores.registrosPisoTapas && (
+                              <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                                <FaExclamationTriangle size={10} /> {controladorErrores.registrosPisoTapas}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Registros dañados */}
+                      <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
+                          <FaExclamationTriangle size={13} style={{ color: '#DC2626' }} />
+                          <span>Registros dañados: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                        </label>
+                        {modoVisualizacion ? (
+                          renderDatoConsulta(`${controladorForm.registrosPisoDanados ?? 0} registros dañados`)
+                        ) : (
+                          <div>
+                            <input
+                              type="number"
+                              min="0"
+                              max={controladorForm.registrosPisoTapas !== '' && !isNaN(parseInt(controladorForm.registrosPisoTapas, 10)) ? parseInt(controladorForm.registrosPisoTapas, 10) : undefined}
+                              placeholder="ej. 1"
+                              value={controladorForm.registrosPisoDanados}
+                              onChange={(e) => handleCambiarRegistrosDanados(e.target.value)}
+                              onWheel={(e) => e.target.blur()}
+                              style={{
+                                width: '100%',
+                                padding: '0.5rem 0.75rem',
+                                border: `1px solid ${controladorErrores.registrosPisoDanados ? '#DC2626' : '#CBD5E1'}`,
+                                backgroundColor: controladorErrores.registrosPisoDanados ? '#FEF2F2' : '#FFFFFF',
+                                borderRadius: '6px',
+                                fontSize: '0.85rem',
+                                boxSizing: 'border-box',
+                                marginTop: 'auto'
+                              }}
+                            />
+                            {controladorErrores.registrosPisoDanados && (
+                              <span style={{ fontSize: '0.74rem', color: '#DC2626', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '600' }}>
+                                <FaExclamationTriangle size={10} /> {controladorErrores.registrosPisoDanados}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* APARTADO DINÁMICO DE COORDENADAS (Solo si hay registros dañados) */}
+                    {Number(controladorForm.registrosPisoDanados) > 0 && (
+                      <div style={{ marginTop: '1rem' }}>
+                        <div style={{
+                          backgroundColor: '#FFFFFF',
+                          border: '1px solid #FCD34D',
+                          borderRadius: '8px',
+                          padding: '0.85rem 1rem'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: '0.75rem',
+                            borderBottom: '1px dashed #E2E8F0',
+                            paddingBottom: '0.5rem',
+                            flexWrap: 'wrap',
+                            gap: '0.5rem'
+                          }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#92400E', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                              <FaMapMarkerAlt style={{ color: '#D97706' }} /> Coordenadas de los {controladorForm.registrosPisoDanados} registro(s) dañado(s):
+                            </span>
+                            <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
+                              Latitud, Longitud (ej. 20.123456, -98.765432)
+                            </span>
+                          </div>
+
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: Number(controladorForm.registrosPisoDanados) > 1 ? 'repeat(auto-fit, minmax(280px, 1fr))' : '1fr',
+                            gap: '0.75rem'
+                          }}>
+                            {(controladorForm.registrosPisoCoordenadas || []).map((item, idx) => (
+                              <div
+                                key={`registro-coord-${idx}`}
+                                style={{
+                                  backgroundColor: '#F8FAFC',
+                                  border: '1px solid #E2E8F0',
+                                  borderRadius: '6px',
+                                  padding: '0.65rem 0.75rem',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '0.35rem'
+                                }}
+                              >
+                                {(() => {
+                                  const coordsReg = extraerCoordenadasValidas(item.coordenadas)
+                                  const mapaRegVisible = mapasDanadasVisibles[idx] !== false && Boolean(coordsReg)
+
+                                  return (
+                                    <>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.35rem' }}>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', fontWeight: '700', color: '#A02142' }}>
+                                          <FaExclamationTriangle size={11} style={{ color: '#DC2626' }} /> Registro dañado #{idx + 1}
+                                        </span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                          {coordsReg && (
+                                            <button
+                                              type="button"
+                                              onClick={() => setMapasDanadasVisibles(prev => ({
+                                                ...prev,
+                                                [idx]: mapaRegVisible ? false : true
+                                              }))}
+                                              style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '0.25rem',
+                                                padding: '0.15rem 0.45rem',
+                                                backgroundColor: mapaRegVisible ? '#EFF6FF' : '#F1F5F9',
+                                                color: mapaRegVisible ? '#1D4ED8' : '#475569',
+                                                border: mapaRegVisible ? '1px solid #BFDBFE' : '1px solid #CBD5E1',
+                                                borderRadius: '4px',
+                                                fontSize: '0.72rem',
+                                                fontWeight: '700',
+                                                cursor: 'pointer',
+                                                whiteSpace: 'nowrap',
+                                                pointerEvents: 'auto'
+                                              }}
+                                              title={mapaRegVisible ? "Ocultar mapa interactivo" : "Mostrar mapa interactivo"}
+                                            >
+                                              <FaMap size={10} />
+                                              <span>{mapaRegVisible ? 'Ocultar mapa' : 'Ver mapa'}</span>
+                                            </button>
+                                          )}
+                                          {!modoVisualizacion && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleObtenerGpsRegistro(idx)}
+                                              disabled={capturandoGpsIndex === idx}
+                                              style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '0.25rem',
+                                                backgroundColor: capturandoGpsIndex === idx ? '#E2E8F0' : '#FEF3C7',
+                                                color: '#92400E',
+                                                border: '1px solid #FCD34D',
+                                                borderRadius: '4px',
+                                                padding: '0.2rem 0.5rem',
+                                                fontSize: '0.72rem',
+                                                fontWeight: '700',
+                                                cursor: capturandoGpsIndex === idx ? 'wait' : 'pointer'
+                                              }}
+                                              title="Capturar ubicación GPS actual del dispositivo"
+                                            >
+                                              <FaMapMarkerAlt size={10} />
+                                              {capturandoGpsIndex === idx ? 'Obteniendo GPS...' : 'GPS actual'}
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {modoVisualizacion ? (
+                                        renderDatoConsulta(item.coordenadas, 'Sin coordenadas registradas')
+                                      ) : (
+                                        <input
+                                          type="text"
+                                          placeholder="ej. 20.123456, -98.765432"
+                                          value={item.coordenadas || ''}
+                                          onChange={(e) => {
+                                            handleCambiarCoordenada(idx, e.target.value)
+                                            if (extraerCoordenadasValidas(e.target.value)) {
+                                              setMapasDanadasVisibles(prev => ({ ...prev, [idx]: true }))
+                                            }
+                                          }}
+                                          style={{
+                                            width: '100%',
+                                            padding: '0.45rem 0.65rem',
+                                            border: '1px solid #CBD5E1',
+                                            borderRadius: '5px',
+                                            fontSize: '0.82rem',
+                                            backgroundColor: 'white',
+                                            boxSizing: 'border-box'
+                                          }}
+                                        />
+                                      )}
+
+                                      {coordsReg && mapaRegVisible && (
+                                        <div style={{
+                                          marginTop: '0.45rem',
+                                          borderRadius: '6px',
+                                          overflow: 'hidden',
+                                          border: '1px solid #CBD5E1',
+                                          boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
+                                          backgroundColor: '#ffffff'
+                                        }}>
+                                          <div style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            padding: '0.35rem 0.6rem',
+                                            backgroundColor: '#F8FAFC',
+                                            borderBottom: '1px solid #E2E8F0',
+                                            fontSize: '0.73rem',
+                                            fontWeight: '600',
+                                            color: '#475569',
+                                            flexWrap: 'wrap',
+                                            gap: '0.35rem'
+                                          }}>
+                                            <span>GPS: <strong style={{ color: '#1E293B' }}>{coordsReg.lat.toFixed(6)}, {coordsReg.lng.toFixed(6)}</strong></span>
+                                            <a
+                                              href={`https://www.google.com/maps?q=${coordsReg.lat},${coordsReg.lng}`}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              style={{ color: '#2563EB', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.72rem', fontWeight: '600' }}
+                                            >
+                                              <FaExternalLinkAlt size={8} /> Abrir en Google Maps
+                                            </a>
+                                          </div>
+                                          <iframe
+                                            title={`Mapa del registro dañado #${idx + 1}`}
+                                            src={`https://maps.google.com/maps?q=${coordsReg.lat},${coordsReg.lng}&hl=es&z=17&output=embed`}
+                                            style={{ width: '100%', height: '170px', border: 'none', display: 'block' }}
+                                            loading="lazy"
+                                          />
+                                        </div>
+                                      )}
+                                    </>
+                                  )
+                                })()}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                 </div>
 
@@ -10393,6 +10504,6 @@ export default function InventarioSemaforos() {
         );
       })()}
 
-          </main>
+    </main>
   )
 }
