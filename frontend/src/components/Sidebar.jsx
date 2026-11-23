@@ -65,8 +65,9 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         paddingRight: '1rem',
       }}>
         <Link
-          to={esAdmin ? '/dashboard' : esInfra ? '/dashboard-infraestructura' : '/crear-oficinas'}
+          to={esAdmin ? '/dashboard' : esInfra ? '/dashboard-infraestructura' : '/login'}
           onClick={closeSidebar}
+          title={esAdmin || esInfra ? 'Ir al Dashboard' : 'Acceso Administrador'}
           style={{ cursor: 'pointer', textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}
         >
           <img

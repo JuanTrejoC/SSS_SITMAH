@@ -61,7 +61,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
 
   const handleHomeClick = () => {
     if (!user) {
-      navigate('/');
+      navigate('/login');
       return;
     }
     if (user.rol === 'administrador' || user.rol === 'admin') {
@@ -69,7 +69,7 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
     } else if (user.rol === 'infraestructura') {
       navigate('/dashboard-infraestructura');
     } else {
-      navigate('/crear-oficinas');
+      navigate('/login');
     }
   };
 
@@ -173,8 +173,9 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
             type="button"
             className="app-header__brand"
             onClick={handleHomeClick}
-            aria-label="Ir al inicio"
-            style={{ cursor: 'pointer', padding: 0, background: 'transparent' }}
+            aria-label={user ? 'Ir al inicio' : 'Acceso Administrador'}
+            title={user ? 'Ir al inicio' : 'Acceso Administrador'}
+            style={{ cursor: 'pointer', padding: 0, background: 'transparent', border: 'none' }}
           >
             <img
               src={logoNuevo}

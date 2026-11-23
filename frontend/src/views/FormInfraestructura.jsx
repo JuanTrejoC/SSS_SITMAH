@@ -148,6 +148,25 @@ export default function FormInfraestructura({ usuarioActual }) {
     setValido(prev => ({ ...prev, [nombre]: esValido }))
   }
 
+  const getBorderColor = (campo) => {
+    if (errores[campo]) return '#EF4444'
+    if (valido[campo]) return '#10B981'
+    return '#CBD5E1'
+  }
+
+  // Cerrar modal de cámara con tecla Esc
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' || e.keyCode === 27) {
+        if (camaraAbierta) {
+          setCamaraAbierta(false)
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [camaraAbierta])
+
   const comprimirImagen = (archivo) => {
     return new Promise((resolve) => {
       if (!['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(archivo.type)) {
@@ -438,624 +457,707 @@ export default function FormInfraestructura({ usuarioActual }) {
   }
 
   return (
-    <div className="main-content-padding" style={{ backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '4rem' }}>
-      <div style={{ maxWidth: '960px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-
-        {/* HEADER / BANNER INSTITUCIONAL */}
+    <div style={{ maxWidth: '1100px', margin: '0 auto', width: '100%' }}>
+      {/* HEADER MODERNO */}
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #691B31 0%, #4e1325 60%, #390d1b 100%)',
+          borderRadius: '16px',
+          padding: '1.75rem 2rem',
+          color: 'white',
+          boxShadow: '0 8px 24px -4px rgba(105, 27, 49, 0.25)',
+          marginBottom: '1.75rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '1.25rem'
+        }}
+      >
         <div
           style={{
-            background: 'linear-gradient(135deg, #691B31 0%, #4a1322 100%)',
-            borderRadius: '16px',
-            padding: '2rem',
-            color: 'white',
-            boxShadow: '0 10px 25px -5px rgba(105, 27, 49, 0.25)',
-            position: 'relative',
-            overflow: 'hidden'
+            width: '56px',
+            height: '56px',
+            borderRadius: '14px',
+            backgroundColor: 'rgba(255, 255, 255, 0.15)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '1.6rem',
+            flexShrink: 0,
+            color: '#BC955B'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', position: 'relative', zIndex: 1 }}>
-            <div
-              style={{
-                width: '56px',
-                height: '56px',
-                borderRadius: '14px',
-                backgroundColor: 'rgba(255,255,255,0.15)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.75rem',
-                flexShrink: 0
-              }}
-            >
-              <FaWrench />
-            </div>
+          <FaWrench size={28} />
+        </div>
+        <div>
+          <h1 style={{ fontSize: 'clamp(1.25rem, 3vw, 1.75rem)', fontWeight: '800', margin: 0 }}>
+            Reportes de Infraestructura
+          </h1>
+          <p style={{ color: '#E5E7EB', margin: '0.35rem 0 0 0', fontSize: 'clamp(0.85rem, 2vw, 0.95rem)', opacity: 0.9 }}>
+            Complete los campos a continuación para solicitar soporte o reporte de mantenimiento en infraestructura.
+          </p>
+        </div>
+      </div>
+
+      {/* TARJETA DE FORMULARIO */}
+      <form
+        onSubmit={enviar}
+        style={{
+          backgroundColor: 'white',
+          borderRadius: '16px',
+          boxShadow: '0 4px 20px -2px rgba(0,0,0,0.06)',
+          border: '1px solid #E5E7EB',
+          padding: 'clamp(1.25rem, 4vw, 2.25rem)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '2rem'
+        }}
+      >
+        {/* SECCIÓN 1: DATOS DEL SOLICITANTE */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem', borderBottom: '2px solid #F3F4F6', paddingBottom: '0.65rem' }}>
+            <span style={{ backgroundColor: 'rgba(105, 27, 49, 0.1)', color: '#691B31', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.85rem' }}>1</span>
+            <h2 style={{ color: '#111827', fontSize: '1.1rem', fontWeight: '700', margin: 0 }}>
+              Datos del Solicitante
+            </h2>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '1.15rem'
+            }}
+          >
+            {/* Solicitante */}
             <div>
-              <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#fcd3d3', fontWeight: '700' }}>
-                Sistema de Atención a Incidencias — SITRAC-H
-              </span>
-              <h1 style={{ fontSize: 'clamp(1.35rem, 3.5vw, 1.85rem)', fontWeight: '800', margin: '0.2rem 0 0.4rem 0' }}>
-                Crear Reporte de Infraestructura
-              </h1>
-              <p style={{ color: '#E5E7EB', margin: 0, fontSize: '0.9rem', opacity: 0.95, lineHeight: 1.4 }}>
-                Reporte de incidencias en inmuebles, estaciones, instalaciones eléctricas, sanitarias, herrería y mantenimiento general.
-              </p>
+              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                Nombre Completo <span style={{ color: '#EF4444' }}>*</span>
+              </label>
+              <PersonalAutocomplete
+                value={formData.solicitante}
+                onChange={(val) => {
+                  setFormData(prev => ({ ...prev, solicitante: val }))
+                  validarCampo('solicitante', val)
+                }}
+                onSelect={(emp) => {
+                  const matchArea = listaAreas.find(a => 
+                    a.nombre.toLowerCase().trim() === (emp.direccion || '').toLowerCase().trim()
+                  )
+                  setFormData(prev => ({
+                    ...prev,
+                    solicitante: emp.nombre,
+                    cargo: emp.cargo || prev.cargo,
+                    area_id: matchArea ? String(matchArea.id) : prev.area_id
+                  }))
+                  if (emp.nombre) validarCampo('solicitante', emp.nombre)
+                  if (emp.cargo) validarCampo('cargo', emp.cargo)
+                  if (matchArea) validarCampo('area_id', String(matchArea.id))
+                }}
+                placeholder="-- Seleccionar Solicitante --"
+              />
+              {errores.solicitante && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.solicitante}</span>}
+            </div>
+
+            {/* Área / Dirección */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                Área <span style={{ color: '#EF4444' }}>*</span>
+              </label>
+              <select
+                value={formData.area_id}
+                onChange={(e) => {
+                  const valor = e.target.value
+                  setFormData(prev => ({ ...prev, area_id: valor }))
+                  validarCampo('area_id', valor)
+                }}
+                className="premium-select"
+                style={{
+                  border: `1.5px solid ${getBorderColor('area_id')}`
+                }}
+              >
+                <option value="">Seleccione área</option>
+                {listaAreas.map(a => (
+                  <option key={a.id} value={a.id}>{a.nombre}</option>
+                ))}
+              </select>
+              {errores.area_id && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.area_id}</span>}
+            </div>
+
+            {/* Cargo */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                Cargo <span style={{ color: '#EF4444' }}>*</span>
+              </label>
+              <select
+                value={formData.cargo}
+                onChange={(e) => {
+                  const valor = e.target.value
+                  setFormData(prev => ({ ...prev, cargo: valor }))
+                  validarCampo('cargo', valor)
+                }}
+                className="premium-select"
+                style={{
+                  border: `1.5px solid ${getBorderColor('cargo')}`
+                }}
+              >
+                <option value="">Seleccione cargo</option>
+                {CARGOS_NORMALIZADOS.map((cargo, idx) => (
+                  <option key={idx} value={cargo}>{cargo}</option>
+                ))}
+              </select>
+              {errores.cargo && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.cargo}</span>}
+            </div>
+
+            {/* Correo Electrónico */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                Correo Electrónico <span style={{ color: '#EF4444' }}>*</span>
+              </label>
+              <input
+                type="email"
+                placeholder="ejemplo@correo.com"
+                value={formData.email}
+                onChange={(e) => {
+                  const valor = e.target.value
+                  setFormData(prev => ({ ...prev, email: valor }))
+                  validarCampo('email', valor)
+                }}
+                className="premium-input"
+                style={{
+                  border: `1.5px solid ${getBorderColor('email')}`
+                }}
+              />
+              {errores.email && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.email}</span>}
             </div>
           </div>
         </div>
 
-        {/* FORMULARIO */}
-        <form
-          onSubmit={enviar}
-          style={{
-            backgroundColor: 'white',
-            borderRadius: '16px',
-            padding: '2rem',
-            border: '1px solid #E5E7EB',
-            boxShadow: '0 4px 15px -3px rgba(0,0,0,0.05)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1.75rem'
-          }}
-        >
-          {/* SECCIÓN 1: DATOS DEL SOLICITANTE */}
-          <div>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#111827', margin: '0 0 1rem 0', borderBottom: '2px solid #F3F4F6', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ width: '8px', height: '18px', backgroundColor: '#691B31', borderRadius: '4px', display: 'inline-block' }}></span>
-              1. Datos del Solicitante
+        {/* SECCIÓN 2: UBICACIÓN E INCIDENCIA */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem', borderBottom: '2px solid #F3F4F6', paddingBottom: '0.65rem' }}>
+            <span style={{ backgroundColor: 'rgba(188, 149, 91, 0.15)', color: '#BC955B', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.85rem' }}>2</span>
+            <h2 style={{ color: '#111827', fontSize: '1.1rem', fontWeight: '700', margin: 0 }}>
+              Ubicación e Incidencia de Infraestructura
             </h2>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', alignItems: 'start' }}>
-              {/* Solicitante */}
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
-                  <span>Nombre Completo <span style={{ color: '#DC2626' }}>*</span></span>
-                </label>
-                <PersonalAutocomplete
-                  value={formData.solicitante}
-                  onChange={(val) => {
-                    setFormData(prev => ({ ...prev, solicitante: val }))
-                    validarCampo('solicitante', val)
-                  }}
-                  onSelect={(emp) => {
-                    const matchArea = listaAreas.find(a => 
-                      a.nombre.toLowerCase().trim() === (emp.direccion || '').toLowerCase().trim()
-                    );
-                    setFormData(prev => ({
-                      ...prev,
-                      solicitante: emp.nombre,
-                      cargo: emp.cargo || prev.cargo,
-                      area_id: matchArea ? String(matchArea.id) : prev.area_id
-                    }));
-                    if (emp.nombre) validarCampo('solicitante', emp.nombre);
-                    if (emp.cargo) validarCampo('cargo', emp.cargo);
-                    if (matchArea) validarCampo('area_id', String(matchArea.id));
-                  }}
-                  placeholder="-- Seleccionar Solicitante --"
-                />
-                {errores.solicitante && <span style={{ color: '#DC2626', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>{errores.solicitante}</span>}
-              </div>
-
-              {/* Área / Dirección */}
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
-                  <span>Dirección o Área <span style={{ color: '#DC2626' }}>*</span></span>
-                </label>
-                <select
-                  value={formData.area_id}
-                  onChange={(e) => {
-                    setFormData(prev => ({ ...prev, area_id: e.target.value }))
-                    validarCampo('area_id', e.target.value)
-                  }}
-                  onBlur={(e) => validarCampo('area_id', e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    boxSizing: 'border-box',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '8px',
-                    border: errores.area_id ? '1.5px solid #DC2626' : (valido.area_id ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
-                    outline: 'none',
-                    fontSize: '0.9rem',
-                    backgroundColor: 'white'
-                  }}
-                >
-                  <option value="">-- Seleccionar Área --</option>
-                  {listaAreas.map(a => (
-                    <option key={a.id} value={a.id}>{a.nombre}</option>
-                  ))}
-                </select>
-                {errores.area_id && <span style={{ color: '#DC2626', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>{errores.area_id}</span>}
-              </div>
-
-              {/* Cargo */}
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
-                  <span>Cargo  <span style={{ color: '#DC2626' }}>*</span></span>
-                </label>
-                <select
-                  value={formData.cargo}
-                  onChange={(e) => {
-                    setFormData(prev => ({ ...prev, cargo: e.target.value }))
-                    validarCampo('cargo', e.target.value)
-                  }}
-                  onBlur={(e) => validarCampo('cargo', e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    boxSizing: 'border-box',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '8px',
-                    border: errores.cargo ? '1.5px solid #DC2626' : (valido.cargo ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
-                    outline: 'none',
-                    fontSize: '0.9rem',
-                    backgroundColor: 'white'
-                  }}
-                >
-                  <option value="">-- Seleccionar Cargo --</option>
-                  {CARGOS_NORMALIZADOS.map((cargo, idx) => (
-                    <option key={idx} value={cargo}>{cargo}</option>
-                  ))}
-                </select>
-                {errores.cargo && <span style={{ color: '#DC2626', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>{errores.cargo}</span>}
-              </div>
-
-              {/* Correo Electrónico */}
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
-                  <span>Correo Electrónico <span style={{ color: '#DC2626' }}>*</span></span>
-                </label>
-                <input
-                  type="email"
-                  placeholder="correo@sitrach.gob.mx"
-                  value={formData.email}
-                  onChange={(e) => {
-                    setFormData(prev => ({ ...prev, email: e.target.value }))
-                    validarCampo('email', e.target.value)
-                  }}
-                  onBlur={(e) => validarCampo('email', e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    boxSizing: 'border-box',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '8px',
-                    border: errores.email ? '1.5px solid #DC2626' : (valido.email ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
-                    outline: 'none',
-                    fontSize: '0.9rem'
-                  }}
-                />
-                {errores.email && <span style={{ color: '#DC2626', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>{errores.email}</span>}
-              </div>
-
-              {/* Teléfono */}
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
-                  <span>Teléfono  <span style={{ color: '#DC2626' }}>*</span></span>
-                </label>
-                <input
-                  type="tel"
-                  maxLength={10}
-                  placeholder="7711234567"
-                  value={formData.telefono}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9]/g, '')
-                    setFormData(prev => ({ ...prev, telefono: val }))
-                    validarCampo('telefono', val)
-                  }}
-                  onBlur={(e) => validarCampo('telefono', e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    boxSizing: 'border-box',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '8px',
-                    border: errores.telefono ? '1.5px solid #DC2626' : (valido.telefono ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
-                    outline: 'none',
-                    fontSize: '0.9rem'
-                  }}
-                />
-                {errores.telefono && <span style={{ color: '#DC2626', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>{errores.telefono}</span>}
-              </div>
-            </div>
           </div>
 
-          {/* SECCIÓN 2: UBICACIÓN Y ELEMENTO AFECTADO */}
-          <div>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#111827', margin: '0 0 1rem 0', borderBottom: '2px solid #F3F4F6', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ width: '8px', height: '18px', backgroundColor: '#BC955B', borderRadius: '4px', display: 'inline-block' }}></span>
-              2. Ubicación e Incidencia de Infraestructura
-            </h2>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem', alignItems: 'start' }}>
-              {/* Sede / Instalación */}
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
-                  <span>Sede <span style={{ color: '#DC2626' }}>*</span></span>
-                </label>
-                <select
-                  value={formData.sede_id}
-                  onChange={(e) => {
-                    setFormData(prev => ({ ...prev, sede_id: e.target.value }))
-                    validarCampo('sede_id', e.target.value)
-                  }}
-                  onBlur={(e) => validarCampo('sede_id', e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    boxSizing: 'border-box',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '8px',
-                    border: errores.sede_id ? '1.5px solid #DC2626' : (valido.sede_id ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
-                    outline: 'none',
-                    fontSize: '0.9rem',
-                    backgroundColor: 'white'
-                  }}
-                >
-                  <option value="">-- Seleccionar Sede  --</option>
-                  {listaSedes.map(s => (
-                    <option key={s.id} value={s.id}>{s.nombre}</option>
-                  ))}
-                </select>
-                {errores.sede_id && <span style={{ color: '#DC2626', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>{errores.sede_id}</span>}
-              </div>
-
-              {/* Elemento / Falla */}
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
-                  <span>Instalación o Elemento Afectado <span style={{ color: '#DC2626' }}>*</span></span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. Lámparas principales de andén / Fuga en sanitarios"
-                  value={formData.equipo}
-                  onChange={(e) => {
-                    setFormData(prev => ({ ...prev, equipo: e.target.value }))
-                    validarCampo('equipo', e.target.value)
-                  }}
-                  onBlur={(e) => validarCampo('equipo', e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    boxSizing: 'border-box',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '8px',
-                    border: errores.equipo ? '1.5px solid #DC2626' : (valido.equipo ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
-                    outline: 'none',
-                    fontSize: '0.9rem'
-                  }}
-                />
-                {errores.equipo && <span style={{ color: '#DC2626', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>{errores.equipo}</span>}
-              </div>
-
-              {/* Categoría de Infraestructura */}
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
-                  <span>Tipo de Infraestructura <span style={{ color: '#DC2626' }}>*</span></span>
-                </label>
-                <select
-                  value={formData.tipo_infraestructura}
-                  onChange={(e) => {
-                    const val = e.target.value
-                    setFormData(prev => ({ ...prev, tipo_infraestructura: val }))
-                    if (val === 'Otro') setMostrarOtro(true)
-                    else setMostrarOtro(false)
-                  }}
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    boxSizing: 'border-box',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '8px',
-                    border: '1px solid #D1D5DB',
-                    outline: 'none',
-                    fontSize: '0.9rem',
-                    backgroundColor: 'white'
-                  }}
-                >
-                  {TIPOS_INFRAESTRUCTURA.map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Campo adicional si seleccionó 'Otro' */}
-              {mostrarOtro && (
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
-                    <span>Especifique el Tipo de Infraestructura <span style={{ color: '#DC2626' }}>*</span></span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Especifique..."
-                    value={formData.descripcion_otro}
-                    onChange={(e) => {
-                      setFormData(prev => ({ ...prev, descripcion_otro: e.target.value }))
-                      validarCampo('descripcion_otro', e.target.value)
-                    }}
-                    style={{
-                      width: '100%',
-                      height: '44px',
-                      boxSizing: 'border-box',
-                      padding: '0.65rem 0.85rem',
-                      borderRadius: '8px',
-                      border: errores.descripcion_otro ? '1.5px solid #DC2626' : '1px solid #D1D5DB',
-                      outline: 'none',
-                      fontSize: '0.9rem'
-                    }}
-                  />
-                  {errores.descripcion_otro && <span style={{ color: '#DC2626', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>{errores.descripcion_otro}</span>}
-                </div>
-              )}
-
-              {/* Referencia o Ubicación Específica */}
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
-                  <span>No. de Inventario o Ubicación Específica (Opcional)</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. Andén sur / Tablero B / Sin número"
-                  value={formData.numero_serie}
-                  onChange={(e) => setFormData(prev => ({ ...prev, numero_serie: e.target.value }))}
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    boxSizing: 'border-box',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '8px',
-                    border: '1px solid #D1D5DB',
-                    outline: 'none',
-                    fontSize: '0.9rem'
-                  }}
-                />
-              </div>
-
-              {/* Prioridad */}
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <label style={{ display: 'flex', alignItems: 'flex-end', height: '44px', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.4rem', lineHeight: '1.25' }}>
-                  <span>Nivel de Prioridad <span style={{ color: '#DC2626' }}>*</span></span>
-                </label>
-                <select
-                  value={formData.prioridad}
-                  onChange={(e) => {
-                    setFormData(prev => ({ ...prev, prioridad: e.target.value }))
-                    validarCampo('prioridad', e.target.value)
-                  }}
-                  onBlur={(e) => validarCampo('prioridad', e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    boxSizing: 'border-box',
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '8px',
-                    border: errores.prioridad ? '1.5px solid #DC2626' : (valido.prioridad ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
-                    outline: 'none',
-                    fontSize: '0.9rem',
-                    backgroundColor: 'white'
-                  }}
-                >
-                  <option value="">-- Seleccionar Prioridad --</option>
-                  <option value="baja">Baja</option>
-                  <option value="media">Media</option>
-                  <option value="alta">Alta</option>
-                </select>
-                {errores.prioridad && <span style={{ color: '#DC2626', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>{errores.prioridad}</span>}
-              </div>
-            </div>
-
-            {/* Descripción Detallada */}
-            <div style={{ marginTop: '1.25rem' }}>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#374151', marginBottom: '0.35rem' }}>
-                Descripción Detallada de la Incidencia <span style={{ color: '#DC2626' }}>*</span>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '1.15rem'
+            }}
+          >
+            {/* Teléfono */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                Teléfono (10 dígitos) <span style={{ color: '#EF4444' }}>*</span>
               </label>
-              <textarea
-                rows={4}
-                placeholder="Describa con precisión la situación observada, los daños visibles o requerimientos de reparación..."
-                value={formData.descripcion}
+              <input
+                type="tel"
+                maxLength={10}
+                placeholder="7711234567"
+                value={formData.telefono}
                 onChange={(e) => {
-                  setFormData(prev => ({ ...prev, descripcion: e.target.value }))
-                  validarCampo('descripcion', e.target.value)
+                  const val = e.target.value.replace(/[^0-9]/g, '')
+                  setFormData(prev => ({ ...prev, telefono: val }))
+                  validarCampo('telefono', val)
                 }}
-                onBlur={(e) => validarCampo('descripcion', e.target.value)}
+                className="premium-input"
                 style={{
-                  width: '100%',
-                  padding: '0.75rem 0.85rem',
-                  borderRadius: '8px',
-                  border: errores.descripcion ? '1.5px solid #DC2626' : (valido.descripcion ? '1.5px solid #10B981' : '1px solid #D1D5DB'),
-                  outline: 'none',
-                  fontSize: '0.9rem',
-                  resize: 'vertical'
+                  border: `1.5px solid ${getBorderColor('telefono')}`
                 }}
               />
-              {errores.descripcion && <span style={{ color: '#DC2626', fontSize: '0.75rem', marginTop: '0.2rem', display: 'block' }}>{errores.descripcion}</span>}
+              {errores.telefono && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.telefono}</span>}
+            </div>
+
+            {/* Sede */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                Sede <span style={{ color: '#EF4444' }}>*</span>
+              </label>
+              <select
+                value={formData.sede_id}
+                onChange={(e) => {
+                  const valor = e.target.value
+                  setFormData(prev => ({ ...prev, sede_id: valor }))
+                  validarCampo('sede_id', valor)
+                }}
+                className="premium-select"
+                style={{
+                  border: `1.5px solid ${getBorderColor('sede_id')}`
+                }}
+              >
+                <option value="">Seleccione sede</option>
+                {listaSedes.map(s => (
+                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                ))}
+              </select>
+              {errores.sede_id && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.sede_id}</span>}
+            </div>
+
+            {/* Instalación o Elemento Afectado */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                Instalación o Elemento Afectado <span style={{ color: '#EF4444' }}>*</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Ej. Lámparas principales / Fuga en sanitarios"
+                value={formData.equipo}
+                onChange={(e) => {
+                  const valor = e.target.value
+                  setFormData(prev => ({ ...prev, equipo: valor }))
+                  validarCampo('equipo', valor)
+                }}
+                className="premium-input"
+                style={{
+                  border: `1.5px solid ${getBorderColor('equipo')}`
+                }}
+              />
+              {errores.equipo && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.equipo}</span>}
+            </div>
+
+            {/* Tipo de Infraestructura */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                Tipo de Infraestructura <span style={{ color: '#EF4444' }}>*</span>
+              </label>
+              <select
+                value={formData.tipo_infraestructura}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setFormData(prev => ({ ...prev, tipo_infraestructura: val }))
+                  if (val === 'Otro') setMostrarOtro(true)
+                  else setMostrarOtro(false)
+                }}
+                className="premium-select"
+                style={{
+                  border: `1.5px solid ${getBorderColor('tipo_infraestructura')}`
+                }}
+              >
+                {TIPOS_INFRAESTRUCTURA.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Campo adicional si seleccionó 'Otro' */}
+            {mostrarOtro && (
+              <div>
+                <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                  Especifique el Tipo de Infraestructura <span style={{ color: '#EF4444' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Especifique..."
+                  value={formData.descripcion_otro}
+                  onChange={(e) => {
+                    const valor = e.target.value
+                    setFormData(prev => ({ ...prev, descripcion_otro: valor }))
+                    validarCampo('descripcion_otro', valor)
+                  }}
+                  className="premium-input"
+                  style={{
+                    border: `1.5px solid ${getBorderColor('descripcion_otro')}`
+                  }}
+                />
+                {errores.descripcion_otro && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.descripcion_otro}</span>}
+              </div>
+            )}
+
+            {/* Referencia o Ubicación Específica */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                No. de Inventario o Ubicación Específica <span style={{ color: '#6B7280', fontWeight: 'normal' }}>(Opcional)</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Ej. Andén sur / Tablero B / Sin número"
+                value={formData.numero_serie}
+                onChange={(e) => setFormData(prev => ({ ...prev, numero_serie: e.target.value }))}
+                className="premium-input"
+                style={{
+                  border: '1.5px solid #CBD5E1'
+                }}
+              />
+            </div>
+
+            {/* Prioridad */}
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+                Nivel de Prioridad <span style={{ color: '#EF4444' }}>*</span>
+              </label>
+              <select
+                value={formData.prioridad}
+                onChange={(e) => {
+                  const valor = e.target.value
+                  setFormData(prev => ({ ...prev, prioridad: valor }))
+                  validarCampo('prioridad', valor)
+                }}
+                className="premium-select"
+                style={{
+                  border: `1.5px solid ${getBorderColor('prioridad')}`
+                }}
+              >
+                <option value="">Seleccione prioridad</option>
+                <option value="baja">Baja</option>
+                <option value="media">Media</option>
+                <option value="alta">Alta</option>
+              </select>
+              {errores.prioridad && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.prioridad}</span>}
             </div>
           </div>
 
-          {/* SECCIÓN 3: EVIDENCIA FOTOGRÁFICA */}
-          <div>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#111827', margin: '0 0 0.5rem 0', borderBottom: '2px solid #F3F4F6', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ width: '8px', height: '18px', backgroundColor: '#059669', borderRadius: '4px', display: 'inline-block' }}></span>
-              3. Evidencia Fotográfica (Máximo {MAX_FOTOS} fotografías)
+          {/* Descripción Detallada */}
+          <div style={{ marginTop: '1.25rem' }}>
+            <label style={{ fontSize: '0.85rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.4rem' }}>
+              Descripción Detallada de la Incidencia <span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <textarea
+              rows={4}
+              placeholder="Describa con precisión la situación observada, los daños visibles o requerimientos de reparación..."
+              value={formData.descripcion}
+              maxLength={500}
+              onChange={(e) => {
+                const valor = e.target.value
+                setFormData(prev => ({ ...prev, descripcion: valor }))
+                validarCampo('descripcion', valor)
+              }}
+              className="premium-textarea"
+              style={{
+                minHeight: '100px',
+                resize: 'vertical',
+                border: `1.5px solid ${getBorderColor('descripcion')}`
+              }}
+            />
+            {errores.descripcion && <span style={{ color: '#EF4444', fontSize: '0.775rem', marginTop: '0.25rem', display: 'block' }}>{errores.descripcion}</span>}
+          </div>
+        </div>
+
+        {/* SECCIÓN 3: EVIDENCIA FOTOGRÁFICA */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1.25rem', borderBottom: '2px solid #F3F4F6', paddingBottom: '0.65rem' }}>
+            <span style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#059669', width: '28px', height: '28px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.85rem' }}>3</span>
+            <h2 style={{ color: '#111827', fontSize: '1.1rem', fontWeight: '700', margin: 0 }}>
+              Evidencia Fotográfica (Máximo {MAX_FOTOS} fotografías)
             </h2>
-            <p style={{ fontSize: '0.85rem', color: '#6B7280', margin: '0 0 1rem 0' }}>
-              Adjunta imágenes claras de la afectación física o elemento dañado.
-            </p>
+          </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <input
-                type="file"
-                ref={fileInputRef}
-                multiple
-                accept="image/*"
-                onChange={manejarArchivos}
-                style={{ display: 'none' }}
-                id="input-evidencia-infraestructura"
-              />
-              <input
-                type="file"
-                ref={cameraInputRef}
-                accept="image/*"
-                capture="environment"
-                onChange={manejarArchivos}
-                style={{ display: 'none' }}
-                id="input-camera-fallback-infraestructura"
-              />
+          <input
+            type="file"
+            ref={fileInputRef}
+            multiple
+            accept="image/*"
+            onChange={manejarArchivos}
+            style={{ display: 'none' }}
+            id="input-evidencia-infraestructura"
+          />
+          <input
+            type="file"
+            ref={cameraInputRef}
+            accept="image/*"
+            capture="environment"
+            onChange={manejarArchivos}
+            style={{ display: 'none' }}
+            id="input-camera-fallback-infraestructura"
+          />
 
-              {vistasPrevias.length < MAX_FOTOS && (
+          <div
+            style={{
+              border: '2px dashed #CBD5E1',
+              borderRadius: '14px',
+              padding: '1.25rem',
+              backgroundColor: '#F8FAFC',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}
+          >
+            {vistasPrevias.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', textAlign: 'center', padding: '1rem 0' }}>
+                <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', fontSize: '1.4rem' }}>
+                  <FaCamera />
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.95rem', fontWeight: '700', color: '#334155' }}>
+                    Adjuntar fotografías del daño o afectación física
+                  </span>
+                  <span style={{ fontSize: '0.8rem', color: '#64748B', display: 'block', marginTop: '0.2rem' }}>
+                    Toma una foto al instante o sube imágenes JPG, PNG o WEBP (máx. 10 MB cada una) · {MAX_FOTOS - vistasPrevias.length} disponible(s)
+                  </span>
+                </div>
+                
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={abrirCamara}
+                    style={{
+                      backgroundColor: '#0284C7',
+                      color: 'white',
+                      padding: '0.6rem 1.3rem',
+                      borderRadius: '8px',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      border: 'none',
+                      boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#0369A1'}
+                    onMouseOut={e => e.currentTarget.style.backgroundColor = '#0284C7'}
+                  >
+                    <FaCamera /> Tomar Foto Directa
+                  </button>
+                  <label
+                    htmlFor="input-evidencia-infraestructura"
+                    style={{
+                      backgroundColor: '#691B31',
+                      color: 'white',
+                      padding: '0.6rem 1.3rem',
+                      borderRadius: '8px',
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      boxShadow: '0 2px 6px rgba(105, 27, 49, 0.25)',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseOver={e => e.currentTarget.style.backgroundColor = '#8a2441'}
+                    onMouseOut={e => e.currentTarget.style.backgroundColor = '#691B31'}
+                  >
+                    <FaImages /> Seleccionar de Galería / Archivo
+                  </label>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <span style={{ backgroundColor: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', padding: '0.3rem 0.85rem', borderRadius: '20px', fontWeight: '700', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
+                    <FaImages /> {vistasPrevias.length} de {MAX_FOTOS} fotos seleccionadas
+                  </span>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {vistasPrevias.length < MAX_FOTOS && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={abrirCamara}
+                          style={{
+                            backgroundColor: '#0284C7',
+                            color: 'white',
+                            border: 'none',
+                            padding: '0.4rem 0.85rem',
+                            borderRadius: '6px',
+                            fontSize: '0.8rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem'
+                          }}
+                        >
+                          <FaCamera /> Tomar otra foto
+                        </button>
+                        <label
+                          htmlFor="input-evidencia-infraestructura"
+                          style={{
+                            backgroundColor: '#691B31',
+                            color: 'white',
+                            padding: '0.4rem 0.85rem',
+                            borderRadius: '6px',
+                            fontSize: '0.8rem',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem'
+                          }}
+                        >
+                          <FaImages /> Agregar más fotos
+                        </label>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        vistasPrevias.forEach(v => URL.revokeObjectURL(v.url))
+                        setVistasPrevias([])
+                        setFormData(prev => ({ ...prev, evidencias: [] }))
+                      }}
+                      style={{
+                        backgroundColor: '#FEE2E2',
+                        color: '#991B1B',
+                        border: '1px solid #FCA5A5',
+                        padding: '0.4rem 0.85rem',
+                        borderRadius: '6px',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem'
+                      }}
+                    >
+                      <FaTrashAlt /> Quitar todas
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cuadrícula de fotos */}
                 <div
                   style={{
-                    border: '2px dashed #D1D5DB',
-                    borderRadius: '12px',
-                    padding: '1.5rem',
-                    textAlign: 'center',
-                    backgroundColor: '#F9FAFB'
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                    gap: '0.85rem'
                   }}
                 >
-                  <FaCamera size={28} color="#691B31" style={{ marginBottom: '0.5rem' }} />
-                  <div style={{ fontWeight: '600', fontSize: '0.9rem', color: '#374151' }}>
-                    Adjuntar fotografías del daño o afectación física
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: '0.25rem', marginBottom: '1rem' }}>
-                    Toma una foto al instante o sube imágenes JPG, PNG o WEBP (máx. 10 MB cada una) · {MAX_FOTOS - vistasPrevias.length} disponible(s)
-                  </div>
-                  
-                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      onClick={abrirCamara}
-                      style={{
-                        backgroundColor: '#0284C7',
-                        color: 'white',
-                        padding: '0.6rem 1.3rem',
-                        borderRadius: '8px',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        border: 'none',
-                        boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-                        transition: 'background-color 0.2s'
-                      }}
-                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#0369A1'}
-                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#0284C7'}
-                    >
-                      <FaCamera /> Tomar Foto Directa
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      style={{
-                        backgroundColor: '#691B31',
-                        color: 'white',
-                        padding: '0.6rem 1.3rem',
-                        borderRadius: '8px',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        border: 'none',
-                        boxShadow: '0 2px 6px rgba(105, 27, 49, 0.25)',
-                        transition: 'background-color 0.2s'
-                      }}
-                      onMouseOver={e => e.currentTarget.style.backgroundColor = '#8a2441'}
-                      onMouseOut={e => e.currentTarget.style.backgroundColor = '#691B31'}
-                    >
-                      <FaImages /> Seleccionar de Galería / Archivo
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Miniaturas de imágenes */}
-              {vistasPrevias.length > 0 && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
-                  {vistasPrevias.map((vp, index) => (
+                  {vistasPrevias.map((item, index) => (
                     <div
-                      key={vp.id}
+                      key={item.id || index}
                       style={{
                         position: 'relative',
                         borderRadius: '10px',
                         overflow: 'hidden',
-                        border: '1px solid #E5E7EB',
-                        backgroundColor: '#F3F4F6'
+                        border: '2px solid #BC955B',
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.08)',
+                        backgroundColor: '#FFFFFF',
+                        display: 'flex',
+                        flexDirection: 'column'
                       }}
                     >
-                      <img
-                        src={vp.url}
-                        alt={`Evidencia ${index + 1}`}
-                        style={{ width: '100%', height: '140px', objectFit: 'cover', display: 'block' }}
-                      />
+                      {/* Badge de número */}
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: '6px',
+                          left: '6px',
+                          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                          color: 'white',
+                          fontSize: '0.7rem',
+                          fontWeight: '700',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          zIndex: 2
+                        }}
+                      >
+                        #{index + 1}
+                      </span>
+
+                      {/* Botón eliminar individual */}
                       <button
                         type="button"
                         onClick={() => eliminarEvidencia(index)}
+                        title="Eliminar esta foto"
                         style={{
                           position: 'absolute',
                           top: '6px',
                           right: '6px',
-                          backgroundColor: 'rgba(220, 38, 38, 0.9)',
+                          backgroundColor: 'rgba(239, 68, 68, 0.9)',
                           color: 'white',
                           border: 'none',
                           borderRadius: '50%',
-                          width: '28px',
-                          height: '28px',
+                          width: '26px',
+                          height: '26px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           cursor: 'pointer',
-                          boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+                          zIndex: 2,
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
                         }}
                       >
                         <FaTimes size={12} />
                       </button>
-                      <div style={{ padding: '0.35rem 0.5rem', fontSize: '0.75rem', color: '#4B5563', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {vp.name} ({vp.size} MB)
+
+                      <img
+                        src={item.url}
+                        alt={`Evidencia ${index + 1}`}
+                        style={{
+                          width: '100%',
+                          height: '115px',
+                          objectFit: 'cover',
+                          display: 'block'
+                        }}
+                      />
+
+                      <div style={{ padding: '0.35rem 0.5rem', fontSize: '0.72rem', color: '#64748B', backgroundColor: '#F8FAFC', borderTop: '1px solid #E2E8F0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {item.name || `Foto ${index + 1}`} ({item.size} MB)
                       </div>
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
+        </div>
 
-          {/* BOTÓN DE ENVÍO */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid #E5E7EB' }}>
-            <button
-              type="submit"
-              disabled={cargando}
-              style={{
-                backgroundColor: cargando ? '#9CA3AF' : '#691B31',
-                color: 'white',
-                border: 'none',
-                padding: '0.85rem 2rem',
-                borderRadius: '10px',
-                fontSize: '1rem',
-                fontWeight: '700',
-                cursor: cargando ? 'not-allowed' : 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.65rem',
-                boxShadow: '0 4px 12px rgba(105, 27, 49, 0.25)',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {cargando ? (
-                <>
-                  <i className="fa-solid fa-spinner fa-spin"></i> Registrando reporte...
-                </>
-              ) : (
-                <>
-                  <FaPaperPlane /> Enviar Reporte de Infraestructura
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+        {/* BOTONES DE ACCIÓN */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '1rem',
+            borderTop: '1px solid #F3F4F6',
+            paddingTop: '1.25rem',
+            flexWrap: 'wrap'
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            disabled={cargando}
+            style={{
+              backgroundColor: '#F3F4F6',
+              color: '#4B5563',
+              border: '1px solid #D1D5DB',
+              padding: '0.75rem 1.65rem',
+              borderRadius: '10px',
+              fontWeight: '600',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              minHeight: '44px'
+            }}
+          >
+            Cancelar
+          </button>
 
-      </div>
+          <button
+            type="submit"
+            disabled={cargando}
+            style={{
+              backgroundColor: '#BC955B',
+              color: 'white',
+              border: 'none',
+              padding: '0.75rem 2rem',
+              borderRadius: '10px',
+              fontWeight: '700',
+              fontSize: '0.9rem',
+              cursor: cargando ? 'not-allowed' : 'pointer',
+              boxShadow: '0 4px 12px rgba(188, 149, 91, 0.3)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              minHeight: '44px'
+            }}
+          >
+            {cargando ? (
+              <>
+                <i className="fa-solid fa-spinner fa-spin"></i> Registrando reporte...
+              </>
+            ) : (
+              <>
+                <FaPaperPlane /> Enviar Reporte de Infraestructura
+              </>
+            )}
+          </button>
+        </div>
+      </form>
 
       {/* Modal de Cámara en Vivo */}
       <ModalCamara

@@ -75,16 +75,28 @@ async function obtenerEquiposPorResponsable(req, res) {
     return ok(res, []);
   }
 
-  // Extraer palabras significativas (mínimo 2 caracteres)
-  const words = nombre
+  // Preposiciones y artículos comunes en nombres y apellidos en español
+  const stopWords = new Set(['de', 'del', 'la', 'las', 'los', 'y', 'e', 'san']);
+
+  // Extraer palabras significativas (mínimo 2 caracteres, omitiendo conectores)
+  let words = nombre
     .split(/\s+/)
     .map(w => w.trim())
-    .filter(w => w.length >= 2);
+    .filter(w => w.length >= 2 && !stopWords.has(w.toLowerCase()));
+
+  // Fallback si todas las palabras eran conectores
+  if (words.length === 0) {
+    words = nombre
+      .split(/\s+/)
+      .map(w => w.trim())
+      .filter(w => w.length >= 2);
+  }
 
   let equipos = [];
 
   if (words.length > 0) {
-    // 1. Intentar coincidencia con todas las palabras (ej. "Israel" y "Moreno")
+    // Búsqueda estricta: Coincidencia con TODAS las palabras del solicitante (AND)
+    // Se elimina el fallback OR para evitar mostrar cientos de equipos por un solo apellido o nombre común.
     equipos = await prisma.equipoTecnologico.findMany({
       where: {
         AND: words.map(w => ({ responsable: { contains: w } })),
@@ -121,49 +133,6 @@ async function obtenerEquiposPorResponsable(req, res) {
         { numeroInventario: 'asc' }
       ]
     });
-
-    // 2. Si no hubo resultados con todas las palabras, intentar con palabras principales (longitud >= 4)
-    if (equipos.length === 0 && words.length > 1) {
-      const palabrasLargas = words.filter(w => w.length >= 4);
-      if (palabrasLargas.length > 0) {
-        equipos = await prisma.equipoTecnologico.findMany({
-          where: {
-            OR: palabrasLargas.map(w => ({ responsable: { contains: w } })),
-            estatus: { notIn: ['Baja', 'baja', 'Desincorporado', 'desincorporado'] }
-          },
-          select: {
-            id: true,
-            tipo: true,
-            numeroInventario: true,
-            numeroSerie: true,
-            marca: true,
-            modelo: true,
-            responsable: true,
-            cargoResponsable: true,
-            areaUbicacion: true,
-            estatus: true,
-            componentes: {
-              where: {
-                estatus: { notIn: ['Baja', 'baja', 'Desincorporado', 'desincorporado'] }
-              },
-              select: {
-                id: true,
-                tipo: true,
-                numeroInventario: true,
-                numeroSerie: true,
-                marca: true,
-                modelo: true,
-                estatus: true
-              }
-            }
-          },
-          orderBy: [
-            { tipo: 'asc' },
-            { numeroInventario: 'asc' }
-          ]
-        });
-      }
-    }
   }
 
   return ok(res, equipos);

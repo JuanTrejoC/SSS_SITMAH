@@ -30,7 +30,6 @@ export default function Login() {
     if (user.rol === 'administrador' || user.rol === 'admin') {
       return <Navigate to="/dashboard" replace />
     }
-    return <Navigate to="/crear-oficinas" replace />
   }
 
   const manejarCambio = (e) => {
