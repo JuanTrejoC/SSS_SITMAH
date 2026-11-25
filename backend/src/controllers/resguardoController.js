@@ -55,26 +55,76 @@ async function sincronizarResguardosPendientes() {
       }
     });
 
-    // Sincronizar todos los equipos tecnológicos con estatus 'Activo'
-    const equipos = await prisma.equipoTecnologico.findMany({
+    // Limpiar resguardos activos sin firmar de componentes/periféricos que pertenecen a un equipo principal (para consolidar en 1 solo resguardo de Kit)
+    await prisma.resguardo.deleteMany({
       where: {
-        estatus: 'Activo'
+        tipoInventario: 'tecnologico',
+        archivoFirmado: null,
+        equipoTecnologico: {
+          equipoPrincipalId: { not: null }
+        }
       }
     });
+
+    // Sincronizar todos los equipos tecnológicos principales con estatus 'Activo'
+    const equipos = await prisma.equipoTecnologico.findMany({
+      where: {
+        estatus: 'Activo',
+        equipoPrincipalId: null // Solo equipos principales (PCs, Laptops o equipos sueltos no vinculados)
+      },
+      include: {
+        componentes: {
+          where: {
+            estatus: { notIn: ['Baja', 'baja', 'Desincorporado', 'desincorporado'] }
+          }
+        }
+      }
+    });
+
     for (const eq of equipos) {
+      const resp = (eq.responsable || '').trim();
+      const nombreResp = (resp && resp.toUpperCase() !== 'N/A' && !resp.toLowerCase().includes('área tecnológica'))
+        ? resp
+        : (eq.areaUbicacion ? `Responsable ${eq.areaUbicacion}` : 'Por Asignar');
+
+      const tipoLabel = eq.tipo ? eq.tipo.replace(/_/g, ' ').toUpperCase() : 'EQUIPO TECNOLÓGICO';
+      const titulo = `${tipoLabel} ${eq.marca || ''} ${eq.modelo || ''}`.trim();
+      const lineas = [];
+      lineas.push(`${tipoLabel} MARCA ${eq.marca || 'S/M'}, MODELO ${eq.modelo || 'S/M'}`);
+      if (eq.numeroInventario) lineas.push(`No. Inventario: ${eq.numeroInventario}`);
+      if (eq.areaUbicacion) lineas.push(`Ubicación: ${eq.areaUbicacion}`);
+
+      // Si tiene componentes/periféricos vinculados (Kit de Cómputo)
+      if (eq.componentes && eq.componentes.length > 0) {
+        lineas.push('');
+        lineas.push('Accesorios y componentes vinculados (Kit de Cómputo):');
+        eq.componentes.forEach(c => {
+          const cTipo = (c.tipo || 'Periférico').replace(/_/g, ' ').toUpperCase();
+          const cMarcaMod = [c.marca, c.modelo].filter(Boolean).join(' ');
+          const cInv = c.numeroInventario ? ` | No. Inv: ${c.numeroInventario}` : '';
+          const cSerie = (c.numeroSerie && c.numeroSerie !== 'S/S' && c.numeroSerie !== 'N/A') ? ` | Serie: ${c.numeroSerie}` : '';
+          lineas.push(`• ${cTipo}${cMarcaMod ? ` ${cMarcaMod}` : ''}${cInv}${cSerie}`);
+        });
+      }
+
+      // Preparar series consolidadas
+      const seriesArr = [];
+      if (eq.numeroSerie && eq.numeroSerie !== 'S/S' && eq.numeroSerie !== 'N/A') {
+        seriesArr.push(`${tipoLabel}: ${eq.numeroSerie}`);
+      }
+      if (eq.componentes && eq.componentes.length > 0) {
+        eq.componentes.forEach(c => {
+          if (c.numeroSerie && c.numeroSerie !== 'S/S' && c.numeroSerie !== 'N/A') {
+            const cTipo = (c.tipo || 'Comp').replace(/_/g, ' ').toUpperCase();
+            seriesArr.push(`${cTipo}: ${c.numeroSerie}`);
+          }
+        });
+      }
+      const numeroSerieFinal = seriesArr.length > 0 ? seriesArr.join('\n') : (eq.numeroSerie || 'S/S');
+      const descripcionFinal = `${titulo}\n\n${lineas.join('\n')}`;
+
       const existe = await prisma.resguardo.findFirst({ where: { equipoTecnologicoId: eq.id } });
       if (!existe) {
-        const resp = (eq.responsable || '').trim();
-        const nombreResp = (resp && resp.toUpperCase() !== 'N/A' && !resp.toLowerCase().includes('área tecnológica'))
-          ? resp
-          : (eq.areaUbicacion ? `Responsable ${eq.areaUbicacion}` : 'Por Asignar');
-
-        const tipoLabel = eq.tipo ? eq.tipo.replace(/_/g, ' ').toUpperCase() : 'EQUIPO TECNOLÓGICO';
-        const titulo = `${tipoLabel} ${eq.marca || ''} ${eq.modelo || ''}`.trim();
-        const lineas = [];
-        lineas.push(`${tipoLabel} MARCA ${eq.marca || 'S/M'}, MODELO ${eq.modelo || 'S/M'}`);
-        if (eq.numeroInventario) lineas.push(`No. Inventario: ${eq.numeroInventario}`);
-        if (eq.areaUbicacion) lineas.push(`Ubicación: ${eq.areaUbicacion}`);
         await prisma.resguardo.create({
           data: {
             tipoInventario: 'tecnologico',
@@ -83,10 +133,23 @@ async function sincronizarResguardosPendientes() {
             cargo: eq.cargoResponsable || (eq.areaUbicacion ? 'Responsable de Ubicación' : ''),
             direccion: eq.direccion || eq.areaUbicacion || 'Operación SITRAC-H',
             area: eq.direccion || eq.areaUbicacion || 'Operación SITRAC-H',
-            descripcionPdf: `${titulo}\n\n${lineas.join('\n')}`,
-            numeroSeriePdf: eq.numeroSerie || 'S/S',
+            descripcionPdf: descripcionFinal,
+            numeroSeriePdf: numeroSerieFinal,
             fechaPrestamo: new Date(),
             estado: 'Activo'
+          }
+        });
+      } else if (!existe.archivoFirmado) {
+        // Si no se ha firmado, sincronizar descripción y series actualizadas en caso de adición o cambio de periféricos
+        await prisma.resguardo.update({
+          where: { id: existe.id },
+          data: {
+            descripcionPdf: descripcionFinal,
+            numeroSeriePdf: numeroSerieFinal,
+            nombreResguardante: nombreResp,
+            cargo: eq.cargoResponsable || existe.cargo,
+            direccion: eq.direccion || existe.direccion,
+            area: eq.direccion || existe.area
           }
         });
       }
@@ -103,7 +166,11 @@ async function listar(req, res) {
       orderBy: { createdAt: 'desc' },
       include: {
         mobiliario: true,
-        equipoTecnologico: true,
+        equipoTecnologico: {
+          include: {
+            componentes: true
+          }
+        },
         existencia: true,
         controladorSemaforo: true
       }
@@ -157,7 +224,12 @@ async function crear(req, res) {
     // Evita duplicar el resguardo activo de la misma persona y el mismo bien
     const existente = await prisma.resguardo.findFirst({
       where: { [campoItem]: Number(itemId), nombreResguardante, estado: 'Activo' },
-      include: { mobiliario: true, equipoTecnologico: true, existencia: true, controladorSemaforo: true }
+      include: {
+        mobiliario: true,
+        equipoTecnologico: { include: { componentes: true } },
+        existencia: true,
+        controladorSemaforo: true
+      }
     });
     if (existente) return ok(res, existente, 200);
 
@@ -165,7 +237,7 @@ async function crear(req, res) {
       data,
       include: {
         mobiliario: true,
-        equipoTecnologico: true,
+        equipoTecnologico: { include: { componentes: true } },
         existencia: true,
         controladorSemaforo: true
       }
@@ -195,7 +267,7 @@ async function actualizar(req, res) {
       data,
       include: {
         mobiliario: true,
-        equipoTecnologico: true,
+        equipoTecnologico: { include: { componentes: true } },
         existencia: true,
         controladorSemaforo: true
       }
@@ -259,7 +331,12 @@ async function subirFirmado(req, res) {
         archivoFirmadoMime: 'application/pdf',
         fechaFirmado: new Date()
       },
-      include: { mobiliario: true, equipoTecnologico: true, existencia: true, controladorSemaforo: true }
+      include: {
+        mobiliario: true,
+        equipoTecnologico: { include: { componentes: true } },
+        existencia: true,
+        controladorSemaforo: true
+      }
     });
 
     borrarArchivo(actual.archivoFirmado);
@@ -305,7 +382,12 @@ async function eliminarFirmado(req, res) {
     const actualizado = await prisma.resguardo.update({
       where: { id },
       data: { archivoFirmado: null, archivoFirmadoMime: null, fechaFirmado: null },
-      include: { mobiliario: true, equipoTecnologico: true, existencia: true, controladorSemaforo: true }
+      include: {
+        mobiliario: true,
+        equipoTecnologico: { include: { componentes: true } },
+        existencia: true,
+        controladorSemaforo: true
+      }
     });
     borrarArchivo(actual.archivoFirmado);
     ok(res, actualizado);

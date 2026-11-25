@@ -69,7 +69,25 @@ export async function generarResguardoDocx(resguardo) {
     ''
   ).trim();
 
-  const numeroSerie = (resguardo.numeroSeriePdf || resguardo.numeroSerie || resguardo.mobiliario?.numeroSerie || resguardo.equipoTecnologico?.numeroSerie || 'S/S').trim().toUpperCase();
+  let numeroSerie = (resguardo.numeroSeriePdf || resguardo.numeroSerie || resguardo.mobiliario?.numeroSerie || resguardo.equipoTecnologico?.numeroSerie || 'S/S').trim().toUpperCase();
+
+  // Si es un equipo tecnológico con componentes y aún no tiene las series multi-línea
+  if (resguardo.equipoTecnologico?.componentes?.length > 0 && !numeroSerie.includes('\n')) {
+    const seriesList = [];
+    const mainTipo = (resguardo.equipoTecnologico.tipo || 'Equipo').replace(/_/g, ' ').toUpperCase();
+    if (numeroSerie && numeroSerie !== 'S/S' && numeroSerie !== 'N/A') {
+      seriesList.push(`${mainTipo}: ${numeroSerie}`);
+    }
+    resguardo.equipoTecnologico.componentes.forEach(c => {
+      if (c.numeroSerie && c.numeroSerie !== 'S/S' && c.numeroSerie !== 'N/A') {
+        const cTipo = (c.tipo || 'Periférico').replace(/_/g, ' ').toUpperCase();
+        seriesList.push(`${cTipo}: ${c.numeroSerie}`);
+      }
+    });
+    if (seriesList.length > 0) {
+      numeroSerie = seriesList.join('\n');
+    }
+  }
 
   // Preparar título y detalle de descripción
   let tituloBien = '';
@@ -128,6 +146,51 @@ export async function generarResguardoDocx(resguardo) {
       .replace(/\bOtro\s+MARCA\b/g, 'MARCA')
       .replace(/\bOTRO\s+MARCA\b/g, 'MARCA');
   }
+
+  // Si tiene componentes vinculados (Kit de Cómputo) y no estaban agregados en la descripción previa
+  if (resguardo.equipoTecnologico?.componentes?.length > 0 && !detalleDesc.toLowerCase().includes('componentes vinculados') && !detalleDesc.toLowerCase().includes('accesorios y equipamiento')) {
+    const kitLines = [];
+    kitLines.push('');
+    kitLines.push('Accesorios y componentes vinculados (Kit de Cómputo):');
+    resguardo.equipoTecnologico.componentes.forEach(c => {
+      const cTipo = (c.tipo || 'Periférico').replace(/_/g, ' ').toUpperCase();
+      const cMarcaMod = [c.marca, c.modelo].filter(Boolean).join(' ');
+      const cInv = c.numeroInventario ? ` | No. Inv: ${c.numeroInventario}` : '';
+      const cSer = (c.numeroSerie && c.numeroSerie !== 'S/S' && c.numeroSerie !== 'N/A') ? ` | Serie: ${c.numeroSerie}` : '';
+      kitLines.push(`• ${cTipo}${cMarcaMod ? ` ${cMarcaMod}` : ''}${cInv}${cSer}`);
+    });
+    detalleDesc = detalleDesc ? `${detalleDesc}\n${kitLines.join('\n')}` : kitLines.join('\n');
+  }
+
+  // Párrafos para la celda de NÚMERO DE SERIE (soporte para Kit multi-línea)
+  const serieLineas = (numeroSerie || 'S/S').split('\n').map(l => l.trim()).filter(Boolean);
+  const serieParagraphs = serieLineas.length > 0 ? serieLineas.map((linea, index) =>
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: index === 0 ? 0 : 40, after: index === serieLineas.length - 1 ? 0 : 40 },
+      children: [
+        new TextRun({
+          text: linea,
+          font: 'Arial',
+          size: serieLineas.length > 3 ? 16 : (serieLineas.length > 1 ? 18 : 20),
+          bold: linea.includes(':'),
+          color: '000000'
+        })
+      ]
+    })
+  ) : [
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [
+        new TextRun({
+          text: 'S/S',
+          font: 'Arial',
+          size: 20,
+          color: '000000'
+        })
+      ]
+    })
+  ];
 
   // Párrafos para la celda de DESCRIPCIÓN
   const descripcionParagraphs = [];
@@ -432,19 +495,7 @@ export async function generarResguardoDocx(resguardo) {
                     width: { size: 45, type: WidthType.PERCENTAGE },
                     verticalAlign: VerticalAlign.TOP,
                     margins: { top: 160, bottom: 160, left: 140, right: 140 },
-                    children: [
-                      new Paragraph({
-                        alignment: AlignmentType.CENTER,
-                        children: [
-                          new TextRun({
-                            text: numeroSerie,
-                            font: 'Arial',
-                            size: 20,
-                            color: '000000'
-                          })
-                        ]
-                      })
-                    ]
+                    children: serieParagraphs
                   })
                 ]
               })

@@ -4,7 +4,8 @@ function formatZodError(error) {
   const errObj = error.error || error;
   const issues = errObj.issues || errObj.errors;
   if (Array.isArray(issues) && issues.length > 0) {
-    return issues[0].message || 'Datos inválidos';
+    const campo = issues[0].path && issues[0].path.length > 0 ? `[${issues[0].path.join('.')}] ` : '';
+    return `${campo}${issues[0].message}` || 'Datos inválidos';
   }
   return errObj.message || 'Datos inválidos';
 }

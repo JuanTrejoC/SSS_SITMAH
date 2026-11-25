@@ -156,6 +156,7 @@ const MODELOS_RELEVADORES_C5000 = [
 const DEFAULT_CABEZALES_DETALLE = [
   {
     id: 1,
+    modelo: 'LV-6',
     numLeds: 4,
     piezas: 0,
     leds: [
@@ -191,13 +192,18 @@ const ajustarLedsPorCantidad = (ledsExistentes, cantidad) => {
 
 const normalizarCabezalesDetalle = (detalle, semaforos3 = 0, semaforos4 = 0) => {
   if (Array.isArray(detalle) && detalle.length > 0) {
-    return detalle.map((g, idx) => ({
-      ...g,
-      id: g.id || idx + 1,
-      numLeds: g.numLeds !== undefined ? Math.max(0, parseInt(g.numLeds, 10) || 0) : (g.leds ? g.leds.length : 4),
-      piezas: g.piezas !== undefined ? Math.max(0, parseInt(g.piezas, 10) || 0) : 0,
-      leds: g.leds || ajustarLedsPorCantidad([], g.numLeds || 4)
-    }))
+    return detalle.map((g, idx) => {
+      const numLeds = g.numLeds !== undefined ? Math.max(0, parseInt(g.numLeds, 10) || 0) : (g.leds ? g.leds.length : 4)
+      const defaultMod = numLeds === 3 ? 'LV-1' : (numLeds === 4 ? 'LV-6' : 'LV-1')
+      return {
+        ...g,
+        id: g.id || idx + 1,
+        modelo: g.modelo || defaultMod,
+        numLeds,
+        piezas: g.piezas !== undefined ? Math.max(0, parseInt(g.piezas, 10) || 0) : 0,
+        leds: g.leds || ajustarLedsPorCantidad([], numLeds)
+      }
+    })
   }
 
   // Si viene en formato antiguo de objeto { luces4, luces3 }
@@ -206,6 +212,7 @@ const normalizarCabezalesDetalle = (detalle, semaforos3 = 0, semaforos4 = 0) => 
     if (detalle.luces4 && (Number(detalle.luces4.piezas) > 0 || !detalle.luces3 || Number(detalle.luces3.piezas) === 0)) {
       list.push({
         id: 1,
+        modelo: detalle.luces4.modelo || 'LV-6',
         numLeds: 4,
         piezas: Number(detalle.luces4.piezas) || 0,
         leds: detalle.luces4.leds || ajustarLedsPorCantidad([], 4)
@@ -214,6 +221,7 @@ const normalizarCabezalesDetalle = (detalle, semaforos3 = 0, semaforos4 = 0) => 
     if (detalle.luces3 && Number(detalle.luces3.piezas) > 0) {
       list.push({
         id: 2,
+        modelo: detalle.luces3.modelo || 'LV-1',
         numLeds: 3,
         piezas: Number(detalle.luces3.piezas) || 0,
         leds: detalle.luces3.leds || ajustarLedsPorCantidad([], 3)
@@ -228,6 +236,7 @@ const normalizarCabezalesDetalle = (detalle, semaforos3 = 0, semaforos4 = 0) => 
     if (semaforos4 > 0 || semaforos3 === 0) {
       list.push({
         id: 1,
+        modelo: 'LV-6',
         numLeds: 4,
         piezas: semaforos4,
         leds: ajustarLedsPorCantidad([], 4)
@@ -236,6 +245,7 @@ const normalizarCabezalesDetalle = (detalle, semaforos3 = 0, semaforos4 = 0) => 
     if (semaforos3 > 0) {
       list.push({
         id: 2,
+        modelo: 'LV-1',
         numLeds: 3,
         piezas: semaforos3,
         leds: ajustarLedsPorCantidad([], 3)
@@ -254,17 +264,33 @@ const ajustarCoordenadasDanadas = (coordenadasActuales = [], cantidad = 0) => {
   for (let i = 0; i < cant; i++) {
     const itemExistente = lista[i]
     if (typeof itemExistente === 'string') {
-      resultado.push({ id: i + 1, coordenadas: itemExistente })
+      resultado.push({ id: i + 1, coordenadas: itemExistente, observaciones: '' })
     } else if (itemExistente && typeof itemExistente === 'object') {
       resultado.push({
         id: itemExistente.id || i + 1,
-        coordenadas: itemExistente.coordenadas || ''
+        coordenadas: itemExistente.coordenadas || '',
+        observaciones: itemExistente.observaciones || ''
       })
     } else {
-      resultado.push({ id: i + 1, coordenadas: '' })
+      resultado.push({ id: i + 1, coordenadas: '', observaciones: '' })
     }
   }
   return resultado
+}
+
+const obtenerNombreArchivoProgramacion = (archivo, respaldoNombre = '') => {
+  if (archivo instanceof File) return archivo.name
+  if (respaldoNombre && typeof respaldoNombre === 'string' && respaldoNombre.trim() !== '' && !respaldoNombre.startsWith('programacion-')) {
+    return respaldoNombre.trim()
+  }
+  if (typeof archivo === 'string' && archivo.trim() !== '') {
+    const base = archivo.split('/').pop().split('\\').pop()
+    if (base.includes('___')) {
+      return base.split('___').slice(1).join('___')
+    }
+    return base
+  }
+  return 'archivo_programacion'
 }
 
 const recalcularTotalesDesdeCabezales = (grupos) => {
@@ -329,22 +355,85 @@ const crearAudibleInicial = (id = 1, sentido = '') => ({
 const extraerCoordenadasValidas = (input) => {
   if (!input) return null
   if (typeof input === 'object' && input !== null) {
-    const lat = parseFloat(input.lat ?? input.latitude)
-    const lng = parseFloat(input.lng ?? input.lon ?? input.longitude)
-    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-      return { lat, lng }
+    let lat = parseFloat(input.lat ?? input.latitude)
+    let lng = parseFloat(input.lng ?? input.lon ?? input.longitude)
+    if (!isNaN(lat) && !isNaN(lng)) {
+      if (lat < -80 && lat > -120 && lng > 14 && lng < 35) {
+        const tmp = lat; lat = lng; lng = tmp
+      }
+      if (lat >= 14 && lat <= 35 && lng >= 80 && lng <= 120) {
+        lng = -Math.abs(lng)
+      }
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return { lat, lng }
+      }
     }
+    return null
   }
   if (typeof input !== 'string') return null
-  const str = input.trim()
-  // Soporta separadores comunes como coma, espacio, pleca, punto y coma
+  let str = input.trim()
+  if (!str || str.toLowerCase() === 'undefined' || str.toLowerCase() === 'null') return null
+
+  // 1. URLs de Google Maps (ej. https://maps.google.com/?q=20.123456,-98.765432 o @20.123456,-98.765432)
+  const urlMatch = str.match(/[@?&](?:q=)?(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/)
+  if (urlMatch) {
+    let lat = parseFloat(urlMatch[1])
+    let lng = parseFloat(urlMatch[2])
+    if (!isNaN(lat) && !isNaN(lng)) {
+      if (lat >= 14 && lat <= 35 && lng >= 80 && lng <= 120) lng = -Math.abs(lng)
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { lat, lng }
+    }
+  }
+
+  // 2. Grados, minutos y segundos (DMS), ej. 20°05'08.3"N 98°46'18.8"W
+  const dmsRegex = /(\d+)[°\s]+(\d+)['\s]+([\d.]+)?["\s]*([NSEWnsew])?[^\dNSEWnsew]+(\d+)[°\s]+(\d+)['\s]+([\d.]+)?["\s]*([NSEWnsew])?/
+  const dmsMatch = str.match(dmsRegex)
+  if (dmsMatch) {
+    let lat = parseInt(dmsMatch[1], 10) + parseInt(dmsMatch[2], 10) / 60 + (parseFloat(dmsMatch[3]) || 0) / 3600
+    if (dmsMatch[4] && dmsMatch[4].toUpperCase() === 'S') lat = -lat
+    let lng = parseInt(dmsMatch[5], 10) + parseInt(dmsMatch[6], 10) / 60 + (parseFloat(dmsMatch[7]) || 0) / 3600
+    if (dmsMatch[8] && dmsMatch[8].toUpperCase() === 'W') lng = -lng
+    if (lat >= 14 && lat <= 35 && lng >= 80 && lng <= 120) lng = -Math.abs(lng)
+    if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { lat, lng }
+  }
+
+  // 3. Dos números con punto decimal (ej. "20.123456, -98.765432" o con texto alrededor "Poste 1 (20.123456, -98.765432)")
+  const decimalRegex = /(-?\d+\.\d+)[^\d.-]+(-?\d+\.\d+)/
+  const decMatch = str.match(decimalRegex)
+  if (decMatch) {
+    let lat = parseFloat(decMatch[1])
+    let lng = parseFloat(decMatch[2])
+    if (!isNaN(lat) && !isNaN(lng)) {
+      // Invertidas (lng, lat)
+      if (lat < -80 && lat > -120 && lng > 14 && lng < 35) {
+        const tmp = lat; lat = lng; lng = tmp
+      }
+      // Longitud positiva en México (omisión de signo negativo)
+      if (lat >= 14 && lat <= 35 && lng >= 80 && lng <= 120) {
+        lng = -Math.abs(lng)
+      }
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return { lat, lng }
+      }
+    }
+  }
+
+  // 4. Separadores comunes para dos números
   const regex = /(-?\d+(?:\.\d+)?)[,\s/|;]+(-?\d+(?:\.\d+)?)/
   const match = str.match(regex)
   if (match) {
-    const lat = parseFloat(match[1])
-    const lng = parseFloat(match[2])
-    if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-      return { lat, lng }
+    let lat = parseFloat(match[1])
+    let lng = parseFloat(match[2])
+    if (!isNaN(lat) && !isNaN(lng)) {
+      if (lat < -80 && lat > -120 && lng > 14 && lng < 35) {
+        const tmp = lat; lat = lng; lng = tmp
+      }
+      if (lat >= 14 && lat <= 35 && lng >= 80 && lng <= 120) {
+        lng = -Math.abs(lng)
+      }
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        return { lat, lng }
+      }
     }
   }
   return null
@@ -642,26 +731,36 @@ const normalizarPostesDetalle = (postesRaw, fallbackItem = null) => {
       const esUidValido = rawUid && typeof rawUid === 'string' && rawUid.length > 8 && !rawUid.match(/^pst_\d+$/)
       const uid = esUidValido ? rawUid : (p.id ? `pst_db_${p.id}` : generarPosteUid())
 
-      const rawCoords = p.ubicacionPoste || p.coordenadas || p.coordenada || p.gps || ''
-      const tapaVal = p.tapaRegistro || p.estadoTapaRegistro || 'Buena'
+      const cleanVal = (val) => (!val || val === 'undefined' || val === 'null') ? '' : String(val).trim()
+      const rawUbicacion = cleanVal(p.ubicacionPoste)
+      const rawCoord = cleanVal(p.coordenadas || p.coordenada || p.gps)
+      const parsedGps = extraerCoordenadasValidas(rawCoord) || extraerCoordenadasValidas(rawUbicacion)
+      const coordStr = parsedGps ? `${parsedGps.lat.toFixed(6)}, ${parsedGps.lng.toFixed(6)}` : (rawCoord || rawUbicacion)
+      const ubicacionFinal = rawUbicacion || coordStr
+      const coordenadasFinal = rawCoord || coordStr
+      const tapaVal = cleanVal(p.tapaRegistro || p.estadoTapaRegistro) || 'Buena'
 
-      return {
+        const cabezalesGrupos = tipoPoste === 'peatonal' ? [] : normalizarCabezalesDetalle(p.cabezalesGrupos || p.cabezalesDetalle || DEFAULT_CABEZALES_DETALLE)
+        const modelosCabUnicos = [...new Set(cabezalesGrupos.map(g => g.modelo).filter(Boolean))]
+        const cabezalModeloConsolidado = tipoPoste === 'peatonal' ? '' : (modelosCabUnicos.join(', ') || p.cabezalModelo || 'LV-1')
+
+        return {
         uid,
         id: p.id || idx + 1,
         guardadoEnServidor: p.guardadoEnServidor !== undefined ? Boolean(p.guardadoEnServidor) : true,
         tipoPoste,
-        ubicacionPoste: rawCoords,
-        coordenadas: rawCoords,
+        ubicacionPoste: ubicacionFinal,
+        coordenadas: coordenadasFinal,
         modeloPoste,
         tapaRegistro: tapaVal,
         estadoTapaRegistro: tapaVal,
         observaciones: p.observaciones || '',
         tipoCabezal: tipoPoste === 'peatonal' ? 'Ninguno' : (p.tipoCabezal || 'LED'),
-        cabezalModelo: tipoPoste === 'peatonal' ? '' : (p.cabezalModelo || 'LV-1'),
+        cabezalModelo: cabezalModeloConsolidado,
         pantallaPiezas: tipoPoste === 'peatonal' ? '' : (numPiezas > 0 ? numPiezas : (p.pantallaPiezas !== undefined ? p.pantallaPiezas : '')),
         pantallaEstado: tipoPoste === 'peatonal' ? 'Funciona' : (p.pantallaEstado || (pantallasLista.some(x => x.estado === 'No funciona') ? 'Parcial' : 'Funciona')),
         pantallasLista: tipoPoste === 'peatonal' ? [] : pantallasLista,
-        cabezalesGrupos: tipoPoste === 'peatonal' ? [] : normalizarCabezalesDetalle(p.cabezalesGrupos || p.cabezalesDetalle || DEFAULT_CABEZALES_DETALLE),
+        cabezalesGrupos,
         tienePeatonal,
         peatonalesLista,
         peatonalModelo: peatonalesLista[0]?.modelo || p.peatonalModelo || '',
@@ -694,13 +793,16 @@ const normalizarPostesDetalle = (postesRaw, fallbackItem = null) => {
     const esPeatonal = (fallbackItem.posteModeloTipo && normalizarNombreModeloPoste(fallbackItem.posteModeloTipo) === 'MP-01')
       || (!fallbackItem.semaforos3Luces && !fallbackItem.semaforos4Luces && tienePeatonal)
 
+    const parsedFallback = extraerCoordenadasValidas(fallbackItem.coordenadas) || extraerCoordenadasValidas(fallbackItem.ubicacionPoste)
+    const fallbackCoordStr = parsedFallback ? `${parsedFallback.lat.toFixed(6)}, ${parsedFallback.lng.toFixed(6)}` : ((fallbackItem.coordenadas && fallbackItem.coordenadas !== 'undefined' && fallbackItem.coordenadas !== 'null') ? fallbackItem.coordenadas : ((fallbackItem.ubicacionPoste && fallbackItem.ubicacionPoste !== 'undefined' && fallbackItem.ubicacionPoste !== 'null') ? fallbackItem.ubicacionPoste : ''))
+
     return [{
       uid: fallbackItem?.id ? `pst_fb_${fallbackItem.id}_1` : generarPosteUid(),
       id: 1,
       guardadoEnServidor: true,
       tipoPoste: esPeatonal ? 'peatonal' : 'mixto',
-      ubicacionPoste: fallbackItem.coordenadas || fallbackItem.ubicacionPoste || '',
-      coordenadas: fallbackItem.coordenadas || fallbackItem.ubicacionPoste || '',
+      ubicacionPoste: fallbackCoordStr,
+      coordenadas: fallbackCoordStr,
       modeloPoste: fallbackItem.posteModeloTipo || (esPeatonal ? 'MP-01' : (fallbackItem.modeloPoste || 'PCC-1')),
       tapaRegistro: fallbackItem.posteTapaRegistro || 'Buena',
       estadoTapaRegistro: fallbackItem.posteTapaRegistro || 'Buena',
@@ -1673,8 +1775,15 @@ export default function InventarioSemaforos() {
           formData.append('postesDetalle', JSON.stringify(postesConUid))
         } else if (key === 'registrosPisoCoordenadas') {
           formData.append('registrosPisoCoordenadas', JSON.stringify(controladorForm.registrosPisoCoordenadas || []))
-        } else if (key === 'tarjetaConflictosMarcaModo' || key === 'switchFibraMarcaModo' || key === 'tarjetaRelevadoresMarcaModo') {
-          // Excluir modos de interfaz auxiliar
+        } else if (
+          key === 'tarjetaConflictosMarcaModo' ||
+          key === 'switchFibraMarcaModo' ||
+          key === 'tarjetaRelevadoresMarcaModo' ||
+          key === 'respaldoProgramacionUsb' ||
+          key === 'postesDetalle' ||
+          key === 'archivoProgramacion'
+        ) {
+          // Excluir modos de interfaz auxiliar y campos manejados explícitamente abajo
         } else {
           formData.append(key, controladorForm[key])
         }
@@ -1683,9 +1792,13 @@ export default function InventarioSemaforos() {
       if (archivoProgramacion) {
         if (archivoProgramacion instanceof File) {
           formData.append('archivoProgramacion', archivoProgramacion)
+          formData.append('respaldoProgramacionUsb', archivoProgramacion.name)
+        } else if (typeof archivoProgramacion === 'string') {
+          formData.append('respaldoProgramacionUsb', controladorForm.respaldoProgramacionUsb || '')
         }
       } else if (editandoControladorId) {
         formData.append('removerArchivo', 'true')
+        formData.append('respaldoProgramacionUsb', '')
       }
 
       const res = await fetch(url, {
@@ -1868,7 +1981,7 @@ export default function InventarioSemaforos() {
         'cimientoCompleto', 'cimientoCuantosDados', 'tapaCableado', 'tornilleriaBaseCompleta', 'tornilleriaCuantosTornillos',
         'observacionesExterior', 'gpsModelo', 'gpsComponenteFisico', 'gpsAntenaExterior',
         'numeroGabinete', 'versionFirmware', 'ipLocal', 'ipSystem', 'mascaraRed', 'gateway',
-        'cicloCompleto', 'respaldoProgramacionUsb',
+        'cicloCompleto',
         'switchFibraMarca', 'switchFibraModelo', 'switchFibraPuertosTotal', 'switchFibraPuertosUso', 'switchFibraFuentePoder',
         'receptorFibraDispositivo', 'receptorFibraCable', 'conexionesTarjetaMadre', 'fuentePoderSupresorPicos'
       ]
@@ -1881,8 +1994,12 @@ export default function InventarioSemaforos() {
 
       if (archivoProgramacion instanceof File) {
         formData.append('archivoProgramacion', archivoProgramacion)
+        formData.append('respaldoProgramacionUsb', archivoProgramacion.name)
+      } else if (typeof archivoProgramacion === 'string') {
+        formData.append('respaldoProgramacionUsb', controladorForm.respaldoProgramacionUsb || '')
       } else if (!archivoProgramacion) {
         formData.append('removerArchivo', 'true')
+        formData.append('respaldoProgramacionUsb', '')
       }
 
       const res = await fetch(`${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/gabinete`, {
@@ -2298,7 +2415,7 @@ export default function InventarioSemaforos() {
     const postesNorm = normalizarPostesDetalle(item.postesDetalle, item)
     const mapasVis = {}
     postesNorm.forEach((p, idx) => {
-      if (extraerCoordenadasValidas(p.ubicacionPoste || p.coordenadas)) {
+      if (extraerCoordenadasValidas(p.coordenadas) || extraerCoordenadasValidas(p.ubicacionPoste)) {
         mapasVis[idx] = true
       }
     })
@@ -2320,7 +2437,7 @@ export default function InventarioSemaforos() {
         const freshPostes = normalizarPostesDetalle(json.data.postesDetalle, json.data)
         const freshMapas = {}
         freshPostes.forEach((p, idx) => {
-          if (extraerCoordenadasValidas(p.ubicacionPoste || p.coordenadas)) {
+          if (extraerCoordenadasValidas(p.coordenadas) || extraerCoordenadasValidas(p.ubicacionPoste)) {
             freshMapas[idx] = true
           }
         })
@@ -2341,6 +2458,15 @@ export default function InventarioSemaforos() {
     setModalControladorAbierto(true)
     cargarCatalogos()
 
+    const postesNorm = normalizarPostesDetalle(item.postesDetalle, item)
+    const mapasVis = {}
+    postesNorm.forEach((p, idx) => {
+      if (extraerCoordenadasValidas(p.coordenadas) || extraerCoordenadasValidas(p.ubicacionPoste)) {
+        mapasVis[idx] = true
+      }
+    })
+    setMapasPostesVisibles(mapasVis)
+
     // Consultar el servidor para asegurar que tenemos la información más fresca (en vivo) por si otro técnico guardó
     try {
       const res = await fetch(`${API_BASE_URL}/api/inventario/controladores/${item.id}`, {
@@ -2352,6 +2478,14 @@ export default function InventarioSemaforos() {
         if (json.data.archivoProgramacion) {
           setArchivoProgramacion(json.data.archivoProgramacion)
         }
+        const freshPostes = normalizarPostesDetalle(json.data.postesDetalle, json.data)
+        const freshMapas = {}
+        freshPostes.forEach((p, idx) => {
+          if (extraerCoordenadasValidas(p.coordenadas) || extraerCoordenadasValidas(p.ubicacionPoste)) {
+            freshMapas[idx] = true
+          }
+        })
+        setMapasPostesVisibles(freshMapas)
       }
     } catch (err) {
       console.warn('No se pudo refrescar controlador en segundo plano:', err)
@@ -2449,10 +2583,13 @@ export default function InventarioSemaforos() {
       a.href = url
 
       let nombreDescarga = 'respaldo_programacion'
-      if (typeof archivoParam === 'string' && archivoParam.trim() !== '') {
-        nombreDescarga = archivoParam.split('/').pop()
-      } else if (archivoParam && archivoParam.name) {
+      if (controladorForm.respaldoProgramacionUsb && !controladorForm.respaldoProgramacionUsb.startsWith('programacion-')) {
+        nombreDescarga = controladorForm.respaldoProgramacionUsb
+      } else if (archivoParam instanceof File) {
         nombreDescarga = archivoParam.name
+      } else if (typeof archivoParam === 'string' && archivoParam.trim() !== '') {
+        const base = archivoParam.split('/').pop().split('\\').pop()
+        nombreDescarga = base.includes('___') ? base.split('___').slice(1).join('___') : base
       }
 
       a.download = nombreDescarga
@@ -2974,7 +3111,8 @@ export default function InventarioSemaforos() {
               if (grupos.length > 0) {
                 grupos.forEach((g, gI) => {
                   const numL = g.leds?.length || g.numLeds || 3
-                  equipos.push(`Cabezal #${gI + 1} [${numL} LEDs] (${p.cabezalModelo || 'LV-1'})`)
+                  const mod = g.modelo || (numL === 4 ? 'LV-6' : 'LV-1')
+                  equipos.push(`Cabezal #${gI + 1} [${numL} LEDs] (${mod})`)
                 })
               } else {
                 equipos.push(`Cabezal LED (${p.cabezalModelo || 'LV-1'})`)
@@ -3015,7 +3153,7 @@ export default function InventarioSemaforos() {
       autoTable(doc, {
         startY: doc.lastAutoTable.finalY + 3.5,
         margin: { top: 12, left: 14, right: 14, bottom: 12 },
-        head: [['# POSTE', 'FUNCIÓN / MODELO', 'ESTADO TAPA', 'COORDENADAS GPS', 'EQUIPAMIENTO INSTALADO EN ESTE POSTE', 'OBSERVACIONES']],
+        head: [['# POSTE', 'FUNCIÓN / MODELO', 'TAPA CABLEADO', 'COORDENADAS GPS', 'EQUIPAMIENTO INSTALADO EN ESTE POSTE', 'OBSERVACIONES']],
         body: postesBody,
         theme: 'grid',
         showHead: 'everyPage',
@@ -3044,13 +3182,17 @@ export default function InventarioSemaforos() {
         ],
         [
           'Coordenadas / Distribución',
-          ctrl.registrosPisoCoordenadas || ctrl.coordenadasRegistros || (postesNorm.length > 0 ? 'En banqueta/camellón por poste' : 'En crucero'),
+          Array.isArray(ctrl.registrosPisoCoordenadas) && ctrl.registrosPisoCoordenadas.length > 0
+            ? ctrl.registrosPisoCoordenadas.map((r, i) => `#${i + 1}: ${r.coordenadas || 'S/C'}${r.observaciones ? ` [${r.observaciones}]` : ''}`).join('\n')
+            : (ctrl.registrosPisoCoordenadas || ctrl.coordenadasRegistros || (postesNorm.length > 0 ? 'En banqueta/camellón por poste' : 'En crucero')),
           'Estado Infraestructura',
           Number(ctrl.registrosPisoDanados) > 0 ? 'Requiere mantenimiento' : 'Operativa y en buen estado'
         ],
         [
           'Observaciones de Registros',
-          ctrl.registrosPisoObservaciones || 'Sin anomalías registradas en canalizaciones ni registros subterráneos',
+          Array.isArray(ctrl.registrosPisoCoordenadas) && ctrl.registrosPisoCoordenadas.some(r => r.observaciones)
+            ? ctrl.registrosPisoCoordenadas.filter(r => r.observaciones).map((r, i) => `Reg #${r.id || i + 1}: ${r.observaciones}`).join(' | ')
+            : (ctrl.registrosPisoObservaciones || 'Sin anomalías registradas en canalizaciones ni registros subterráneos'),
           'Condición de Seguridad',
           Number(ctrl.registrosPisoDanados) > 0 ? 'Riesgo peatonal / Atender' : 'Seguro y nivelado'
         ]
@@ -3779,48 +3921,205 @@ export default function InventarioSemaforos() {
     })
   }
 
-  const handleObtenerGpsRegistro = (index) => {
+  const handleCambiarObservacionRegistroDanado = (index, valor) => {
+    setControladorForm(prev => {
+      const lista = ajustarCoordenadasDanadas(prev.registrosPisoCoordenadas, prev.registrosPisoDanados)
+      if (lista[index]) {
+        lista[index].observaciones = valor
+      }
+      return {
+        ...prev,
+        registrosPisoCoordenadas: lista
+      }
+    })
+  }
+
+  const capturarUbicacionGpsPrecisa = ({ onInicio, onExito, onError, onFin }) => {
     if (!navigator.geolocation) {
-      Swal.fire('Geolocalización no soportada', 'Tu navegador o dispositivo no soporta geolocalización.', 'warning')
+      Swal.fire({
+        title: 'Geolocalización no soportada',
+        text: 'Tu dispositivo o navegador no soporta geolocalización por hardware.',
+        icon: 'warning',
+        confirmButtonColor: '#691B31'
+      })
       return
     }
-    setCapturandoGpsIndex(index)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coordsStr = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`
+
+    if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      Swal.fire({
+        title: 'Permiso GPS del navegador',
+        html: '<p style="font-size:0.88rem;color:#475569;">Para acceder a la antena satelital en dispositivos móviles, los navegadores (Chrome/Safari) exigen conexión <strong>HTTPS</strong> o <strong>localhost</strong>.</p>',
+        icon: 'info',
+        confirmButtonColor: '#691B31'
+      })
+    }
+
+    if (onInicio) onInicio()
+
+    let mejorPos = null
+    let watchId = null
+    let timer = null
+    let finalizado = false
+
+    Swal.fire({
+      title: 'Extrayendo ubicación GPS del poste...',
+      html: `
+        <div style="text-align: center; padding: 0.5rem;">
+          <p style="margin: 0 0 0.5rem; font-size: 0.9rem; color: #475569;">Sincronizando con antena satelital en campo...</p>
+          <div id="gps-live-accuracy" style="display: inline-block; padding: 0.35rem 0.75rem; border-radius: 6px; background-color: #FEF3C7; color: #92400E; font-size: 0.85rem; font-weight: 700; border: 1px solid #FCD34D;">
+            Buscando satélites...
+          </div>
+          <p style="margin: 0.6rem 0 0; font-size: 0.75rem; color: #64748B;">Párate junto al poste para máxima exactitud.</p>
+        </div>
+      `,
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading()
+      }
+    })
+
+    const terminar = (pos) => {
+      if (finalizado) return
+      finalizado = true
+      if (watchId !== null) {
+        try { navigator.geolocation.clearWatch(watchId) } catch (e) {}
+      }
+      if (timer !== null) clearTimeout(timer)
+      if (onFin) onFin()
+
+      const lat = pos.coords.latitude
+      let lng = pos.coords.longitude
+      // En México la longitud siempre es negativa (-86° a -118°)
+      if (lat >= 14 && lat <= 35 && lng >= 80 && lng <= 120) {
+        lng = -Math.abs(lng)
+      }
+      const precision = pos.coords.accuracy ? Math.round(pos.coords.accuracy) : null
+      const coordsStr = `${lat.toFixed(6)}, ${lng.toFixed(6)}`
+
+      if (onExito) onExito({ coordsStr, lat, lng, precision, pos })
+
+      Swal.fire({
+        icon: 'success',
+        title: '¡Ubicación exacta extraída!',
+        html: `
+          <div style="text-align:center; padding: 0.4rem;">
+            <p style="font-size: 1.05rem; font-weight: 800; color: #1E293B; margin: 0 0 0.4rem;">${coordsStr}</p>
+            <p style="font-size: 0.82rem; color: #16A34A; font-weight: 700; margin: 0;">
+              Margen de error satelital: ±${precision || 5} metros
+            </p>
+          </div>
+        `,
+        confirmButtonColor: '#691B31',
+        confirmButtonText: 'Aceptar',
+        timer: 3200
+      })
+    }
+
+    const fallar = (err) => {
+      if (finalizado) return
+      if (mejorPos) {
+        terminar(mejorPos)
+        return
+      }
+      finalizado = true
+      if (watchId !== null) {
+        try { navigator.geolocation.clearWatch(watchId) } catch (e) {}
+      }
+      if (timer !== null) clearTimeout(timer)
+      if (onFin) onFin()
+      if (onError) onError(err)
+
+      console.warn('Error geolocalización:', err)
+      let msg = 'No se pudo obtener la ubicación GPS: ' + (err?.message || 'Tiempo de espera agotado')
+      if (err?.code === 1) msg = 'Permiso de ubicación denegado. Permite el acceso al GPS en tu navegador o móvil.'
+      else if (err?.code === 2) msg = 'Señal GPS no disponible. Verifica que la ubicación de tu dispositivo esté encendida.'
+      else if (err?.code === 3) msg = 'Tiempo de espera agotado buscando señal GPS de alta precisión.'
+
+      Swal.fire({
+        title: 'Aviso de GPS',
+        text: msg,
+        icon: 'warning',
+        confirmButtonColor: '#691B31'
+      })
+    }
+
+    // Permitir hasta 10 segundos para convergencia satelital óptima
+    timer = setTimeout(() => {
+      if (mejorPos) {
+        terminar(mejorPos)
+      } else {
+        navigator.geolocation.getCurrentPosition(
+          (fallbackPos) => terminar(fallbackPos),
+          (fallbackErr) => fallar(fallbackErr),
+          { enableHighAccuracy: false, timeout: 5000, maximumAge: 30000 }
+        )
+      }
+    }, 10000)
+
+    try {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          if (!mejorPos || (pos.coords.accuracy && pos.coords.accuracy < (mejorPos.coords.accuracy || 9999))) {
+            mejorPos = pos
+          }
+          const acc = pos.coords.accuracy ? Math.round(pos.coords.accuracy) : null
+          const el = document.getElementById('gps-live-accuracy')
+          if (el && acc) {
+            el.innerText = `Precisión satelital: ±${acc} metros`
+            if (acc <= 15) {
+              el.style.backgroundColor = '#DCFCE7'
+              el.style.color = '#15803D'
+              el.style.borderColor = '#86EFAC'
+            }
+          }
+          // Si la precisión es de alta exactitud (<= 12 metros), fijar inmediatamente
+          if (pos.coords.accuracy && pos.coords.accuracy <= 12) {
+            terminar(pos)
+          }
+        },
+        (err) => {
+          if (!mejorPos) {
+            navigator.geolocation.getCurrentPosition(
+              (p) => terminar(p),
+              (e) => fallar(e),
+              { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+            )
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      )
+    } catch (e) {
+      navigator.geolocation.getCurrentPosition(
+        (p) => terminar(p),
+        (err) => fallar(err),
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      )
+    }
+  }
+
+  const handleObtenerGpsRegistro = (index) => {
+    capturarUbicacionGpsPrecisa({
+      onInicio: () => setCapturandoGpsIndex(index),
+      onFin: () => setCapturandoGpsIndex(null),
+      onExito: ({ coordsStr }) => {
         handleCambiarCoordenada(index, coordsStr)
         setMapasDanadasVisibles(prev => ({ ...prev, [index]: true }))
-        setCapturandoGpsIndex(null)
-      },
-      (err) => {
-        setCapturandoGpsIndex(null)
-        console.warn('Error geolocalización:', err)
-        Swal.fire('Aviso', 'No se pudo obtener la ubicación actual: ' + (err.message || 'Permiso denegado'), 'info')
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    )
+      }
+    })
   }
 
   const handleObtenerGpsPoste = (pIdx) => {
-    if (!navigator.geolocation) {
-      Swal.fire('Geolocalización no soportada', 'Tu navegador o dispositivo no soporta geolocalización.', 'warning')
-      return
-    }
-    setCapturandoGpsPosteIndex(pIdx)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coordsStr = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`
+    capturarUbicacionGpsPrecisa({
+      onInicio: () => setCapturandoGpsPosteIndex(pIdx),
+      onFin: () => setCapturandoGpsPosteIndex(null),
+      onExito: ({ coordsStr, precision }) => {
+        handleActualizarPoste(pIdx, 'coordenadas', coordsStr)
         handleActualizarPoste(pIdx, 'ubicacionPoste', coordsStr)
+        if (precision) handleActualizarPoste(pIdx, 'gpsPrecision', precision)
         setMapasPostesVisibles(prev => ({ ...prev, [pIdx]: true }))
-        setCapturandoGpsPosteIndex(null)
-      },
-      (err) => {
-        setCapturandoGpsPosteIndex(null)
-        console.warn('Error geolocalización poste:', err)
-        Swal.fire('Aviso', 'No se pudo obtener la ubicación actual: ' + (err.message || 'Permiso denegado'), 'info')
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    )
+      }
+    })
   }
 
   const handleAgregarPoste = () => {
@@ -4143,13 +4442,17 @@ export default function InventarioSemaforos() {
         const siguienteId = grupos.length > 0 ? Math.max(...grupos.map(g => g.id || 0)) + 1 : 1
         const nuevoGrupo = {
           id: siguienteId,
+          modelo: 'LV-1',
           numLeds: 3,
           piezas: 0,
           leds: ajustarLedsPorCantidad([], 3)
         }
+        const nuevosGrupos = [...grupos, nuevoGrupo]
+        const modelosUnicos = [...new Set(nuevosGrupos.map(g => g.modelo).filter(Boolean))]
         return {
           ...p,
-          cabezalesGrupos: [...grupos, nuevoGrupo]
+          cabezalesGrupos: nuevosGrupos,
+          cabezalModelo: modelosUnicos.join(', ') || 'LV-1'
         }
       })
       const totales = recalcularTotalesDesdePostes(nuevosPostes)
@@ -4168,9 +4471,40 @@ export default function InventarioSemaforos() {
         if (idx !== pIdx) return p
         const grupos = normalizarCabezalesDetalle(p.cabezalesGrupos)
         if (grupos.length <= 1) return p
+        const filtrados = grupos.filter((_, i) => i !== gIdx)
+        const modelosUnicos = [...new Set(filtrados.map(g => g.modelo).filter(Boolean))]
         return {
           ...p,
-          cabezalesGrupos: grupos.filter((_, i) => i !== gIdx)
+          cabezalesGrupos: filtrados,
+          cabezalModelo: modelosUnicos.join(', ') || p.cabezalModelo || 'LV-1'
+        }
+      })
+      const totales = recalcularTotalesDesdePostes(nuevosPostes)
+      return {
+        ...prev,
+        ...totales,
+        postes: nuevosPostes
+      }
+    })
+  }
+
+  const handleCambiarModeloGrupoCabezal = (pIdx, gIdx, nuevoModelo) => {
+    setControladorForm(prev => {
+      const listaActual = prev.postes || []
+      const nuevosPostes = listaActual.map((p, idx) => {
+        if (idx !== pIdx) return p
+        const grupos = normalizarCabezalesDetalle(p.cabezalesGrupos)
+        const nuevoGrupos = [...grupos]
+        const grupoActual = nuevoGrupos[gIdx] || { id: gIdx + 1, piezas: 0, leds: [] }
+        nuevoGrupos[gIdx] = {
+          ...grupoActual,
+          modelo: nuevoModelo
+        }
+        const modelosUnicos = [...new Set(nuevoGrupos.map(g => g.modelo).filter(Boolean))]
+        return {
+          ...p,
+          cabezalesGrupos: nuevoGrupos,
+          cabezalModelo: modelosUnicos.join(', ') || nuevoModelo
         }
       })
       const totales = recalcularTotalesDesdePostes(nuevosPostes)
@@ -4192,14 +4526,21 @@ export default function InventarioSemaforos() {
         const nuevoGrupos = [...grupos]
         const grupoActual = nuevoGrupos[gIdx] || { id: gIdx + 1, piezas: 0, leds: [] }
         const nuevosLeds = ajustarLedsPorCantidad(grupoActual.leds, cant)
+        let modeloActualizado = grupoActual.modelo
+        if (!modeloActualizado || (grupoActual.numLeds === 3 && modeloActualizado === 'LV-1' && cant === 4) || (grupoActual.numLeds === 4 && modeloActualizado === 'LV-6' && cant === 3)) {
+          modeloActualizado = cant === 3 ? 'LV-1' : (cant === 4 ? 'LV-6' : (modeloActualizado || 'LV-1'))
+        }
         nuevoGrupos[gIdx] = {
           ...grupoActual,
+          modelo: modeloActualizado,
           numLeds: cant,
           leds: nuevosLeds
         }
+        const modelosUnicos = [...new Set(nuevoGrupos.map(g => g.modelo).filter(Boolean))]
         return {
           ...p,
-          cabezalesGrupos: nuevoGrupos
+          cabezalesGrupos: nuevoGrupos,
+          cabezalModelo: modelosUnicos.join(', ') || modeloActualizado
         }
       })
       const totales = recalcularTotalesDesdePostes(nuevosPostes)
@@ -6962,9 +7303,7 @@ export default function InventarioSemaforos() {
                                   <span style={{ fontSize: '0.82rem', color: '#065F46', fontWeight: '700' }}>
                                     {(() => {
                                       const target = archivoProgramacion || controladorParaVer?.archivoProgramacion || controladorForm.respaldoProgramacionUsb
-                                      if (typeof target === 'string') return target.split('/').pop()
-                                      if (target && target.name) return target.name
-                                      return 'archivo_programacion.zip'
+                                      return obtenerNombreArchivoProgramacion(target, controladorForm.respaldoProgramacionUsb || controladorParaVer?.respaldoProgramacionUsb)
                                     })()}
                                   </span>
                                 </div>
@@ -7030,8 +7369,8 @@ export default function InventarioSemaforos() {
                                   ) : (
                                     <FaUpload size={18} color="#10B981" />
                                   )}
-                                  <span style={{ fontSize: '0.82rem', color: '#065F46', fontWeight: '600', maxWidth: '170px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {typeof archivoProgramacion === 'string' ? archivoProgramacion.split('/').pop() : archivoProgramacion.name}
+                                  <span style={{ fontSize: '0.82rem', color: '#065F46', fontWeight: '600', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={obtenerNombreArchivoProgramacion(archivoProgramacion, controladorForm.respaldoProgramacionUsb)}>
+                                    {obtenerNombreArchivoProgramacion(archivoProgramacion, controladorForm.respaldoProgramacionUsb)}
                                   </span>
                                   {archivoProgramacion instanceof File && (
                                     <span style={{ fontSize: '0.72rem', color: '#047857', fontWeight: '500' }}>
@@ -8022,11 +8361,14 @@ export default function InventarioSemaforos() {
                                 <span style={{ fontSize: '0.88rem', fontWeight: '800', color: '#1E293B' }}>
                                   {normalizarNombreModeloPoste(poste.modeloPoste) || 'Sin modelo asignado'}
                                 </span>
-                                {poste.ubicacionPoste && (
-                                  <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>
-                                    • {poste.ubicacionPoste}
-                                  </span>
-                                )}
+                                {(() => {
+                                  const ubiTxt = (poste.coordenadas && poste.coordenadas !== 'undefined' && poste.coordenadas !== 'null') ? poste.coordenadas : ((poste.ubicacionPoste && poste.ubicacionPoste !== 'undefined' && poste.ubicacionPoste !== 'null') ? poste.ubicacionPoste : '')
+                                  return ubiTxt ? (
+                                    <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>
+                                      • {ubiTxt}
+                                    </span>
+                                  ) : null
+                                })()}
                               </div>
 
                               {!modoVisualizacion && (
@@ -8060,7 +8402,7 @@ export default function InventarioSemaforos() {
 
                             {/* Datos del Poste */}
                             {(() => {
-                              const coordsPoste = extraerCoordenadasValidas(poste.ubicacionPoste)
+                              const coordsPoste = extraerCoordenadasValidas(poste.coordenadas) || extraerCoordenadasValidas(poste.ubicacionPoste)
                               const mapaVisible = mapasPostesVisibles[pIdx] !== false && Boolean(coordsPoste)
 
                               return (
@@ -8230,18 +8572,48 @@ export default function InventarioSemaforos() {
                                         </div>
                                       </div>
                                       {modoVisualizacion ? (
-                                        renderDatoConsulta(poste.ubicacionPoste, 'Sin coordenadas registradas')
+                                        renderDatoConsulta((poste.coordenadas && poste.coordenadas !== 'undefined' && poste.coordenadas !== 'null') ? poste.coordenadas : ((poste.ubicacionPoste && poste.ubicacionPoste !== 'undefined' && poste.ubicacionPoste !== 'null') ? poste.ubicacionPoste : ''), 'Sin coordenadas registradas')
                                       ) : (
                                         <>
                                           <input
                                             type="text"
-                                            list={`sugerencias-ubicacion-postes-${pIdx}`}
-                                            placeholder="ej. 20.123456, -98.765432"
-                                            value={poste.ubicacionPoste || ''}
+                                            placeholder="ej. 20.123456, -98.765432 o enlace Google Maps"
+                                            value={((poste.coordenadas && poste.coordenadas !== 'undefined' && poste.coordenadas !== 'null') ? poste.coordenadas : ((poste.ubicacionPoste && poste.ubicacionPoste !== 'undefined' && poste.ubicacionPoste !== 'null') ? poste.ubicacionPoste : ''))}
                                             onChange={(e) => {
-                                              handleActualizarPoste(pIdx, 'ubicacionPoste', e.target.value)
-                                              if (extraerCoordenadasValidas(e.target.value)) {
+                                              const val = e.target.value
+                                              handleActualizarPoste(pIdx, 'coordenadas', val)
+                                              handleActualizarPoste(pIdx, 'ubicacionPoste', val)
+                                              if (extraerCoordenadasValidas(val)) {
                                                 setMapasPostesVisibles(prev => ({ ...prev, [pIdx]: true }))
+                                              }
+                                            }}
+                                            onPaste={(e) => {
+                                              const textoPegado = e.clipboardData?.getData('text') || ''
+                                              const coords = extraerCoordenadasValidas(textoPegado)
+                                              if (coords) {
+                                                e.preventDefault()
+                                                const coordsLimpias = `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`
+                                                handleActualizarPoste(pIdx, 'coordenadas', coordsLimpias)
+                                                handleActualizarPoste(pIdx, 'ubicacionPoste', coordsLimpias)
+                                                setMapasPostesVisibles(prev => ({ ...prev, [pIdx]: true }))
+                                                Swal.fire({
+                                                  toast: true,
+                                                  position: 'top-end',
+                                                  icon: 'success',
+                                                  title: `Coordenadas extraídas: ${coordsLimpias}`,
+                                                  showConfirmButton: false,
+                                                  timer: 2500
+                                                })
+                                              }
+                                            }}
+                                            onBlur={(e) => {
+                                              const coords = extraerCoordenadasValidas(e.target.value)
+                                              if (coords) {
+                                                const coordsLimpias = `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`
+                                                if (coordsLimpias !== e.target.value.trim()) {
+                                                  handleActualizarPoste(pIdx, 'coordenadas', coordsLimpias)
+                                                  handleActualizarPoste(pIdx, 'ubicacionPoste', coordsLimpias)
+                                                }
                                               }
                                             }}
                                             style={{
@@ -8253,17 +8625,6 @@ export default function InventarioSemaforos() {
                                               boxSizing: 'border-box'
                                             }}
                                           />
-                                          <datalist id={`sugerencias-ubicacion-postes-${pIdx}`}>
-                                            <option value="Camellón Central (Isleta)" />
-                                            <option value="Banqueta Poniente" />
-                                            <option value="Banqueta Oriente" />
-                                            <option value="Banqueta Norte" />
-                                            <option value="Banqueta Sur" />
-                                            <option value="Esquina Norponiente" />
-                                            <option value="Esquina Surponiente" />
-                                            <option value="Esquina Nororiente" />
-                                            <option value="Esquina Suroriente" />
-                                          </datalist>
                                         </>
                                       )}
                                     </div>
@@ -8290,9 +8651,22 @@ export default function InventarioSemaforos() {
                                         fontSize: '0.74rem',
                                         color: '#475569'
                                       }}>
-                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                           <FaMapMarkerAlt size={11} style={{ color: '#DC2626' }} />
                                           <span>Ubicación GPS del poste #{pIdx + 1}: <strong style={{ color: '#1E293B' }}>{coordsPoste.lat.toFixed(6)}, {coordsPoste.lng.toFixed(6)}</strong></span>
+                                          {poste.gpsPrecision && (
+                                            <span style={{
+                                              backgroundColor: poste.gpsPrecision <= 15 ? '#DCFCE7' : '#FEF3C7',
+                                              color: poste.gpsPrecision <= 15 ? '#15803D' : '#92400E',
+                                              border: `1px solid ${poste.gpsPrecision <= 15 ? '#86EFAC' : '#FCD34D'}`,
+                                              padding: '0.1rem 0.35rem',
+                                              borderRadius: '4px',
+                                              fontSize: '0.68rem',
+                                              fontWeight: '700'
+                                            }}>
+                                              ±{poste.gpsPrecision}m Satelital
+                                            </span>
+                                          )}
                                         </span>
                                         <a
                                           href={`https://www.google.com/maps?q=${coordsPoste.lat},${coordsPoste.lng}`}
@@ -8364,7 +8738,7 @@ export default function InventarioSemaforos() {
 
                               <div>
                                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                  <span>Estado de tapa de registro: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                  <span>Estado de tapa de cableado del poste: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
                                 </label>
                                 {modoVisualizacion ? (
                                   renderBadgeConsulta(poste.tapaRegistro || 'Buena')
@@ -8452,122 +8826,88 @@ export default function InventarioSemaforos() {
                                   <span style={{ fontSize: '0.74rem', color: '#64748B' }}>Tipo y desglose de luces</span>
                                 </div>
 
-                                <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginBottom: '0.85rem' }}>
-                                  <div>
-                                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                      <span>Tipo de cabezal: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                                    </label>
-                                    {modoVisualizacion ? (
-                                      <div style={{ display: 'flex', alignItems: 'center', minHeight: '34px' }}>
-                                        <span style={{
-                                          display: 'inline-flex',
-                                          alignItems: 'center',
-                                          gap: '0.35rem',
-                                          padding: '0.3rem 0.75rem',
-                                          borderRadius: '6px',
-                                          fontSize: '0.85rem',
-                                          fontWeight: '700',
-                                          backgroundColor: (poste.tipoCabezal || 'LED') === 'Pantalla' ? '#EFF6FF' : '#F1F5F9',
-                                          color: (poste.tipoCabezal || 'LED') === 'Pantalla' ? '#1D4ED8' : '#334155',
-                                          border: (poste.tipoCabezal || 'LED') === 'Pantalla' ? '1px solid #BFDBFE' : '1px solid #CBD5E1'
-                                        }}>
-                                          {(poste.tipoCabezal || 'LED') === 'Pantalla' ? <FaDesktop size={12} /> : <FaTrafficLight size={12} />}
-                                          {(poste.tipoCabezal || 'LED') === 'Pantalla' ? 'Pantalla LED' : 'LED'}
-                                        </span>
-                                      </div>
-                                    ) : (
-                                      <div style={{
-                                        display: 'grid',
-                                        gridTemplateColumns: '1fr 1fr',
-                                        gap: '3px',
-                                        backgroundColor: '#F1F5F9',
-                                        padding: '3px',
+                                <div style={{ marginBottom: '1rem', maxWidth: '340px' }}>
+                                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                                    <span>Tipo de cabezal: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                  </label>
+                                  {modoVisualizacion ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', minHeight: '34px' }}>
+                                      <span style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.35rem',
+                                        padding: '0.3rem 0.75rem',
                                         borderRadius: '6px',
-                                        border: '1px solid #CBD5E1',
-                                        boxSizing: 'border-box'
+                                        fontSize: '0.85rem',
+                                        fontWeight: '700',
+                                        backgroundColor: (poste.tipoCabezal || 'LED') === 'Pantalla' ? '#EFF6FF' : '#F1F5F9',
+                                        color: (poste.tipoCabezal || 'LED') === 'Pantalla' ? '#1D4ED8' : '#334155',
+                                        border: (poste.tipoCabezal || 'LED') === 'Pantalla' ? '1px solid #BFDBFE' : '1px solid #CBD5E1'
                                       }}>
-                                        {[
-                                          { val: 'LED', label: 'LED', icon: <FaTrafficLight size={11} /> },
-                                          { val: 'Pantalla', label: 'Pantalla LED', icon: <FaDesktop size={11} /> }
-                                        ].map(({ val, label, icon }) => {
-                                          const isSel = (poste.tipoCabezal || 'LED') === val
-                                          return (
-                                            <button
-                                              key={val}
-                                              type="button"
-                                              onClick={() => {
-                                                const nuevoTipo = val
-                                                const piezasVal = nuevoTipo === 'Pantalla' ? (poste.pantallaPiezas || '1') : ''
-                                                const cantNum = parseInt(piezasVal, 10) || 0
-                                                const pantallasInit = cantNum > 0
-                                                  ? Array.from({ length: cantNum }, (_, i) => ({ numero: i + 1, estado: 'Funciona' }))
-                                                  : []
-                                                handleActualizarPosteMultiple(pIdx, {
-                                                  tipoCabezal: nuevoTipo,
-                                                  cabezalModelo: nuevoTipo === 'Pantalla' ? 'Semáforo de pantalla LED' : (poste.cabezalModelo === 'Semáforo de pantalla LED' ? 'LV-1' : (poste.cabezalModelo || 'LV-1')),
-                                                  pantallaPiezas: piezasVal,
-                                                  pantallasLista: nuevoTipo === 'Pantalla' ? (poste.pantallasLista?.length ? poste.pantallasLista : pantallasInit) : [],
-                                                  pantallaEstado: 'Funciona'
-                                                })
-                                              }}
-                                              style={{
-                                                border: 'none',
-                                                borderRadius: '4px',
-                                                padding: '0.45rem 0.5rem',
-                                                fontSize: '0.78rem',
-                                                fontWeight: isSel ? '700' : '500',
-                                                backgroundColor: isSel ? '#691B31' : 'transparent',
-                                                color: isSel ? '#FFFFFF' : '#475569',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                gap: '0.35rem',
-                                                boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
-                                                transition: 'all 0.15s',
-                                                whiteSpace: 'nowrap'
-                                              }}
-                                            >
-                                              {icon}
-                                              <span>{label}</span>
-                                            </button>
-                                          )
-                                        })}
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <div>
-                                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
-                                      <span>Modelo de cabezal: {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
-                                    </label>
-                                    {modoVisualizacion ? (
-                                      renderDatoConsulta(poste.cabezalModelo, 'Sin modelo especificado')
-                                    ) : (
-                                      <select
-                                        value={poste.cabezalModelo || ''}
-                                        onChange={(e) => handleActualizarPoste(pIdx, 'cabezalModelo', e.target.value)}
-                                        style={{
-                                          width: '100%',
-                                          padding: '0.45rem 0.65rem',
-                                          border: '1px solid #CBD5E1',
-                                          borderRadius: '6px',
-                                          fontSize: '0.85rem',
-                                          backgroundColor: 'white',
-                                          color: '#1E293B',
-                                          boxSizing: 'border-box'
-                                        }}
-                                      >
-                                        <option value="">-- Seleccionar modelo de cabezal --</option>
-                                        {MODELOS_CABEZAL_CATALOGO.map((modelo) => (
-                                          <option key={modelo} value={modelo}>{modelo}</option>
-                                        ))}
-                                        {poste.cabezalModelo && !MODELOS_CABEZAL_CATALOGO.includes(poste.cabezalModelo) && (
-                                          <option value={poste.cabezalModelo}>{poste.cabezalModelo}</option>
-                                        )}
-                                      </select>
-                                    )}
-                                  </div>
+                                        {(poste.tipoCabezal || 'LED') === 'Pantalla' ? <FaDesktop size={12} /> : <FaTrafficLight size={12} />}
+                                        {(poste.tipoCabezal || 'LED') === 'Pantalla' ? 'Pantalla LED' : 'LED'}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <div style={{
+                                      display: 'grid',
+                                      gridTemplateColumns: '1fr 1fr',
+                                      gap: '3px',
+                                      backgroundColor: '#F1F5F9',
+                                      padding: '3px',
+                                      borderRadius: '6px',
+                                      border: '1px solid #CBD5E1',
+                                      boxSizing: 'border-box'
+                                    }}>
+                                      {[
+                                        { val: 'LED', label: 'LED', icon: <FaTrafficLight size={11} /> },
+                                        { val: 'Pantalla', label: 'Pantalla LED', icon: <FaDesktop size={11} /> }
+                                      ].map(({ val, label, icon }) => {
+                                        const isSel = (poste.tipoCabezal || 'LED') === val
+                                        return (
+                                          <button
+                                            key={val}
+                                            type="button"
+                                            onClick={() => {
+                                              const nuevoTipo = val
+                                              const piezasVal = nuevoTipo === 'Pantalla' ? (poste.pantallaPiezas || '1') : ''
+                                              const cantNum = parseInt(piezasVal, 10) || 0
+                                              const pantallasInit = cantNum > 0
+                                                ? Array.from({ length: cantNum }, (_, i) => ({ numero: i + 1, estado: 'Funciona' }))
+                                                : []
+                                              handleActualizarPosteMultiple(pIdx, {
+                                                tipoCabezal: nuevoTipo,
+                                                cabezalModelo: nuevoTipo === 'Pantalla' ? 'Semáforo de pantalla LED' : (poste.cabezalModelo === 'Semáforo de pantalla LED' ? 'LV-1' : (poste.cabezalModelo || 'LV-1')),
+                                                pantallaPiezas: piezasVal,
+                                                pantallasLista: nuevoTipo === 'Pantalla' ? (poste.pantallasLista?.length ? poste.pantallasLista : pantallasInit) : [],
+                                                pantallaEstado: 'Funciona'
+                                              })
+                                            }}
+                                            style={{
+                                              border: 'none',
+                                              borderRadius: '4px',
+                                              padding: '0.45rem 0.5rem',
+                                              fontSize: '0.78rem',
+                                              fontWeight: isSel ? '700' : '500',
+                                              backgroundColor: isSel ? '#691B31' : 'transparent',
+                                              color: isSel ? '#FFFFFF' : '#475569',
+                                              cursor: 'pointer',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              gap: '0.35rem',
+                                              boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                              transition: 'all 0.15s',
+                                              whiteSpace: 'nowrap'
+                                            }}
+                                          >
+                                            {icon}
+                                            <span>{label}</span>
+                                          </button>
+                                        )
+                                      })}
+                                    </div>
+                                  )}
                                 </div>
 
                                 {/* Pantalla LED */}
@@ -8708,7 +9048,7 @@ export default function InventarioSemaforos() {
                                               cursor: 'pointer'
                                             }}
                                           >
-                                            <FaPlus size={10} style={{ color: '#BC955B' }} /> + Otro cabezal
+                                            <FaPlus size={10} style={{ color: '#BC955B' }} /> Otro cabezal
                                           </button>
                                         )}
                                       </div>
@@ -8727,12 +9067,54 @@ export default function InventarioSemaforos() {
                                               border: '1px solid #E2E8F0'
                                             }}
                                           >
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
-                                              <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                              <span style={{ fontSize: '0.84rem', fontWeight: '800', color: '#334155', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                                 <FaTrafficLight size={11} style={{ color: '#691B31' }} />
                                                 Cabezal {cabezalesGrupos.length > 1 ? `#${gIdx + 1}` : ''}
                                               </span>
-                                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                                                {/* Selector individual de modelo para ESTE cabezal */}
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                                  <span style={{ fontSize: '0.76rem', fontWeight: '700', color: '#475569' }}>Modelo:</span>
+                                                  {modoVisualizacion ? (
+                                                    <span style={{
+                                                      fontSize: '0.78rem',
+                                                      fontWeight: '800',
+                                                      color: '#1E293B',
+                                                      backgroundColor: '#EFF6FF',
+                                                      border: '1px solid #BFDBFE',
+                                                      padding: '0.15rem 0.5rem',
+                                                      borderRadius: '4px'
+                                                    }}>
+                                                      {grupo.modelo || (numLeds === 4 ? 'LV-6' : 'LV-1')}
+                                                    </span>
+                                                  ) : (
+                                                    <select
+                                                      value={grupo.modelo || (numLeds === 4 ? 'LV-6' : 'LV-1')}
+                                                      onChange={(e) => handleCambiarModeloGrupoCabezal(pIdx, gIdx, e.target.value)}
+                                                      style={{
+                                                        padding: '0.2rem 0.45rem',
+                                                        border: '1px solid #CBD5E1',
+                                                        borderRadius: '5px',
+                                                        fontSize: '0.78rem',
+                                                        fontWeight: '700',
+                                                        color: '#1E293B',
+                                                        backgroundColor: 'white',
+                                                        cursor: 'pointer'
+                                                      }}
+                                                      title={`Seleccionar modelo para el Cabezal #${gIdx + 1}`}
+                                                    >
+                                                      {MODELOS_CABEZAL_CATALOGO.filter(m => m !== 'Semáforo de pantalla LED').map((modelo) => (
+                                                        <option key={modelo} value={modelo}>{modelo}</option>
+                                                      ))}
+                                                      {grupo.modelo && !MODELOS_CABEZAL_CATALOGO.includes(grupo.modelo) && (
+                                                        <option value={grupo.modelo}>{grupo.modelo}</option>
+                                                      )}
+                                                    </select>
+                                                  )}
+                                                </div>
+
+                                                {/* Cantidad de LEDs */}
                                                 {modoVisualizacion ? (
                                                   <span style={{
                                                     fontSize: '0.78rem',
@@ -8745,7 +9127,7 @@ export default function InventarioSemaforos() {
                                                     {numLeds} LEDs
                                                   </span>
                                                 ) : (
-                                                  <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                                  <label style={{ fontSize: '0.78rem', fontWeight: '700', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                                     <span>LEDs:</span>
                                                     <input
                                                       type="number"
@@ -9049,6 +9431,7 @@ export default function InventarioSemaforos() {
                                     </span>
                                   )}
                                 </div>
+
                                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
                                   <span style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: '600' }}>¿Instalado en este poste?:</span>
                                   {modoVisualizacion ? (
@@ -9378,7 +9761,7 @@ export default function InventarioSemaforos() {
                                         alignSelf: 'flex-start'
                                       }}
                                     >
-                                      <FaPlus size={10} style={{ color: '#BC955B' }} /> + Agregar otro semáforo peatonal en este poste
+                                      <FaPlus size={10} style={{ color: '#BC955B' }} /> Agregar otro semáforo peatonal en este poste
                                     </button>
                                   )}
                                 </div>
@@ -9867,16 +10250,16 @@ export default function InventarioSemaforos() {
                             gap: '0.5rem'
                           }}>
                             <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#92400E', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <FaMapMarkerAlt style={{ color: '#D97706' }} /> Coordenadas de los {controladorForm.registrosPisoDanados} registro(s) dañado(s):
+                              <FaMapMarkerAlt style={{ color: '#D97706' }} /> Detalle y ubicación de los {controladorForm.registrosPisoDanados} registro(s) dañado(s):
                             </span>
                             <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
-                              Latitud, Longitud (ej. 20.123456, -98.765432)
+                              Coordenadas GPS y observaciones por registro
                             </span>
                           </div>
 
                           <div style={{
                             display: 'grid',
-                            gridTemplateColumns: Number(controladorForm.registrosPisoDanados) > 1 ? 'repeat(auto-fit, minmax(280px, 1fr))' : '1fr',
+                            gridTemplateColumns: Number(controladorForm.registrosPisoDanados) > 1 ? 'repeat(auto-fit, minmax(320px, 1fr))' : '1fr',
                             gap: '0.75rem'
                           }}>
                             {(controladorForm.registrosPisoCoordenadas || []).map((item, idx) => (
@@ -9889,7 +10272,7 @@ export default function InventarioSemaforos() {
                                   padding: '0.65rem 0.75rem',
                                   display: 'flex',
                                   flexDirection: 'column',
-                                  gap: '0.35rem'
+                                  gap: '0.45rem'
                                 }}
                               >
                                 {(() => {
@@ -9958,30 +10341,60 @@ export default function InventarioSemaforos() {
                                         </div>
                                       </div>
 
-                                      {modoVisualizacion ? (
-                                        renderDatoConsulta(item.coordenadas, 'Sin coordenadas registradas')
-                                      ) : (
-                                        <input
-                                          type="text"
-                                          placeholder="ej. 20.123456, -98.765432"
-                                          value={item.coordenadas || ''}
-                                          onChange={(e) => {
-                                            handleCambiarCoordenada(idx, e.target.value)
-                                            if (extraerCoordenadasValidas(e.target.value)) {
-                                              setMapasDanadasVisibles(prev => ({ ...prev, [idx]: true }))
-                                            }
-                                          }}
-                                          style={{
-                                            width: '100%',
-                                            padding: '0.45rem 0.65rem',
-                                            border: '1px solid #CBD5E1',
-                                            borderRadius: '5px',
-                                            fontSize: '0.82rem',
-                                            backgroundColor: 'white',
-                                            boxSizing: 'border-box'
-                                          }}
-                                        />
-                                      )}
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                        <label style={{ fontSize: '0.74rem', fontWeight: '700', color: '#475569' }}>
+                                          Coordenadas GPS:
+                                        </label>
+                                        {modoVisualizacion ? (
+                                          renderDatoConsulta(item.coordenadas, 'Sin coordenadas registradas')
+                                        ) : (
+                                          <input
+                                            type="text"
+                                            placeholder="ej. 20.123456, -98.765432"
+                                            value={item.coordenadas || ''}
+                                            onChange={(e) => {
+                                              handleCambiarCoordenada(idx, e.target.value)
+                                              if (extraerCoordenadasValidas(e.target.value)) {
+                                                setMapasDanadasVisibles(prev => ({ ...prev, [idx]: true }))
+                                              }
+                                            }}
+                                            style={{
+                                              width: '100%',
+                                              padding: '0.45rem 0.65rem',
+                                              border: '1px solid #CBD5E1',
+                                              borderRadius: '5px',
+                                              fontSize: '0.82rem',
+                                              backgroundColor: 'white',
+                                              boxSizing: 'border-box'
+                                            }}
+                                          />
+                                        )}
+                                      </div>
+
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                        <label style={{ fontSize: '0.74rem', fontWeight: '700', color: '#475569' }}>
+                                          Observaciones:
+                                        </label>
+                                        {modoVisualizacion ? (
+                                          renderDatoConsulta(item.observaciones, 'Sin observaciones registradas')
+                                        ) : (
+                                          <input
+                                            type="text"
+                                            placeholder="ej. Tapa fracturada, marco vencido, cables expuestos..."
+                                            value={item.observaciones || ''}
+                                            onChange={(e) => handleCambiarObservacionRegistroDanado(idx, e.target.value)}
+                                            style={{
+                                              width: '100%',
+                                              padding: '0.45rem 0.65rem',
+                                              border: '1px solid #CBD5E1',
+                                              borderRadius: '5px',
+                                              fontSize: '0.82rem',
+                                              backgroundColor: 'white',
+                                              boxSizing: 'border-box'
+                                            }}
+                                          />
+                                        )}
+                                      </div>
 
                                       {coordsReg && mapaRegVisible && (
                                         <div style={{

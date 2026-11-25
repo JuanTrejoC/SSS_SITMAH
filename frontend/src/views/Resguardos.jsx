@@ -556,21 +556,53 @@ function Resguardos() {
 
         if (dataTec.ok && dataTec.data) {
           const arrTec = Array.isArray(dataTec.data) ? dataTec.data : (dataTec.data.items || []);
-          items = [...items, ...arrTec.map(i => {
+          // Solo mostrar equipos principales (no componentes hijos ya vinculados a una PC/Laptop)
+          const principales = arrTec.filter(i => !i.equipoPrincipalId);
+          items = [...items, ...principales.map(i => {
             const esOtro = (i.tipo || '').toLowerCase() === 'otro';
             const det = i.detalles;
             const nombreReal = esOtro
               ? ((typeof det === 'object' && det) ? (det.nombre || det.nombreEquipo || det.especificarTipo || '') : '') || i.modelo || 'EQUIPO ESPECIAL'
               : (i.tipo || 'TECNOLÓGICO');
             const titulo = `${nombreReal} ${i.marca || ''} ${i.modelo || ''}`.replace(/\s+/g, ' ').trim().toUpperCase();
+
+            const lineasDesc = [];
             const detalle = i.observaciones || i.caracteristicas || `MARCA ${i.marca || 'S/M'}, MODELO ${i.modelo || 'S/M'}`;
-            const desc = detalle ? `${titulo}\n\n${detalle}` : titulo;
+            lineasDesc.push(detalle);
+            if (i.numeroInventario) lineasDesc.push(`No. Inventario: ${i.numeroInventario}`);
+            if (i.areaUbicacion) lineasDesc.push(`Ubicación: ${i.areaUbicacion}`);
+
+            const seriesArr = [];
+            if (i.numeroSerie && i.numeroSerie !== 'S/S' && i.numeroSerie !== 'N/A') {
+              seriesArr.push(`${nombreReal}: ${i.numeroSerie}`);
+            }
+
+            if (i.componentes && i.componentes.length > 0) {
+              lineasDesc.push('');
+              lineasDesc.push('Accesorios y componentes vinculados (Kit de Cómputo):');
+              i.componentes.forEach(c => {
+                const cTipo = (c.tipo || 'Periférico').replace(/_/g, ' ').toUpperCase();
+                const cMarcaMod = [c.marca, c.modelo].filter(Boolean).join(' ');
+                const cInv = c.numeroInventario ? ` | No. Inv: ${c.numeroInventario}` : '';
+                const cSer = (c.numeroSerie && c.numeroSerie !== 'S/S' && c.numeroSerie !== 'N/A') ? ` | Serie: ${c.numeroSerie}` : '';
+                lineasDesc.push(`• ${cTipo}${cMarcaMod ? ` ${cMarcaMod}` : ''}${cInv}${cSer}`);
+
+                if (c.numeroSerie && c.numeroSerie !== 'S/S' && c.numeroSerie !== 'N/A') {
+                  seriesArr.push(`${cTipo}: ${c.numeroSerie}`);
+                }
+              });
+            }
+
+            const desc = `${titulo}\n\n${lineasDesc.join('\n')}`;
+            const snFinal = seriesArr.length > 0 ? seriesArr.join('\n') : (i.numeroSerie || 'S/S');
+            const kitTag = i.componentes?.length > 0 ? ` [Kit: +${i.componentes.length} componentes]` : '';
+
             return {
               ...i,
               __formTipo: 'tecnologico',
-              label: `[Tecnológico] ${nombreReal} - ${[i.marca, i.modelo].filter(Boolean).join(' ')} (${i.numeroInventario ? `Inv: ${i.numeroInventario}` : ''}${i.numeroInventario && i.numeroSerie ? ' | ' : ''}${i.numeroSerie ? `Serie: ${i.numeroSerie}` : (!i.numeroInventario ? 'Sin Inv / Sin Serie' : '')})`.trim(),
+              label: `[Tecnológico] ${nombreReal} - ${[i.marca, i.modelo].filter(Boolean).join(' ')}${kitTag} (${i.numeroInventario ? `Inv: ${i.numeroInventario}` : ''}${i.numeroInventario && i.numeroSerie ? ' | ' : ''}${i.numeroSerie ? `Serie: ${i.numeroSerie}` : (!i.numeroInventario ? 'Sin Inv / Sin Serie' : '')})`.trim(),
               desc: desc,
-              sn: i.numeroSerie || 'S/S',
+              sn: snFinal,
               nombreResguardante: i.responsable || '',
               cargo: i.cargoResponsable || '',
               direccion: i.direccion || i.areaUbicacion || ''
@@ -895,6 +927,7 @@ function Resguardos() {
       const tecModelo = (r.equipoTecnologico?.modelo || '').toLowerCase();
       const tecInv = (r.equipoTecnologico?.numeroInventario || '').toLowerCase();
       const tecSerie = (r.equipoTecnologico?.numeroSerie || '').toLowerCase();
+      const tecComp = (r.equipoTecnologico?.componentes || []).map(c => `${c.tipo || ''} ${c.marca || ''} ${c.modelo || ''} ${c.numeroInventario || ''} ${c.numeroSerie || ''}`).join(' ').toLowerCase();
 
       // Existencia / Herramienta
       const exNombre = (r.existencia?.nombre || '').toLowerCase();
@@ -926,6 +959,7 @@ function Resguardos() {
         tecModelo.includes(term) ||
         tecInv.includes(term) ||
         tecSerie.includes(term) ||
+        tecComp.includes(term) ||
         exNombre.includes(term) ||
         exMarca.includes(term) ||
         exModelo.includes(term) ||
@@ -1196,6 +1230,30 @@ function Resguardos() {
                     {/* BIEN / EQUIPO */}
                     <td style={{ padding: '1.25rem' }}>
                       <div style={{ fontWeight: '600', color: '#1e293b', fontSize: '0.95rem' }}>{nombreItem}</div>
+                      {r.tipoInventario === 'tecnologico' && r.equipoTecnologico?.componentes?.length > 0 && (
+                        <div style={{ marginTop: '0.35rem' }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.35rem',
+                              backgroundColor: '#eff6ff',
+                              color: '#1d4ed8',
+                              border: '1px solid #bfdbfe',
+                              borderRadius: '9999px',
+                              padding: '0.15rem 0.55rem',
+                              fontSize: '0.75rem',
+                              fontWeight: '600'
+                            }}
+                            title={r.equipoTecnologico.componentes.map(c => `${(c.tipo || 'Periférico').replace(/_/g, ' ')}: ${[c.marca, c.modelo].filter(Boolean).join(' ') || c.numeroInventario || 'S/N'}`).join(', ')}
+                          >
+                            <FaCheck size={10} /> Kit (+{r.equipoTecnologico.componentes.length} periféricos)
+                          </span>
+                          <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '0.2rem', lineHeight: '1.2' }}>
+                            {r.equipoTecnologico.componentes.map(c => (c.tipo || 'Accesorio').replace(/_/g, ' ').toUpperCase()).join(' • ')}
+                          </div>
+                        </div>
+                      )}
                     </td>
 
                     {/* RESPONSABLE */}
@@ -1211,7 +1269,22 @@ function Resguardos() {
                     {/* IDENTIFICACIÓN */}
                     <td style={{ padding: '1.25rem' }}>
                       <div style={{ fontWeight: '600', color: '#1e293b' }}>Inv: {invItem || 'N/A'}</div>
-                      <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.15rem' }}>Serie: {serieItem || 'N/A'}</div>
+                      <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '0.15rem' }}>
+                        {serieItem?.includes('\n') ? (
+                          <span
+                            title={serieItem}
+                            style={{
+                              color: '#0369a1',
+                              fontWeight: '500',
+                              cursor: 'help'
+                            }}
+                          >
+                            Serie: {serieItem.split('\n')[0]} <span style={{ fontSize: '0.75rem', backgroundColor: '#e0f2fe', padding: '0.1rem 0.35rem', borderRadius: '4px' }}>+{serieItem.split('\n').length - 1} series</span>
+                          </span>
+                        ) : (
+                          `Serie: ${serieItem || 'N/A'}`
+                        )}
+                      </div>
                     </td>
 
                     {/* FECHA */}

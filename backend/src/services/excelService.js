@@ -1158,8 +1158,24 @@ async function exportarControladoresSemaforoExcel(controladores, meta = {}) {
     // Estado Base y Registros
     const estadoPartes = [];
     const regDanados = Number(ctrl.registrosPisoDanados) || 0;
-    if (regDanados > 0) estadoPartes.push(`⚠️ ${regDanados} REG. DAÑADO(S)`);
-    else estadoPartes.push('Registros: En buen estado');
+    if (regDanados > 0) {
+      let regObs = '';
+      let coordsArray = ctrl.registrosPisoCoordenadas;
+      if (typeof coordsArray === 'string') {
+        try { coordsArray = JSON.parse(coordsArray); } catch (e) { coordsArray = null; }
+      }
+      if (Array.isArray(coordsArray) && coordsArray.some(r => r && (r.observaciones || r.coordenadas))) {
+        const detalles = coordsArray.filter(r => r && (r.observaciones || r.coordenadas)).map((r, idx) => {
+          const obs = r.observaciones ? ` - ${r.observaciones}` : '';
+          const coord = r.coordenadas ? ` (${r.coordenadas})` : '';
+          return `Reg #${r.id || idx + 1}${coord}${obs}`;
+        });
+        if (detalles.length > 0) regObs = `:\n${detalles.join('\n')}`;
+      }
+      estadoPartes.push(`⚠️ ${regDanados} REG. DAÑADO(S)${regObs}`);
+    } else {
+      estadoPartes.push('Registros: En buen estado');
+    }
     if (ctrl.cimientoCompleto) estadoPartes.push(`Cimiento: ${ctrl.cimientoCompleto}`);
     if (ctrl.tapaCableado) estadoPartes.push(`Tapa cableado: ${ctrl.tapaCableado}`);
     const estadoStr = estadoPartes.join('\n');

@@ -18,7 +18,12 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    cb(null, `programacion-${Date.now()}${path.extname(file.originalname)}`);
+    let originalName = file.originalname || 'respaldo.zip';
+    try {
+      originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    } catch (_) {}
+    const safeName = originalName.replace(/[\\/:*?"<>|]/g, '_').trim();
+    cb(null, `${Date.now()}___${safeName || 'respaldo.zip'}`);
   }
 });
 const upload = multer({

@@ -149,7 +149,13 @@ const controladorSemaforoSchema = z.object({
   mascaraRed: z.string().nullable().optional(),
   gateway: z.string().nullable().optional(),
   cicloCompleto: z.string().nullable().optional(),
-  respaldoProgramacionUsb: z.string().nullable().optional(),
+  respaldoProgramacionUsb: z.union([
+    z.string(),
+    z.array(z.string()).transform(arr => {
+      const valid = arr.filter(v => typeof v === 'string' && v.trim() !== '');
+      return valid.length > 0 ? valid[valid.length - 1] : null;
+    })
+  ]).nullable().optional(),
   // Electrónica Interna - Conflictos y Relevadores
   tarjetaConflictosMarca: z.string().nullable().optional(),
   tarjetaConflictosModelo: z.string().nullable().optional(),
@@ -592,6 +598,25 @@ async function listarControladoresSemaforo(req, res) {
   ok(res, { items, total, page, limit });
 }
 
+const limpiarTextoCoordenada = (val) => {
+  if (!val) return '';
+  const s = String(val).trim();
+  if (s.toLowerCase() === 'undefined' || s.toLowerCase() === 'null') return '';
+  return s;
+};
+
+const sanitizarPosteCoordenadas = (p) => {
+  if (!p || typeof p !== 'object') return p;
+  const cCoord = limpiarTextoCoordenada(p.coordenadas);
+  const cUbi = limpiarTextoCoordenada(p.ubicacionPoste);
+  const valorFinal = cCoord || cUbi || '';
+  return {
+    ...p,
+    coordenadas: valorFinal,
+    ubicacionPoste: cUbi || valorFinal
+  };
+};
+
 async function crearControladorSemaforo(req, res) {
   const body = { ...req.body };
   // Convert boolean strings to actual booleans (from FormData)
@@ -625,6 +650,16 @@ async function crearControladorSemaforo(req, res) {
     }
   }
 
+  // Sanitizar si cualquier campo no-array llegó duplicado en FormData (Multer lo convierte en array),
+  // colapsarlo al último valor no vacío.
+  const arrayAllowedFields = new Set(['cabezalesDetalle', 'postesDetalle', 'registrosPisoCoordenadas']);
+  Object.keys(body).forEach(k => {
+    if (Array.isArray(body[k]) && !arrayAllowedFields.has(k)) {
+      const nonEmpties = body[k].filter(v => v !== undefined && v !== null && v !== '');
+      body[k] = nonEmpties.length > 0 ? nonEmpties[nonEmpties.length - 1] : '';
+    }
+  });
+
   const parsed = controladorSemaforoSchema.safeParse(body);
   if (!parsed.success) return fail(res, parsed.error);
 
@@ -647,21 +682,28 @@ async function crearControladorSemaforo(req, res) {
     dataToSave.audible = true;
   }
   if (Array.isArray(body.postesDetalle)) {
-    const list = body.postesDetalle.map((p, idx) => ({
-      ...p,
-      uid: (p.uid && typeof p.uid === 'string' && p.uid.length > 8 && !p.uid.match(/^pst_\d+$/))
-        ? p.uid
-        : `pst_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 6)}`,
-      id: Number(p.id) || idx + 1,
-      guardadoEnServidor: true
-    }));
+    const list = body.postesDetalle.map((p, idx) => {
+      const pLimpio = sanitizarPosteCoordenadas(p);
+      return {
+        ...pLimpio,
+        uid: (pLimpio.uid && typeof pLimpio.uid === 'string' && pLimpio.uid.length > 8 && !pLimpio.uid.match(/^pst_\d+$/))
+          ? pLimpio.uid
+          : `pst_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 6)}`,
+        id: Number(pLimpio.id) || idx + 1,
+        guardadoEnServidor: true
+      };
+    });
     dataToSave.postesDetalle = list;
     const totales = recalcularTotalesDesdePostesBackend(list);
     Object.assign(dataToSave, totales);
   }
   if (req.file) {
-    // Relative path to be stored in the database
+    let originalName = req.file.originalname || req.file.filename;
+    try {
+      originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    } catch (_) {}
     dataToSave.archivoProgramacion = `uploads/${req.file.filename}`;
+    dataToSave.respaldoProgramacionUsb = originalName;
   }
 
   try {
@@ -720,6 +762,16 @@ async function actualizarControladorSemaforo(req, res) {
     }
   }
 
+  // Sanitizar si cualquier campo no-array llegó duplicado en FormData (Multer lo convierte en array),
+  // colapsarlo al último valor no vacío.
+  const arrayAllowedFields = new Set(['cabezalesDetalle', 'postesDetalle', 'registrosPisoCoordenadas']);
+  Object.keys(body).forEach(k => {
+    if (Array.isArray(body[k]) && !arrayAllowedFields.has(k)) {
+      const nonEmpties = body[k].filter(v => v !== undefined && v !== null && v !== '');
+      body[k] = nonEmpties.length > 0 ? nonEmpties[nonEmpties.length - 1] : '';
+    }
+  });
+
   const parsed = controladorSemaforoSchema.safeParse(body);
   if (!parsed.success) return fail(res, parsed.error);
 
@@ -736,9 +788,15 @@ async function actualizarControladorSemaforo(req, res) {
         dataToUpdate.audible = true;
       }
       if (req.file) {
+        let originalName = req.file.originalname || req.file.filename;
+        try {
+          originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+        } catch (_) {}
         dataToUpdate.archivoProgramacion = `uploads/${req.file.filename}`;
+        dataToUpdate.respaldoProgramacionUsb = originalName;
       } else if (body.removerArchivo === 'true') {
         dataToUpdate.archivoProgramacion = null;
+        dataToUpdate.respaldoProgramacionUsb = null;
       }
 
       // Proteger campos de gabinete para que no se sobreescriban con valores vacíos si la base de datos ya tiene información
@@ -798,16 +856,25 @@ async function actualizarControladorSemaforo(req, res) {
         listDB.forEach(p => dbUidMap.set(p.uid, p));
 
         incomingList.forEach(pIn => {
-          if (dbUidMap.has(pIn.uid)) {
+          const pInLimpio = sanitizarPosteCoordenadas(pIn);
+          if (dbUidMap.has(pInLimpio.uid)) {
             // Poste que ya existía: actualizarlo protegiendo campos no vacíos de la BD
-            const dbP = dbUidMap.get(pIn.uid);
-            const merged = { ...dbP, ...pIn, guardadoEnServidor: true };
-            if (!merged.ubicacionPoste && dbP.ubicacionPoste) merged.ubicacionPoste = dbP.ubicacionPoste;
+            const dbP = sanitizarPosteCoordenadas(dbUidMap.get(pInLimpio.uid));
+            const coordFinal = pInLimpio.coordenadas || dbP.coordenadas || pInLimpio.ubicacionPoste || dbP.ubicacionPoste || '';
+            const ubiFinal = pInLimpio.ubicacionPoste || dbP.ubicacionPoste || coordFinal || '';
+
+            const merged = {
+              ...dbP,
+              ...pInLimpio,
+              coordenadas: coordFinal,
+              ubicacionPoste: ubiFinal,
+              guardadoEnServidor: true
+            };
             if (!merged.observaciones && dbP.observaciones) merged.observaciones = dbP.observaciones;
-            dbUidMap.set(pIn.uid, merged);
+            dbUidMap.set(pInLimpio.uid, merged);
           } else {
             // Poste nuevo creado por este técnico: agregarlo sin conflicto
-            dbUidMap.set(pIn.uid, { ...pIn, guardadoEnServidor: true });
+            dbUidMap.set(pInLimpio.uid, { ...pInLimpio, guardadoEnServidor: true });
           }
         });
 
@@ -858,9 +925,24 @@ async function descargarProgramacion(req, res) {
   }
 
   const path = require('path');
+  const fs = require('fs');
   const filePath = path.resolve(__dirname, '../../', existe.archivoProgramacion);
-  res.download(filePath, existe.archivoProgramacion.split('/').pop(), (err) => {
-    if (err) {
+  if (!fs.existsSync(filePath)) {
+    return fail(res, 'El archivo físico no existe en el servidor', 404);
+  }
+
+  let nombreDescarga = existe.respaldoProgramacionUsb;
+  if (!nombreDescarga || nombreDescarga.startsWith('programacion-')) {
+    const base = existe.archivoProgramacion.split('/').pop().split('\\').pop();
+    if (base.includes('___')) {
+      nombreDescarga = base.split('___').slice(1).join('___');
+    } else {
+      nombreDescarga = base;
+    }
+  }
+
+  res.download(filePath, nombreDescarga || 'respaldo.zip', (err) => {
+    if (err && !res.headersSent) {
       console.error('Error enviando archivo:', err);
       res.status(500).send('Error al descargar el archivo.');
     }
@@ -1000,6 +1082,12 @@ const recalcularTotalesDesdePostesBackend = (postesRaw) => {
   const totalCamaras = listaPostes.reduce((acc, p) => p.tieneCamara ? acc + (parseInt(p.camaraCantidad, 10) || 0) : acc, 0);
 
   const modelosPostes = [...new Set(listaPostes.map(p => normalizarNombreModeloPosteBackend(p.modeloPoste)).filter(Boolean))].join(', ');
+  const modelosCabezales = [...new Set(listaPostes.filter(p => p.tipoPoste !== 'peatonal').flatMap(p => {
+    if (Array.isArray(p.cabezalesGrupos) && p.cabezalesGrupos.length > 0) {
+      return p.cabezalesGrupos.map(g => g.modelo).filter(Boolean);
+    }
+    return [p.cabezalModelo].filter(Boolean);
+  }))].join(', ');
   const primerPoste = listaPostes[0] || {};
   const primerPosteModelo = normalizarNombreModeloPosteBackend(primerPoste.modeloPoste);
   const primerPeatonal = listaPostes.find(p => p.tienePeatonal && peatonalesLuminosos(p).length > 0)?.peatonalesLista?.[0];
@@ -1019,6 +1107,7 @@ const recalcularTotalesDesdePostesBackend = (postesRaw) => {
     pantallaEstado: estadoPantallasConsolidado,
     pasoPeatonal: tienePasoPeatonal,
     audible: tieneAudible,
+    cabezalModelo: modelosCabezales || primerPoste.cabezalModelo || null,
     posteModeloTipo: modelosPostes || primerPosteModelo || null,
     posteTapaRegistro: primerPoste.tapaRegistro || 'Buena',
     posteObservaciones: listaPostes.map((p, i) => {
@@ -1071,9 +1160,15 @@ async function actualizarGabineteControlador(req, res) {
   });
 
   if (req.file) {
+    let originalName = req.file.originalname || req.file.filename;
+    try {
+      originalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    } catch (_) {}
     gabineteData.archivoProgramacion = `uploads/${req.file.filename}`;
+    gabineteData.respaldoProgramacionUsb = originalName;
   } else if (body.removerArchivo === 'true') {
     gabineteData.archivoProgramacion = null;
+    gabineteData.respaldoProgramacionUsb = null;
   }
 
   const controlador = await prisma.controladorSemaforo.update({
@@ -1139,6 +1234,7 @@ async function agregarPosteControlador(req, res) {
   if (!rawPoste || typeof rawPoste !== 'object') {
     return fail(res, 'Los datos del poste son requeridos', 400);
   }
+  const cleanPoste = sanitizarPosteCoordenadas(rawPoste);
 
   // Asegurar UIDs únicos válidos en todos los postes existentes de la BD
   list = list.map((p, idx) => ({
@@ -1150,16 +1246,21 @@ async function agregarPosteControlador(req, res) {
     guardadoEnServidor: true
   }));
 
-  const uid = (rawPoste.uid && typeof rawPoste.uid === 'string' && rawPoste.uid.length > 8 && !rawPoste.uid.match(/^pst_\d+$/))
-    ? rawPoste.uid
+  const uid = (cleanPoste.uid && typeof cleanPoste.uid === 'string' && cleanPoste.uid.length > 8 && !cleanPoste.uid.match(/^pst_\d+$/))
+    ? cleanPoste.uid
     : `pst_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
 
   // Si ya existía este poste en la BD (por UID), actualizarlo en lugar de duplicarlo
   const existingIdx = list.findIndex(p => p.uid === uid);
   if (existingIdx !== -1) {
+    const dbP = sanitizarPosteCoordenadas(list[existingIdx]);
+    const coordFinal = cleanPoste.coordenadas || dbP.coordenadas || cleanPoste.ubicacionPoste || dbP.ubicacionPoste || '';
+    const ubiFinal = cleanPoste.ubicacionPoste || dbP.ubicacionPoste || coordFinal || '';
     list[existingIdx] = {
-      ...list[existingIdx],
-      ...rawPoste,
+      ...dbP,
+      ...cleanPoste,
+      coordenadas: coordFinal,
+      ubicacionPoste: ubiFinal,
       uid,
       id: list[existingIdx].id,
       guardadoEnServidor: true
@@ -1167,7 +1268,7 @@ async function agregarPosteControlador(req, res) {
   } else {
     const sigId = list.length > 0 ? Math.max(...list.map(p => Number(p.id) || 0)) + 1 : 1;
     list.push({
-      ...rawPoste,
+      ...cleanPoste,
       uid,
       id: sigId,
       guardadoEnServidor: true
@@ -1213,6 +1314,7 @@ async function actualizarPosteControlador(req, res) {
   if (!rawPoste || typeof rawPoste !== 'object') {
     return fail(res, 'Los datos del poste son requeridos', 400);
   }
+  const cleanPoste = sanitizarPosteCoordenadas(rawPoste);
 
   // Asegurar UIDs únicos válidos en todos los postes de la BD
   list = list.map((p, idx) => ({
@@ -1224,7 +1326,7 @@ async function actualizarPosteControlador(req, res) {
     guardadoEnServidor: true
   }));
 
-  const targetUid = rawPoste.uid || (isNaN(Number(posteIdentificador)) ? String(posteIdentificador) : null);
+  const targetUid = cleanPoste.uid || (isNaN(Number(posteIdentificador)) ? String(posteIdentificador) : null);
 
   let index = -1;
   if (targetUid) {
@@ -1239,15 +1341,20 @@ async function actualizarPosteControlador(req, res) {
   if (index === -1) {
     const sigId = list.length > 0 ? Math.max(...list.map(p => Number(p.id) || 0)) + 1 : 1;
     list.push({
-      ...rawPoste,
+      ...cleanPoste,
       uid: finalUid,
       id: sigId,
       guardadoEnServidor: true
     });
   } else {
+    const dbP = sanitizarPosteCoordenadas(list[index]);
+    const coordFinal = cleanPoste.coordenadas || dbP.coordenadas || cleanPoste.ubicacionPoste || dbP.ubicacionPoste || '';
+    const ubiFinal = cleanPoste.ubicacionPoste || dbP.ubicacionPoste || coordFinal || '';
     list[index] = {
-      ...list[index],
-      ...rawPoste,
+      ...dbP,
+      ...cleanPoste,
+      coordenadas: coordFinal,
+      ubicacionPoste: ubiFinal,
       uid: finalUid,
       id: list[index].id,
       guardadoEnServidor: true
