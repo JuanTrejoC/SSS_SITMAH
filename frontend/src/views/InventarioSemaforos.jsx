@@ -70,12 +70,16 @@ const MODELOS_POSTE = {
 }
 
 const OPCIONES_COLORES_LED = [
-  { valor: 'Rojo', label: 'Rojo', color: '#DC2626' },
-  { valor: 'Amarillo', label: 'Amarillo', color: '#D97706' },
-  { valor: 'Verde', label: 'Verde', color: '#16A34A' },
-  { valor: 'Flecha Verde', label: 'Flecha Verde', color: '#059669' },
-  { valor: 'Flecha Roja', label: 'Flecha Roja', color: '#B91C1C' },
-  { valor: 'Ninguno', label: 'Ninguno', color: '#94A3B8' }
+  { valor: 'Rojo', label: 'Rojo', color: '#DC2626', simbolo: '' },
+  { valor: 'Amarillo', label: 'Amarillo', color: '#D97706', simbolo: '' },
+  { valor: 'Verde', label: 'Verde', color: '#16A34A', simbolo: '' },
+  { valor: 'Flecha Verde', label: 'Flecha Verde', color: '#059669', simbolo: '↗' },
+  { valor: 'Flecha Roja', label: 'Flecha Roja', color: '#B91C1C', simbolo: '↗' },
+  { valor: 'Flecha Ámbar', label: 'Flecha Ámbar', color: '#D97706', simbolo: '↗' },
+  { valor: 'Bicicleta', label: 'Bicicleta', color: '#0284C7', simbolo: '🚲' },
+  { valor: 'Bus', label: 'Bus', color: '#7C3AED', simbolo: '🚌' },
+  { valor: 'Reloj', label: 'Reloj', color: '#475569', simbolo: '⏱' },
+  { valor: 'Ninguno', label: 'Ninguno', color: '#94A3B8', simbolo: '' }
 ]
 
 const MODELOS_POSTES_CATALOGO = [
@@ -449,24 +453,37 @@ const limpiarIpFormato = (ip) => {
 
 const obtenerConfigColorLed = (color) => {
   const str = String(color || '').trim()
-  const lower = str.toLowerCase()
-  if (lower.includes('amarill')) {
-    return { valor: 'Amarillo', label: 'Amarillo', color: '#D97706', bg: '#FEF3C7', border: '#F59E0B', isArrow: false, shadow: 'rgba(245, 158, 11, 0.4)' }
-  }
+  const lower = str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
   if (lower.includes('flecha verde')) {
-    return { valor: 'Flecha Verde', label: 'Flecha Verde', color: '#059669', bg: '#D1FAE5', dotBg: '#4ADE80', border: '#10B981', isArrow: true, shadow: 'rgba(16, 185, 129, 0.4)' }
+    return { valor: 'Flecha Verde', label: 'Flecha Verde', color: '#059669', bg: '#D1FAE5', dotBg: '#4ADE80', border: '#10B981', isArrow: true, simbolo: '↗', shadow: 'rgba(16, 185, 129, 0.4)' }
   }
   if (lower.includes('flecha roja')) {
-    return { valor: 'Flecha Roja', label: 'Flecha Roja', color: '#B91C1C', bg: '#FEE2E2', dotBg: '#FCA5A5', border: '#DC2626', isArrow: true, shadow: 'rgba(185, 28, 28, 0.4)' }
+    return { valor: 'Flecha Roja', label: 'Flecha Roja', color: '#B91C1C', bg: '#FEE2E2', dotBg: '#FCA5A5', border: '#DC2626', isArrow: true, simbolo: '↗', shadow: 'rgba(185, 28, 28, 0.4)' }
+  }
+  if (lower.includes('flecha ambar') || lower.includes('flecha amarill')) {
+    return { valor: 'Flecha Ámbar', label: 'Flecha Ámbar', color: '#D97706', bg: '#FEF3C7', dotBg: '#FBBF24', border: '#F59E0B', isArrow: true, simbolo: '↗', shadow: 'rgba(245, 158, 11, 0.4)' }
+  }
+  if (lower.includes('bici')) {
+    return { valor: 'Bicicleta', label: 'Bicicleta', color: '#0284C7', bg: '#E0F2FE', dotBg: '#38BDF8', border: '#0EA5E9', isBike: true, simbolo: '🚲', shadow: 'rgba(14, 165, 233, 0.4)' }
+  }
+  if (lower.includes('bus') || lower.includes('autobus') || lower.includes('camion')) {
+    return { valor: 'Bus', label: 'Bus', color: '#7C3AED', bg: '#EDE9FE', dotBg: '#A78BFA', border: '#8B5CF6', isBus: true, simbolo: '🚌', shadow: 'rgba(139, 92, 246, 0.4)' }
+  }
+  if (lower.includes('reloj') || lower.includes('cronometro') || lower.includes('cuenta')) {
+    return { valor: 'Reloj', label: 'Reloj', color: '#475569', bg: '#F1F5F9', dotBg: '#94A3B8', border: '#64748B', isClock: true, simbolo: '⏱', shadow: 'rgba(100, 116, 139, 0.4)' }
+  }
+  if (lower.includes('amarill') || lower.includes('ambar')) {
+    return { valor: 'Amarillo', label: 'Amarillo', color: '#D97706', bg: '#FEF3C7', border: '#F59E0B', isArrow: false, simbolo: '', shadow: 'rgba(245, 158, 11, 0.4)' }
   }
   if (lower.includes('verd')) {
-    return { valor: 'Verde', label: 'Verde', color: '#16A34A', bg: '#DCFCE7', border: '#22C55E', isArrow: false, shadow: 'rgba(16, 185, 129, 0.4)' }
+    return { valor: 'Verde', label: 'Verde', color: '#16A34A', bg: '#DCFCE7', border: '#22C55E', isArrow: false, simbolo: '', shadow: 'rgba(16, 185, 129, 0.4)' }
   }
   if (lower.includes('ningun')) {
-    return { valor: 'Ninguno', label: 'Ninguno', color: '#94A3B8', bg: '#F1F5F9', border: '#CBD5E1', isArrow: false, shadow: 'transparent' }
+    return { valor: 'Ninguno', label: 'Ninguno', color: '#94A3B8', bg: '#F1F5F9', border: '#CBD5E1', isArrow: false, simbolo: '', shadow: 'transparent' }
   }
   // Por defecto 'Rojo' con configuración garantizada
-  return { valor: 'Rojo', label: 'Rojo', color: '#DC2626', bg: '#FEE2E2', border: '#EF4444', isArrow: false, shadow: 'rgba(239, 68, 68, 0.4)' }
+  return { valor: 'Rojo', label: 'Rojo', color: '#DC2626', bg: '#FEE2E2', border: '#EF4444', isArrow: false, simbolo: '', shadow: 'rgba(239, 68, 68, 0.4)' }
 }
 
 const extraerListaCabezales = (item) => {
@@ -9409,12 +9426,20 @@ export default function InventarioSemaforos() {
                                                           >
                                                             <span
                                                               style={{
-                                                                width: '13px',
-                                                                height: '13px',
+                                                                width: '14px',
+                                                                height: '14px',
                                                                 borderRadius: '50%',
-                                                                backgroundColor: colorActual.color
+                                                                backgroundColor: colorActual.color,
+                                                                display: 'inline-flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                color: '#FFFFFF',
+                                                                fontSize: '8px',
+                                                                lineHeight: 1
                                                               }}
-                                                            />
+                                                            >
+                                                              {colorActual.simbolo || ''}
+                                                            </span>
                                                           </span>
                                                           <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#1E293B', minWidth: '18px', flexShrink: 0 }}>
                                                             L{led.numero || idx + 1}
@@ -9424,7 +9449,7 @@ export default function InventarioSemaforos() {
                                                               display: 'inline-flex',
                                                               alignItems: 'center',
                                                               justifyContent: 'space-between',
-                                                              width: '104px',
+                                                              width: '118px',
                                                               padding: '0.2rem 0.35rem',
                                                               border: '1px solid #CBD5E1',
                                                               borderLeft: `4px solid ${colorActual.color}`,
@@ -9521,12 +9546,20 @@ export default function InventarioSemaforos() {
                                                         >
                                                           <span
                                                             style={{
-                                                              width: '13px',
-                                                              height: '13px',
+                                                              width: '14px',
+                                                              height: '14px',
                                                               borderRadius: '50%',
-                                                              backgroundColor: colorActual.color
+                                                              backgroundColor: colorActual.color,
+                                                              display: 'inline-flex',
+                                                              alignItems: 'center',
+                                                              justifyContent: 'center',
+                                                              color: '#FFFFFF',
+                                                              fontSize: '8px',
+                                                              lineHeight: 1
                                                             }}
-                                                          />
+                                                          >
+                                                            {colorActual.simbolo || ''}
+                                                          </span>
                                                         </span>
                                                         <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#1E293B', minWidth: '18px', flexShrink: 0 }}>
                                                           L{led.numero || idx + 1}
@@ -9535,7 +9568,7 @@ export default function InventarioSemaforos() {
                                                           value={led.color || 'Rojo'}
                                                           onChange={(e) => handleCambiarLedEnPoste(pIdx, gIdx, idx, 'color', e.target.value)}
                                                           style={{
-                                                            width: '104px',
+                                                            width: '118px',
                                                             padding: '0.2rem 0.35rem',
                                                             border: '1px solid #CBD5E1',
                                                             borderLeft: `4px solid ${colorActual.color}`,
@@ -10208,16 +10241,53 @@ export default function InventarioSemaforos() {
                                       {modoVisualizacion ? (
                                         renderDatoConsulta(poste.camaraModelo, 'Sin modelo de cámara')
                                       ) : (
-                                        <select
-                                          value={poste.camaraModelo || ''}
-                                          onChange={(e) => handleActualizarPoste(pIdx, 'camaraModelo', e.target.value)}
-                                          style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', backgroundColor: 'white', color: '#1E293B', boxSizing: 'border-box' }}
-                                        >
-                                          <option value="">-- Seleccionar modelo de cámara --</option>
-                                          {MODELOS_CAMARA_CATALOGO.map((modelo) => (
-                                            <option key={modelo} value={modelo}>{modelo}</option>
-                                          ))}
-                                        </select>
+                                        (() => {
+                                          const esCatalogo = MODELOS_CAMARA_CATALOGO.includes(poste.camaraModelo)
+                                          const esModoOtro = poste.camaraModeloModo === 'Otro' || (!esCatalogo && !!poste.camaraModelo)
+                                          const selectVal = esModoOtro ? 'Otro' : (poste.camaraModelo || '')
+
+                                          return (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                                              <select
+                                                value={selectVal}
+                                                onChange={(e) => {
+                                                  const val = e.target.value
+                                                  if (val === 'Otro') {
+                                                    handleActualizarPosteMultiple(pIdx, {
+                                                      camaraModeloModo: 'Otro',
+                                                      camaraModelo: esCatalogo ? '' : (poste.camaraModelo || '')
+                                                    })
+                                                  } else {
+                                                    handleActualizarPosteMultiple(pIdx, {
+                                                      camaraModeloModo: val,
+                                                      camaraModelo: val
+                                                    })
+                                                  }
+                                                }}
+                                                style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', backgroundColor: 'white', color: '#1E293B', boxSizing: 'border-box' }}
+                                              >
+                                                <option value="">-- Seleccionar modelo de cámara --</option>
+                                                {MODELOS_CAMARA_CATALOGO.map((modelo) => (
+                                                  <option key={modelo} value={modelo}>{modelo}</option>
+                                                ))}
+                                                <option value="Otro">Otro (especificar)</option>
+                                              </select>
+                                              {esModoOtro && (
+                                                <input
+                                                  type="text"
+                                                  placeholder="Especificar modelo / tipo de cámara..."
+                                                  value={esCatalogo ? '' : (poste.camaraModelo || '')}
+                                                  onChange={(e) => handleActualizarPosteMultiple(pIdx, {
+                                                    camaraModeloModo: 'Otro',
+                                                    camaraModelo: e.target.value
+                                                  })}
+                                                  style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                                                  autoFocus={!poste.camaraModelo}
+                                                />
+                                              )}
+                                            </div>
+                                          )
+                                        })()
                                       )}
                                     </div>
 
