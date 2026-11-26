@@ -1479,13 +1479,18 @@ export default function InventarioTecnologico() {
         : `${API_BASE_URL}/api/inventario-tecnologico`;
       const method = editandoId ? 'PUT' : 'POST';
 
+      const payload = {
+        ...form,
+        cantidad: Math.max(1, parseInt(form.cantidad, 10) || 1)
+      };
+
       const res = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${user.token}`
         },
-        body: JSON.stringify(form)
+        body: JSON.stringify(payload)
       });
       const json = await res.json().catch(() => ({}));
 
@@ -2955,8 +2960,24 @@ export default function InventarioTecnologico() {
                           type="number"
                           min="1"
                           max="100"
-                          value={form.cantidad ?? 1}
-                          onChange={e => setForm({ ...form, cantidad: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                          value={form.cantidad !== undefined ? form.cantidad : 1}
+                          onChange={e => {
+                            const val = e.target.value;
+                            if (val === '') {
+                              setForm(prev => ({ ...prev, cantidad: '' }));
+                            } else {
+                              const num = parseInt(val, 10);
+                              setForm(prev => ({ ...prev, cantidad: isNaN(num) ? '' : num }));
+                            }
+                          }}
+                          onFocus={e => e.target.select()}
+                          onBlur={() => {
+                            if (!form.cantidad || Number(form.cantidad) < 1) {
+                              setForm(prev => ({ ...prev, cantidad: 1 }));
+                            } else if (Number(form.cantidad) > 100) {
+                              setForm(prev => ({ ...prev, cantidad: 100 }));
+                            }
+                          }}
                           style={inputStyle}
                           required
                         />

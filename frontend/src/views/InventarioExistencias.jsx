@@ -3021,10 +3021,23 @@ Podrás asignar cada uno a un resguardante, área o estatus diferente por separa
                         type="number"
                         min="1"
                         max="100"
-                        value={form.detalles?.cantidad ?? 1}
+                        value={form.detalles?.cantidad !== undefined ? form.detalles.cantidad : 1}
                         onChange={e => {
                           const val = e.target.value;
-                          handleDetalleChange('cantidad', val === '' ? '' : Math.max(1, parseInt(val, 10) || 1));
+                          if (val === '') {
+                            handleDetalleChange('cantidad', '');
+                          } else {
+                            const num = parseInt(val, 10);
+                            handleDetalleChange('cantidad', isNaN(num) ? '' : num);
+                          }
+                        }}
+                        onFocus={e => e.target.select()}
+                        onBlur={() => {
+                          if (!form.detalles?.cantidad || Number(form.detalles.cantidad) < 1) {
+                            handleDetalleChange('cantidad', 1);
+                          } else if (Number(form.detalles.cantidad) > 100) {
+                            handleDetalleChange('cantidad', 100);
+                          }
                         }}
                         style={inputStyle}
                         placeholder="1"
