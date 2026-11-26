@@ -73,12 +73,18 @@ const OPCIONES_COLORES_LED = [
   { valor: 'Rojo', label: 'Rojo', color: '#DC2626', simbolo: '' },
   { valor: 'Amarillo', label: 'Amarillo', color: '#D97706', simbolo: '' },
   { valor: 'Verde', label: 'Verde', color: '#16A34A', simbolo: '' },
-  { valor: 'Flecha Verde', label: 'Flecha Verde', color: '#059669', simbolo: '↗' },
-  { valor: 'Flecha Roja', label: 'Flecha Roja', color: '#B91C1C', simbolo: '↗' },
+  { valor: 'Flecha Verde', label: 'Flecha Verde', color: '#16A34A', simbolo: '↗' },
   { valor: 'Flecha Ámbar', label: 'Flecha Ámbar', color: '#D97706', simbolo: '↗' },
-  { valor: 'Bicicleta', label: 'Bicicleta', color: '#0284C7', simbolo: '🚲' },
-  { valor: 'Bus', label: 'Bus', color: '#7C3AED', simbolo: '🚌' },
-  { valor: 'Reloj', label: 'Reloj', color: '#475569', simbolo: '⏱' },
+  { valor: 'Flecha Roja', label: 'Flecha Roja', color: '#DC2626', simbolo: '↗' },
+  { valor: 'Bicicleta Verde', label: 'Bicicleta Verde', color: '#16A34A', simbolo: '🚲' },
+  { valor: 'Bicicleta Amarilla', label: 'Bicicleta Amarilla', color: '#D97706', simbolo: '🚲' },
+  { valor: 'Bicicleta Roja', label: 'Bicicleta Roja', color: '#DC2626', simbolo: '🚲' },
+  { valor: 'Bus Verde', label: 'Bus Verde', color: '#16A34A', simbolo: '🚌' },
+  { valor: 'Bus Amarillo', label: 'Bus Amarillo', color: '#D97706', simbolo: '🚌' },
+  { valor: 'Bus Rojo', label: 'Bus Rojo', color: '#DC2626', simbolo: '🚌' },
+  { valor: 'Reloj Verde', label: 'Reloj Verde', color: '#16A34A', simbolo: '⏱' },
+  { valor: 'Reloj Amarillo', label: 'Reloj Amarillo', color: '#D97706', simbolo: '⏱' },
+  { valor: 'Reloj Rojo', label: 'Reloj Rojo', color: '#DC2626', simbolo: '⏱' },
   { valor: 'Ninguno', label: 'Ninguno', color: '#94A3B8', simbolo: '' }
 ]
 
@@ -455,24 +461,51 @@ const obtenerConfigColorLed = (color) => {
   const str = String(color || '').trim()
   const lower = str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
+  // 1. Flechas
   if (lower.includes('flecha verde')) {
-    return { valor: 'Flecha Verde', label: 'Flecha Verde', color: '#059669', bg: '#D1FAE5', dotBg: '#4ADE80', border: '#10B981', isArrow: true, simbolo: '↗', shadow: 'rgba(16, 185, 129, 0.4)' }
+    return { valor: 'Flecha Verde', label: 'Flecha Verde', color: '#16A34A', bg: '#DCFCE7', dotBg: '#4ADE80', border: '#10B981', isArrow: true, simbolo: '↗', shadow: 'rgba(16, 185, 129, 0.4)' }
   }
-  if (lower.includes('flecha roja')) {
-    return { valor: 'Flecha Roja', label: 'Flecha Roja', color: '#B91C1C', bg: '#FEE2E2', dotBg: '#FCA5A5', border: '#DC2626', isArrow: true, simbolo: '↗', shadow: 'rgba(185, 28, 28, 0.4)' }
+  if (lower.includes('flecha roja') || lower.includes('flecha rojo')) {
+    return { valor: 'Flecha Roja', label: 'Flecha Roja', color: '#DC2626', bg: '#FEE2E2', dotBg: '#FCA5A5', border: '#DC2626', isArrow: true, simbolo: '↗', shadow: 'rgba(185, 28, 28, 0.4)' }
   }
   if (lower.includes('flecha ambar') || lower.includes('flecha amarill')) {
     return { valor: 'Flecha Ámbar', label: 'Flecha Ámbar', color: '#D97706', bg: '#FEF3C7', dotBg: '#FBBF24', border: '#F59E0B', isArrow: true, simbolo: '↗', shadow: 'rgba(245, 158, 11, 0.4)' }
   }
+
+  // 2. Bicicleta (Verde, Amarilla, Roja)
   if (lower.includes('bici')) {
-    return { valor: 'Bicicleta', label: 'Bicicleta', color: '#0284C7', bg: '#E0F2FE', dotBg: '#38BDF8', border: '#0EA5E9', isBike: true, simbolo: '🚲', shadow: 'rgba(14, 165, 233, 0.4)' }
+    if (lower.includes('amarill') || lower.includes('ambar')) {
+      return { valor: 'Bicicleta Amarilla', label: 'Bicicleta Amarilla', color: '#D97706', bg: '#FEF3C7', dotBg: '#FBBF24', border: '#F59E0B', isBike: true, simbolo: '🚲', shadow: 'rgba(245, 158, 11, 0.4)' }
+    }
+    if (lower.includes('roja') || lower.includes('rojo')) {
+      return { valor: 'Bicicleta Roja', label: 'Bicicleta Roja', color: '#DC2626', bg: '#FEE2E2', dotBg: '#FCA5A5', border: '#DC2626', isBike: true, simbolo: '🚲', shadow: 'rgba(185, 28, 28, 0.4)' }
+    }
+    return { valor: 'Bicicleta Verde', label: 'Bicicleta Verde', color: '#16A34A', bg: '#DCFCE7', dotBg: '#4ADE80', border: '#10B981', isBike: true, simbolo: '🚲', shadow: 'rgba(16, 185, 129, 0.4)' }
   }
+
+  // 3. Bus (Verde, Amarillo, Rojo)
   if (lower.includes('bus') || lower.includes('autobus') || lower.includes('camion')) {
-    return { valor: 'Bus', label: 'Bus', color: '#7C3AED', bg: '#EDE9FE', dotBg: '#A78BFA', border: '#8B5CF6', isBus: true, simbolo: '🚌', shadow: 'rgba(139, 92, 246, 0.4)' }
+    if (lower.includes('amarill') || lower.includes('ambar')) {
+      return { valor: 'Bus Amarillo', label: 'Bus Amarillo', color: '#D97706', bg: '#FEF3C7', dotBg: '#FBBF24', border: '#F59E0B', isBus: true, simbolo: '🚌', shadow: 'rgba(245, 158, 11, 0.4)' }
+    }
+    if (lower.includes('rojo') || lower.includes('roja')) {
+      return { valor: 'Bus Rojo', label: 'Bus Rojo', color: '#DC2626', bg: '#FEE2E2', dotBg: '#FCA5A5', border: '#DC2626', isBus: true, simbolo: '🚌', shadow: 'rgba(185, 28, 28, 0.4)' }
+    }
+    return { valor: 'Bus Verde', label: 'Bus Verde', color: '#16A34A', bg: '#DCFCE7', dotBg: '#4ADE80', border: '#10B981', isBus: true, simbolo: '🚌', shadow: 'rgba(16, 185, 129, 0.4)' }
   }
+
+  // 4. Reloj (Verde, Amarillo, Rojo)
   if (lower.includes('reloj') || lower.includes('cronometro') || lower.includes('cuenta')) {
-    return { valor: 'Reloj', label: 'Reloj', color: '#475569', bg: '#F1F5F9', dotBg: '#94A3B8', border: '#64748B', isClock: true, simbolo: '⏱', shadow: 'rgba(100, 116, 139, 0.4)' }
+    if (lower.includes('amarill') || lower.includes('ambar')) {
+      return { valor: 'Reloj Amarillo', label: 'Reloj Amarillo', color: '#D97706', bg: '#FEF3C7', dotBg: '#FBBF24', border: '#F59E0B', isClock: true, simbolo: '⏱', shadow: 'rgba(245, 158, 11, 0.4)' }
+    }
+    if (lower.includes('rojo') || lower.includes('roja')) {
+      return { valor: 'Reloj Rojo', label: 'Reloj Rojo', color: '#DC2626', bg: '#FEE2E2', dotBg: '#FCA5A5', border: '#DC2626', isClock: true, simbolo: '⏱', shadow: 'rgba(185, 28, 28, 0.4)' }
+    }
+    return { valor: 'Reloj Verde', label: 'Reloj Verde', color: '#16A34A', bg: '#DCFCE7', dotBg: '#4ADE80', border: '#10B981', isClock: true, simbolo: '⏱', shadow: 'rgba(16, 185, 129, 0.4)' }
   }
+
+  // 5. Básicos
   if (lower.includes('amarill') || lower.includes('ambar')) {
     return { valor: 'Amarillo', label: 'Amarillo', color: '#D97706', bg: '#FEF3C7', border: '#F59E0B', isArrow: false, simbolo: '', shadow: 'rgba(245, 158, 11, 0.4)' }
   }
@@ -9449,7 +9482,7 @@ export default function InventarioSemaforos() {
                                                               display: 'inline-flex',
                                                               alignItems: 'center',
                                                               justifyContent: 'space-between',
-                                                              width: '118px',
+                                                              width: '135px',
                                                               padding: '0.2rem 0.35rem',
                                                               border: '1px solid #CBD5E1',
                                                               borderLeft: `4px solid ${colorActual.color}`,
@@ -9568,7 +9601,7 @@ export default function InventarioSemaforos() {
                                                           value={led.color || 'Rojo'}
                                                           onChange={(e) => handleCambiarLedEnPoste(pIdx, gIdx, idx, 'color', e.target.value)}
                                                           style={{
-                                                            width: '118px',
+                                                            width: '135px',
                                                             padding: '0.2rem 0.35rem',
                                                             border: '1px solid #CBD5E1',
                                                             borderLeft: `4px solid ${colorActual.color}`,
