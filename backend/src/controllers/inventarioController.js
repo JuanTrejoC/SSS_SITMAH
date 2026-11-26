@@ -173,6 +173,9 @@ const controladorSemaforoSchema = z.object({
   receptorFibraCable: z.string().nullable().optional(),
   conexionesTarjetaMadre: z.string().nullable().optional(),
   fuentePoderSupresorPicos: z.string().nullable().optional(),
+  acometidaElectrica: z.string().nullable().optional(),
+  tieneMufa: z.string().nullable().optional(),
+  interruptorPrincipal: z.string().nullable().optional(),
   // Sección D: Postes (SEMEX)
   posteModeloTipo: z.string().nullable().optional(),
   posteTapaRegistro: z.string().nullable().optional(),
@@ -806,7 +809,8 @@ async function actualizarControladorSemaforo(req, res) {
         'tarjetaConflictosEstado', 'tarjetaRelevadoresMarca', 'tarjetaRelevadoresModelo',
         'tarjetaRelevadoresCantidad', 'switchFibraMarca', 'switchFibraModelo', 'switchFibraPuertosTotal',
         'switchFibraPuertosUso', 'switchFibraFuentePoder', 'receptorFibraDispositivo', 'receptorFibraCable',
-        'conexionesTarjetaMadre', 'fuentePoderSupresorPicos', 'gpsModelo', 'gpsComponenteFisico',
+        'conexionesTarjetaMadre', 'fuentePoderSupresorPicos', 'acometidaElectrica', 'interruptorPrincipal',
+        'gpsModelo', 'gpsComponenteFisico',
         'gpsAntenaExterior', 'observacionesExterior'
       ];
 
@@ -1146,7 +1150,8 @@ async function actualizarGabineteControlador(req, res) {
     'numeroGabinete', 'versionFirmware', 'ipLocal', 'ipSystem', 'mascaraRed', 'gateway',
     'cicloCompleto', 'respaldoProgramacionUsb',
     'switchFibraMarca', 'switchFibraModelo', 'switchFibraPuertosTotal', 'switchFibraPuertosUso', 'switchFibraFuentePoder',
-    'receptorFibraDispositivo', 'receptorFibraCable', 'conexionesTarjetaMadre', 'fuentePoderSupresorPicos'
+    'receptorFibraDispositivo', 'receptorFibraCable', 'conexionesTarjetaMadre', 'fuentePoderSupresorPicos',
+    'acometidaElectrica', 'tieneMufa', 'interruptorPrincipal'
   ];
 
   allowedFields.forEach(campo => {

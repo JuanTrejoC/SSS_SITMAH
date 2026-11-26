@@ -8,6 +8,7 @@ import escudoHidalgoSrc from '../assets/escudo_hidalgo.png'
 import { API_BASE_URL } from '../config'
 import { useAuth } from '../context/AuthContext'
 import { mostrarAlertaError, verificarConexion } from '../utils/conexionUtils'
+import MapaInteractivoUbicacion from '../components/MapaInteractivoUbicacion'
 import {
   FaRoad, FaPlus, FaEdit, FaTrashAlt, FaBoxes, FaEye,
   FaChevronLeft, FaChevronRight, FaTimes,
@@ -560,6 +561,8 @@ const crearPosteInicial = (id = 1, modelo = 'PCC-1', tipo = null, uid = null) =>
     modeloPoste: esPeatonal ? 'MP-01' : (modeloNorm || 'PCC-1'),
     tapaRegistro: 'Buena',
     estadoTapaRegistro: 'Buena',
+    cimientoCompleto: 'Sí',
+    cimientoCuantosEsparragos: '',
     observaciones: '',
     tipoCabezal: esPeatonal ? 'Ninguno' : 'LED',
     cabezalModelo: esPeatonal ? '' : 'LV-1',
@@ -754,6 +757,8 @@ const normalizarPostesDetalle = (postesRaw, fallbackItem = null) => {
         modeloPoste,
         tapaRegistro: tapaVal,
         estadoTapaRegistro: tapaVal,
+        cimientoCompleto: p.cimientoCompleto || 'Sí',
+        cimientoCuantosEsparragos: (p.cimientoCuantosEsparragos !== undefined && p.cimientoCuantosEsparragos !== null) ? String(p.cimientoCuantosEsparragos) : '',
         observaciones: p.observaciones || '',
         tipoCabezal: tipoPoste === 'peatonal' ? 'Ninguno' : (p.tipoCabezal || 'LED'),
         cabezalModelo: cabezalModeloConsolidado,
@@ -1238,6 +1243,9 @@ export default function InventarioSemaforos() {
     receptorFibraCable: '',
     conexionesTarjetaMadre: '',
     fuentePoderSupresorPicos: '',
+    acometidaElectrica: '',
+    tieneMufa: '',
+    interruptorPrincipal: '',
     // Sección D: Postes y Equipamiento Asociado
     postes: [],
     posteModeloTipo: '',
@@ -1637,11 +1645,11 @@ export default function InventarioSemaforos() {
     if (controladorForm.cimientoCompleto === 'No') {
       const val = (controladorForm.cimientoCuantosDados || '').trim()
       if (!val) {
-        errores.cimientoCuantosDados = 'Indique cuántos dados tiene.'
+        errores.cimientoCuantosDados = 'Indique cuántos espárragos tiene.'
       } else {
         const num = parseInt(val, 10)
         if (isNaN(num) || num > 3 || num < 0) {
-          errores.cimientoCuantosDados = 'Máximo 3 dados (0 a 3).'
+          errores.cimientoCuantosDados = 'Máximo 3 espárragos (0 a 3).'
         }
       }
     }
@@ -1983,7 +1991,7 @@ export default function InventarioSemaforos() {
         'numeroGabinete', 'versionFirmware', 'ipLocal', 'ipSystem', 'mascaraRed', 'gateway',
         'cicloCompleto',
         'switchFibraMarca', 'switchFibraModelo', 'switchFibraPuertosTotal', 'switchFibraPuertosUso', 'switchFibraFuentePoder',
-        'receptorFibraDispositivo', 'receptorFibraCable', 'conexionesTarjetaMadre', 'fuentePoderSupresorPicos'
+        'receptorFibraDispositivo', 'receptorFibraCable', 'conexionesTarjetaMadre', 'fuentePoderSupresorPicos', 'acometidaElectrica', 'tieneMufa', 'interruptorPrincipal'
       ]
 
       camposGabinete.forEach(key => {
@@ -2394,6 +2402,13 @@ export default function InventarioSemaforos() {
       receptorFibraCable: item.receptorFibraCable || '',
       conexionesTarjetaMadre: item.conexionesTarjetaMadre || '',
       fuentePoderSupresorPicos: item.fuentePoderSupresorPicos || '',
+      acometidaElectrica: item.acometidaElectrica
+        ? (item.acometidaElectrica.includes('aérea') || item.acometidaElectrica.includes('Aérea') ? 'Aérea'
+           : item.acometidaElectrica.includes('subterránea') || item.acometidaElectrica.includes('Subterránea') ? 'Subterránea'
+           : item.acometidaElectrica)
+        : '',
+      tieneMufa: item.tieneMufa || (item.acometidaElectrica && item.acometidaElectrica.toLowerCase().includes('mufa') ? 'Sí' : ''),
+      interruptorPrincipal: item.interruptorPrincipal || '',
       // Registros de Piso
       registrosPisoTapas: item.registrosPisoTapas !== undefined && item.registrosPisoTapas !== null ? String(item.registrosPisoTapas) : '',
       registrosPisoDanados: item.registrosPisoDanados !== undefined && item.registrosPisoDanados !== null ? item.registrosPisoDanados : '',
@@ -2940,8 +2955,8 @@ export default function InventarioSemaforos() {
 
       // 1. INSPECCIÓN EXTERIOR, CIMENTACIÓN Y BASE
       const cimientoTexto = ctrl.cimientoCompleto === 'Sí'
-        ? '4 dados presentes'
-        : (ctrl.cimientoCuantosDados ? `Incompleto (${ctrl.cimientoCuantosDados} dados presentes)` : (ctrl.cimientoCompleto || '—'))
+        ? '4 espárragos presentes'
+        : (ctrl.cimientoCuantosDados ? `Incompleto (${ctrl.cimientoCuantosDados} espárragos presentes)` : (ctrl.cimientoCompleto || '—'))
 
       const tapaTexto = ctrl.tapaCableado === 'Sí'
         ? 'Presente'
@@ -3039,7 +3054,8 @@ export default function InventarioSemaforos() {
       const seccion4RedEnergia = [
         ['Switch de Fibra Óptica', switchDetalle, 'Fuente de Poder Switch', ctrl.switchFibraFuente || (ctrl.switch ? 'Operativa' : 'No disponible')],
         ['Receptor de Fibra Óptica', ctrl.receptorFibraDispositivo || (ctrl.fibraOptica ? 'Presente' : 'No disponible'), 'Cable de Fibra Óptica', ctrl.receptorFibraCable || (ctrl.fibraOptica ? 'Conectado' : 'No conectado')],
-        ['Alimentación / Supresor', ctrl.alimentacionSupresorPicos || (ctrl.fuentePoder ? 'Operando' : 'No disponible'), 'Conexiones Tarjeta Madre', ctrl.totalConexionesTarjetaMadre ? `${ctrl.totalConexionesTarjetaMadre} conexiones ocupadas` : '8 conexiones']
+        ['Alimentación / Supresor', ctrl.alimentacionSupresorPicos || (ctrl.fuentePoder ? 'Operando' : 'No disponible'), 'Conexiones Tarjeta Madre', ctrl.totalConexionesTarjetaMadre ? `${ctrl.totalConexionesTarjetaMadre} conexiones ocupadas` : '8 conexiones'],
+        ['Acometida Eléctrica (CFE)', `${ctrl.acometidaElectrica || 'No tiene'}${ctrl.tieneMufa ? ` (Mufa: ${ctrl.tieneMufa})` : ''}`, 'Interruptor Principal', ctrl.interruptorPrincipal || 'No tiene']
       ]
 
       autoTable(doc, {
@@ -3139,10 +3155,15 @@ export default function InventarioSemaforos() {
             equipos.push(`${cant} Cámara(s) Peek`)
           }
 
+          const cimientoPoste = (p.cimientoCompleto || 'Sí') === 'No'
+            ? `Inc. (${p.cimientoCuantosEsparragos || '0'} esp.)`
+            : 'Completo'
+          const tapaCimientoStr = `${p.tapaRegistro || p.estadoTapaRegistro || 'Buena'} / ${cimientoPoste}`
+
           return [
             `Poste #${idx + 1}`,
             tipoMod,
-            p.tapaRegistro || p.estadoTapaRegistro || 'Buena',
+            tapaCimientoStr,
             p.ubicacionPoste || p.coordenadas || '—',
             equipos.length > 0 ? equipos.join(' | ') : '—',
             p.observaciones || '—'
@@ -3153,7 +3174,7 @@ export default function InventarioSemaforos() {
       autoTable(doc, {
         startY: doc.lastAutoTable.finalY + 3.5,
         margin: { top: 12, left: 14, right: 14, bottom: 12 },
-        head: [['# POSTE', 'FUNCIÓN / MODELO', 'TAPA CABLEADO', 'COORDENADAS GPS', 'EQUIPAMIENTO INSTALADO EN ESTE POSTE', 'OBSERVACIONES']],
+        head: [['# POSTE', 'FUNCIÓN / MODELO', 'TAPA / CIMIENTO', 'COORDENADAS GPS', 'EQUIPAMIENTO INSTALADO EN ESTE POSTE', 'OBSERVACIONES']],
         body: postesBody,
         theme: 'grid',
         showHead: 'everyPage',
@@ -3777,6 +3798,9 @@ export default function InventarioSemaforos() {
       receptorFibraCable: '',
       conexionesTarjetaMadre: '',
       fuentePoderSupresorPicos: '',
+      acometidaElectrica: '',
+      tieneMufa: '',
+      interruptorPrincipal: '',
       // Registros de Piso
       registrosPisoTapas: '',
       registrosPisoDanados: '',
@@ -6549,7 +6573,7 @@ export default function InventarioSemaforos() {
                           <FaBuilding size={14} style={{ color: '#BC955B' }} /> Sección 1: Inspección Exterior, Cimentación y Base
                         </h4>
                         <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
-                          Revisión física del poste / crucero
+                          Revisión física del controlador / crucero
                         </span>
                       </div>
                       {editandoControladorId && !modoVisualizacion && (
@@ -6580,19 +6604,19 @@ export default function InventarioSemaforos() {
                     </div>
 
                     <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', alignItems: 'start' }}>
-                      {/* Pregunta 1: Cimiento 4 dados */}
+                      {/* Pregunta 1: Cimiento 4 espárragos */}
                       <div style={{ backgroundColor: 'white', padding: '0.85rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column' }}>
                         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.82rem', fontWeight: '700', color: '#334155', marginBottom: '0.4rem' }}>
                           <FaCube size={13} style={{ color: '#691B31', marginTop: '2px', flexShrink: 0 }} />
-                          <span>{modoVisualizacion ? 'Cimentación de Base' : 'Cimiento: ¿4 dados completos y en buen estado?'} <span style={{ color: '#DC2626' }}>*</span></span>
+                          <span>{modoVisualizacion ? 'Cimentación de Base' : 'Cimiento: ¿4 espárragos completos y en buen estado?'} <span style={{ color: '#DC2626' }}>*</span></span>
                         </label>
                         <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', marginTop: '0.35rem', minHeight: '32px' }}>
                           {modoVisualizacion ? (
                             renderBadgeConsulta(
                               controladorForm.cimientoCompleto,
                               controladorForm.cimientoCompleto === 'Sí'
-                                ? '4 dados presentes'
-                                : (controladorForm.cimientoCuantosDados ? `Incompleto (${controladorForm.cimientoCuantosDados} dados presentes)` : 'Incompleto')
+                                ? '4 espárragos presentes'
+                                : (controladorForm.cimientoCuantosDados ? `Incompleto (${controladorForm.cimientoCuantosDados} espárragos presentes)` : 'Incompleto')
                             )
                           ) : (
                             ['Sí', 'No'].map((opcion) => (
@@ -6622,7 +6646,7 @@ export default function InventarioSemaforos() {
                         {!modoVisualizacion && controladorForm.cimientoCompleto === 'No' && (
                           <div style={{ marginTop: '0.65rem', paddingTop: '0.65rem', borderTop: '1px dashed #CBD5E1' }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: '700', color: '#1E293B', marginBottom: '0.35rem' }}>
-                              <FaCube size={11} style={{ color: '#691B31' }} /> <span>¿Cuántos dados tiene? <span style={{ color: '#DC2626' }}>*</span></span>
+                              <FaCube size={11} style={{ color: '#691B31' }} /> <span>¿Cuántos espárragos tiene? <span style={{ color: '#DC2626' }}>*</span></span>
                             </label>
                             <input
                               type="text"
@@ -6635,7 +6659,7 @@ export default function InventarioSemaforos() {
                                 if (val.trim() && (!isNaN(num) && (num > 3 || num < 0))) {
                                   setControladorErrores(prev => ({
                                     ...prev,
-                                    cimientoCuantosDados: 'Máximo 3 dados (0 a 3).'
+                                    cimientoCuantosDados: 'Máximo 3 espárragos (0 a 3).'
                                   }))
                                 } else if (controladorErrores.cimientoCuantosDados) {
                                   setControladorErrores(prev => ({ ...prev, cimientoCuantosDados: undefined }))
@@ -7066,7 +7090,7 @@ export default function InventarioSemaforos() {
                         ) : (
                           <input
                             type="text"
-                            placeholder="ej. v2.4.1"
+                            placeholder="1-5"
                             value={controladorForm.versionFirmware}
                             onChange={(e) => setControladorForm({ ...controladorForm, versionFirmware: e.target.value })}
                             style={{
@@ -7094,7 +7118,7 @@ export default function InventarioSemaforos() {
                           <div>
                             <input
                               type="text"
-                              placeholder="ej. 192.168.1.100"
+                              placeholder="2-1-5-3"
                               value={controladorForm.ipLocal}
                               onChange={(e) => {
                                 const val = e.target.value
@@ -7135,7 +7159,7 @@ export default function InventarioSemaforos() {
                           <div>
                             <input
                               type="text"
-                              placeholder="ej. 10.0.0.1"
+                              placeholder="2-1-5-3"
                               value={controladorForm.ipSystem}
                               onChange={(e) => {
                                 const val = e.target.value
@@ -7176,7 +7200,7 @@ export default function InventarioSemaforos() {
                           <div>
                             <input
                               type="text"
-                              placeholder="ej. 255.255.255.0"
+                              placeholder="2-1-5-3"
                               value={controladorForm.mascaraRed}
                               onChange={(e) => {
                                 const val = e.target.value
@@ -7217,7 +7241,7 @@ export default function InventarioSemaforos() {
                           <div>
                             <input
                               type="text"
-                              placeholder="ej. 192.168.1.1"
+                              placeholder="2-1-5-3"
                               value={controladorForm.gateway}
                               onChange={(e) => {
                                 const val = e.target.value
@@ -7258,7 +7282,7 @@ export default function InventarioSemaforos() {
                           <div>
                             <input
                               type="text"
-                              placeholder="ej. 90 segundos"
+                              placeholder="2-3-2-1"
                               value={controladorForm.cicloCompleto}
                               onChange={(e) => {
                                 const val = e.target.value
@@ -8228,6 +8252,96 @@ export default function InventarioSemaforos() {
                         )}
                       </div>
                     </div>
+
+                    {/* 5 & 6: Acometida Eléctrica CFE & Interruptor Principal */}
+                    <div className="form-responsive-grid grid-2" style={{ gap: '0.85rem 1rem', marginTop: '0.85rem' }}>
+                      {/* Acometida Eléctrica y Mufa */}
+                      <div style={{ backgroundColor: 'white', padding: '0.9rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.65rem' }}>
+                        <div>
+                          <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#691B31', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <FaBolt size={13} style={{ color: '#BC955B' }} /> Acometida Eléctrica
+                          </span>
+                          <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                            <span>¿Tiene acometida eléctrica? {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                          </label>
+                          {modoVisualizacion ? (
+                            renderBadgeConsulta(controladorForm.acometidaElectrica)
+                          ) : (
+                            <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '34px' }}>
+                              {['Aérea', 'Subterránea'].map((opcion) => (
+                                <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.acometidaElectrica === opcion ? '700' : '500', color: '#1E293B' }}>
+                                  <input
+                                    type="radio"
+                                    name="acometidaElectrica"
+                                    value={opcion}
+                                    checked={controladorForm.acometidaElectrica === opcion}
+                                    onChange={(e) => setControladorForm({ ...controladorForm, acometidaElectrica: e.target.value })}
+                                    style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                  />
+                                  {opcion}
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ paddingTop: '0.5rem', borderTop: '1px solid #F1F5F9' }}>
+                          <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                            <span>¿Tiene mufa? {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                          </label>
+                          {modoVisualizacion ? (
+                            renderBadgeConsulta(controladorForm.tieneMufa)
+                          ) : (
+                            <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '34px' }}>
+                              {['Sí', 'No'].map((opcion) => (
+                                <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.tieneMufa === opcion ? '700' : '500', color: '#1E293B' }}>
+                                  <input
+                                    type="radio"
+                                    name="tieneMufa"
+                                    value={opcion}
+                                    checked={controladorForm.tieneMufa === opcion}
+                                    onChange={(e) => setControladorForm({ ...controladorForm, tieneMufa: e.target.value })}
+                                    style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                  />
+                                  {opcion}
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* ¿Tiene interruptor principal (breaker o pastilla)? */}
+                      <div style={{ backgroundColor: 'white', padding: '0.9rem', borderRadius: '8px', border: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '0.35rem' }}>
+                        <div>
+                          <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#691B31', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                            <FaPowerOff size={13} style={{ color: '#BC955B' }} /> Interruptor Principal
+                          </span>
+                          <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#334155', marginBottom: '0.35rem' }}>
+                            <span>¿Tiene interruptor principal (breaker o pastilla)? {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                          </label>
+                        </div>
+                        {modoVisualizacion ? (
+                          renderBadgeConsulta(controladorForm.interruptorPrincipal)
+                        ) : (
+                          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '38px', marginTop: 'auto' }}>
+                            {['Sí, funciona', 'Sí, pero está dañado', 'No tiene'].map((opcion) => (
+                              <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.interruptorPrincipal === opcion ? '700' : '500', color: '#1E293B' }}>
+                                <input
+                                  type="radio"
+                                  name="interruptorPrincipal"
+                                  value={opcion}
+                                  checked={controladorForm.interruptorPrincipal === opcion}
+                                  onChange={(e) => setControladorForm({ ...controladorForm, interruptorPrincipal: e.target.value })}
+                                  style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                />
+                                {opcion}
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {/* SECCIÓN D: POSTES Y EQUIPAMIENTO VINCULADO */}
@@ -8630,74 +8744,26 @@ export default function InventarioSemaforos() {
                                     </div>
                                   </div>
 
-                                  {/* MAPA DEL POSTE A TODO LO ANCHO DE LA TARJETA */}
+                                  {/* MAPA INTERACTIVO DEL POSTE */}
                                   {coordsPoste && mapaVisible && (
-                                    <div style={{
-                                      marginBottom: '0.85rem',
-                                      borderRadius: '8px',
-                                      overflow: 'hidden',
-                                      border: '1px solid #CBD5E1',
-                                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                                      backgroundColor: '#ffffff',
-                                      pointerEvents: 'auto'
-                                    }}>
-                                      <div style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        padding: '0.35rem 0.65rem',
-                                        backgroundColor: '#F8FAFC',
-                                        borderBottom: '1px solid #E2E8F0',
-                                        fontSize: '0.74rem',
-                                        color: '#475569'
-                                      }}>
-                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                          <FaMapMarkerAlt size={11} style={{ color: '#DC2626' }} />
-                                          <span>Ubicación GPS del poste #{pIdx + 1}: <strong style={{ color: '#1E293B' }}>{coordsPoste.lat.toFixed(6)}, {coordsPoste.lng.toFixed(6)}</strong></span>
-                                          {poste.gpsPrecision && (
-                                            <span style={{
-                                              backgroundColor: poste.gpsPrecision <= 15 ? '#DCFCE7' : '#FEF3C7',
-                                              color: poste.gpsPrecision <= 15 ? '#15803D' : '#92400E',
-                                              border: `1px solid ${poste.gpsPrecision <= 15 ? '#86EFAC' : '#FCD34D'}`,
-                                              padding: '0.1rem 0.35rem',
-                                              borderRadius: '4px',
-                                              fontSize: '0.68rem',
-                                              fontWeight: '700'
-                                            }}>
-                                              ±{poste.gpsPrecision}m Satelital
-                                            </span>
-                                          )}
-                                        </span>
-                                        <a
-                                          href={`https://www.google.com/maps?q=${coordsPoste.lat},${coordsPoste.lng}`}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          style={{
-                                            color: '#2563EB',
-                                            textDecoration: 'none',
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '0.25rem',
-                                            fontSize: '0.72rem',
-                                            fontWeight: '600'
-                                          }}
-                                          title="Abrir en Google Maps externo"
-                                        >
-                                          <FaExternalLinkAlt size={9} /> Abrir en Google Maps
-                                        </a>
-                                      </div>
-                                      <iframe
-                                        title={`Mapa del poste #${pIdx + 1}`}
-                                        src={`https://maps.google.com/maps?q=${coordsPoste.lat},${coordsPoste.lng}&hl=es&z=17&output=embed`}
-                                        style={{
-                                          width: '100%',
-                                          height: '210px',
-                                          border: 'none',
-                                          display: 'block'
-                                        }}
-                                        loading="lazy"
-                                      />
-                                    </div>
+                                    <MapaInteractivoUbicacion
+                                      titulo={`Poste #${pIdx + 1}`}
+                                      coordenadas={poste.coordenadas || poste.ubicacionPoste}
+                                      readOnly={modoVisualizacion}
+                                      altura="190px"
+                                      onGuardarCoordenadas={(nuevaCoord) => {
+                                        handleActualizarPoste(pIdx, 'coordenadas', nuevaCoord)
+                                        handleActualizarPoste(pIdx, 'ubicacionPoste', nuevaCoord)
+                                        Swal.fire({
+                                          toast: true,
+                                          position: 'top-end',
+                                          icon: 'success',
+                                          title: `Ubicación del Poste #${pIdx + 1} actualizada: ${nuevaCoord}`,
+                                          showConfirmButton: false,
+                                          timer: 2500
+                                        })
+                                      }}
+                                    />
                                   )}
                                 </>
                               )
@@ -8781,6 +8847,108 @@ export default function InventarioSemaforos() {
                                     })}
                                   </div>
                                 )}
+
+                                {/* Cimiento: ¿Espárragos completos y en buen estado? */}
+                                <div style={{
+                                  marginTop: '0.65rem',
+                                  padding: '0.65rem 0.8rem',
+                                  backgroundColor: '#F8FAFC',
+                                  borderRadius: '8px',
+                                  border: '1px solid #E2E8F0',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                                }}>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', fontWeight: '700', color: '#334155', marginBottom: '0.45rem' }}>
+                                    <FaCube size={12} style={{ color: '#691B31' }} />
+                                    <span>Cimiento: ¿Espárragos completos y en buen estado? {!modoVisualizacion && <span style={{ color: '#DC2626' }}>*</span>}</span>
+                                  </label>
+                                  {modoVisualizacion ? (
+                                    renderBadgeConsulta(
+                                      poste.cimientoCompleto,
+                                      (poste.cimientoCompleto || 'Sí') === 'Sí'
+                                        ? 'Espárragos completos'
+                                        : (poste.cimientoCuantosEsparragos ? `Incompleto (${poste.cimientoCuantosEsparragos} espárragos)` : 'Incompleto')
+                                    )
+                                  ) : (
+                                    <>
+                                      <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(2, 1fr)',
+                                        gap: '4px',
+                                        backgroundColor: '#F1F5F9',
+                                        padding: '3px',
+                                        borderRadius: '6px',
+                                        border: '1px solid #CBD5E1',
+                                        boxSizing: 'border-box'
+                                      }}>
+                                        {['Sí', 'No'].map((opcion) => {
+                                          const isSel = (poste.cimientoCompleto || 'Sí') === opcion
+                                          return (
+                                            <button
+                                              key={opcion}
+                                              type="button"
+                                              onClick={() => {
+                                                handleActualizarPoste(pIdx, 'cimientoCompleto', opcion)
+                                                if (opcion === 'Sí') {
+                                                  handleActualizarPoste(pIdx, 'cimientoCuantosEsparragos', '')
+                                                }
+                                              }}
+                                              style={{
+                                                border: 'none',
+                                                borderRadius: '4px',
+                                                padding: '0.42rem 0.5rem',
+                                                fontSize: '0.78rem',
+                                                fontWeight: isSel ? '700' : '500',
+                                                backgroundColor: isSel ? '#691B31' : 'transparent',
+                                                color: isSel ? '#FFFFFF' : '#475569',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.15s',
+                                                boxShadow: isSel ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                                                textAlign: 'center'
+                                              }}
+                                            >
+                                              {opcion}
+                                            </button>
+                                          )
+                                        })}
+                                      </div>
+
+                                      {/* Subcampo condicional mejorado si eligió No */}
+                                      {poste.cimientoCompleto === 'No' && (
+                                        <div style={{
+                                          marginTop: '0.55rem',
+                                          padding: '0.55rem 0.7rem',
+                                          backgroundColor: '#FFFFFF',
+                                          borderRadius: '6px',
+                                          border: '1.5px solid #FCA5A5',
+                                          boxShadow: '0 1px 3px rgba(220, 38, 38, 0.08)'
+                                        }}>
+                                          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.77rem', fontWeight: '700', color: '#991B1B', marginBottom: '0.3rem' }}>
+                                            <FaCube size={11} style={{ color: '#DC2626' }} />
+                                            <span>¿Cuántos espárragos tiene? <span style={{ color: '#DC2626' }}>*</span></span>
+                                          </label>
+                                          <input
+                                            type="text"
+                                            placeholder="ej. 1, 2, 3 o más"
+                                            value={poste.cimientoCuantosEsparragos || ''}
+                                            onChange={(e) => handleActualizarPoste(pIdx, 'cimientoCuantosEsparragos', e.target.value)}
+                                            autoFocus
+                                            style={{
+                                              width: '100%',
+                                              padding: '0.4rem 0.6rem',
+                                              border: '1px solid #CBD5E1',
+                                              borderRadius: '5px',
+                                              fontSize: '0.82rem',
+                                              backgroundColor: '#FFFFFF',
+                                              boxSizing: 'border-box',
+                                              outline: 'none',
+                                              transition: 'border-color 0.2s'
+                                            }}
+                                          />
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
@@ -10397,44 +10565,23 @@ export default function InventarioSemaforos() {
                                       </div>
 
                                       {coordsReg && mapaRegVisible && (
-                                        <div style={{
-                                          marginTop: '0.45rem',
-                                          borderRadius: '6px',
-                                          overflow: 'hidden',
-                                          border: '1px solid #CBD5E1',
-                                          boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
-                                          backgroundColor: '#ffffff'
-                                        }}>
-                                          <div style={{
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            padding: '0.35rem 0.6rem',
-                                            backgroundColor: '#F8FAFC',
-                                            borderBottom: '1px solid #E2E8F0',
-                                            fontSize: '0.73rem',
-                                            fontWeight: '600',
-                                            color: '#475569',
-                                            flexWrap: 'wrap',
-                                            gap: '0.35rem'
-                                          }}>
-                                            <span>GPS: <strong style={{ color: '#1E293B' }}>{coordsReg.lat.toFixed(6)}, {coordsReg.lng.toFixed(6)}</strong></span>
-                                            <a
-                                              href={`https://www.google.com/maps?q=${coordsReg.lat},${coordsReg.lng}`}
-                                              target="_blank"
-                                              rel="noreferrer"
-                                              style={{ color: '#2563EB', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.72rem', fontWeight: '600' }}
-                                            >
-                                              <FaExternalLinkAlt size={8} /> Abrir en Google Maps
-                                            </a>
-                                          </div>
-                                          <iframe
-                                            title={`Mapa del registro dañado #${idx + 1}`}
-                                            src={`https://maps.google.com/maps?q=${coordsReg.lat},${coordsReg.lng}&hl=es&z=17&output=embed`}
-                                            style={{ width: '100%', height: '170px', border: 'none', display: 'block' }}
-                                            loading="lazy"
-                                          />
-                                        </div>
+                                        <MapaInteractivoUbicacion
+                                          titulo={`Registro #${idx + 1}`}
+                                          coordenadas={item.coordenadas}
+                                          readOnly={modoVisualizacion}
+                                          altura="180px"
+                                          onGuardarCoordenadas={(nuevaCoord) => {
+                                            handleCambiarCoordenada(idx, nuevaCoord)
+                                            Swal.fire({
+                                              toast: true,
+                                              position: 'top-end',
+                                              icon: 'success',
+                                              title: `Registro #${idx + 1}: ${nuevaCoord}`,
+                                              showConfirmButton: false,
+                                              timer: 2500
+                                            })
+                                          }}
+                                        />
                                       )}
                                     </>
                                   )

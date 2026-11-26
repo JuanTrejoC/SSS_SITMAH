@@ -370,6 +370,9 @@ model ControladorSemaforo {
   receptorFibraCable          String?  @map("receptor_fibra_cable") @db.VarChar(50)
   conexionesTarjetaMadre      String?  @map("conexiones_tarjeta_madre") @db.VarChar(50)
   fuentePoderSupresorPicos    String?  @map("fuente_poder_supresor_picos") @db.VarChar(50)
+  acometidaElectrica          String?  @map("acometida_electrica") @db.VarChar(50)
+  tieneMufa                   String?  @map("tiene_mufa") @db.VarChar(10)
+  interruptorPrincipal        String?  @map("interruptor_principal") @db.VarChar(50)
 
   // Sección D: Postes (SEMEX)
   posteModeloTipo             String?  @map("poste_modelo_tipo") @db.VarChar(100)
