@@ -1719,7 +1719,14 @@ export default function InventarioSemaforos() {
     const esIpValida = (ip) => {
       if (!ip || String(ip).trim() === '') return true
       const limpio = limpiarIpFormato(ip)
-      return /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(limpio)
+      const partes = limpio.split('.')
+      if (partes.length === 4 && partes.every(p => {
+        const n = parseInt(p.trim(), 10)
+        return !isNaN(n) && n >= 0 && n <= 255
+      })) {
+        return true
+      }
+      return false
     }
     if (controladorForm.ipLocal && !esIpValida(controladorForm.ipLocal)) {
       errores.ipLocal = 'IP Local inválida (ej. 192.168.1.100).'
@@ -2072,11 +2079,20 @@ export default function InventarioSemaforos() {
           toast: true,
           position: 'top-end',
           icon: 'success',
-          title: 'Gabinete guardado exitosamente',
+          title: 'Red y Energía guardados exitosamente',
           showConfirmButton: false,
           timer: 2500
         })
-        cargarControladores()
+        if (json.data?.controlador) {
+          const c = json.data.controlador
+          setControladorForm(prev => ({
+            ...prev,
+            acometidaElectrica: c.acometidaElectrica || prev.acometidaElectrica,
+            tieneMufa: c.tieneMufa || prev.tieneMufa,
+            interruptorPrincipal: c.interruptorPrincipal || prev.interruptorPrincipal
+          }))
+        }
+        cargarControladores(true)
         cargarTodosLosControladores()
       } else {
         mostrarAlertaError(json.error || 'No se pudo guardar el gabinete.', 'Error', 'Ocurrió un error al guardar.')
@@ -8368,10 +8384,10 @@ export default function InventarioSemaforos() {
                                 <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.acometidaElectrica === opcion ? '700' : '500', color: '#1E293B' }}>
                                   <input
                                     type="radio"
-                                    name="acometidaElectrica"
+                                    name={`acometidaElectrica-${editandoControladorId || 'nuevo'}`}
                                     value={opcion}
                                     checked={controladorForm.acometidaElectrica === opcion}
-                                    onChange={(e) => setControladorForm({ ...controladorForm, acometidaElectrica: e.target.value })}
+                                    onChange={() => setControladorForm(prev => ({ ...prev, acometidaElectrica: opcion }))}
                                     style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
                                   />
                                   {opcion}
@@ -8393,10 +8409,10 @@ export default function InventarioSemaforos() {
                                 <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.tieneMufa === opcion ? '700' : '500', color: '#1E293B' }}>
                                   <input
                                     type="radio"
-                                    name="tieneMufa"
+                                    name={`tieneMufa-${editandoControladorId || 'nuevo'}`}
                                     value={opcion}
                                     checked={controladorForm.tieneMufa === opcion}
-                                    onChange={(e) => setControladorForm({ ...controladorForm, tieneMufa: e.target.value })}
+                                    onChange={() => setControladorForm(prev => ({ ...prev, tieneMufa: opcion }))}
                                     style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
                                   />
                                   {opcion}
@@ -8425,10 +8441,10 @@ export default function InventarioSemaforos() {
                               <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.interruptorPrincipal === opcion ? '700' : '500', color: '#1E293B' }}>
                                 <input
                                   type="radio"
-                                  name="interruptorPrincipal"
+                                  name={`interruptorPrincipal-${editandoControladorId || 'nuevo'}`}
                                   value={opcion}
                                   checked={controladorForm.interruptorPrincipal === opcion}
-                                  onChange={(e) => setControladorForm({ ...controladorForm, interruptorPrincipal: e.target.value })}
+                                  onChange={() => setControladorForm(prev => ({ ...prev, interruptorPrincipal: opcion }))}
                                   style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
                                 />
                                 {opcion}
@@ -8437,6 +8453,34 @@ export default function InventarioSemaforos() {
                           </div>
                         )}
                       </div>
+
+                      {/* Botón directo de guardado para Acometida, Mufa e Interruptor */}
+                      {editandoControladorId && !modoVisualizacion && (
+                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', marginTop: '0.35rem' }}>
+                          <button
+                            type="button"
+                            onClick={handleGuardarGabineteModular}
+                            disabled={guardandoModularSeccion === 'gabinete'}
+                            style={{
+                              backgroundColor: '#691B31',
+                              border: 'none',
+                              color: 'white',
+                              borderRadius: '7px',
+                              padding: '0.45rem 1.1rem',
+                              fontSize: '0.82rem',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.45rem',
+                              boxShadow: '0 2px 4px rgba(105, 27, 49, 0.25)'
+                            }}
+                          >
+                            {guardandoModularSeccion === 'gabinete' ? <FaSyncAlt className="fa-spin" size={12} /> : <FaSave size={12} />}
+                            <span>{guardandoModularSeccion === 'gabinete' ? 'Guardando...' : 'Guardar Red, Acometida e Interruptor'}</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
