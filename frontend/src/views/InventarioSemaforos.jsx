@@ -1793,7 +1793,8 @@ export default function InventarioSemaforos() {
         ) {
           // Excluir modos de interfaz auxiliar y campos manejados explícitamente abajo
         } else {
-          formData.append(key, controladorForm[key])
+          const val = controladorForm[key]
+          formData.append(key, val !== undefined && val !== null ? val : '')
         }
       })
 
@@ -2402,13 +2403,31 @@ export default function InventarioSemaforos() {
       receptorFibraCable: item.receptorFibraCable || '',
       conexionesTarjetaMadre: item.conexionesTarjetaMadre || '',
       fuentePoderSupresorPicos: item.fuentePoderSupresorPicos || '',
-      acometidaElectrica: item.acometidaElectrica
-        ? (item.acometidaElectrica.includes('aérea') || item.acometidaElectrica.includes('Aérea') ? 'Aérea'
-           : item.acometidaElectrica.includes('subterránea') || item.acometidaElectrica.includes('Subterránea') ? 'Subterránea'
-           : item.acometidaElectrica)
-        : '',
-      tieneMufa: item.tieneMufa || (item.acometidaElectrica && item.acometidaElectrica.toLowerCase().includes('mufa') ? 'Sí' : ''),
-      interruptorPrincipal: item.interruptorPrincipal || '',
+      acometidaElectrica: (() => {
+        if (!item.acometidaElectrica) return ''
+        const val = String(item.acometidaElectrica).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        if (val.includes('aerea')) return 'Aérea'
+        if (val.includes('subterranea')) return 'Subterránea'
+        return item.acometidaElectrica
+      })(),
+      tieneMufa: (() => {
+        if (item.tieneMufa) {
+          const val = String(item.tieneMufa).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          if (val === 'si' || val === 's' || val === 'true') return 'Sí'
+          if (val === 'no' || val === 'false') return 'No'
+          return item.tieneMufa
+        }
+        if (item.acometidaElectrica && String(item.acometidaElectrica).toLowerCase().includes('mufa')) return 'Sí'
+        return ''
+      })(),
+      interruptorPrincipal: (() => {
+        if (!item.interruptorPrincipal) return ''
+        const val = String(item.interruptorPrincipal).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        if (val.includes('funciona')) return 'Sí, funciona'
+        if (val.includes('danado') || val.includes('daniado')) return 'Sí, pero está dañado'
+        if (val.includes('no tiene') || val.includes('ningun') || val === 'no') return 'No tiene'
+        return item.interruptorPrincipal
+      })(),
       // Registros de Piso
       registrosPisoTapas: item.registrosPisoTapas !== undefined && item.registrosPisoTapas !== null ? String(item.registrosPisoTapas) : '',
       registrosPisoDanados: item.registrosPisoDanados !== undefined && item.registrosPisoDanados !== null ? item.registrosPisoDanados : '',
@@ -7861,20 +7880,47 @@ export default function InventarioSemaforos() {
                       paddingBottom: '0.5rem',
                       marginBottom: '0.2rem'
                     }}>
-                      <h4 style={{
-                        margin: 0,
-                        fontSize: '0.92rem',
-                        fontWeight: '800',
-                        color: '#691B31',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.45rem'
-                      }}>
-                        <FaProjectDiagram size={14} style={{ color: '#BC955B' }} /> Sección 4: Red, Conectividad y Energía
-                      </h4>
-                      <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
-                        Switch de fibra, conexiones y alimentación
-                      </span>
+                      <div>
+                        <h4 style={{
+                          margin: 0,
+                          fontSize: '0.92rem',
+                          fontWeight: '800',
+                          color: '#691B31',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.45rem'
+                        }}>
+                          <FaProjectDiagram size={14} style={{ color: '#BC955B' }} /> Sección 4: Red, Conectividad y Energía
+                        </h4>
+                        <span style={{ fontSize: '0.72rem', color: '#64748B', fontWeight: '600' }}>
+                          Switch de fibra, conexiones y alimentación
+                        </span>
+                      </div>
+                      {editandoControladorId && !modoVisualizacion && (
+                        <button
+                          type="button"
+                          onClick={handleGuardarGabineteModular}
+                          disabled={guardandoModularSeccion === 'gabinete'}
+                          style={{
+                            backgroundColor: '#FFFFFF',
+                            border: '1.5px solid #691B31',
+                            color: '#691B31',
+                            borderRadius: '6px',
+                            padding: '0.3rem 0.7rem',
+                            fontSize: '0.78rem',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                          }}
+                          title="Guarda los datos de red, conectividad y energía en el servidor"
+                        >
+                          {guardandoModularSeccion === 'gabinete' ? <FaSyncAlt className="fa-spin" size={11} /> : <FaSave size={11} />}
+                          <span>{guardandoModularSeccion === 'gabinete' ? 'Guardando...' : 'Guardar Red y Energía'}</span>
+                        </button>
+                      )}
                     </div>
 
                     {/* 1. Switch de Fibra */}

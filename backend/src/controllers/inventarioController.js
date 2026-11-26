@@ -809,7 +809,7 @@ async function actualizarControladorSemaforo(req, res) {
         'tarjetaConflictosEstado', 'tarjetaRelevadoresMarca', 'tarjetaRelevadoresModelo',
         'tarjetaRelevadoresCantidad', 'switchFibraMarca', 'switchFibraModelo', 'switchFibraPuertosTotal',
         'switchFibraPuertosUso', 'switchFibraFuentePoder', 'receptorFibraDispositivo', 'receptorFibraCable',
-        'conexionesTarjetaMadre', 'fuentePoderSupresorPicos', 'acometidaElectrica', 'interruptorPrincipal',
+        'conexionesTarjetaMadre', 'fuentePoderSupresorPicos', 'acometidaElectrica', 'tieneMufa', 'interruptorPrincipal',
         'gpsModelo', 'gpsComponenteFisico',
         'gpsAntenaExterior', 'observacionesExterior'
       ];
