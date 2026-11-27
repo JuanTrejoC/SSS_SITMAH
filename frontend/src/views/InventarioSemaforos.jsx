@@ -7993,6 +7993,31 @@ export default function InventarioSemaforos() {
                           Switch de fibra, conexiones y alimentación
                         </span>
                       </div>
+                      {editandoControladorId && !modoVisualizacion && (
+                        <button
+                          type="button"
+                          onClick={handleGuardarGabineteModular}
+                          disabled={guardandoModularSeccion === 'gabinete'}
+                          style={{
+                            backgroundColor: '#FFFFFF',
+                            border: '1.5px solid #691B31',
+                            color: '#691B31',
+                            borderRadius: '6px',
+                            padding: '0.3rem 0.7rem',
+                            fontSize: '0.78rem',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                          }}
+                          title="Guarda los datos de red, conectividad y energía en el servidor"
+                        >
+                          {guardandoModularSeccion === 'gabinete' ? <FaSyncAlt className="fa-spin" size={11} /> : <FaSave size={11} />}
+                          <span>{guardandoModularSeccion === 'gabinete' ? 'Guardando...' : 'Guardar Red y Energía'}</span>
+                        </button>
+                      )}
                     </div>
 
                     {/* 1. Switch de Fibra */}
@@ -8459,6 +8484,34 @@ export default function InventarioSemaforos() {
                           </div>
                         )}
                       </div>
+
+                      {/* Botón directo de guardado para Acometida, Mufa e Interruptor */}
+                      {editandoControladorId && !modoVisualizacion && (
+                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', marginTop: '0.35rem' }}>
+                          <button
+                            type="button"
+                            onClick={handleGuardarGabineteModular}
+                            disabled={guardandoModularSeccion === 'gabinete'}
+                            style={{
+                              backgroundColor: '#691B31',
+                              border: 'none',
+                              color: 'white',
+                              borderRadius: '7px',
+                              padding: '0.45rem 1.1rem',
+                              fontSize: '0.82rem',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.45rem',
+                              boxShadow: '0 2px 4px rgba(105, 27, 49, 0.25)'
+                            }}
+                          >
+                            {guardandoModularSeccion === 'gabinete' ? <FaSyncAlt className="fa-spin" size={12} /> : <FaSave size={12} />}
+                            <span>{guardandoModularSeccion === 'gabinete' ? 'Guardando...' : 'Guardar Red, Acometida e Interruptor'}</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
