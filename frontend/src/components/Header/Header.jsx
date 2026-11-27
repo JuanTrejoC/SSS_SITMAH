@@ -17,11 +17,26 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
   const [datosLogin, setDatosLogin] = useState({ usuario: '', contrasena: '' });
   const [errores, setErrores] = useState({ usuario: false, contrasena: false });
   const [mostrarBuscador, setMostrarBuscador] = useState(false);
+  const [estaEnLinea, setEstaEnLinea] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   
   const navigate = useNavigate();
   const location = useLocation();
   const profileRef = useRef(null);
   const loginRef = useRef(null);
+
+  // Detección de conectividad del usuario en línea / desconectado
+  useEffect(() => {
+    const handleOnline = () => setEstaEnLinea(true);
+    const handleOffline = () => setEstaEnLinea(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Atajo de teclado global Ctrl+K o Cmd+K para abrir el buscador
   useEffect(() => {
@@ -229,9 +244,17 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
               <button 
                 className="app-header__profile-btn"
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
+                title={estaEnLinea ? `${user.nombre} • Activo en línea` : `${user.nombre} • Desconectado`}
+                aria-label={`Perfil de ${user.nombre} (${estaEnLinea ? 'En línea' : 'Desconectado'})`}
               >
-                <div className="profile-icon">
-                  {user.nombre.charAt(0).toUpperCase()}
+                <div className="profile-icon-wrapper">
+                  <div className="profile-icon">
+                    {user.nombre.charAt(0).toUpperCase()}
+                  </div>
+                  <span 
+                    className={`profile-status-badge ${estaEnLinea ? 'online' : 'offline'}`}
+                    title={estaEnLinea ? "Activo en línea" : "Desconectado"}
+                  />
                 </div>
               </button>
 
@@ -240,7 +263,13 @@ export default function Header({ toggleSidebar, hideLogos, hideBackButton = fals
                   <div className="profile-info">
                     <span className="profile-name">{user.nombre}</span>
                     {user.username && <span className="profile-username">@{user.username}</span>}
-                    <span className="profile-role" style={{ textTransform: 'capitalize' }}>{user.rol}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginTop: '0.45rem' }}>
+                      <span className="profile-role" style={{ textTransform: 'capitalize', margin: 0 }}>{user.rol}</span>
+                      <div className={`profile-status-pill ${estaEnLinea ? 'online' : 'offline'}`}>
+                        <span className={`profile-status-dot ${estaEnLinea ? 'online' : 'offline'}`} />
+                        <span>{estaEnLinea ? 'En línea' : 'Desconectado'}</span>
+                      </div>
+                    </div>
                   </div>
                   {(user.rol === 'administrador' || user.rol === 'admin') && (
                     <>

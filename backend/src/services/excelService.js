@@ -1148,6 +1148,9 @@ async function exportarControladoresSemaforoExcel(controladores, meta = {}) {
     if (ctrl.versionFirmware) redPartes.push(`Firmware: ${ctrl.versionFirmware}`);
     if (ctrl.switch) redPartes.push(`Switch: ${ctrl.switchFibraMarca || ''} ${ctrl.switchFibraModelo || ''}`.trim() || 'Sí');
     if (ctrl.fibraOptica) redPartes.push('Fibra Óptica: Sí');
+    if (ctrl.acometidaElectrica) redPartes.push(`Acometida: ${ctrl.acometidaElectrica}`);
+    if (ctrl.tieneMufa) redPartes.push(`Mufa: ${ctrl.tieneMufa}`);
+    if (ctrl.interruptorPrincipal) redPartes.push(`Interruptor: ${ctrl.interruptorPrincipal}`);
     const redStr = redPartes.length > 0 ? redPartes.join('\n') : 'Sin configuración de red';
 
     // Cámaras

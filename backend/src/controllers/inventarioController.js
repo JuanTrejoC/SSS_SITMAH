@@ -625,8 +625,9 @@ async function crearControladorSemaforo(req, res) {
   // Convert boolean strings to actual booleans (from FormData)
   const booleanFields = ['pasoPeatonal', 'audible', 'pantallaLed', 'tarjetaRelevadora', 'fuentePoder', 'cpu', 'switch', 'fibraOptica', 'gps', 'botonera'];
   booleanFields.forEach(key => {
-    if (body[key] === 'true') body[key] = true;
-    if (body[key] === 'false') body[key] = false;
+    if (body[key] !== undefined) {
+      body[key] = body[key] === 'true' || body[key] === true || body[key] === 1 || body[key] === '1';
+    }
   });
 
   if (typeof body.cabezalesDetalle === 'string') {
@@ -737,8 +738,9 @@ async function actualizarControladorSemaforo(req, res) {
   // Convert boolean strings to actual booleans (from FormData)
   const booleanFields = ['pasoPeatonal', 'audible', 'pantallaLed', 'tarjetaRelevadora', 'fuentePoder', 'cpu', 'switch', 'fibraOptica', 'gps', 'botonera'];
   booleanFields.forEach(key => {
-    if (body[key] === 'true') body[key] = true;
-    if (body[key] === 'false') body[key] = false;
+    if (body[key] !== undefined) {
+      body[key] = body[key] === 'true' || body[key] === true || body[key] === 1 || body[key] === '1';
+    }
   });
 
   if (typeof body.cabezalesDetalle === 'string') {
@@ -1035,11 +1037,17 @@ const recalcularTotalesDesdePostesBackend = (postesRaw) => {
         const leds = (grupo.leds || []).slice(0, num);
         leds.forEach(led => {
           const c = (led.color || '').toLowerCase();
-          if (c === 'verde') totalVerdes += 1;
-          else if (c === 'flecha verde') totalFlechasVerdes += 1;
-          else if (c === 'rojo') totalRojos += 1;
-          else if (c === 'flecha roja') totalFlechasRojas += 1;
-          else if (c === 'amarillo') totalAmarillos += 1;
+          if (c.includes('flecha')) {
+            if (c.includes('verd')) totalFlechasVerdes += 1;
+            else if (c.includes('roj')) totalFlechasRojas += 1;
+            else if (c.includes('amarill') || c.includes('ambar')) totalAmarillos += 1;
+          } else if (c.includes('verd')) {
+            totalVerdes += 1;
+          } else if (c.includes('roj')) {
+            totalRojos += 1;
+          } else if (c.includes('amarill') || c.includes('ambar')) {
+            totalAmarillos += 1;
+          }
         });
       });
     }
@@ -1129,22 +1137,24 @@ const recalcularTotalesDesdePostesBackend = (postesRaw) => {
 
 async function actualizarGabineteControlador(req, res) {
   const id = Number(req.params.id);
+  if (!id || isNaN(id)) return fail(res, 'ID de controlador inválido', 400);
+
   const existe = await prisma.controladorSemaforo.findUnique({ where: { id } });
   if (!existe) return fail(res, 'Controlador semafórico no encontrado', 404);
 
   const body = { ...req.body };
+  const gabineteData = {};
+
   const booleanFields = ['tarjetaRelevadora', 'fuentePoder', 'cpu', 'switch', 'fibraOptica', 'gps', 'botonera'];
   booleanFields.forEach(key => {
-    if (body[key] === 'true') body[key] = true;
-    if (body[key] === 'false') body[key] = false;
+    if (body[key] !== undefined) {
+      gabineteData[key] = (body[key] === 'true' || body[key] === true || body[key] === 1 || body[key] === '1');
+    }
   });
 
-  const gabineteData = {};
   const allowedFields = [
-    'modelo', 'cruceroId',
     'tarjetaConflictosMarca', 'tarjetaConflictosModelo', 'tarjetaConflictosEstado',
     'tarjetaRelevadoresMarca', 'tarjetaRelevadoresModelo', 'tarjetaRelevadoresCantidad',
-    'tarjetaRelevadora', 'fuentePoder', 'cpu', 'switch', 'fibraOptica', 'gps', 'botonera',
     'cimientoCompleto', 'cimientoCuantosDados', 'tapaCableado', 'tornilleriaBaseCompleta', 'tornilleriaCuantosTornillos',
     'observacionesExterior', 'gpsModelo', 'gpsComponenteFisico', 'gpsAntenaExterior',
     'numeroGabinete', 'versionFirmware', 'ipLocal', 'ipSystem', 'mascaraRed', 'gateway',
@@ -1154,13 +1164,19 @@ async function actualizarGabineteControlador(req, res) {
     'acometidaElectrica', 'tieneMufa', 'interruptorPrincipal'
   ];
 
+  if (body.modelo && typeof body.modelo === 'string' && body.modelo.trim()) {
+    gabineteData.modelo = body.modelo.trim();
+  }
+  if (body.cruceroId !== undefined && body.cruceroId !== null && body.cruceroId !== '') {
+    const cId = Number(body.cruceroId);
+    if (!isNaN(cId) && cId > 0) {
+      gabineteData.cruceroId = cId;
+    }
+  }
+
   allowedFields.forEach(campo => {
     if (body[campo] !== undefined) {
-      if (campo === 'cruceroId') {
-        gabineteData[campo] = Number(body[campo]);
-      } else {
-        gabineteData[campo] = body[campo];
-      }
+      gabineteData[campo] = body[campo];
     }
   });
 
@@ -1176,13 +1192,18 @@ async function actualizarGabineteControlador(req, res) {
     gabineteData.respaldoProgramacionUsb = null;
   }
 
-  const controlador = await prisma.controladorSemaforo.update({
-    where: { id },
-    data: gabineteData,
-    include: { crucero: true }
-  });
+  try {
+    const controlador = await prisma.controladorSemaforo.update({
+      where: { id },
+      data: gabineteData,
+      include: { crucero: true }
+    });
 
-  ok(res, { controlador, mensaje: 'Datos del gabinete guardados exitosamente.' });
+    ok(res, { controlador, mensaje: 'Datos del gabinete guardados exitosamente.' });
+  } catch (error) {
+    console.error('Error al actualizar gabinete controlador:', error);
+    fail(res, error.message || 'Error al actualizar el gabinete en la base de datos', 500);
+  }
 }
 
 async function obtenerPostesControlador(req, res) {

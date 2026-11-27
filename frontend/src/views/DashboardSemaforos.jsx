@@ -8,6 +8,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { API_BASE_URL } from '../config'
 import AtencionReporte from '../components/AtencionReporte'
 import { marcarNotificacionLeida, notificarCambioReporte } from '../utils/notificacionesLeidas'
+import { obtenerRangoSemanaTexto } from '../utils/dateUtils'
 
 export default function DashboardSemaforos() {
   const { user } = useAuth()
@@ -16,8 +17,20 @@ export default function DashboardSemaforos() {
   const [reportes, setReportes] = useState([])
   const [busqueda, setBusqueda] = useState('')
   const [estadoFiltro, setEstadoFiltro] = useState('Pendiente')
+  const [tipoFiltroFecha, setTipoFiltroFecha] = useState('mes')
+  const [diaFiltro, setDiaFiltro] = useState('')
+  const [semanaFiltro, setSemanaFiltro] = useState('')
   const [mesFiltro, setMesFiltro] = useState('')
   const [anioFiltro, setAnioFiltro] = useState('')
+  const weekInputRef = useRef(null)
+
+  const cambiarTipoFiltroFecha = (nuevoTipo) => {
+    setTipoFiltroFecha(nuevoTipo)
+    setDiaFiltro('')
+    setSemanaFiltro('')
+    setMesFiltro('')
+    setAnioFiltro('')
+  }
   const [verDetalle, setVerDetalle] = useState(null)
   const [cargando, setCargando] = useState(false)
   const [incluirImagenes, setIncluirImagenes] = useState(false)
@@ -126,7 +139,7 @@ export default function DashboardSemaforos() {
     }
 
     if (reportes.length > 0) {
-      const encontrado = reportes.find(r => 
+      const encontrado = reportes.find(r =>
         (reportId && String(r.id) === String(reportId)) ||
         (folioParam && String(r.folio).toLowerCase() === folioParam.toLowerCase())
       )
@@ -143,15 +156,15 @@ export default function DashboardSemaforos() {
       fetch(`${API_BASE_URL}/api/admin/reportes/semaforo/${reportId}`, {
         headers: { 'Authorization': `Bearer ${user.token}` }
       })
-      .then(res => res.json())
-      .then(json => {
-        if (json.ok && json.data) {
-          abrirDetalle(json.data)
-          setEstadoFiltro('Todos')
-        }
-      })
-      .catch(err => console.error('Error al cargar reporte de semáforo por URL:', err))
-      .finally(() => limpiarUrl())
+        .then(res => res.json())
+        .then(json => {
+          if (json.ok && json.data) {
+            abrirDetalle(json.data)
+            setEstadoFiltro('Todos')
+          }
+        })
+        .catch(err => console.error('Error al cargar reporte de semáforo por URL:', err))
+        .finally(() => limpiarUrl())
     }
   }, [location.search, reportes, user?.token])
 
@@ -172,14 +185,14 @@ export default function DashboardSemaforos() {
           fetch(`${API_BASE_URL}/api/admin/reportes/semaforo/${id}`, {
             headers: { 'Authorization': `Bearer ${user.token}` }
           })
-          .then(res => res.json())
-          .then(json => {
-            if (json.ok && json.data) {
-              abrirDetalle(json.data)
-              setEstadoFiltro('Todos')
-            }
-          })
-          .catch(err => console.error('Error al abrir reporte por evento:', err))
+            .then(res => res.json())
+            .then(json => {
+              if (json.ok && json.data) {
+                abrirDetalle(json.data)
+                setEstadoFiltro('Todos')
+              }
+            })
+            .catch(err => console.error('Error al abrir reporte por evento:', err))
         }
       }
     }
@@ -194,8 +207,14 @@ export default function DashboardSemaforos() {
     setCargando(true)
     try {
       let url = `${API_BASE_URL}/api/admin/reportes/semaforo?limit=100`
-      if (mesFiltro) url += `&mes=${mesFiltro}`
-      if (anioFiltro) url += `&anio=${anioFiltro}`
+      if (tipoFiltroFecha === 'dia' && diaFiltro) {
+        url += `&dia=${diaFiltro}`
+      } else if (tipoFiltroFecha === 'semana' && semanaFiltro) {
+        url += `&semana=${semanaFiltro}`
+      } else if (tipoFiltroFecha === 'mes') {
+        if (mesFiltro) url += `&mes=${mesFiltro}`
+        if (anioFiltro) url += `&anio=${anioFiltro}`
+      }
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${user.token}`
@@ -240,7 +259,7 @@ export default function DashboardSemaforos() {
     cargarReportes()
     cargarInventario()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, mesFiltro, anioFiltro])
+  }, [user, tipoFiltroFecha, diaFiltro, semanaFiltro, mesFiltro, anioFiltro])
 
   const asignarPieza = async () => {
     if (!componenteSeleccionado) {
@@ -289,10 +308,10 @@ export default function DashboardSemaforos() {
           ...verDetalle,
           piezasAsignadas: [...(verDetalle.piezasAsignadas || []), nuevaPieza]
         });
-        setReportes(prevReportes => 
-          prevReportes.map(rep => 
-            rep.id === verDetalle.id 
-              ? { ...rep, piezasAsignadas: [...(rep.piezasAsignadas || []), nuevaPieza] } 
+        setReportes(prevReportes =>
+          prevReportes.map(rep =>
+            rep.id === verDetalle.id
+              ? { ...rep, piezasAsignadas: [...(rep.piezasAsignadas || []), nuevaPieza] }
               : rep
           )
         );
@@ -327,10 +346,10 @@ export default function DashboardSemaforos() {
           ...prev,
           piezasAsignadas: (prev.piezasAsignadas || []).map(p => p.id === piezaId ? { ...p, estadoPiezaReemplazada: nuevoEstado } : p)
         }));
-        setReportes(prevReportes => 
-          prevReportes.map(rep => 
-            rep.id === verDetalle.id 
-              ? { ...rep, piezasAsignadas: (rep.piezasAsignadas || []).map(p => p.id === piezaId ? { ...p, estadoPiezaReemplazada: nuevoEstado } : p) } 
+        setReportes(prevReportes =>
+          prevReportes.map(rep =>
+            rep.id === verDetalle.id
+              ? { ...rep, piezasAsignadas: (rep.piezasAsignadas || []).map(p => p.id === piezaId ? { ...p, estadoPiezaReemplazada: nuevoEstado } : p) }
               : rep
           )
         );
@@ -449,8 +468,14 @@ export default function DashboardSemaforos() {
     if (!user?.token) return
     try {
       let url = `${API_BASE_URL}/api/admin/reportes/semaforo/export?`
-      if (mesFiltro) url += `mes=${mesFiltro}&`
-      if (anioFiltro) url += `anio=${anioFiltro}&`
+      if (tipoFiltroFecha === 'dia' && diaFiltro) {
+        url += `dia=${diaFiltro}&`
+      } else if (tipoFiltroFecha === 'semana' && semanaFiltro) {
+        url += `semana=${semanaFiltro}&`
+      } else if (tipoFiltroFecha === 'mes') {
+        if (mesFiltro) url += `mes=${mesFiltro}&`
+        if (anioFiltro) url += `anio=${anioFiltro}&`
+      }
       if (estadoFiltro !== 'Todos') {
         const mapEstado = { 'Pendiente': 'abierto', 'En Proceso': 'en_proceso', 'Resuelto': 'resuelto' }
         url += `estado=${mapEstado[estadoFiltro]}&`
@@ -577,29 +602,191 @@ export default function DashboardSemaforos() {
 
         {/* BARRA DE FILTROS Y BÚSQUEDA */}
         <div style={{ backgroundColor: 'white', padding: '1.35rem', borderRadius: '16px', border: '1px solid #E5E7EB', boxShadow: '0 4px 15px -3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             <div>
-              <label style={{ fontSize: '0.825rem', fontWeight: '600', color: '#4B5563', display: 'block', marginBottom: '0.35rem' }}>
-                <i className="fa-solid fa-calendar-days" style={{ marginRight: '0.35rem', color: '#BC955B' }}></i> Mes y Año
-              </label>
-              <input
-                type="month"
-                id="monthFilter"
-                value={(anioFiltro && mesFiltro) ? `${anioFiltro}-${mesFiltro.padStart(2, '0')}` : ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val) {
-                    const [y, m] = val.split('-');
-                    setAnioFiltro(y);
-                    setMesFiltro(parseInt(m, 10).toString());
-                  } else {
-                    setAnioFiltro('');
-                    setMesFiltro('');
-                  }
-                }}
-                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #D1D5DB', borderRadius: '10px', backgroundColor: 'white', fontSize: '0.875rem', outline: 'none' }}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                <label style={{ fontSize: '0.825rem', fontWeight: '600', color: '#4B5563', margin: 0, display: 'flex', alignItems: 'center' }}>
+                  <i className="fa-solid fa-calendar-days" style={{ marginRight: '0.35rem', color: '#BC955B' }}></i>
+                  {tipoFiltroFecha === 'dia' ? 'Por Día' : tipoFiltroFecha === 'semana' ? 'Por Semana' : 'Mes y Año'}
+                  {((tipoFiltroFecha === 'dia' && diaFiltro) ||
+                    (tipoFiltroFecha === 'semana' && semanaFiltro) ||
+                    (tipoFiltroFecha === 'mes' && (mesFiltro || anioFiltro))) && (
+                      <span
+                        onClick={() => {
+                          setDiaFiltro('')
+                          setSemanaFiltro('')
+                          setMesFiltro('')
+                          setAnioFiltro('')
+                        }}
+                        title="Quitar filtro de fecha"
+                        style={{ marginLeft: '0.5rem', cursor: 'pointer', color: '#DC2626', fontSize: '0.75rem', fontWeight: 'normal', textDecoration: 'underline' }}
+                      >
+                        Limpiar
+                      </span>
+                    )}
+                </label>
+                <div style={{ display: 'inline-flex', background: '#F3F4F6', borderRadius: '6px', padding: '2px', gap: '2px' }}>
+                  <button
+                    type="button"
+                    onClick={() => cambiarTipoFiltroFecha('dia')}
+                    style={{
+                      border: 'none',
+                      padding: '2px 8px',
+                      fontSize: '0.725rem',
+                      fontWeight: tipoFiltroFecha === 'dia' ? '600' : '500',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      backgroundColor: tipoFiltroFecha === 'dia' ? '#691B31' : 'transparent',
+                      color: tipoFiltroFecha === 'dia' ? '#FFFFFF' : '#6B7280',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    Día
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cambiarTipoFiltroFecha('semana')}
+                    style={{
+                      border: 'none',
+                      padding: '2px 8px',
+                      fontSize: '0.725rem',
+                      fontWeight: tipoFiltroFecha === 'semana' ? '600' : '500',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      backgroundColor: tipoFiltroFecha === 'semana' ? '#691B31' : 'transparent',
+                      color: tipoFiltroFecha === 'semana' ? '#FFFFFF' : '#6B7280',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    Semana
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cambiarTipoFiltroFecha('mes')}
+                    style={{
+                      border: 'none',
+                      padding: '2px 8px',
+                      fontSize: '0.725rem',
+                      fontWeight: tipoFiltroFecha === 'mes' ? '600' : '500',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      backgroundColor: tipoFiltroFecha === 'mes' ? '#691B31' : 'transparent',
+                      color: tipoFiltroFecha === 'mes' ? '#FFFFFF' : '#6B7280',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    Mes
+                  </button>
+                </div>
+              </div>
+
+              {tipoFiltroFecha === 'dia' && (
+                <input
+                  type="date"
+                  id="dayFilter"
+                  value={diaFiltro}
+                  onChange={(e) => setDiaFiltro(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #D1D5DB', borderRadius: '10px', backgroundColor: 'white', fontSize: '0.875rem', outline: 'none' }}
+                />
+              )}
+              {tipoFiltroFecha === 'semana' && (
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input
+                    type="text"
+                    readOnly
+                    id="weekFilterText"
+                    value={semanaFiltro ? obtenerRangoSemanaTexto(semanaFiltro) : ''}
+                    placeholder="Seleccionar semana (ej. del 23 al 29 de noviembre)..."
+                    onClick={() => {
+                      if (weekInputRef.current) {
+                        try {
+                          weekInputRef.current.showPicker()
+                        } catch (err) {
+                          weekInputRef.current.focus()
+                        }
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.6rem 2.4rem 0.6rem 0.8rem',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '10px',
+                      backgroundColor: 'white',
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      color: semanaFiltro ? '#111827' : '#9CA3AF',
+                      fontWeight: semanaFiltro ? '500' : 'normal',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden'
+                    }}
+                  />
+                  <span
+                    onClick={() => {
+                      if (weekInputRef.current) {
+                        try {
+                          weekInputRef.current.showPicker()
+                        } catch (err) {
+                          weekInputRef.current.focus()
+                        }
+                      }
+                    }}
+                    style={{
+                      position: 'absolute',
+                      right: '0.8rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      cursor: 'pointer',
+                      color: '#BC955B',
+                      fontSize: '1rem',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Abrir calendario de semanas"
+                  >
+                    <i className="fa-solid fa-calendar-week"></i>
+                  </span>
+                  <input
+                    ref={weekInputRef}
+                    type="week"
+                    id="weekFilter"
+                    value={semanaFiltro}
+                    onChange={(e) => setSemanaFiltro(e.target.value)}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      opacity: 0,
+                      pointerEvents: 'none',
+                      zIndex: -1
+                    }}
+                    tabIndex={-1}
+                  />
+                </div>
+              )}
+              {tipoFiltroFecha === 'mes' && (
+                <input
+                  type="month"
+                  id="monthFilter"
+                  value={(anioFiltro && mesFiltro) ? `${anioFiltro}-${mesFiltro.padStart(2, '0')}` : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) {
+                      const [y, m] = val.split('-');
+                      setAnioFiltro(y);
+                      setMesFiltro(parseInt(m, 10).toString());
+                    } else {
+                      setAnioFiltro('');
+                      setMesFiltro('');
+                    }
+                  }}
+                  style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #D1D5DB', borderRadius: '10px', backgroundColor: 'white', fontSize: '0.875rem', outline: 'none' }}
+                />
+              )}
             </div>
 
             <div>
@@ -739,16 +926,16 @@ export default function DashboardSemaforos() {
                                 cambiarEstado(r.id, nuevoEstado);
                               }
                             }}
-                            style={{ 
-                              padding: '0.35rem 0.6rem', 
-                              border: '1px solid #D1D5DB', 
-                              borderRadius: '8px', 
-                              backgroundColor: r.estado === 'resuelto' ? '#ECFDF5' : r.estado === 'en_proceso' ? '#EFF6FF' : '#FFFBEB', 
+                            style={{
+                              padding: '0.35rem 0.6rem',
+                              border: '1px solid #D1D5DB',
+                              borderRadius: '8px',
+                              backgroundColor: r.estado === 'resuelto' ? '#ECFDF5' : r.estado === 'en_proceso' ? '#EFF6FF' : '#FFFBEB',
                               color: r.estado === 'resuelto' ? '#065F46' : r.estado === 'en_proceso' ? '#1E40AF' : '#92400E',
                               fontWeight: '700',
-                              fontSize: '0.8rem', 
-                              outline: 'none', 
-                              cursor: r.estado === 'resuelto' ? 'not-allowed' : 'pointer' 
+                              fontSize: '0.8rem',
+                              outline: 'none',
+                              cursor: r.estado === 'resuelto' ? 'not-allowed' : 'pointer'
                             }}
                           >
                             <option value="abierto">Pendiente</option>
@@ -870,8 +1057,8 @@ export default function DashboardSemaforos() {
                       </strong>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.85rem' }}>
                         {evidenciasIniciales.map((ev) => (
-                          <div key={ev.id} style={{ 
-                            border: '1px solid #E5E7EB', borderRadius: '10px', overflow: 'hidden', 
+                          <div key={ev.id} style={{
+                            border: '1px solid #E5E7EB', borderRadius: '10px', overflow: 'hidden',
                             maxWidth: '200px', backgroundColor: 'white'
                           }}>
                             {ev.mimetype?.startsWith('image/') ? (
@@ -924,7 +1111,7 @@ export default function DashboardSemaforos() {
                       {mostrarInventario ? 'Ocultar Catálogo' : '+ Asignar Pieza'}
                     </button>
                   </div>
-                  
+
                   {mostrarInventario && (
                     <div style={{ backgroundColor: '#F8FAFC', padding: '1rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid #E5E7EB' }}>
                       <h4 style={{ margin: '0 0 0.65rem 0', fontSize: '0.85rem', color: '#4B5563', fontWeight: '700' }}>Seleccionar del Inventario de Existencias (1 pieza por reemplazo)</h4>
@@ -1012,12 +1199,12 @@ export default function DashboardSemaforos() {
                   {verDetalle.piezasAsignadas && verDetalle.piezasAsignadas.length > 0 ? (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem' }}>
                       {verDetalle.piezasAsignadas.map((p, idx) => (
-                        <div key={idx} style={{ 
-                          padding: '0.85rem 1rem', 
-                          backgroundColor: 'white', 
-                          border: '1px solid #E5E7EB', 
-                          borderRadius: '12px', 
-                          display: 'flex', 
+                        <div key={idx} style={{
+                          padding: '0.85rem 1rem',
+                          backgroundColor: 'white',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '12px',
+                          display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           gap: '0.75rem',
@@ -1025,8 +1212,8 @@ export default function DashboardSemaforos() {
                           transition: 'transform 0.2s, box-shadow 0.2s',
                           position: 'relative'
                         }}
-                        onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px -2px rgba(0,0,0,0.08)' }}
-                        onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px -2px rgba(0,0,0,0.05)' }}
+                          onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px -2px rgba(0,0,0,0.08)' }}
+                          onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px -2px rgba(0,0,0,0.05)' }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', minWidth: 0, flex: 1 }}>
                             <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: '#FEF3C7', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', flexShrink: 0 }}>
@@ -1103,21 +1290,21 @@ export default function DashboardSemaforos() {
                               boxShadow: '0 2px 8px -2px rgba(0,0,0,0.05)',
                               transition: 'transform 0.2s, box-shadow 0.2s'
                             }}
-                            onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px -2px rgba(0,0,0,0.08)' }}
-                            onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px -2px rgba(0,0,0,0.05)' }}
+                              onMouseOver={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 12px -2px rgba(0,0,0,0.08)' }}
+                              onMouseOut={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px -2px rgba(0,0,0,0.05)' }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                <div style={{ 
-                                  width: '38px', 
-                                  height: '38px', 
-                                  borderRadius: '10px', 
-                                  backgroundColor: esReparacion ? '#EFF6FF' : '#FEF2F2', 
-                                  color: esReparacion ? '#2563EB' : '#DC2626', 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  justifyContent: 'center', 
-                                  fontSize: '1.05rem', 
-                                  flexShrink: 0 
+                                <div style={{
+                                  width: '38px',
+                                  height: '38px',
+                                  borderRadius: '10px',
+                                  backgroundColor: esReparacion ? '#EFF6FF' : '#FEF2F2',
+                                  color: esReparacion ? '#2563EB' : '#DC2626',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '1.05rem',
+                                  flexShrink: 0
                                 }}>
                                   <i className="fa-solid fa-wrench"></i>
                                 </div>
@@ -1224,17 +1411,17 @@ export default function DashboardSemaforos() {
                 Una vez marcado como <strong>Resuelto</strong>, no podrás volver a cambiar el estado de este reporte.
               </p>
               <div style={{ display: 'flex', gap: '0.85rem', justifyContent: 'center' }}>
-                <button 
-                  onClick={() => setConfirmResuelto({ visible: false, id: null })} 
+                <button
+                  onClick={() => setConfirmResuelto({ visible: false, id: null })}
                   style={{ flex: 1, padding: '0.65rem', backgroundColor: '#F3F4F6', color: '#374151', border: '1px solid #D1D5DB', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}
                 >
                   Cancelar
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     cambiarEstado(confirmResuelto.id, 'resuelto');
                     setConfirmResuelto({ visible: false, id: null });
-                  }} 
+                  }}
                   style={{ flex: 1, padding: '0.65rem', backgroundColor: '#BC955B', color: 'white', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
                 >
                   Aceptar
@@ -1295,7 +1482,7 @@ const CustomInventorySelect = ({ value, onChange, inventario = [], piezasAsignad
     inventario.forEach(item => {
       const cat = item.categoria || 'Sin Categoría';
       const rawNombre = (item.nombre || item.descripcion || 'Sin Nombre').trim();
-      
+
       if (!data[cat]) data[cat] = {};
       if (!data[cat][rawNombre]) {
         data[cat][rawNombre] = {
@@ -1316,8 +1503,8 @@ const CustomInventorySelect = ({ value, onChange, inventario = [], piezasAsignad
   // Auto-seleccionar primera categoría si no hay seleccionada
   const activeCategory = hoveredCategory || (categorias.length > 0 ? categorias[0] : null);
   const articulosEnCategoria = activeCategory && jerarquia[activeCategory] ? Object.values(jerarquia[activeCategory]) : [];
-  const activeArticle = hoveredArticle && jerarquia[activeCategory]?.[hoveredArticle] 
-    ? jerarquia[activeCategory][hoveredArticle] 
+  const activeArticle = hoveredArticle && jerarquia[activeCategory]?.[hoveredArticle]
+    ? jerarquia[activeCategory][hoveredArticle]
     : (articulosEnCategoria.length > 0 ? articulosEnCategoria[0] : null);
 
   const modelosEnArticulo = activeArticle ? activeArticle.items : [];
@@ -1515,7 +1702,7 @@ const CustomInventorySelect = ({ value, onChange, inventario = [], piezasAsignad
                       const deshabilitada = yaAsignada || sinStock;
                       const isCurrentVal = value === opcion.id;
 
-                      const labelModelo = opcion.modelo || opcion.marca 
+                      const labelModelo = opcion.modelo || opcion.marca
                         ? `${opcion.marca ? opcion.marca + ' ' : ''}${opcion.modelo || ''}`.trim()
                         : (opcion.numeroSerie ? `S/N: ${opcion.numeroSerie}` : 'Modelo Estándar');
 

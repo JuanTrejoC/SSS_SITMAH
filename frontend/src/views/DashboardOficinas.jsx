@@ -10,6 +10,7 @@ import AtencionReporte from '../components/AtencionReporte'
 import ModalAsignacionEquipo from '../components/ModalAsignacionEquipo'
 import ModalReemplazoEquipo from '../components/ModalReemplazoEquipo'
 import { marcarNotificacionLeida, notificarCambioReporte } from '../utils/notificacionesLeidas'
+import { obtenerRangoSemanaTexto } from '../utils/dateUtils'
 
 export default function DashboardOficinas() {
   const { user } = useAuth()
@@ -19,8 +20,20 @@ export default function DashboardOficinas() {
   const [busqueda, setBusqueda] = useState('')
   const [estadoFiltro, setEstadoFiltro] = useState('Pendiente')
   const [prioridadFiltro, setPrioridadFiltro] = useState('Todas')
+  const [tipoFiltroFecha, setTipoFiltroFecha] = useState('mes')
+  const [diaFiltro, setDiaFiltro] = useState('')
+  const [semanaFiltro, setSemanaFiltro] = useState('')
   const [mesFiltro, setMesFiltro] = useState('')
   const [anioFiltro, setAnioFiltro] = useState('')
+  const weekInputRef = useRef(null)
+
+  const cambiarTipoFiltroFecha = (nuevoTipo) => {
+    setTipoFiltroFecha(nuevoTipo)
+    setDiaFiltro('')
+    setSemanaFiltro('')
+    setMesFiltro('')
+    setAnioFiltro('')
+  }
   const [verDetalle, setVerDetalle] = useState(null)
   const [cargando, setCargando] = useState(false)
   const [incluirImagenes, setIncluirImagenes] = useState(false)
@@ -225,8 +238,14 @@ export default function DashboardOficinas() {
     setCargando(true)
     try {
       let url = `${API_BASE_URL}/api/admin/reportes/oficina?limit=100`
-      if (mesFiltro) url += `&mes=${mesFiltro}`
-      if (anioFiltro) url += `&anio=${anioFiltro}`
+      if (tipoFiltroFecha === 'dia' && diaFiltro) {
+        url += `&dia=${diaFiltro}`
+      } else if (tipoFiltroFecha === 'semana' && semanaFiltro) {
+        url += `&semana=${semanaFiltro}`
+      } else if (tipoFiltroFecha === 'mes') {
+        if (mesFiltro) url += `&mes=${mesFiltro}`
+        if (anioFiltro) url += `&anio=${anioFiltro}`
+      }
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${user.token}`
@@ -250,7 +269,7 @@ export default function DashboardOficinas() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarReportes()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, mesFiltro, anioFiltro])
+  }, [user, tipoFiltroFecha, diaFiltro, semanaFiltro, mesFiltro, anioFiltro])
 
   ;
 
@@ -499,8 +518,14 @@ export default function DashboardOficinas() {
     if (!user?.token) return
     try {
       let url = `${API_BASE_URL}/api/admin/reportes/oficina/export?`
-      if (mesFiltro) url += `mes=${mesFiltro}&`
-      if (anioFiltro) url += `anio=${anioFiltro}&`
+      if (tipoFiltroFecha === 'dia' && diaFiltro) {
+        url += `dia=${diaFiltro}&`
+      } else if (tipoFiltroFecha === 'semana' && semanaFiltro) {
+        url += `semana=${semanaFiltro}&`
+      } else if (tipoFiltroFecha === 'mes') {
+        if (mesFiltro) url += `mes=${mesFiltro}&`
+        if (anioFiltro) url += `anio=${anioFiltro}&`
+      }
       if (estadoFiltro !== 'Todos') {
         const mapEstado = { 'Pendiente': 'abierto', 'En Proceso': 'en_proceso', 'Resuelto': 'resuelto' }
         url += `estado=${mapEstado[estadoFiltro]}&`
@@ -636,26 +661,188 @@ export default function DashboardOficinas() {
           {/* Fila 1: Filtros dropdown */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
             <div>
-              <label style={{ fontSize: '0.825rem', fontWeight: '600', color: '#4B5563', display: 'block', marginBottom: '0.35rem' }}>
-                <i className="fa-solid fa-calendar-days" style={{ marginRight: '0.35rem', color: '#BC955B' }}></i> Mes y Año
-              </label>
-              <input
-                type="month"
-                id="monthFilter"
-                value={(anioFiltro && mesFiltro) ? `${anioFiltro}-${mesFiltro.padStart(2, '0')}` : ''}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val) {
-                    const [y, m] = val.split('-');
-                    setAnioFiltro(y);
-                    setMesFiltro(parseInt(m, 10).toString());
-                  } else {
-                    setAnioFiltro('');
-                    setMesFiltro('');
-                  }
-                }}
-                style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #D1D5DB', borderRadius: '10px', backgroundColor: 'white', fontSize: '0.875rem', outline: 'none' }}
-              />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
+                <label style={{ fontSize: '0.825rem', fontWeight: '600', color: '#4B5563', margin: 0, display: 'flex', alignItems: 'center' }}>
+                  <i className="fa-solid fa-calendar-days" style={{ marginRight: '0.35rem', color: '#BC955B' }}></i>
+                  {tipoFiltroFecha === 'dia' ? 'Por Día' : tipoFiltroFecha === 'semana' ? 'Por Semana' : 'Mes y Año'}
+                  {((tipoFiltroFecha === 'dia' && diaFiltro) ||
+                    (tipoFiltroFecha === 'semana' && semanaFiltro) ||
+                    (tipoFiltroFecha === 'mes' && (mesFiltro || anioFiltro))) && (
+                    <span
+                      onClick={() => {
+                        setDiaFiltro('')
+                        setSemanaFiltro('')
+                        setMesFiltro('')
+                        setAnioFiltro('')
+                      }}
+                      title="Quitar filtro de fecha"
+                      style={{ marginLeft: '0.5rem', cursor: 'pointer', color: '#DC2626', fontSize: '0.75rem', fontWeight: 'normal', textDecoration: 'underline' }}
+                    >
+                      Limpiar
+                    </span>
+                  )}
+                </label>
+                <div style={{ display: 'inline-flex', background: '#F3F4F6', borderRadius: '6px', padding: '2px', gap: '2px' }}>
+                  <button
+                    type="button"
+                    onClick={() => cambiarTipoFiltroFecha('dia')}
+                    style={{
+                      border: 'none',
+                      padding: '2px 8px',
+                      fontSize: '0.725rem',
+                      fontWeight: tipoFiltroFecha === 'dia' ? '600' : '500',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      backgroundColor: tipoFiltroFecha === 'dia' ? '#691B31' : 'transparent',
+                      color: tipoFiltroFecha === 'dia' ? '#FFFFFF' : '#6B7280',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    Día
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cambiarTipoFiltroFecha('semana')}
+                    style={{
+                      border: 'none',
+                      padding: '2px 8px',
+                      fontSize: '0.725rem',
+                      fontWeight: tipoFiltroFecha === 'semana' ? '600' : '500',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      backgroundColor: tipoFiltroFecha === 'semana' ? '#691B31' : 'transparent',
+                      color: tipoFiltroFecha === 'semana' ? '#FFFFFF' : '#6B7280',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    Semana
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cambiarTipoFiltroFecha('mes')}
+                    style={{
+                      border: 'none',
+                      padding: '2px 8px',
+                      fontSize: '0.725rem',
+                      fontWeight: tipoFiltroFecha === 'mes' ? '600' : '500',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      backgroundColor: tipoFiltroFecha === 'mes' ? '#691B31' : 'transparent',
+                      color: tipoFiltroFecha === 'mes' ? '#FFFFFF' : '#6B7280',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    Mes
+                  </button>
+                </div>
+              </div>
+
+              {tipoFiltroFecha === 'dia' && (
+                <input
+                  type="date"
+                  id="dayFilter"
+                  value={diaFiltro}
+                  onChange={(e) => setDiaFiltro(e.target.value)}
+                  style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #D1D5DB', borderRadius: '10px', backgroundColor: 'white', fontSize: '0.875rem', outline: 'none' }}
+                />
+              )}
+              {tipoFiltroFecha === 'semana' && (
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input
+                    type="text"
+                    readOnly
+                    id="weekFilterText"
+                    value={semanaFiltro ? obtenerRangoSemanaTexto(semanaFiltro) : ''}
+                    placeholder="Seleccionar semana (ej. del 23 al 29 de noviembre)..."
+                    onClick={() => {
+                      if (weekInputRef.current) {
+                        try {
+                          weekInputRef.current.showPicker()
+                        } catch (err) {
+                          weekInputRef.current.focus()
+                        }
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '0.6rem 2.4rem 0.6rem 0.8rem',
+                      border: '1px solid #D1D5DB',
+                      borderRadius: '10px',
+                      backgroundColor: 'white',
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      color: semanaFiltro ? '#111827' : '#9CA3AF',
+                      fontWeight: semanaFiltro ? '500' : 'normal',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden'
+                    }}
+                  />
+                  <span
+                    onClick={() => {
+                      if (weekInputRef.current) {
+                        try {
+                          weekInputRef.current.showPicker()
+                        } catch (err) {
+                          weekInputRef.current.focus()
+                        }
+                      }
+                    }}
+                    style={{
+                      position: 'absolute',
+                      right: '0.8rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      cursor: 'pointer',
+                      color: '#BC955B',
+                      fontSize: '1rem',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Abrir calendario de semanas"
+                  >
+                    <i className="fa-solid fa-calendar-week"></i>
+                  </span>
+                  <input
+                    ref={weekInputRef}
+                    type="week"
+                    id="weekFilter"
+                    value={semanaFiltro}
+                    onChange={(e) => setSemanaFiltro(e.target.value)}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      opacity: 0,
+                      pointerEvents: 'none',
+                      zIndex: -1
+                    }}
+                    tabIndex={-1}
+                  />
+                </div>
+              )}
+              {tipoFiltroFecha === 'mes' && (
+                <input
+                  type="month"
+                  id="monthFilter"
+                  value={(anioFiltro && mesFiltro) ? `${anioFiltro}-${mesFiltro.padStart(2, '0')}` : ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val) {
+                      const [y, m] = val.split('-');
+                      setAnioFiltro(y);
+                      setMesFiltro(parseInt(m, 10).toString());
+                    } else {
+                      setAnioFiltro('');
+                      setMesFiltro('');
+                    }
+                  }}
+                  style={{ width: '100%', padding: '0.6rem 0.8rem', border: '1px solid #D1D5DB', borderRadius: '10px', backgroundColor: 'white', fontSize: '0.875rem', outline: 'none' }}
+                />
+              )}
             </div>
 
             <div>

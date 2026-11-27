@@ -323,11 +323,18 @@ const recalcularTotalesDesdeCabezales = (grupos) => {
     if (numLeds === 4) semaforos4 += 1
 
     leds.forEach(led => {
-      if (led.color === 'Verde') totalVerdes += 1
-      else if (led.color === 'Rojo') totalRojos += 1
-      else if (led.color === 'Amarillo') totalAmarillos += 1
-      else if (led.color === 'Flecha Verde') totalFlechasVerdes += 1
-      else if (led.color === 'Flecha Roja') totalFlechasRojas += 1
+      const c = (led.color || '').toLowerCase()
+      if (c.includes('flecha')) {
+        if (c.includes('verd')) totalFlechasVerdes += 1
+        else if (c.includes('roj')) totalFlechasRojas += 1
+        else if (c.includes('amarill') || c.includes('ambar')) totalAmarillos += 1
+      } else if (c.includes('verd')) {
+        totalVerdes += 1
+      } else if (c.includes('roj')) {
+        totalRojos += 1
+      } else if (c.includes('amarill') || c.includes('ambar')) {
+        totalAmarillos += 1
+      }
     })
   })
 
@@ -1179,6 +1186,25 @@ export default function InventarioSemaforos() {
   const [mostrarProgramacion, setMostrarProgramacion] = useState(false)
   const [archivoProgramacion, setArchivoProgramacion] = useState(null)
   const archivoProgramacionInputRef = useRef(null)
+  const modalCardRef = useRef(null)
+
+  // Garantizar que el modal siempre abra desde el inicio del formulario (arriba)
+  useEffect(() => {
+    if (modalControladorAbierto) {
+      const resetScroll = () => {
+        if (modalCardRef.current) {
+          modalCardRef.current.scrollTop = 0
+        }
+      }
+      resetScroll()
+      const t1 = setTimeout(resetScroll, 30)
+      const t2 = setTimeout(resetScroll, 120)
+      return () => {
+        clearTimeout(t1)
+        clearTimeout(t2)
+      }
+    }
+  }, [modalControladorAbierto, editandoControladorId])
 
   // Modelos únicos de controladores para el filtro select
   const modelosDisponibles = Array.from(
@@ -2068,11 +2094,18 @@ export default function InventarioSemaforos() {
         formData.append('respaldoProgramacionUsb', '')
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/gabinete`, {
+      let res = await fetch(`${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/gabinete`, {
         method: 'PATCH',
         headers: { 'Authorization': `Bearer ${user.token}` },
         body: formData
       })
+      if (res.status === 405 || res.status === 404 || res.status === 501) {
+        res = await fetch(`${API_BASE_URL}/api/inventario/controladores/${editandoControladorId}/gabinete`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${user.token}` },
+          body: formData
+        })
+      }
       const json = await res.json().catch(() => ({}))
       if (res.ok && json.ok) {
         Swal.fire({
@@ -2087,15 +2120,15 @@ export default function InventarioSemaforos() {
           const c = json.data.controlador
           setControladorForm(prev => ({
             ...prev,
-            acometidaElectrica: c.acometidaElectrica || prev.acometidaElectrica,
-            tieneMufa: c.tieneMufa || prev.tieneMufa,
-            interruptorPrincipal: c.interruptorPrincipal || prev.interruptorPrincipal
+            acometidaElectrica: c.acometidaElectrica !== undefined && c.acometidaElectrica !== null ? c.acometidaElectrica : prev.acometidaElectrica,
+            tieneMufa: c.tieneMufa !== undefined && c.tieneMufa !== null ? c.tieneMufa : prev.tieneMufa,
+            interruptorPrincipal: c.interruptorPrincipal !== undefined && c.interruptorPrincipal !== null ? c.interruptorPrincipal : prev.interruptorPrincipal
           }))
         }
         cargarControladores(true)
         cargarTodosLosControladores()
       } else {
-        mostrarAlertaError(json.error || 'No se pudo guardar el gabinete.', 'Error', 'Ocurrió un error al guardar.')
+        mostrarAlertaError(json.error || 'No se pudo guardar la red, acometida e interruptor.', 'Error al guardar', `Código de respuesta: ${res.status}. ${json.error || 'Verifique la conexión o el servidor.'}`)
       }
     } catch (err) {
       console.error('Error guardando gabinete:', err)
@@ -6247,7 +6280,7 @@ export default function InventarioSemaforos() {
       {/* ============================================================ */}
       {modalControladorAbierto && (
         <div className={`modal-controlador-overlay ${formPantallaCompleta ? 'fullscreen' : ''}`}>
-          <div className={`modal-controlador-card ${formPantallaCompleta ? 'fullscreen' : ''} ${modoVisualizacion ? 'modo-consulta' : ''}`}>
+          <div ref={modalCardRef} className={`modal-controlador-card ${formPantallaCompleta ? 'fullscreen' : ''} ${modoVisualizacion ? 'modo-consulta' : ''}`}>
             <div style={{ maxWidth: formPantallaCompleta ? '1020px' : '100%', margin: '0 auto', width: '100%' }}>
               {/* ENCABEZADO DEL MODAL */}
               {modoVisualizacion ? (
@@ -6750,7 +6783,6 @@ export default function InventarioSemaforos() {
                                   setControladorErrores(prev => ({ ...prev, cimientoCuantosDados: undefined }))
                                 }
                               }}
-                              autoFocus
                               style={{
                                 width: '100%',
                                 padding: '0.45rem 0.65rem',
@@ -6871,7 +6903,6 @@ export default function InventarioSemaforos() {
                                   setControladorErrores(prev => ({ ...prev, tornilleriaCuantosTornillos: undefined }))
                                 }
                               }}
-                              autoFocus
                               style={{
                                 width: '100%',
                                 padding: '0.45rem 0.65rem',
@@ -7962,31 +7993,6 @@ export default function InventarioSemaforos() {
                           Switch de fibra, conexiones y alimentación
                         </span>
                       </div>
-                      {editandoControladorId && !modoVisualizacion && (
-                        <button
-                          type="button"
-                          onClick={handleGuardarGabineteModular}
-                          disabled={guardandoModularSeccion === 'gabinete'}
-                          style={{
-                            backgroundColor: '#FFFFFF',
-                            border: '1.5px solid #691B31',
-                            color: '#691B31',
-                            borderRadius: '6px',
-                            padding: '0.3rem 0.7rem',
-                            fontSize: '0.78rem',
-                            fontWeight: '700',
-                            cursor: 'pointer',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
-                          }}
-                          title="Guarda los datos de red, conectividad y energía en el servidor"
-                        >
-                          {guardandoModularSeccion === 'gabinete' ? <FaSyncAlt className="fa-spin" size={11} /> : <FaSave size={11} />}
-                          <span>{guardandoModularSeccion === 'gabinete' ? 'Guardando...' : 'Guardar Red y Energía'}</span>
-                        </button>
-                      )}
                     </div>
 
                     {/* 1. Switch de Fibra */}
@@ -8453,34 +8459,6 @@ export default function InventarioSemaforos() {
                           </div>
                         )}
                       </div>
-
-                      {/* Botón directo de guardado para Acometida, Mufa e Interruptor */}
-                      {editandoControladorId && !modoVisualizacion && (
-                        <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', marginTop: '0.35rem' }}>
-                          <button
-                            type="button"
-                            onClick={handleGuardarGabineteModular}
-                            disabled={guardandoModularSeccion === 'gabinete'}
-                            style={{
-                              backgroundColor: '#691B31',
-                              border: 'none',
-                              color: 'white',
-                              borderRadius: '7px',
-                              padding: '0.45rem 1.1rem',
-                              fontSize: '0.82rem',
-                              fontWeight: '700',
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.45rem',
-                              boxShadow: '0 2px 4px rgba(105, 27, 49, 0.25)'
-                            }}
-                          >
-                            {guardandoModularSeccion === 'gabinete' ? <FaSyncAlt className="fa-spin" size={12} /> : <FaSave size={12} />}
-                            <span>{guardandoModularSeccion === 'gabinete' ? 'Guardando...' : 'Guardar Red, Acometida e Interruptor'}</span>
-                          </button>
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -9071,7 +9049,6 @@ export default function InventarioSemaforos() {
                                             placeholder="ej. 1, 2, 3 o más"
                                             value={poste.cimientoCuantosEsparragos || ''}
                                             onChange={(e) => handleActualizarPoste(pIdx, 'cimientoCuantosEsparragos', e.target.value)}
-                                            autoFocus
                                             style={{
                                               width: '100%',
                                               padding: '0.4rem 0.6rem',
@@ -10359,7 +10336,6 @@ export default function InventarioSemaforos() {
                                                     camaraModelo: e.target.value
                                                   })}
                                                   style={{ width: '100%', padding: '0.45rem 0.65rem', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box' }}
-                                                  autoFocus={!poste.camaraModelo}
                                                 />
                                               )}
                                             </div>

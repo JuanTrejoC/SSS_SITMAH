@@ -70,6 +70,7 @@ router.delete('/controladores/:id', asyncHandler(inventario.eliminarControladorS
 
 // Rutas modulares para levantamiento concurrente en campo
 router.patch('/controladores/:id/gabinete', upload.single('archivoProgramacion'), asyncHandler(inventario.actualizarGabineteControlador));
+router.put('/controladores/:id/gabinete', upload.single('archivoProgramacion'), asyncHandler(inventario.actualizarGabineteControlador));
 router.get('/controladores/:id/postes', asyncHandler(inventario.obtenerPostesControlador));
 router.post('/controladores/:id/postes', asyncHandler(inventario.agregarPosteControlador));
 router.put('/controladores/:id/postes/:posteId', asyncHandler(inventario.actualizarPosteControlador));
