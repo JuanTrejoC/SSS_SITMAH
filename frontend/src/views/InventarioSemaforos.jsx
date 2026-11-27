@@ -1254,6 +1254,8 @@ export default function InventarioSemaforos() {
     ? controladoresFiltrados
     : controladores
 
+  const normalizarOpcion = (v) => String(v || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
   const [controladorForm, setControladorForm] = useState({
     modelo: '',
     cruceroId: '',
@@ -2118,11 +2120,14 @@ export default function InventarioSemaforos() {
         })
         if (json.data?.controlador) {
           const c = json.data.controlador
+          const cAcometida = c.acometidaElectrica ?? c.acometida_electrica
+          const cMufa = c.tieneMufa ?? c.tiene_mufa
+          const cInterruptor = c.interruptorPrincipal ?? c.interruptor_principal
           setControladorForm(prev => ({
             ...prev,
-            acometidaElectrica: c.acometidaElectrica !== undefined && c.acometidaElectrica !== null ? c.acometidaElectrica : prev.acometidaElectrica,
-            tieneMufa: c.tieneMufa !== undefined && c.tieneMufa !== null ? c.tieneMufa : prev.tieneMufa,
-            interruptorPrincipal: c.interruptorPrincipal !== undefined && c.interruptorPrincipal !== null ? c.interruptorPrincipal : prev.interruptorPrincipal
+            acometidaElectrica: cAcometida !== undefined && cAcometida !== null && cAcometida !== '' ? cAcometida : prev.acometidaElectrica,
+            tieneMufa: cMufa !== undefined && cMufa !== null && cMufa !== '' ? cMufa : prev.tieneMufa,
+            interruptorPrincipal: cInterruptor !== undefined && cInterruptor !== null && cInterruptor !== '' ? cInterruptor : prev.interruptorPrincipal
           }))
         }
         cargarControladores(true)
@@ -2503,29 +2508,33 @@ export default function InventarioSemaforos() {
       conexionesTarjetaMadre: item.conexionesTarjetaMadre || '',
       fuentePoderSupresorPicos: item.fuentePoderSupresorPicos || '',
       acometidaElectrica: (() => {
-        if (!item.acometidaElectrica) return ''
-        const val = String(item.acometidaElectrica).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        const raw = item.acometidaElectrica ?? item.acometida_electrica
+        if (!raw) return ''
+        const val = String(raw).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         if (val.includes('aerea')) return 'Aérea'
         if (val.includes('subterranea')) return 'Subterránea'
-        return item.acometidaElectrica
+        return String(raw)
       })(),
       tieneMufa: (() => {
-        if (item.tieneMufa) {
-          const val = String(item.tieneMufa).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        const raw = item.tieneMufa ?? item.tiene_mufa
+        if (raw !== undefined && raw !== null && String(raw).trim() !== '') {
+          const val = String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
           if (val === 'si' || val === 's' || val === 'true') return 'Sí'
           if (val === 'no' || val === 'false') return 'No'
-          return item.tieneMufa
+          return String(raw)
         }
-        if (item.acometidaElectrica && String(item.acometidaElectrica).toLowerCase().includes('mufa')) return 'Sí'
+        const acom = item.acometidaElectrica ?? item.acometida_electrica
+        if (acom && String(acom).toLowerCase().includes('mufa')) return 'Sí'
         return ''
       })(),
       interruptorPrincipal: (() => {
-        if (!item.interruptorPrincipal) return ''
-        const val = String(item.interruptorPrincipal).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        const raw = item.interruptorPrincipal ?? item.interruptor_principal
+        if (!raw) return ''
+        const val = String(raw).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
         if (val.includes('funciona')) return 'Sí, funciona'
         if (val.includes('danado') || val.includes('daniado')) return 'Sí, pero está dañado'
         if (val.includes('no tiene') || val.includes('ningun') || val === 'no') return 'No tiene'
-        return item.interruptorPrincipal
+        return String(raw)
       })(),
       // Registros de Piso
       registrosPisoTapas: item.registrosPisoTapas !== undefined && item.registrosPisoTapas !== null ? String(item.registrosPisoTapas) : '',
@@ -2607,7 +2616,15 @@ export default function InventarioSemaforos() {
       })
       const json = await res.json().catch(() => ({}))
       if (res.ok && json.data) {
-        setControladorForm(mapearDatosControladorAForm(json.data))
+        setControladorForm(prev => {
+          const fresh = mapearDatosControladorAForm(json.data)
+          return {
+            ...fresh,
+            acometidaElectrica: fresh.acometidaElectrica || prev.acometidaElectrica || '',
+            tieneMufa: fresh.tieneMufa || prev.tieneMufa || '',
+            interruptorPrincipal: fresh.interruptorPrincipal || prev.interruptorPrincipal || ''
+          }
+        })
         if (json.data.archivoProgramacion) {
           setArchivoProgramacion(json.data.archivoProgramacion)
         }
@@ -8411,19 +8428,22 @@ export default function InventarioSemaforos() {
                             renderBadgeConsulta(controladorForm.acometidaElectrica)
                           ) : (
                             <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '34px' }}>
-                              {['Aérea', 'Subterránea'].map((opcion) => (
-                                <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.acometidaElectrica === opcion ? '700' : '500', color: '#1E293B' }}>
-                                  <input
-                                    type="radio"
-                                    name={`acometidaElectrica-${editandoControladorId || 'nuevo'}`}
-                                    value={opcion}
-                                    checked={controladorForm.acometidaElectrica === opcion}
-                                    onChange={() => setControladorForm(prev => ({ ...prev, acometidaElectrica: opcion }))}
-                                    style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                                  />
-                                  {opcion}
-                                </label>
-                              ))}
+                              {['Aérea', 'Subterránea'].map((opcion) => {
+                                const isChecked = normalizarOpcion(controladorForm.acometidaElectrica) === normalizarOpcion(opcion)
+                                return (
+                                  <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: isChecked ? '700' : '500', color: '#1E293B' }}>
+                                    <input
+                                      type="radio"
+                                      name={`acometidaElectrica-${editandoControladorId || 'nuevo'}`}
+                                      value={opcion}
+                                      checked={isChecked}
+                                      onChange={() => setControladorForm(prev => ({ ...prev, acometidaElectrica: opcion }))}
+                                      style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                    />
+                                    {opcion}
+                                  </label>
+                                )
+                              })}
                             </div>
                           )}
                         </div>
@@ -8436,19 +8456,22 @@ export default function InventarioSemaforos() {
                             renderBadgeConsulta(controladorForm.tieneMufa)
                           ) : (
                             <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '34px' }}>
-                              {['Sí', 'No'].map((opcion) => (
-                                <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.tieneMufa === opcion ? '700' : '500', color: '#1E293B' }}>
-                                  <input
-                                    type="radio"
-                                    name={`tieneMufa-${editandoControladorId || 'nuevo'}`}
-                                    value={opcion}
-                                    checked={controladorForm.tieneMufa === opcion}
-                                    onChange={() => setControladorForm(prev => ({ ...prev, tieneMufa: opcion }))}
-                                    style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                                  />
-                                  {opcion}
-                                </label>
-                              ))}
+                              {['Sí', 'No'].map((opcion) => {
+                                const isChecked = normalizarOpcion(controladorForm.tieneMufa) === normalizarOpcion(opcion)
+                                return (
+                                  <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: isChecked ? '700' : '500', color: '#1E293B' }}>
+                                    <input
+                                      type="radio"
+                                      name={`tieneMufa-${editandoControladorId || 'nuevo'}`}
+                                      value={opcion}
+                                      checked={isChecked}
+                                      onChange={() => setControladorForm(prev => ({ ...prev, tieneMufa: opcion }))}
+                                      style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                    />
+                                    {opcion}
+                                  </label>
+                                )
+                              })}
                             </div>
                           )}
                         </div>
@@ -8468,19 +8491,22 @@ export default function InventarioSemaforos() {
                           renderBadgeConsulta(controladorForm.interruptorPrincipal)
                         ) : (
                           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '38px', marginTop: 'auto' }}>
-                            {['Sí, funciona', 'Sí, pero está dañado', 'No tiene'].map((opcion) => (
-                              <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: controladorForm.interruptorPrincipal === opcion ? '700' : '500', color: '#1E293B' }}>
-                                <input
-                                  type="radio"
-                                  name={`interruptorPrincipal-${editandoControladorId || 'nuevo'}`}
-                                  value={opcion}
-                                  checked={controladorForm.interruptorPrincipal === opcion}
-                                  onChange={() => setControladorForm(prev => ({ ...prev, interruptorPrincipal: opcion }))}
-                                  style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
-                                />
-                                {opcion}
-                              </label>
-                            ))}
+                            {['Sí, funciona', 'Sí, pero está dañado', 'No tiene'].map((opcion) => {
+                              const isChecked = normalizarOpcion(controladorForm.interruptorPrincipal) === normalizarOpcion(opcion)
+                              return (
+                                <label key={opcion} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: isChecked ? '700' : '500', color: '#1E293B' }}>
+                                  <input
+                                    type="radio"
+                                    name={`interruptorPrincipal-${editandoControladorId || 'nuevo'}`}
+                                    value={opcion}
+                                    checked={isChecked}
+                                    onChange={() => setControladorForm(prev => ({ ...prev, interruptorPrincipal: opcion }))}
+                                    style={{ accentColor: '#691B31', width: '16px', height: '16px', cursor: 'pointer' }}
+                                  />
+                                  {opcion}
+                                </label>
+                              )
+                            })}
                           </div>
                         )}
                       </div>

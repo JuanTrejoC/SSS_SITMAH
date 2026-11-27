@@ -664,6 +664,18 @@ async function crearControladorSemaforo(req, res) {
     }
   });
 
+  // Mapear compatibilidad snake_case a camelCase para acometida, mufa e interruptor
+  const snakeMap = {
+    acometida_electrica: 'acometidaElectrica',
+    tiene_mufa: 'tieneMufa',
+    interruptor_principal: 'interruptorPrincipal'
+  };
+  Object.keys(snakeMap).forEach(k => {
+    if (body[k] !== undefined && body[snakeMap[k]] === undefined) {
+      body[snakeMap[k]] = body[k];
+    }
+  });
+
   const parsed = controladorSemaforoSchema.safeParse(body);
   if (!parsed.success) return fail(res, parsed.error);
 
@@ -774,6 +786,18 @@ async function actualizarControladorSemaforo(req, res) {
     if (Array.isArray(body[k]) && !arrayAllowedFields.has(k)) {
       const nonEmpties = body[k].filter(v => v !== undefined && v !== null && v !== '');
       body[k] = nonEmpties.length > 0 ? nonEmpties[nonEmpties.length - 1] : '';
+    }
+  });
+
+  // Mapear compatibilidad snake_case a camelCase para acometida, mufa e interruptor
+  const snakeMap = {
+    acometida_electrica: 'acometidaElectrica',
+    tiene_mufa: 'tieneMufa',
+    interruptor_principal: 'interruptorPrincipal'
+  };
+  Object.keys(snakeMap).forEach(k => {
+    if (body[k] !== undefined && body[snakeMap[k]] === undefined) {
+      body[snakeMap[k]] = body[k];
     }
   });
 
@@ -1175,8 +1199,17 @@ async function actualizarGabineteControlador(req, res) {
   }
 
   allowedFields.forEach(campo => {
-    if (body[campo] !== undefined) {
-      gabineteData[campo] = body[campo];
+    let valor = body[campo];
+    if (valor === undefined) {
+      const snake = campo.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+      if (body[snake] !== undefined) valor = body[snake];
+    }
+    if (valor !== undefined) {
+      if (Array.isArray(valor)) {
+        const nonEmpties = valor.filter(v => v !== undefined && v !== null && v !== '');
+        valor = nonEmpties.length > 0 ? nonEmpties[nonEmpties.length - 1] : null;
+      }
+      gabineteData[campo] = valor === '' ? null : valor;
     }
   });
 
